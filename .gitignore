@@ -1,0 +1,24 @@
+# Ambientes Virtuais (Não queremos subir isso, é muito pesado)
+venv/
+env/
+
+# Variáveis de Ambiente e Senhas (CRÍTICO: Nunca subir o .env)
+.env
+
+# Arquivos temporários do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Sessão do Navegador do Playwright (Onde ficam seus cookies de login)
+sessao_chrome_senior/
+
+# Arquivos do VS Code (Opcional, mas mantém o repositório limpo)
+.vscode/
+
+# Vídeos e Prints gravados pelo Playwright (Caso você configure para salvar no futuro)
+test-results/
+videos/
+*.mp4
+*.png
