@@ -1,77 +1,113 @@
 import asyncio
 import os
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from browser_use import Agent
+from playwright.async_api import async_playwright
 
-# Cortando a telemetria do browser-use
-os.environ["ANONYMIZED_TELEMETRY"] = "false"
-os.environ["BROWSER_USE_TELEMETRY"] = "false"
-
-# Carrega as variáveis do .env
 load_dotenv()
 
-# ---------------------------------------------------------
-# A NOSSA CLASSE BLINDADA (Versão OpenAI)
-# Estendemos o ChatOpenAI para entregar o "provider" que o 
-# browser-use exige e blindamos contra os erros do Pydantic.
-# ---------------------------------------------------------
-class OpenAIParaBrowserUse(ChatOpenAI):
-    @property
-    def provider(self):
-        return "openai"
-
-    # Escudo Anti-Pydantic: ignora bloqueios de injeção dinâmica
-    def __setattr__(self, name, value):
-        try:
-            super().__setattr__(name, value)
-        except ValueError:
-            object.__setattr__(self, name, value)
-
 async def main():
-    # 1. Puxa as credenciais do .env
     usuario = os.getenv("SENIOR_USER")
     senha = os.getenv("SENIOR_PASS")
 
-    # Trava de segurança caso falte algo no .env
     if not usuario or not senha:
-        print("❌ ERRO: Por favor, defina SENIOR_USER e SENIOR_PASS no seu arquivo .env")
+        print("❌ ERRO: Verifique as credenciais no .env")
         return
 
-    # 2. A JOGADA DE MESTRE: Instanciamos a NOSSA classe compatível
-    chave_google = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    
-    llm = OpenAIParaBrowserUse(
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        api_key=chave_google,
-        model="gemini-2.0-flash", 
-    )
-    
-    # 3. O Roteiro Dinâmico (injetando o usuário e a senha)
-    roteiro = f"""
-    Você está automatizando o portal da Senior X. Siga os passos rigorosamente:
-    1. Acesse a URL: 'https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/'
-    2. Aguarde a página carregar completamente.
-    3. Encontre o campo de 'Usuário' (ou e-mail) e digite o valor: '{usuario}'
-    4. Se houver um botão de 'Avançar' ou 'Continuar' para revelar a senha, clique nele. Caso os campos de usuário e senha estejam na mesma tela, pule este passo.
-    5. Encontre o campo de 'Senha' e digite o valor: '{senha}'
-    6. Encontre o botão de 'Entrar', 'Autenticar' ou 'Login' e clique nele.
-    7. Aguarde o carregamento da tela inicial do sistema (dashboard principal).
-    8. Olhe para o menu lateral esquerdo, procure pelo item 'Senior Flow' e clique nele.
-    9. Pare a execução para eu avaliar.
-    """
-    
-    agent = Agent(
-        task=roteiro,
-        llm=llm,
-    )
-    
-    print("🎬 Ação! O robô está assumindo o controle com suas credenciais...")
-    
-    result = await agent.run()
-    
-    print("\n✅ Corte! Cena finalizada.")
-    print("Resumo:", result)
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False, args=['--start-maximized'])
+        context = await browser.new_context(no_viewport=True)
+        page = await context.new_page()
+
+        print("🚀 Acessando o portal da Senior...")
+        await page.goto("https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
+        
+        await page.wait_for_timeout(2000)
+        print("🛡️ Disparando tecla 'ESC' para limpar pop-ups do navegador...")
+        await page.keyboard.press("Escape")
+
+        print("📝 Preenchendo usuário...")
+        await page.get_by_placeholder("usuario@dominio.com.br").fill(usuario)
+        await page.wait_for_timeout(500)
+        await page.get_by_role("button", name="Próximo").click()
+
+        print("🔑 Preenchendo senha...")
+        senha_input = page.locator("input[type='password']")
+        await senha_input.wait_for(state="visible")
+        await page.wait_for_timeout(500)
+        await senha_input.fill(senha)
+
+        print("🚪 Enviando comando de Login (Apertando ENTER)...")
+        await page.wait_for_timeout(500)
+        await senha_input.press("Enter")
+
+        print("⏳ Aguardando painel carregar (7 segundos)...")
+        await page.wait_for_load_state("networkidle")
+        await page.wait_for_timeout(7000) 
+        
+        await page.keyboard.press("Escape")
+
+        print("🧍‍♂️ Simulando navegação humana no Menu Lateral...")
+        
+        menu_senior_flow = page.locator("[id='menu-label-Senior Flow']").locator("..")
+        await menu_senior_flow.scroll_into_view_if_needed()
+        await page.wait_for_timeout(1000) 
+        await menu_senior_flow.hover()
+        await page.wait_for_timeout(500)
+        await menu_senior_flow.click()
+
+        print("📂 Procurando submenu 'GED'...")
+        await page.wait_for_timeout(1500)
+        menu_ged = page.locator("span", has_text="GED").first.locator("..")
+        await menu_ged.scroll_into_view_if_needed()
+        await page.wait_for_timeout(500)
+        await menu_ged.hover()
+        await page.wait_for_timeout(500)
+        await menu_ged.click()
+
+        print("📄 Procurando opção 'Documentos'...")
+        await page.wait_for_timeout(1500)
+        menu_documentos = page.locator("span", has_text="Documentos").first.locator("..")
+        await menu_documentos.scroll_into_view_if_needed()
+        await page.wait_for_timeout(500)
+        await menu_documentos.hover()
+        await page.wait_for_timeout(500)
+        await menu_documentos.click()
+
+        print("⏳ Aguardando a interface do GED carregar...")
+        await page.wait_for_load_state("networkidle")
+        await page.wait_for_timeout(4000)
+
+        print("🎯 Entrando no Iframe 'ci' e buscando botão 'Nova pasta'...")
+        # AQUI ESTÁ A MÁGICA QUE VOCÊ DESCOBRIU!
+        frame_alvo = page.frame_locator('iframe[name="ci"]')
+        btn_nova_pasta = frame_alvo.get_by_role("button", name="Nova pasta")
+        
+        # Esperamos o botão existir dentro do iframe correto
+        await btn_nova_pasta.wait_for(state="visible", timeout=10000)
+
+        print("🤖 Movimento humano de clique...")
+        await btn_nova_pasta.scroll_into_view_if_needed()
+        await page.wait_for_timeout(1000)
+        await btn_nova_pasta.hover()
+        await page.wait_for_timeout(500)
+        await btn_nova_pasta.click()
+
+        print("✍️ Digitando 'Universidade Corporativa'...")
+        await page.wait_for_timeout(1500) 
+        
+        # O campo de texto para o nome da pasta também está dentro desse iframe
+        input_nome_pasta = frame_alvo.locator("input[type='text']:visible").first
+        await input_nome_pasta.wait_for(state="visible")
+        
+        await page.wait_for_timeout(500)
+        await input_nome_pasta.fill("Universidade Corporativa")
+
+        print("💾 Salvando a pasta (Apertando ENTER)...")
+        await page.wait_for_timeout(1000)
+        await input_nome_pasta.press("Enter")
+
+        print("✅ Operação concluída! O robô dominou o GED.")
+        await page.pause()
 
 if __name__ == "__main__":
     asyncio.run(main())
