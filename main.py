@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
@@ -40,16 +41,25 @@ async def main():
         await page.wait_for_timeout(500)
         await senha_input.press("Enter")
 
-        print("⏳ Aguardando painel carregar (7 segundos)...")
-        await page.wait_for_load_state("networkidle")
+        
+        print("⏳ Aguardando painel carregar (Foco Visual do DOM)...")
+        # Substituímos a exigência de silêncio na rede pelo carregamento básico do HTML
+        await page.wait_for_load_state("domcontentloaded")
+        
+        # Pausa estratégica para dar tempo dos popups de erro do ambiente de testes sumirem
         await page.wait_for_timeout(7000) 
         
         await page.keyboard.press("Escape")
 
         print("🧍‍♂️ Simulando navegação humana no Menu Lateral...")
-        
         menu_senior_flow = page.locator("[id='menu-label-Senior Flow']").locator("..")
+        
+        # A JOGADA DE MESTRE: O código só avança quando o ERP de fato desenhar o menu na tela, 
+        # ignorando completamente se há downloads ou scripts rodando no fundo.
+        await menu_senior_flow.wait_for(state="attached", timeout=30000)
+        
         await menu_senior_flow.scroll_into_view_if_needed()
+        
         await page.wait_for_timeout(1000) 
         await menu_senior_flow.hover()
         await page.wait_for_timeout(500)
@@ -92,21 +102,30 @@ async def main():
         await page.wait_for_timeout(500)
         await btn_nova_pasta.click()
 
-        print("✍️ Digitando 'Universidade Corporativa'...")
+        print("✍️ Localizando a nova pasta gerada na tabela...")
         await page.wait_for_timeout(1500) 
         
-        # O campo de texto para o nome da pasta também está dentro desse iframe
-        input_nome_pasta = frame_alvo.locator("input[type='text']:visible").first
-        await input_nome_pasta.wait_for(state="visible")
+        nome_pasta_gerada = frame_alvo.get_by_role("heading", name="Nova pasta").first
+        await nome_pasta_gerada.wait_for(state="visible", timeout=10000)
         
+        # Trazemos para a tela, mas SEM CLICAR para não perder a seleção azul natural do sistema!
+        await nome_pasta_gerada.scroll_into_view_if_needed()
         await page.wait_for_timeout(500)
-        await input_nome_pasta.fill("Universidade Corporativa")
+        
+        print("🧹 Apagando o texto selecionado (Backspace)...")
+        # Um toque fatal no Backspace para apagar o texto azul
+        await page.keyboard.press("Backspace")
+        
+        print("⌨️ Renomeando para 'Universidade Corporativa'...")
+        await page.wait_for_timeout(200)
+        await page.keyboard.type("Universidade Corporativa", delay=50)
 
         print("💾 Salvando a pasta (Apertando ENTER)...")
-        await page.wait_for_timeout(1000)
-        await input_nome_pasta.press("Enter")
+        await page.wait_for_timeout(500)
+        await page.keyboard.press("Enter")
 
-        print("✅ Operação concluída! O robô dominou o GED.")
+        print("✅ Operação concluída! A pasta raiz do curso está pronta.")
+        
         await page.pause()
 
 if __name__ == "__main__":
