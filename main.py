@@ -6,6 +6,42 @@ from playwright.async_api import async_playwright
 
 load_dotenv()
 
+# ==========================================
+# 🔦 FUNÇÃO SÊNIOR: TOUR GUIADO (HOLOFOTE)
+# ==========================================
+async def tour_clique(locator, nome_etapa, cor_neon="#00ff00"):
+    print(f"🔦 [Tour] Focando em: {nome_etapa}...")
+    
+    # Rola suavemente até o elemento
+    await locator.scroll_into_view_if_needed()
+    await asyncio.sleep(0.5)
+    
+    # O robô repousa o mouse em cima para ativar submenus
+    await locator.hover()
+    
+    # Guarda o estilo original do sistema para não quebrar o layout
+    estilo_original = await locator.evaluate("el => el.style.outline")
+    sombra_original = await locator.evaluate("el => el.style.boxShadow")
+    transicao_original = await locator.evaluate("el => el.style.transition")
+    
+    # Acende o HOLOFOTE NEON (Borda verde brilhante)
+    await locator.evaluate("el => el.style.transition = 'all 0.3s ease'")
+    await locator.evaluate(f"el => el.style.outline = '4px solid {cor_neon}'")
+    await locator.evaluate(f"el => el.style.boxShadow = '0 0 20px {cor_neon}'")
+    
+    # Pausa dramática para o humano assistir ao Tour
+    await asyncio.sleep(1.5)
+    
+    # Apaga a luz e clica suavemente
+    await locator.evaluate(f"el => el.style.outline = '{estilo_original}'")
+    await locator.evaluate(f"el => el.style.boxShadow = '{sombra_original}'")
+    await locator.evaluate(f"el => el.style.transition = '{transicao_original}'")
+    
+    await locator.click()
+
+# ==========================================
+# 🤖 SCRIPT PRINCIPAL
+# ==========================================
 async def main():
     usuario = os.getenv("SENIOR_USER")
     senha = os.getenv("SENIOR_PASS")
@@ -23,109 +59,74 @@ async def main():
         await page.goto("https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
         
         await page.wait_for_timeout(2000)
-        print("🛡️ Disparando tecla 'ESC' para limpar pop-ups do navegador...")
         await page.keyboard.press("Escape")
 
-        print("📝 Preenchendo usuário...")
+        print("📝 Login...")
         await page.get_by_placeholder("usuario@dominio.com.br").fill(usuario)
         await page.wait_for_timeout(500)
         await page.get_by_role("button", name="Próximo").click()
 
-        print("🔑 Preenchendo senha...")
         senha_input = page.locator("input[type='password']")
         await senha_input.wait_for(state="visible")
         await page.wait_for_timeout(500)
         await senha_input.fill(senha)
 
-        print("🚪 Enviando comando de Login (Apertando ENTER)...")
         await page.wait_for_timeout(500)
         await senha_input.press("Enter")
 
-        
-        print("⏳ Aguardando painel carregar (Foco Visual do DOM)...")
-        # Substituímos a exigência de silêncio na rede pelo carregamento básico do HTML
+        print("⏳ Aguardando renderização do painel...")
         await page.wait_for_load_state("domcontentloaded")
-        
-        # Pausa estratégica para dar tempo dos popups de erro do ambiente de testes sumirem
         await page.wait_for_timeout(7000) 
-        
         await page.keyboard.press("Escape")
 
-        print("🧍‍♂️ Simulando navegação humana no Menu Lateral...")
+        print("\n🎬 --- INICIANDO O TOUR VIRTUAL --- 🎬\n")
+        
+        # 1. Menu Senior Flow
         menu_senior_flow = page.locator("[id='menu-label-Senior Flow']").locator("..")
-        
-        # A JOGADA DE MESTRE: O código só avança quando o ERP de fato desenhar o menu na tela, 
-        # ignorando completamente se há downloads ou scripts rodando no fundo.
-        await menu_senior_flow.wait_for(state="attached", timeout=30000)
-        
-        await menu_senior_flow.scroll_into_view_if_needed()
-        
-        await page.wait_for_timeout(1000) 
-        await menu_senior_flow.hover()
-        await page.wait_for_timeout(500)
-        await menu_senior_flow.click()
+        await tour_clique(menu_senior_flow, "Menu Lateral: Senior Flow")
 
-        print("📂 Procurando submenu 'GED'...")
-        await page.wait_for_timeout(1500)
+        # 2. Submenu GED
+        await page.wait_for_timeout(1000)
         menu_ged = page.locator("span", has_text="GED").first.locator("..")
-        await menu_ged.scroll_into_view_if_needed()
-        await page.wait_for_timeout(500)
-        await menu_ged.hover()
-        await page.wait_for_timeout(500)
-        await menu_ged.click()
+        await tour_clique(menu_ged, "Submenu: GED", cor_neon="#ff00ff") # Destaque Rosa/Roxo
 
-        print("📄 Procurando opção 'Documentos'...")
-        await page.wait_for_timeout(1500)
+        # 3. Opção Documentos
+        await page.wait_for_timeout(1000)
         menu_documentos = page.locator("span", has_text="Documentos").first.locator("..")
-        await menu_documentos.scroll_into_view_if_needed()
-        await page.wait_for_timeout(500)
-        await menu_documentos.hover()
-        await page.wait_for_timeout(500)
-        await menu_documentos.click()
+        await tour_clique(menu_documentos, "Módulo: Documentos")
 
-        print("⏳ Aguardando a interface do GED carregar...")
-        await page.wait_for_load_state("networkidle")
+        print("⏳ Aguardando a interface pesada do Iframe carregar...")
+        await page.wait_for_load_state("domcontentloaded")
         await page.wait_for_timeout(4000)
 
-        print("🎯 Entrando no Iframe 'ci' e buscando botão 'Nova pasta'...")
-        # AQUI ESTÁ A MÁGICA QUE VOCÊ DESCOBRIU!
+        # 4. Botão Nova Pasta (Dentro do Iframe!)
         frame_alvo = page.frame_locator('iframe[name="ci"]')
         btn_nova_pasta = frame_alvo.get_by_role("button", name="Nova pasta")
-        
-        # Esperamos o botão existir dentro do iframe correto
         await btn_nova_pasta.wait_for(state="visible", timeout=10000)
+        
+        await tour_clique(btn_nova_pasta, "Ação Principal: Criar Nova Pasta", cor_neon="#00ffff") # Ciano
 
-        print("🤖 Movimento humano de clique...")
-        await btn_nova_pasta.scroll_into_view_if_needed()
-        await page.wait_for_timeout(1000)
-        await btn_nova_pasta.hover()
-        await page.wait_for_timeout(500)
-        await btn_nova_pasta.click()
-
-        print("✍️ Localizando a nova pasta gerada na tabela...")
+        print("\n✍️ Criando a pasta raiz do curso...")
         await page.wait_for_timeout(1500) 
         
+        # A sua lógica perfeita de renomear a pasta!
         nome_pasta_gerada = frame_alvo.get_by_role("heading", name="Nova pasta").first
         await nome_pasta_gerada.wait_for(state="visible", timeout=10000)
-        
-        # Trazemos para a tela, mas SEM CLICAR para não perder a seleção azul natural do sistema!
         await nome_pasta_gerada.scroll_into_view_if_needed()
         await page.wait_for_timeout(500)
         
         print("🧹 Apagando o texto selecionado (Backspace)...")
-        # Um toque fatal no Backspace para apagar o texto azul
         await page.keyboard.press("Backspace")
         
         print("⌨️ Renomeando para 'Universidade Corporativa'...")
         await page.wait_for_timeout(200)
         await page.keyboard.type("Universidade Corporativa", delay=50)
 
-        print("💾 Salvando a pasta (Apertando ENTER)...")
+        print("💾 Salvando (Apertando ENTER)...")
         await page.wait_for_timeout(500)
         await page.keyboard.press("Enter")
 
-        print("✅ Operação concluída! A pasta raiz do curso está pronta.")
-        
+        print("✅ Tour e criação finalizados com sucesso!")
         await page.pause()
 
 if __name__ == "__main__":
