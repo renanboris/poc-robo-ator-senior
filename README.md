@@ -2,7 +2,7 @@
 
 Este projeto é um Agente de IA capaz de navegar de forma autônoma pelo portal **Senior X**, realizar login e navegar até o módulo de Documentos do GED via Senior Flow. 
 
-Desenvolvido para a **Blaze Code**, o projeto utiliza o framework `browser-use` com o modelo **Gemini 2.0 Flash** da Google.
+Desenvolvido para a **Senior Sistemas**, o projeto utiliza o framework `browser-use` com o modelo **Gemini 2.0 Flash** da Google.
 
 ## 🛠️ Desafios Técnicos Superados
 
