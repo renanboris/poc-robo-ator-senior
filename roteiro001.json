@@ -1,0 +1,83 @@
+{
+  "metadata": {
+    "id_treinamento": "TRN-SENIOR-GED-001",
+    "titulo": "Como criar estruturas de pastas no GED",
+    "modulo": "Senior Flow"
+  },
+  "configuracao_gravacao": {
+    "gravar_video": true,
+    "pasta_destino": "videos_gerados",
+    "voz_ia": "pt-BR-FranciscaNeural"
+  },
+  "passos": [
+    {
+      "id_passo": 1,
+      "acao": "clique",
+      "alvo_semantico": {
+        "seletor": "[id='menu-label-Senior Flow']",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Olá! Vamos começar a montar a nossa estrutura? Primeiro, dê um clique no menu Senior Flow, aqui no painel lateral esquerdo."
+    },
+    {
+      "id_passo": 2,
+      "acao": "clique",
+      "alvo_semantico": {
+        "seletor": "span",
+        "com_texto": "GED",
+        "primeiro": true,
+        "pegar_pai": true
+      },
+      "narracao_ia": "Muito bem. Agora desça um pouquinho e abra o módulo de Gestão Eletrônica, o nosso GED."
+    },
+    {
+      "id_passo": 3,
+      "acao": "clique",
+      "alvo_semantico": {
+        "seletor": "span",
+        "com_texto": "Documentos",
+        "primeiro": true,
+        "pegar_pai": true
+      },
+      "narracao_ia": "Selecione a opção Documentos para acessarmos o repositório principal do sistema."
+    },
+    {
+      "id_passo": 4,
+      "acao": "aguardar_carregamento",
+      "alvo_semantico": {
+        "dentro_do_iframe": "ci",
+        "role": "button",
+        "nome": "Nova pasta"
+      },
+      "tempo_espera": 3000,
+      "narracao_ia": "O sistema está carregando os nossos arquivos, leva só um segundinho."
+    },
+    {
+      "id_passo": 5,
+      "acao": "clique",
+      "alvo_semantico": {
+        "dentro_do_iframe": "ci",
+        "role": "button",
+        "nome": "Nova pasta"
+      },
+      "narracao_ia": "Perfeito! Para criar o nosso diretório base, clique no botão Nova pasta, que fica logo aqui na barra superior."
+    },
+    {
+      "id_passo": 6,
+      "acao": "digitar_e_enter",
+      "alvo_semantico": {
+        "dentro_do_iframe": "ci",
+        "role": "heading",
+        "nome": "Nova pasta",
+        "primeiro": true
+      },
+      "valor_input": "Universidade Corporativa",
+      "narracao_ia": "Veja que o sistema criou a pasta. Agora é só apagar o nome padrão, digitar o nome da nossa Universidade Corporativa e apertar a tecla Enter no seu teclado."
+    },
+    {
+      "id_passo": 7,
+      "acao": "concluir_video",
+      "narracao_ia": "Prontinho! A estrutura da nossa universidade foi criada com sucesso. Te vejo na próxima aula!"
+    }
+  ]
+}
