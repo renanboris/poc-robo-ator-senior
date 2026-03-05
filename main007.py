@@ -7,13 +7,8 @@ import pygame
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
-# 🩹 MONKEY PATCH: Resolve o erro "ANTIALIAS" do Pillow 10+ com o MoviePy
-import PIL.Image
-if not hasattr(PIL.Image, 'ANTIALIAS'):
-    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
-
-# 🎬 BIBLIOTECAS DE PÓS-PRODUÇÃO 
-from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, ImageClip, CompositeVideoClip
+# 🎬 BIBLIOTECAS DE PÓS-PRODUÇÃO (A MÁGICA DA EDIÇÃO)
+from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 import moviepy.audio.fx.all as afx
 
 load_dotenv()
@@ -47,7 +42,7 @@ async def gerar_e_tocar_audio(texto, id_passo, id_treinamento, voz="pt-BR-Franci
     canal_voz = pygame.mixer.Channel(1)
     canal_voz.play(som_voz)
     
-    return arquivo_mp3 
+    return arquivo_mp3 # Retorna o caminho para a Linha do Tempo da Edição
 
 def aguardar_audio_terminar():
     canal_voz = pygame.mixer.Channel(1)
@@ -65,11 +60,8 @@ async def resolver_alvo_semantico(page, alvo):
             loc = contexto.get_by_placeholder(alvo["placeholder"], exact=False)
         elif "seletor" in alvo:
             kwargs = {}
-            # Agora ele suporta as duas formas que a IA pode usar para atrelar texto a um seletor
             if "com_texto" in alvo:
                 kwargs["has_text"] = alvo["com_texto"]
-            elif "texto_esperado" in alvo:
-                kwargs["has_text"] = alvo["texto_esperado"]
             loc = contexto.locator(alvo["seletor"], **kwargs)
         elif "texto_contem" in alvo:
             loc = contexto.get_by_text(alvo["texto_contem"], exact=False) 
@@ -204,101 +196,58 @@ async def exibir_encerramento_cinema(page):
 
 
 # ==============================================================
-# 🎛️ MOTOR DE PÓS-PRODUÇÃO AVANÇADO (CINEMA AUTOMÁTICO)
+# 🎛️ MOTOR DE PÓS-PRODUÇÃO (A ILHA DE EDIÇÃO AUTOMÁTICA)
 # ==============================================================
-def renderizar_video_final_cinema(caminho_webm, timeline, id_treino, tempo_corte_login):
+def renderizar_video_final(caminho_webm, timeline, id_treino):
     print("\n" + "="*50)
-    print("🎬 INICIANDO PÓS-PRODUÇÃO CINEMATOGRÁFICA (EDITION MODE)...")
+    print("🎬 INICIANDO PÓS-PRODUÇÃO CINEMATOGRÁFICA...")
     print("="*50)
     
     try:
-        if not os.path.exists("overlay.png"):
-            print("❌ ERRO: 'overlay.png' não encontrada. O vídeo será gerado sem a moldura.")
-            overlay_fundo = None
-        else:
-            print("🎨 Carregando sua moldura profissional (overlay.png)...")
-            overlay_fundo = ImageClip("overlay.png").set_duration(0) 
-
-        video_bruto = VideoFileClip(caminho_webm)
-        
-        # ✂️ A TESOURA: Corta o tempo de login
-        print(f"✂️ Aplicando 'A Tesoura': Cortando primeiros {tempo_corte_login:.1f}s de login...")
-        video_cortado = video_bruto.subclip(tempo_corte_login)
-        duração_final = video_cortado.duration
-
-        # 🖼️ O PICTURE-IN-PICTURE (O SEU PAINEL DE CONTROLE)
-        if overlay_fundo:
-            print("🖼️ Criando efeito 'Picture-in-Picture'...")
-            
-            # 🛠️ --------------------------------------------------------
-            # PAINEL DE CONTROLE DA MOLDURA (Ajuste aqui se precisar!)
-            # -----------------------------------------------------------
-            TAMANHO_VIDEO = 0.95  # 0.95 = 95% do tamanho (Aumentei para preencher mais)
-            MARGEM_TOPO = 20      # Quantos pixels afastar do teto (Ajuste para alinhar com a barra verde)
-            # -----------------------------------------------------------
-            
-            # Redimensiona o vídeo bruto (agora sem bordas pretas) para a escala desejada
-            video_encaixe = video_cortado.resize(TAMANHO_VIDEO) 
-            
-            # Centraliza automaticamente na horizontal e aplica a sua margem no topo
-            pos_x = "center" 
-            pos_y = MARGEM_TOPO 
-            
-            video_encaixe = video_encaixe.set_position((pos_x, pos_y))
-            overlay_fundo = overlay_fundo.set_duration(duração_final)
-            
-            # Mescla a moldura com o vídeo centralizado
-            video_final_bruto = CompositeVideoClip([overlay_fundo, video_encaixe], size=(1920, 1080))
-        else:
-            video_final_bruto = video_cortado
-
-
+        video = VideoFileClip(caminho_webm)
         clipes_de_audio = []
 
-        # 🎵 Aplicar Música de Fundo 
+        # 1. Aplicar Música de Fundo (Se existir)
         if os.path.exists("trilha.mp3"):
             print("🎵 Injetando trilha sonora e balanceando volume...")
-            bgm = AudioFileClip("trilha.mp3").fx(afx.volumex, 0.08).fx(afx.audio_loop, duration=duração_final)
+            bgm = AudioFileClip("trilha.mp3").fx(afx.volumex, 0.08).fx(afx.audio_loop, duration=video.duration)
             clipes_de_audio.append(bgm)
 
-        # 🎙️ Sincronizar Vozes 
-        print("🎙️ Sincronizando falas na linha do tempo exata...")
+        # 2. Sincronizar as Vozes na Linha do Tempo Exata
+        print("🎙️ Sincronizando falas da professora na linha do tempo...")
         for item in timeline:
             if os.path.exists(item["arquivo"]):
-                novo_tempo_inicio = item["inicio"] - tempo_corte_login
-                if novo_tempo_inicio < 0: novo_tempo_inicio = 0
-                
-                voz = AudioFileClip(item["arquivo"]).set_start(novo_tempo_inicio)
+                voz = AudioFileClip(item["arquivo"]).set_start(item["inicio"])
                 clipes_de_audio.append(voz)
 
-        # ⚙️ Mesclar e Renderizar 
-        print("⚙️ Renderizando arquivo MP4 Final Profissional. Isso pode levar alguns minutos...")
+        # 3. Mesclar e Renderizar MP4
+        print("⚙️ Renderizando arquivo MP4 Final. Isso pode levar alguns minutos...")
         audio_final = CompositeAudioClip(clipes_de_audio)
-        video_final = video_final_bruto.set_audio(audio_final)
+        video_final = video.set_audio(audio_final)
 
         pasta_saida = "videos_prontos"
         os.makedirs(pasta_saida, exist_ok=True)
-        caminho_final = os.path.join(pasta_saida, f"{id_treino}_PROFISSIONAL.mp4")
+        caminho_final = os.path.join(pasta_saida, f"{id_treino}_FINALIZADO.mp4")
 
+        # Renderização acelerada e otimizada para Web
         video_final.write_videofile(
             caminho_final, 
             codec="libx264", 
             audio_codec="aac", 
             fps=24, 
-            preset="fast", 
+            preset="ultrafast", 
             logger="bar"
         )
         
-        video_bruto.close()
-        video_final_bruto.close()
+        video.close()
         video_final.close()
         
         print("\n" + "🚀"*15)
-        print(f"✅ VÍDEO PRONTO E MASTERIZADO GERADO EM:\n👉 {caminho_final}")
+        print(f"✅ VÍDEO PRONTO PARA O LMS GERADO EM:\n👉 {caminho_final}")
         print("🚀"*15 + "\n")
         
     except Exception as e:
-        print(f"❌ Erro na Pós-Produção Cinematográfica: {e}")
+        print(f"❌ Erro na Pós-Produção: {e}")
 
 
 # ==============================================================
@@ -328,25 +277,24 @@ async def executar_roteiro(caminho_json):
     pasta_video = cfg.get("pasta_destino", "videos_gerados")
     os.makedirs(pasta_video, exist_ok=True)
 
+    # ⏱️ O Diário de Bordo da Edição
     timeline_audios = []
     caminho_video_webm = None
-    tempo_fim_login_bruto = None
 
     async with async_playwright() as p:
-        # Iniciamos o navegador maximizado, mas o "cérebro" da gravação força 1920x1080
         browser = await p.chromium.launch(headless=False, args=['--start-maximized'])
-        
-        # 🚀 A MÁGICA CONTRA AS BORDAS PRETAS ESTÁ AQUI (viewport fixo)
         context = await browser.new_context(
-            viewport={"width": 1920, "height": 1080},
+            no_viewport=True,
             record_video_dir=pasta_video if cfg["gravar_video"] else None,
             record_video_size={"width": 1920, "height": 1080}
         )
         page = await context.new_page()
 
-        tempo_inicio_gravacao_bruto = time.time()
+        # O Playwright começa a gravar o vídeo exatamente no momento em que a page é criada.
+        # Nós marcamos esse milissegundo como o T=0.0s do nosso vídeo.
+        tempo_inicio_gravacao = time.time()
 
-        print("🔄 Realizando Login... (Não aperte F11, deixe o robô trabalhar!)")
+        print("🔄 Realizando Login...")
         await page.goto("https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
         await asyncio.sleep(2.0)
         await page.keyboard.press("Escape")
@@ -360,20 +308,12 @@ async def executar_roteiro(caminho_json):
         await asyncio.sleep(0.5)
         await senha_input.press("Enter")
         await page.wait_for_load_state("domcontentloaded")
-        
-        try:
-            await page.locator("iframe[name='ci']").wait_for(state="visible", timeout=30000)
-            await asyncio.sleep(7.0) 
-        except Exception:
-            pass 
-            
-        tempo_fim_login_bruto = time.time()
-        
+        await asyncio.sleep(7.0) 
         await page.keyboard.press("Escape")
         await asyncio.sleep(0.3)
         await page.keyboard.press("Escape")
 
-        print("\n🎬 --- GRAVANDO VÍDEO PROFISSIONAL E SINCRONIZANDO FALAS --- 🎬\n")
+        print("\n🎬 --- GRAVANDO VÍDEO E SINCRONIZANDO FALAS --- 🎬\n")
         
         for passo in roteiro["passos"]:
             acao = passo["acao"]
@@ -383,9 +323,9 @@ async def executar_roteiro(caminho_json):
             
             if acao == "concluir_video":
                 await exibir_encerramento_cinema(page)
-                instante_bruto = time.time() - tempo_inicio_gravacao_bruto
+                instante_atual = time.time() - tempo_inicio_gravacao
                 caminho_mp3 = await gerar_e_tocar_audio(texto_ia, passo['id_passo'], id_treino, voz=voz_escolhida)
-                timeline_audios.append({"arquivo": caminho_mp3, "inicio": instante_bruto})
+                timeline_audios.append({"arquivo": caminho_mp3, "inicio": instante_atual})
                 
                 aguardar_audio_terminar()
                 await asyncio.sleep(3.0)
@@ -393,9 +333,10 @@ async def executar_roteiro(caminho_json):
 
             await exibir_legenda_cinema(page, texto_ia)
             
-            instante_bruto = time.time() - tempo_inicio_gravacao_bruto
+            # Anota o tempo exato em que a voz começou a tocar
+            instante_atual = time.time() - tempo_inicio_gravacao
             caminho_mp3 = await gerar_e_tocar_audio(texto_ia, passo['id_passo'], id_treino, voz=voz_escolhida)
-            timeline_audios.append({"arquivo": caminho_mp3, "inicio": instante_bruto})
+            timeline_audios.append({"arquivo": caminho_mp3, "inicio": instante_atual})
             
             alvo = passo.get("alvo_semantico")
             if alvo:
@@ -466,8 +407,9 @@ async def executar_roteiro(caminho_json):
             await asyncio.sleep(0.5)
 
         pygame.mixer.music.stop()
-        print("\n✅ Gravação Finalizada com Sincronismo Profissional! Fechando navegador...")
+        print("\n✅ Gravação Finalizada! Fechando navegador...")
         
+        # Pega o caminho do arquivo .webm que o Playwright gerou antes de fechar
         if cfg["gravar_video"]:
             caminho_video_webm = await page.video.path()
             
@@ -476,9 +418,9 @@ async def executar_roteiro(caminho_json):
         await context.close()
         await browser.close()
 
-    if cfg["gravar_video"] and caminho_video_webm and tempo_fim_login_bruto:
-        tempo_para_corte_login = tempo_fim_login_bruto - tempo_inicio_gravacao_bruto
-        renderizar_video_final_cinema(caminho_video_webm, timeline_audios, id_treino, tempo_para_corte_login)
+    # Assim que a gravação bruta fecha, envia tudo para a Ilha de Edição!
+    if cfg["gravar_video"] and caminho_video_webm:
+        renderizar_video_final(caminho_video_webm, timeline_audios, id_treino)
 
 
 if __name__ == "__main__":

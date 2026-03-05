@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "id_treinamento": "TRN-SENIOR-GED-004",
-    "titulo": "Pesquisando e Visualizando Documentos",
+    "id_treinamento": "GERADO_AUTO",
+    "titulo": "Excluir e Restaurar Arquivos no GED",
     "modulo": "Senior Flow"
   },
   "configuracao_gravacao": {
@@ -14,72 +14,163 @@
       "id_passo": 1,
       "acao": "clique",
       "alvo_semantico": {
-        "seletor": "[id='menu-label-Senior Flow']",
+        "primeiro": true,
+        "texto_esperado": "Menu principal Senior Flow",
         "pegar_pai": true
       },
-      "narracao_ia": "Olá! Bem-vindo a mais um treinamento. Hoje vamos aprender a localizar rapidamente um arquivo no sistema. Para começar, nós acessamos o menu Senior Flow, aqui na esquerda."
+      "narracao_ia": "Nós acessamos o menu principal do Senior Flow para iniciar a navegação no sistema."
     },
     {
       "id_passo": 2,
       "acao": "clique",
       "alvo_semantico": {
-        "seletor": "span",
-        "com_texto": "GED",
         "primeiro": true,
+        "texto_esperado": "GED",
         "pegar_pai": true
       },
-      "narracao_ia": "No menu que se abriu, expandimos o módulo de Gestão Eletrônica, o nosso GED."
+      "narracao_ia": "Nós clicamos em 'GED' para acessar a Gestão Eletrônica de Documentos, onde nossos arquivos estão armazenados."
     },
     {
       "id_passo": 3,
       "acao": "clique",
       "alvo_semantico": {
-        "seletor": "span",
-        "com_texto": "Documentos",
         "primeiro": true,
+        "texto_esperado": "Documentos",
         "pegar_pai": true
       },
-      "narracao_ia": "Em seguida, selecionamos a área de Documentos. É aqui que toda a base de conhecimento da empresa fica armazenada em segurança."
+      "narracao_ia": "Nós clicamos em 'Documentos' para visualizar a listagem de todos os arquivos disponíveis no GED."
     },
     {
       "id_passo": 4,
-      "acao": "aguardar_carregamento",
+      "acao": "clique",
       "alvo_semantico": {
-        "dentro_do_iframe": "ci",
-        "placeholder": "Buscar documentos",
         "primeiro": true,
+        "dentro_do_iframe": "ci",
+        "seletor": "#itemTitle",
         "pegar_pai": true
       },
-      "tempo_espera": 3000,
-      "narracao_ia": "Neste momento, aguardamos a interface principal carregar os arquivos recentes."
+      "narracao_ia": "Nós clicamos no arquivo 'Universidade Corporativa' para selecioná-lo e realizar a ação de exclusão."
     },
     {
       "id_passo": 5,
-      "acao": "digitar_e_enter",
+      "acao": "clique",
       "alvo_semantico": {
-        "dentro_do_iframe": "ci",
-        "placeholder": "Buscar documentos",
         "primeiro": true,
-        "pegar_pai": true
+        "dentro_do_iframe": "ci",
+        "seletor": "div"
       },
-      "valor_input": "Universidade Corporativa",
-      "narracao_ia": "Para encontrar uma pasta específica, nós vamos até a barra de pesquisa superior, digitamos o nome desejado e pressionamos a tecla Enter."
+      "narracao_ia": "Nós clicamos no ícone de opções para abrir o menu de ações disponíveis para o arquivo selecionado."
     },
     {
       "id_passo": 6,
       "acao": "clique",
       "alvo_semantico": {
-        "dentro_do_iframe": "ci",
-        "texto_contem": "Universidade Corporativa",
         "primeiro": true,
-        "pegar_pai": true
+        "dentro_do_iframe": "ci",
+        "seletor": "div"
       },
-      "narracao_ia": "Veja que o sistema filtrou os resultados imediatamente. Agora, nós clicamos sobre o item para explorar o seu conteúdo."
+      "narracao_ia": "Nós clicamos na opção de exclusão para remover o arquivo do diretório principal."
     },
     {
       "id_passo": 7,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "dentro_do_iframe": "ci",
+        "texto_esperado": "Excluir",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Nós clicamos em 'Excluir' para confirmar a remoção do arquivo. É importante lembrar que a rotina de exclusão é processada em fila a cada 30 minutos, processando 14 itens por vez, então o tempo para a exclusão definitiva pode variar."
+    },
+    {
+      "id_passo": 8,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "dentro_do_iframe": "ci",
+        "texto_esperado": "Confirmar",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Nós clicamos em 'Confirmar' para finalizar o processo de exclusão. Após a conclusão, seremos notificados na plataforma."
+    },
+    {
+      "id_passo": 9,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "texto_esperado": "Menu principal Senior Flow",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Nós acessamos novamente o menu principal do Senior Flow para navegar até a lixeira e verificar o arquivo excluído."
+    },
+    {
+      "id_passo": 10,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "texto_esperado": "Lixeira",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Nós clicamos em 'Lixeira' para acessar a área onde os documentos removidos do tenant são armazenados. Esta funcionalidade permite visualizar e restaurar documentos, sendo acessível para usuários com a permissão específica."
+    },
+    {
+      "id_passo": 11,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "dentro_do_iframe": "ci",
+        "texto_esperado": "Mostrar mais itens",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Nós clicamos em 'Mostrar mais itens' para garantir que todos os documentos excluídos sejam carregados e possamos localizar o arquivo 'Universidade Corporativa'."
+    },
+    {
+      "id_passo": 12,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "dentro_do_iframe": "ci",
+        "seletor": "#itemTitle",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Nós clicamos no arquivo 'Universidade Corporativa' dentro da lixeira para selecioná-lo, pois nosso objetivo é restaurá-lo."
+    },
+    {
+      "id_passo": 13,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "dentro_do_iframe": "ci",
+        "seletor": "div"
+      },
+      "narracao_ia": "Nós clicamos no ícone de opções para exibir as ações disponíveis para o documento selecionado na lixeira."
+    },
+    {
+      "id_passo": 14,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "dentro_do_iframe": "ci",
+        "texto_esperado": "Restaurar Documentos",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Nós clicamos em 'Restaurar Documentos' para iniciar o processo de recuperação do arquivo 'Universidade Corporativa' para o diretório original."
+    },
+    {
+      "id_passo": 15,
+      "acao": "clique",
+      "alvo_semantico": {
+        "primeiro": true,
+        "dentro_do_iframe": "ci",
+        "texto_esperado": "Restaurar",
+        "pegar_pai": true
+      },
+      "narracao_ia": "Nós clicamos em 'Restaurar' para confirmar a recuperação do arquivo. Com isso, o documento será movido da lixeira de volta para o GED."
+    },
+    {
+      "id_passo": 16,
       "acao": "concluir_video",
-      "narracao_ia": "Muito fácil, não é? A pesquisa inteligente do GED economiza muito tempo no dia a dia. Te vejo no próximo módulo!"
+      "narracao_ia": "Nós concluímos o processo de exclusão e restauração de um arquivo no GED. Agora sabemos como gerenciar documentos removidos utilizando a lixeira."
     }
   ]
 }

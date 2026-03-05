@@ -17,8 +17,15 @@ sessao_chrome_senior/
 # Arquivos do VS Code (Opcional, mas mantém o repositório limpo)
 .vscode/
 
-# Vídeos e Prints gravados pelo Playwright (Caso você configure para salvar no futuro)
+# Vídeos e Prints gravados pelo Playwright e MoviePy
 test-results/
 videos/
 *.mp4
+*.webm
 *.png
+
+# Arquivos de Mídia e Pós-Produção do Training OS
+videos_gerados/
+videos_prontos/
+audios_gerados/
+roteiro.json
