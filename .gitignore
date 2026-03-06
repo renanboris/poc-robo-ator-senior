@@ -5,6 +5,9 @@ env/
 # Variáveis de Ambiente e Senhas (CRÍTICO: Nunca subir o .env)
 .env
 
+# Scripts de teste locais com dados sensíveis
+teste_api*
+
 # Arquivos temporários do Python
 __pycache__/
 *.pyc
