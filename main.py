@@ -7,13 +7,15 @@ import pygame
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
-# 🩹 MONKEY PATCH: Resolve o erro "ANTIALIAS" do Pillow 10+ com o MoviePy
+# ==========================================
+# 🔧 CORREÇÃO PARA PYTHON 3.13 + MOVIEPY
+# ==========================================
 import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
-# 🎬 BIBLIOTECAS DE PÓS-PRODUÇÃO 
-from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, ImageClip, CompositeVideoClip
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, ImageClip, concatenate_videoclips
 import moviepy.audio.fx.all as afx
 
 load_dotenv()
@@ -24,9 +26,12 @@ pygame.mixer.set_num_channels(2)
 # ==============================================================
 # 🛡️ FUNÇÃO ANTI-CONGELAMENTO
 # ==============================================================
-async def safe_evaluate(target, script, *args, timeout=2.0):
+async def safe_evaluate(target, script, arg=None, timeout=3.0):
     try:
-        await asyncio.wait_for(target.evaluate(script, *args), timeout=timeout)
+        if arg is not None:
+            await asyncio.wait_for(target.evaluate(script, arg), timeout=timeout)
+        else:
+            await asyncio.wait_for(target.evaluate(script), timeout=timeout)
         return True
     except Exception:
         return False
@@ -57,89 +62,61 @@ def aguardar_audio_terminar():
 # ==============================================================
 # 🧠 RESOLVEDOR SEMÂNTICO
 # ==============================================================
-async def resolver_alvo_semantico(page, alvo):
-    def construir_locator(contexto):
-        if "role" in alvo:
-            loc = contexto.get_by_role(alvo["role"], name=alvo.get("nome"))
-        elif "placeholder" in alvo:
-            loc = contexto.get_by_placeholder(alvo["placeholder"], exact=False)
-        elif "seletor" in alvo:
-            kwargs = {}
-            # Agora ele suporta as duas formas que a IA pode usar para atrelar texto a um seletor
-            if "com_texto" in alvo:
-                kwargs["has_text"] = alvo["com_texto"]
-            elif "texto_esperado" in alvo:
-                kwargs["has_text"] = alvo["texto_esperado"]
-            loc = contexto.locator(alvo["seletor"], **kwargs)
-        elif "texto_contem" in alvo:
-            loc = contexto.get_by_text(alvo["texto_contem"], exact=False) 
-        elif "texto_esperado" in alvo:
-            loc = contexto.get_by_text(alvo["texto_esperado"], exact=True)
-        else:
-            raise ValueError(f"Alvo inválido: {alvo}")
-
-        if alvo.get("pegar_pai"):
-            loc = loc.locator("..")
-        return loc
-
+def resolver_alvo_semantico(contexto_pagina, alvo):
+    contexto = contexto_pagina
     if "dentro_do_iframe" in alvo:
-        nome_frame = alvo["dentro_do_iframe"]
-        loc_iframe = construir_locator(page.frame_locator(f'iframe[name="{nome_frame}"]'))
-        loc_main = construir_locator(page)
-        loc_final = loc_iframe.or_(loc_main)
-    else:
-        loc_final = construir_locator(page)
-
-    if alvo.get("primeiro"):
-        for _ in range(20): 
-            try:
-                count = await loc_final.count()
-                for i in range(count):
-                    nth_loc = loc_final.nth(i)
-                    if await nth_loc.is_visible():
-                        return nth_loc
-            except Exception:
-                pass
-            await asyncio.sleep(0.5)
-        return loc_final.first
+        contexto = contexto_pagina.frame_locator(f"iframe[name='{alvo['dentro_do_iframe']}']")
         
-    return loc_final
+    if "seletor" in alvo:
+        kwargs = {}
+        if "com_texto" in alvo: kwargs["has_text"] = alvo["com_texto"]
+        elif "texto_esperado" in alvo: kwargs["has_text"] = alvo["texto_esperado"]
+        loc = contexto.locator(alvo["seletor"], **kwargs)
+    elif "texto_esperado" in alvo:
+        loc = contexto.get_by_text(alvo["texto_esperado"], exact=False)
+    else:
+        raise ValueError(f"Alvo semântico inválido: {alvo}")
+        
+    if alvo.get("pegar_pai"): loc = loc.locator("..")
+    if alvo.get("primeiro"): loc = loc.first
+    return loc
 
 # ==============================================================
 # 🎬 MOTOR DE GRAVAÇÃO, EFEITOS E LEGENDAS
 # ==============================================================
 async def exibir_legenda_cinema(page, texto):
-    script = f"""(texto) => {{
-        let existing = document.getElementById('blaze-video-subtitle');
+    script = """(texto) => {
+        let existing = document.getElementById('senior-video-subtitle');
         if (existing) existing.remove();
 
         const sub = document.createElement('div');
-        sub.id = 'blaze-video-subtitle';
+        sub.id = 'senior-video-subtitle';
         sub.style = `
             position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px);
             color: #ffffff; padding: 15px 35px; border-radius: 50px;
-            font-family: 'Segoe UI', sans-serif; font-size: 20px; font-weight: 500;
-            text-align: center; max-width: 75%; z-index: 999999;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-bottom: 3px solid #2596be;
+            font-family: 'Segoe UI', sans-serif; font-size: 22px; font-weight: 500;
+            text-align: center; max-width: 75%; z-index: 2147483647; line-height: 1.4;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-bottom: 3px solid #009999;
             opacity: 0; transition: opacity 0.5s ease;
         `;
         sub.innerHTML = texto;
-        document.body.appendChild(sub);
+        document.documentElement.appendChild(sub);
         
         setTimeout(() => sub.style.opacity = '1', 50);
-    }}"""
-    await safe_evaluate(page, script, texto, timeout=3.0)
+    }"""
+    await safe_evaluate(page, script, arg=texto, timeout=3.0)
 
 async def remover_legenda(page):
-    script = "() => { let e = document.getElementById('blaze-video-subtitle'); if(e) e.remove(); }"
+    script = "() => { let e = document.getElementById('senior-video-subtitle'); if(e) e.remove(); }"
     await safe_evaluate(page, script, timeout=1.5)
 
-async def holofote_e_clique(locator, cor_neon="#2596be", tipo_clique="esquerdo"):
+async def holofote_e_clique(locator, cor_neon="#009999", tipo_clique="esquerdo"):
     await locator.scroll_into_view_if_needed()
     await locator.hover()
     await asyncio.sleep(0.5)
     
+    await safe_evaluate(locator, f"el => el.style.transition = 'all 0.3s ease'")
     await safe_evaluate(locator, f"el => el.style.outline = '4px solid {cor_neon}'")
     await safe_evaluate(locator, f"el => el.style.boxShadow = '0 0 25px {cor_neon}'")
     
@@ -165,7 +142,7 @@ async def exibir_encerramento_cinema(page):
                     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
                     background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(12px);
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    z-index: 9999999; opacity: 0; transition: opacity 1s ease;
+                    z-index: 2147483647; opacity: 0; transition: opacity 1s ease;
                 `;
 
                 overlay.innerHTML = `
@@ -180,7 +157,7 @@ async def exibir_encerramento_cinema(page):
                         Treinamento Concluído
                     </h1>
                 `;
-                document.body.appendChild(overlay);
+                document.documentElement.appendChild(overlay);
                 setTimeout(() => overlay.style.opacity = '1', 50);
                 resolve(true); 
             };
@@ -198,107 +175,90 @@ async def exibir_encerramento_cinema(page):
     }"""
     for tentativa in range(3):
         sucesso = await safe_evaluate(page, script, timeout=5.0)
-        if sucesso:
-            return
+        if sucesso: return
         await asyncio.sleep(1.0)
 
 
 # ==============================================================
-# 🎛️ MOTOR DE PÓS-PRODUÇÃO AVANÇADO (CINEMA AUTOMÁTICO)
+# 🎛️ MOTOR DE PÓS-PRODUÇÃO (A ILHA DE EDIÇÃO AUTOMÁTICA)
 # ==============================================================
-def renderizar_video_final_cinema(caminho_webm, timeline, id_treino, tempo_corte_login):
+def renderizar_video_final(caminho_webm, timeline, id_treino, tempo_corte):
     print("\n" + "="*50)
-    print("🎬 INICIANDO PÓS-PRODUÇÃO CINEMATOGRÁFICA (EDITION MODE)...")
+    print("🎬 INICIANDO PÓS-PRODUÇÃO CINEMATOGRÁFICA...")
     print("="*50)
     
     try:
-        if not os.path.exists("overlay.png"):
-            print("❌ ERRO: 'overlay.png' não encontrada. O vídeo será gerado sem a moldura.")
-            overlay_fundo = None
-        else:
-            print("🎨 Carregando sua moldura profissional (overlay.png)...")
-            overlay_fundo = ImageClip("overlay.png").set_duration(0) 
-
-        video_bruto = VideoFileClip(caminho_webm)
-        
-        # ✂️ A TESOURA: Corta o tempo de login
-        print(f"✂️ Aplicando 'A Tesoura': Cortando primeiros {tempo_corte_login:.1f}s de login...")
-        video_cortado = video_bruto.subclip(tempo_corte_login)
-        duração_final = video_cortado.duration
-
-        # 🖼️ O PICTURE-IN-PICTURE (O SEU PAINEL DE CONTROLE)
-        if overlay_fundo:
-            print("🖼️ Criando efeito 'Picture-in-Picture'...")
-            
-            # 🛠️ --------------------------------------------------------
-            # PAINEL DE CONTROLE DA MOLDURA (Ajuste aqui se precisar!)
-            # -----------------------------------------------------------
-            TAMANHO_VIDEO = 0.95  # 0.95 = 95% do tamanho (Aumentei para preencher mais)
-            MARGEM_TOPO = 20      # Quantos pixels afastar do teto (Ajuste para alinhar com a barra verde)
-            # -----------------------------------------------------------
-            
-            # Redimensiona o vídeo bruto (agora sem bordas pretas) para a escala desejada
-            video_encaixe = video_cortado.resize(TAMANHO_VIDEO) 
-            
-            # Centraliza automaticamente na horizontal e aplica a sua margem no topo
-            pos_x = "center" 
-            pos_y = MARGEM_TOPO 
-            
-            video_encaixe = video_encaixe.set_position((pos_x, pos_y))
-            overlay_fundo = overlay_fundo.set_duration(duração_final)
-            
-            # Mescla a moldura com o vídeo centralizado
-            video_final_bruto = CompositeVideoClip([overlay_fundo, video_encaixe], size=(1920, 1080))
-        else:
-            video_final_bruto = video_cortado
-
-
+        # 1. A TESOURA: Corta os minutos/segundos de login do vídeo bruto
+        print(f"✂️ Cortando os primeiros {tempo_corte:.1f} segundos (Login)...")
+        video = VideoFileClip(caminho_webm).subclip(tempo_corte)
         clipes_de_audio = []
 
-        # 🎵 Aplicar Música de Fundo 
+        # 2. A MOLDURA: Aplica o Overlay Corporativo com Redimensionamento
+        if os.path.exists("overlay.png"):
+            print("🖼️ Aplicando Overlay corporativo e ajustando margens...")
+            overlay = ImageClip("overlay.png").set_duration(video.duration)
+            
+            # -----------------------------------------------------------------
+            # 📐 AJUSTE DE MARGEM AQUI!
+            # O valor 0.85 significa que o vídeo ocupará 85% do tamanho da tela.
+            # Se a sua janela transparente for menor, diminua (ex: 0.75).
+            # Se for maior, aumente (ex: 0.90).
+            # -----------------------------------------------------------------
+            fator_de_escala = 0.85 
+            
+            # Encolhe o vídeo e coloca exatamente no centro
+            video_redimensionado = video.resize(fator_de_escala).set_position('center')
+            
+            # Cria um canvas de 1920x1080. 
+            # Coloca o vídeo redimensionado no fundo e o overlay (com buraco transparente) por cima.
+            video = CompositeVideoClip([video_redimensionado, overlay], size=(1920, 1080))
+
+        # 3. MÚSICA DE FUNDO
         if os.path.exists("trilha.mp3"):
             print("🎵 Injetando trilha sonora e balanceando volume...")
-            bgm = AudioFileClip("trilha.mp3").fx(afx.volumex, 0.08).fx(afx.audio_loop, duration=duração_final)
+            bgm = AudioFileClip("trilha.mp3").fx(afx.volumex, 0.08).fx(afx.audio_loop, duration=video.duration)
             clipes_de_audio.append(bgm)
 
-        # 🎙️ Sincronizar Vozes 
-        print("🎙️ Sincronizando falas na linha do tempo exata...")
+        # 4. VOZES
+        print("🎙️ Sincronizando falas da professora na linha do tempo...")
         for item in timeline:
             if os.path.exists(item["arquivo"]):
-                novo_tempo_inicio = item["inicio"] - tempo_corte_login
-                if novo_tempo_inicio < 0: novo_tempo_inicio = 0
-                
-                voz = AudioFileClip(item["arquivo"]).set_start(novo_tempo_inicio)
+                voz = AudioFileClip(item["arquivo"]).set_start(item["inicio"])
                 clipes_de_audio.append(voz)
 
-        # ⚙️ Mesclar e Renderizar 
-        print("⚙️ Renderizando arquivo MP4 Final Profissional. Isso pode levar alguns minutos...")
+        # 5. RENDERIZAÇÃO
+        print("⚙️ Renderizando arquivo MP4 Final. Isso pode levar alguns minutos...")
         audio_final = CompositeAudioClip(clipes_de_audio)
-        video_final = video_final_bruto.set_audio(audio_final)
+        video = video.set_audio(audio_final)
+
+        video_final = video
+        if os.path.exists("outro.mp4"):
+            print("✨ Inserindo Lottie de encerramento...")
+            outro = VideoFileClip("outro.mp4").resize(video.size).set_fps(video.fps) 
+            video_final = concatenate_videoclips([video, outro], method="compose")
 
         pasta_saida = "videos_prontos"
         os.makedirs(pasta_saida, exist_ok=True)
-        caminho_final = os.path.join(pasta_saida, f"{id_treino}_PROFISSIONAL.mp4")
+        caminho_final = os.path.join(pasta_saida, f"{id_treino}_FINALIZADO.mp4")
 
         video_final.write_videofile(
             caminho_final, 
             codec="libx264", 
             audio_codec="aac", 
             fps=24, 
-            preset="fast", 
+            preset="ultrafast", 
             logger="bar"
         )
         
-        video_bruto.close()
-        video_final_bruto.close()
+        video.close()
         video_final.close()
         
         print("\n" + "🚀"*15)
-        print(f"✅ VÍDEO PRONTO E MASTERIZADO GERADO EM:\n👉 {caminho_final}")
+        print(f"✅ VÍDEO PRONTO PARA O LMS GERADO EM:\n👉 {caminho_final}")
         print("🚀"*15 + "\n")
         
     except Exception as e:
-        print(f"❌ Erro na Pós-Produção Cinematográfica: {e}")
+        print(f"❌ Erro na Pós-Produção: {e}")
 
 
 # ==============================================================
@@ -316,7 +276,7 @@ async def executar_roteiro(caminho_json):
         roteiro = json.load(f)
 
     meta = roteiro["metadata"]
-    id_treino = meta["id_treinamento"]
+    id_treino = meta.get("id_treinamento", "TREINAMENTO")
     cfg = roteiro["configuracao_gravacao"]
     voz_escolhida = cfg.get("voz_ia", "pt-BR-FranciscaNeural")
 
@@ -330,23 +290,20 @@ async def executar_roteiro(caminho_json):
 
     timeline_audios = []
     caminho_video_webm = None
-    tempo_fim_login_bruto = None
+    tempo_corte_segundos = 0
 
     async with async_playwright() as p:
-        # Iniciamos o navegador maximizado, mas o "cérebro" da gravação força 1920x1080
         browser = await p.chromium.launch(headless=False, args=['--start-maximized'])
+        tempo_inicio_contexto = time.time()
         
-        # 🚀 A MÁGICA CONTRA AS BORDAS PRETAS ESTÁ AQUI (viewport fixo)
         context = await browser.new_context(
-            viewport={"width": 1920, "height": 1080},
+            no_viewport=True,
             record_video_dir=pasta_video if cfg["gravar_video"] else None,
             record_video_size={"width": 1920, "height": 1080}
         )
         page = await context.new_page()
 
-        tempo_inicio_gravacao_bruto = time.time()
-
-        print("🔄 Realizando Login... (Não aperte F11, deixe o robô trabalhar!)")
+        print("🔄 Realizando Login na Senior X...")
         await page.goto("https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
         await asyncio.sleep(2.0)
         await page.keyboard.press("Escape")
@@ -361,31 +318,27 @@ async def executar_roteiro(caminho_json):
         await senha_input.press("Enter")
         await page.wait_for_load_state("domcontentloaded")
         
-        try:
-            await page.locator("iframe[name='ci']").wait_for(state="visible", timeout=30000)
-            await asyncio.sleep(7.0) 
-        except Exception:
-            pass 
-            
-        tempo_fim_login_bruto = time.time()
-        
+        await asyncio.sleep(7.0) 
         await page.keyboard.press("Escape")
         await asyncio.sleep(0.3)
         await page.keyboard.press("Escape")
 
-        print("\n🎬 --- GRAVANDO VÍDEO PROFISSIONAL E SINCRONIZANDO FALAS --- 🎬\n")
+        tempo_inicio_gravacao = time.time()
+        tempo_corte_segundos = tempo_inicio_gravacao - tempo_inicio_contexto
+
+        print("\n🎬 --- GRAVANDO VÍDEO E SINCRONIZANDO FALAS --- 🎬\n")
         
         for passo in roteiro["passos"]:
             acao = passo["acao"]
             texto_ia = passo.get('narracao_ia', '')
             
-            print(f"▶️ Passo {passo['id_passo']} | 🎙️ Voz: '{texto_ia}'")
+            print(f"▶️ Passo {passo['id_passo']} | 🎙️ Voz: '{texto_ia[:50]}...'")
             
             if acao == "concluir_video":
                 await exibir_encerramento_cinema(page)
-                instante_bruto = time.time() - tempo_inicio_gravacao_bruto
+                instante_atual = time.time() - tempo_inicio_gravacao
                 caminho_mp3 = await gerar_e_tocar_audio(texto_ia, passo['id_passo'], id_treino, voz=voz_escolhida)
-                timeline_audios.append({"arquivo": caminho_mp3, "inicio": instante_bruto})
+                timeline_audios.append({"arquivo": caminho_mp3, "inicio": instante_atual})
                 
                 aguardar_audio_terminar()
                 await asyncio.sleep(3.0)
@@ -393,24 +346,33 @@ async def executar_roteiro(caminho_json):
 
             await exibir_legenda_cinema(page, texto_ia)
             
-            instante_bruto = time.time() - tempo_inicio_gravacao_bruto
+            instante_atual = time.time() - tempo_inicio_gravacao
             caminho_mp3 = await gerar_e_tocar_audio(texto_ia, passo['id_passo'], id_treino, voz=voz_escolhida)
-            timeline_audios.append({"arquivo": caminho_mp3, "inicio": instante_bruto})
+            timeline_audios.append({"arquivo": caminho_mp3, "inicio": instante_atual})
             
             alvo = passo.get("alvo_semantico")
-            if alvo:
-                locator = await resolver_alvo_semantico(page, alvo)
+            if not alvo: continue
+            
+            locator = resolver_alvo_semantico(page, alvo)
+
+            try:
+                await locator.wait_for(state="visible", timeout=10000)
+            except Exception:
+                print(f"   ⚠️ Timeout no seletor primário. Tentando auto-repair...")
+                if acao == "digitar_e_enter":
+                    try:
+                        contexto_frame = page.frame_locator(f"iframe[name='{alvo['dentro_do_iframe']}']") if "dentro_do_iframe" in alvo else page
+                        locator = contexto_frame.get_by_text("Nova pasta", exact=False).first
+                        await locator.wait_for(state="visible", timeout=4000)
+                    except: pass
 
             if acao == "clique":
-                await locator.wait_for(state="visible", timeout=10000)
                 await holofote_e_clique(locator, tipo_clique="esquerdo")
                 
             elif acao == "duplo_clique":
-                await locator.wait_for(state="visible", timeout=10000)
                 await holofote_e_clique(locator, tipo_clique="duplo")
                 
             elif acao == "clique_direito":
-                await locator.wait_for(state="visible", timeout=10000)
                 await holofote_e_clique(locator, tipo_clique="direito")
             
             elif acao == "aguardar_carregamento":
@@ -419,7 +381,6 @@ async def executar_roteiro(caminho_json):
                 await asyncio.sleep(tempo / 1000.0)
                 
             elif acao == "digitar_e_enter":
-                await locator.wait_for(state="visible", timeout=10000)
                 await locator.scroll_into_view_if_needed()
                 await locator.hover()
                 
@@ -432,22 +393,22 @@ async def executar_roteiro(caminho_json):
                         }
                         if(parent) parent = parent.parentElement;
                     }
-                    el.style.outline = '4px solid #2596be';
-                    el.style.boxShadow = '0 0 25px #2596be';
+                    el.style.transition = 'all 0.3s ease';
+                    el.style.outline = '4px solid #009999';
+                    el.style.boxShadow = '0 0 25px #009999';
                 }""")
                 
                 aguardar_audio_terminar()
                 
                 await locator.click()
                 await asyncio.sleep(0.5)
-                
-                await locator.fill("")
-                await locator.type(passo["valor_input"], delay=60)
-                
+                await page.keyboard.press("Control+A")
+                await page.keyboard.press("Backspace")
+                await page.keyboard.type(passo.get("valor_input", ""), delay=50)
                 await asyncio.sleep(0.5)
-                await locator.press("Enter")
+                await page.keyboard.press("Enter")
                 
-                await asyncio.sleep(2.0)
+                await asyncio.sleep(1.0)
                 
                 await safe_evaluate(locator, """el => {
                     el.style.outline = '';
@@ -466,7 +427,7 @@ async def executar_roteiro(caminho_json):
             await asyncio.sleep(0.5)
 
         pygame.mixer.music.stop()
-        print("\n✅ Gravação Finalizada com Sincronismo Profissional! Fechando navegador...")
+        print("\n✅ Gravação Finalizada! Fechando navegador...")
         
         if cfg["gravar_video"]:
             caminho_video_webm = await page.video.path()
@@ -475,11 +436,15 @@ async def executar_roteiro(caminho_json):
         await page.close()
         await context.close()
         await browser.close()
+        await asyncio.sleep(1.0)
 
-    if cfg["gravar_video"] and caminho_video_webm and tempo_fim_login_bruto:
-        tempo_para_corte_login = tempo_fim_login_bruto - tempo_inicio_gravacao_bruto
-        renderizar_video_final_cinema(caminho_video_webm, timeline_audios, id_treino, tempo_para_corte_login)
-
+    print("\n" + "="*50)
+    decisao = input("🤔 A gravação visual ficou boa? Deseja enviar para a renderização final no MoviePy? (S/N)\n> ")
+    if decisao.strip().upper() == 'S':
+        if cfg["gravar_video"] and caminho_video_webm:
+            renderizar_video_final(caminho_video_webm, timeline_audios, id_treino, tempo_corte_segundos)
+    else:
+        print("🛑 Renderização cancelada.")
 
 if __name__ == "__main__":
     asyncio.run(executar_roteiro("roteiro.json"))
