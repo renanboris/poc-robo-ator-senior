@@ -1,30 +1,26 @@
-# GenUCS - Automação Inteligente Senior X 🤖
+# 🎓 Senior Sistemas - Training OS (Auto Training Generator)
 
-Este projeto é um Agente de IA capaz de navegar de forma autônoma pelo portal **Senior X**, realizar login e navegar até o módulo de Documentos do GED via Senior Flow. 
+Um motor avançado de Inteligência Artificial para a Universidade Corporativa da Senior Sistemas. 
+Este sistema transforma o conhecimento tácito de um instrutor em treinamentos corporativos completos (Vídeo, Áudio, Legendas e JSON Universal para DAP) de forma 100% automatizada.
 
-Desenvolvido para a **Senior Sistemas**, o projeto utiliza o framework `browser-use` com o modelo **Gemini 2.0 Flash** da Google.
 
-## 🛠️ Desafios Técnicos Superados
 
-Durante o desenvolvimento, implementamos soluções avançadas para contornar limitações de bibliotecas em estado *bleeding edge*:
+## 🚀 Como Funciona (A Arquitetura)
 
-- **Bypass de Pydantic V2:** Implementação de herança de classe (`OpenAIParaBrowserUse`) para permitir injeção dinâmica de atributos exigidos pelo `browser-use` que são nativamente bloqueados pelo Pydantic.
-- **Gemini 2.0 OpenAI Compatibility:** Uso do endpoint de compatibilidade da OpenAI para mitigar o erro de estruturação de JSON (`items` vs `action`) comum na integração direta do Gemini com Langchain.
-- **Gestão de Telemetria:** Desativação forçada de telemetria via variáveis de ambiente para evitar conflitos de performance e privacidade.
+O **Training OS** foi construído com a filosofia de *Self-Documenting Software* e está dividido em 4 módulos principais:
 
-## 🚀 Como Rodar o Projeto
+1. **Capture Engine (O Mapeador):** Usa Playwright e um Radar JS injetado ("Raio-X") para capturar cliques, inputs e interações do instrutor no Senior X, contornando elementos invisíveis e IDs dinâmicos.
+2. **Intent Engine (Aura IA + Pinecone RAG):** O motor de Design Instrucional. Analisa o log bruto, consulta a documentação técnica da Senior num Banco Vetorial (Pinecone) e agrupa ações num **Universal Lesson JSON**.
+3. **Playback Engine (Estúdio ao Vivo):** Recria as ações no navegador aplicando um "Holofote" corporativo (`#009999`), injeta legendas nativas no HTML e toca a narração gerada (Edge-TTS + Pygame) em tempo real.
+4. **Render Engine (Ilha de Edição):** Usa o MoviePy para aplicar a tesoura (cortar tempo de login), aplicar a moldura (`overlay.png`), mixar trilha sonora (`trilha.mp3`) e concatenar o Lottie final (`outro.mp4`).
 
-### 1. Pré-requisitos
-- Python 3.11+ (Testado com sucesso no 3.13)
-- Google Gemini API Key
+## 🛠️ Configuração do Ambiente (Setup)
 
-### 2. Instalação
-Clone o repositório e configure o ambiente virtual:
-```powershell
-# Criar ambiente virtual
-python -m venv venv
-.\venv\Scripts\activate
+### Pré-requisitos
+- Python 3.10+ instalado.
+- Chaves de API do Google Gemini (`google-genai`) e Pinecone.
 
-# Instalar dependências
-pip install browser-use langchain-openai python-dotenv playwright
-playwright install
+### Instalação Passo a Passo
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/renanboris/poc-robo-ator-senior.git

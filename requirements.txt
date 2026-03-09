@@ -1,0 +1,19 @@
+# Automacao Web e Captura
+playwright==1.42.0
+
+# IA e LLM (Novo SDK do Google)
+google-genai==0.3.0
+
+# Vector DB (RAG do Manual Senior)
+pinecone==5.4.2
+
+# Motor de Audio (TTS e Preview)
+edge-tts==6.1.12
+pygame==2.6.1
+
+# Ilha de Edicao e Imagem
+moviepy==1.0.3
+Pillow==10.4.0
+
+# Variaveis de Ambiente
+python-dotenv==1.0.1
