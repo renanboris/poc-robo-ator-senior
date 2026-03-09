@@ -10,10 +10,13 @@ import subprocess
 import sys
 import threading
 import re
+import sqlite3
 
 app = FastAPI(title="Senior Training OS")
 
-# Configuração de pastas
+# ==============================================================
+# 📁 CONFIGURAÇÃO DE DIRETÓRIOS E ARQUIVOS ESTÁTICOS
+# ==============================================================
 os.makedirs("templates", exist_ok=True)
 ROTEIROS_DIR = "roteiros_salvos"
 os.makedirs(ROTEIROS_DIR, exist_ok=True)
@@ -22,148 +25,211 @@ os.makedirs(VIDEOS_DIR, exist_ok=True)
 
 templates = Jinja2Templates(directory="templates")
 
-# Monta a pasta de vídeos para poder ser acessada pelo navegador
+# Monta a pasta de vídeos para poder ser acessada pelo player HTML
 app.mount("/videos", StaticFiles(directory=VIDEOS_DIR), name="videos")
 
-# 🟢 ESTADO GLOBAL DE TAREFAS
-estado_servidor = {"ocupado": False, "mensagem": "", "erro": "", "sucesso": ""}
+# ==============================================================
+# 🔄 GERENCIADOR DE TAREFAS EM BACKGROUND E ESTADO GLOBAL
+# ==============================================================
+estado_servidor = {
+    "ocupado": False, 
+    "mensagem": "", 
+    "erro": "", 
+    "sucesso": ""
+}
+
+# Variável global para rastrear o processo em execução e permitir o cancelamento (Stop)
+processo_atual = None
 
 def executar_processo_bg(comando, msg_executando, msg_sucesso):
-    global estado_servidor
+    global estado_servidor, processo_atual
+    
     estado_servidor["ocupado"] = True
     estado_servidor["mensagem"] = msg_executando
     estado_servidor["erro"] = ""
     estado_servidor["sucesso"] = ""
 
     try:
-        # A CORREÇÃO SUPREMA DE ENCODING:
-        # Força o Python filho a usar UTF-8 no terminal do Windows para não quebrar com emojis (✅)
+        # Força o Python filho a usar UTF-8 para não quebrar com caracteres especiais e emojis no Windows
         env_vars = os.environ.copy()
         env_vars["PYTHONIOENCODING"] = "utf-8"
         
-        processo = subprocess.run(
+        # Usamos Popen para ter o controle do processo e poder usar o terminate()
+        processo_atual = subprocess.Popen(
             comando, 
-            capture_output=True, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
             text=True, 
-            encoding='utf-8',
-            errors='replace',
+            encoding='utf-8', 
+            errors='replace', 
             env=env_vars
         )
         
-        if processo.returncode != 0:
-            linhas_erro = processo.stderr.strip().split('\n')
-            erro_curto = linhas_erro[-1] if linhas_erro and linhas_erro[-1] else "Processo abortado pelo usuário."
-            estado_servidor["erro"] = f"Falha: {erro_curto}"
+        # Aguarda terminar e captura as saídas do terminal
+        stdout, stderr = processo_atual.communicate()
+        
+        # Verifica se o processo falhou ou foi abortado/cancelado
+        if processo_atual.returncode != 0:
+            linhas_erro = stderr.strip().split('\n')
+            erro_curto = linhas_erro[-1] if linhas_erro and linhas_erro[-1] else "Processo abortado."
+            
+            # Se for cancelamento manual ou interrupção de teclado, exibe mensagem amigável
+            if "KeyboardInterrupt" in stderr or processo_atual.returncode == 1 or processo_atual.returncode < 0:
+                estado_servidor["erro"] = "Execução cancelada pelo usuário."
+            else:
+                estado_servidor["erro"] = f"Falha: {erro_curto}"
         else:
             estado_servidor["sucesso"] = msg_sucesso
+            
     except Exception as e:
         estado_servidor["erro"] = str(e)
     finally:
         estado_servidor["ocupado"] = False
+        processo_atual = None
 
+# ==============================================================
+# 🚀 MODELOS DE DADOS
+# ==============================================================
 class NovaAulaReq(BaseModel):
     nome_aula: str
     objetivo: str
 
+# ==============================================================
+# 🌐 ROTAS DA API
+# ==============================================================
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
+    """Renderiza a interface principal do Painel (index.html)."""
     return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/api/metricas")
+async def get_metricas():
+    """Consulta o banco SQLite (Brain) para alimentar o Dashboard de Zero-Touch."""
+    try:
+        if not os.path.exists("brain.db"): 
+            return {"total_memorizado": 0, "sucesso_recuperacao": 0}
+            
+        with sqlite3.connect("brain.db") as conn:
+            total = conn.execute("SELECT COUNT(*) FROM memoria_semantica").fetchone()[0]
+            hits = conn.execute("SELECT SUM(hits) FROM memoria_semantica").fetchone()[0] or 0
+            
+        return {"total_memorizado": total, "sucesso_recuperacao": hits}
+    except Exception:
+        return {"total_memorizado": 0, "sucesso_recuperacao": 0}
 
 @app.get("/api/status")
 async def get_status():
+    """Retorna o estado atual do servidor para o Polling da interface Web."""
     return estado_servidor
 
 @app.post("/api/limpar-status")
 async def limpar_status():
+    """Limpa as mensagens de erro ou sucesso após elas serem exibidas na tela."""
     estado_servidor["erro"] = ""
     estado_servidor["sucesso"] = ""
     return {"status": "ok"}
+    
+@app.post("/api/cancelar")
+async def cancelar_processo():
+    """Rota chamada pelo Botão de Pânico vermelho para matar o robô na hora."""
+    global processo_atual
+    if processo_atual:
+        processo_atual.terminate() # Interrompe o processo imediatamente
+        return {"status": "cancelado"}
+    return {"status": "inativo"}
 
 @app.get("/api/roteiros")
 async def listar_roteiros():
+    """Varre a pasta e retorna a lista de todos os roteiros mapeados."""
     arquivos = [f for f in os.listdir(ROTEIROS_DIR) if f.endswith('.json')]
     roteiros = []
-    for arq in arquivos:
+    
+    for arquivo in arquivos:
         try:
-            caminho_completo = os.path.join(ROTEIROS_DIR, arq)
+            caminho_completo = os.path.join(ROTEIROS_DIR, arquivo)
             with open(caminho_completo, 'r', encoding='utf-8') as f:
                 dados = json.load(f)
-                nome_aula = dados.get("metadata", {}).get("nome_aula", arq.replace(".json", ""))
+                nome_aula = dados.get("metadata", {}).get("nome_aula", arquivo.replace(".json", ""))
                 nome_arquivo_base = re.sub(r'[\\/*?:"<>|]', "", nome_aula).replace(" ", "_")
                 
-                # Verifica se o vídeo mp4 já existe para esta aula
-                video_path = os.path.join(VIDEOS_DIR, f"{nome_arquivo_base}.mp4")
-                tem_video = os.path.exists(video_path)
+                # Verifica se já existe um vídeo renderizado para habilitar o botão de Play
+                tem_video = os.path.exists(os.path.join(VIDEOS_DIR, f"{nome_arquivo_base}.mp4"))
                 
                 roteiros.append({
-                    "arquivo": arq,
-                    "nome": nome_aula,
+                    "arquivo": arquivo, 
+                    "nome": nome_aula, 
                     "qtd_passos": len(dados.get("passos", [])),
-                    "mtime": os.path.getmtime(caminho_completo),
+                    "mtime": os.path.getmtime(caminho_completo), 
                     "tem_video": tem_video,
                     "video_url": f"/videos/{nome_arquivo_base}.mp4" if tem_video else None
                 })
-        except: pass
-    
-    # Ordena colocando os salvos mais recentemente no topo
+        except Exception:
+            pass
+            
+    # Ordena colocando os arquivos modificados/criados mais recentemente no topo
     roteiros.sort(key=lambda x: x["mtime"], reverse=True)
     return roteiros
 
 @app.get("/api/roteiros/{arquivo}")
 async def get_roteiro(arquivo: str):
-    caminho = os.path.join(ROTEIROS_DIR, arquivo)
-    if not os.path.exists(caminho):
+    """Lê e retorna o conteúdo completo de um Roteiro JSON específico."""
+    try:
+        with open(os.path.join(ROTEIROS_DIR, arquivo), 'r', encoding='utf-8') as f: 
+            return json.load(f)
+    except FileNotFoundError:
         return JSONResponse(status_code=404, content={"erro": "Arquivo não encontrado"})
-    with open(caminho, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 @app.post("/api/roteiros/{arquivo}")
 async def salvar_roteiro(arquivo: str, request: Request):
+    """Salva as alterações feitas pelo usuário no Estúdio de Edição."""
     dados = await request.json()
-    with open(os.path.join(ROTEIROS_DIR, arquivo), 'w', encoding='utf-8') as f:
+    with open(os.path.join(ROTEIROS_DIR, arquivo), 'w', encoding='utf-8') as f: 
         json.dump(dados, f, indent=2, ensure_ascii=False)
     return {"status": "sucesso"}
 
 @app.delete("/api/roteiros/{arquivo}")
 async def excluir_roteiro(arquivo: str):
+    """Apaga o roteiro JSON permanentemente (Lixeira)."""
     caminho = os.path.join(ROTEIROS_DIR, arquivo)
-    if os.path.exists(caminho):
+    if os.path.exists(caminho): 
         os.remove(caminho)
-        return {"status": "sucesso", "mensagem": "Roteiro excluído permanentemente!"}
+        return {"status": "sucesso"}
     return JSONResponse(status_code=404, content={"erro": "Arquivo não encontrado"})
 
 @app.post("/api/gravar")
 async def gravar_aula(req: NovaAulaReq):
-    if estado_servidor["ocupado"]: return JSONResponse(status_code=400, content={"erro": "O robô já está em uso."})
-    threading.Thread(target=executar_processo_bg, args=(
-        [sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"],
-        "Aguardando você mapear a tela no Senior X...",
-        "✅ Mapeamento concluído! A aula foi salva."
-    )).start()
+    """Dispara o Mapeador de Tela (capture.py)."""
+    if estado_servidor["ocupado"]: 
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+        
+    comando = [sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"]
+    threading.Thread(target=executar_processo_bg, args=(comando, "Mapeando a tela no Senior X...", "✅ Mapeamento salvo com sucesso.")).start()
     return {"status": "iniciado"}
 
 @app.post("/api/executar-robo/{arquivo}")
 async def executar_robo(arquivo: str):
-    if estado_servidor["ocupado"]: return JSONResponse(status_code=400, content={"erro": "O robô já está em uso."})
-    caminho = os.path.join(ROTEIROS_DIR, arquivo)
-    threading.Thread(target=executar_processo_bg, args=(
-        [sys.executable, "main.py", caminho, "--record"],
-        "Robô atuando na tela... Por favor, não mexa no mouse nem no teclado!",
-        "✅ Atuação concluída! Você já pode renderizar o vídeo final."
-    )).start()
+    """Dispara o robô atuador (main.py --record)."""
+    if estado_servidor["ocupado"]: 
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+        
+    comando = [sys.executable, "main.py", os.path.join(ROTEIROS_DIR, arquivo), "--record"]
+    threading.Thread(target=executar_processo_bg, args=(comando, "Robô atuando... Por favor, não mexa no mouse!", "✅ Atuação concluída.")).start()
     return {"status": "iniciado"}
 
 @app.post("/api/renderizar/{arquivo}")
 async def renderizar_video(arquivo: str):
-    if estado_servidor["ocupado"]: return JSONResponse(status_code=400, content={"erro": "O robô já está em uso."})
-    caminho = os.path.join(ROTEIROS_DIR, arquivo)
-    threading.Thread(target=executar_processo_bg, args=(
-        [sys.executable, "main.py", caminho, "--render"],
-        "🎬 Renderizando o vídeo e extraindo o SRT... Isso pode levar um tempinho.",
-        "🎉 SUCESSO! Vídeo gerado na pasta 'videos_prontos'."
-    )).start()
+    """Dispara a pós-produção do MoviePy (main.py --render)."""
+    if estado_servidor["ocupado"]: 
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+        
+    comando = [sys.executable, "main.py", os.path.join(ROTEIROS_DIR, arquivo), "--render"]
+    threading.Thread(target=executar_processo_bg, args=(comando, "Renderizando vídeo final e extraindo legendas...", "🎉 Vídeo pronto e disponível!")).start()
     return {"status": "iniciado"}
 
+# ==============================================================
+# 🚀 PONTO DE ENTRADA DA APLICAÇÃO
+# ==============================================================
 if __name__ == "__main__":
     print("\n" + "="*50)
     print("🚀 SENIOR TRAINING OS - SERVIDOR INICIADO")

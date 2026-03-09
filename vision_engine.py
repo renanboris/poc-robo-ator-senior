@@ -4,8 +4,8 @@ vision_engine.py — Motor de localização e execução de ações no browser.
 Filosofia: cascata de estratégias do mais barato ao mais caro.
 Cada camada só é acionada se a anterior falhar completamente.
 
-Camadas:
-  0  Cache semântico da sessão (hit = executa sem busca)
+Camadas de Resiliência:
+  0  Brain (Memória SQLite Permanente - Auto-Cura e Zero-Touch)
   1  Foco nativo / active element (campos de digitação inline e novas pastas)
   1.5 Heurísticas Senior X (Ícones mudos como Home, Lixeira, etc)
   2  Sniper semântico — 15+ seletores Playwright nativos (getByRole, getByLabel…)
@@ -22,13 +22,14 @@ import json
 import logging
 import os
 import re
-from dataclasses import dataclass, field
+import sqlite3
+from dataclasses import dataclass
 from typing import Optional
 
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from playwright.async_api import Page, FrameLocator
+from playwright.async_api import Page
 
 load_dotenv()
 
@@ -36,8 +37,32 @@ logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # ──────────────────────────────────────────────────────────────
-# 📦 ESTRUTURAS DE DADOS
+# 🧠 O "BRAIN" - MEMÓRIA DE LONGO PRAZO (SQLITE)
 # ──────────────────────────────────────────────────────────────
+DB_PATH = "brain.db"
+MAX_FALHAS_CACHE = 3
+
+def _init_db():
+    """Inicializa o banco de dados SQLite caso ele não exista."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS memoria_semantica (
+                hash_intencao TEXT PRIMARY KEY,
+                intencao TEXT,
+                seletor TEXT,
+                coords TEXT,
+                iframe TEXT,
+                hits INTEGER DEFAULT 0,
+                falhas_consecutivas INTEGER DEFAULT 0,
+                ultima_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+_init_db()
+
+def _chave_cache(intencao: str) -> str:
+    """Gera um hash único baseado na intenção semântica para servir de chave no banco."""
+    return hashlib.md5(intencao.strip().lower().encode()).hexdigest()[:16]
 
 @dataclass
 class EntradaCache:
@@ -47,6 +72,84 @@ class EntradaCache:
     hits: int = 0
     falhas_consecutivas: int = 0  
 
+def _consultar_cache(intencao: str) -> Optional[EntradaCache]:
+    """Busca no banco de dados SQLite se o robô já sabe onde clicar para esta intenção."""
+    chave = _chave_cache(intencao)
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM memoria_semantica WHERE hash_intencao = ?", (chave,)).fetchone()
+            
+            if row:
+                # Mecanismo de Auto-Cura (Self-Healing)
+                if row['falhas_consecutivas'] >= MAX_FALHAS_CACHE:
+                    logger.debug(f"   🗑️ [Brain] Memória obsoleta apagada (mudança de UI detectada): '{intencao[:40]}'")
+                    conn.execute("DELETE FROM memoria_semantica WHERE hash_intencao = ?", (chave,))
+                    return None
+                    
+                logger.info(f"   🧠 [Brain] Memória ativada para: '{intencao[:50]}'")
+                return EntradaCache(
+                    seletor=row['seletor'],
+                    coords=json.loads(row['coords']) if row['coords'] else None,
+                    iframe_src=row['iframe'],
+                    hits=row['hits'],
+                    falhas_consecutivas=row['falhas_consecutivas']
+                )
+    except Exception as e:
+        logger.error(f"Erro ao ler Brain DB: {e}")
+    return None
+
+def _registrar_sucesso_cache(intencao: str, seletor: Optional[str] = None, coords: Optional[dict] = None, iframe: Optional[str] = None):
+    """Salva a localização do elemento no banco de dados para a próxima execução (Zero-Touch)."""
+    chave = _chave_cache(intencao)
+    coords_str = json.dumps(coords) if coords else None
+    
+    # Ignora seletores muito vagos gerados por fallbacks
+    if seletor and not seletor.startswith(("text=", "[", "#")):
+        seletor = None
+        
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            existente = conn.execute("SELECT hits FROM memoria_semantica WHERE hash_intencao = ?", (chave,)).fetchone()
+            
+            if existente:
+                # Atualiza a memória existente zerando as falhas e aumentando os hits
+                query = "UPDATE memoria_semantica SET hits = hits + 1, falhas_consecutivas = 0, ultima_atualizacao = CURRENT_TIMESTAMP"
+                params = []
+                if seletor: 
+                    query += ", seletor = ?"
+                    params.append(seletor)
+                if coords_str:
+                    query += ", coords = ?"
+                    params.append(coords_str)
+                if iframe:
+                    query += ", iframe = ?"
+                    params.append(iframe)
+                
+                query += " WHERE hash_intencao = ?"
+                params.append(chave)
+                conn.execute(query, params)
+            else:
+                # Insere uma nova memória de longo prazo
+                conn.execute("""
+                    INSERT INTO memoria_semantica (hash_intencao, intencao, seletor, coords, iframe, hits, falhas_consecutivas)
+                    VALUES (?, ?, ?, ?, ?, 1, 0)
+                """, (chave, intencao, seletor, coords_str, iframe))
+    except Exception as e:
+        logger.error(f"Erro ao salvar no Brain DB: {e}")
+
+def _registrar_falha_cache(intencao: str):
+    """Se uma memória falhou, soma +1 nas falhas. Ao chegar a 3, a memória será deletada."""
+    chave = _chave_cache(intencao)
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("UPDATE memoria_semantica SET falhas_consecutivas = falhas_consecutivas + 1 WHERE hash_intencao = ?", (chave,))
+    except Exception:
+        pass
+
+# ──────────────────────────────────────────────────────────────
+# 📦 ESTRUTURAS DE CANDIDATOS (SNIPER)
+# ──────────────────────────────────────────────────────────────
 @dataclass
 class TentativaLocalizacao:
     seletor: str
@@ -60,44 +163,6 @@ class TentativaLocalizacao:
     descricao: str = ""               
 
 # ──────────────────────────────────────────────────────────────
-# 🗃️ CACHE SEMÂNTICO
-# ──────────────────────────────────────────────────────────────
-
-_cache_sessao: dict[str, EntradaCache] = {}
-MAX_FALHAS_CACHE = 3
-
-def _chave_cache(intencao: str) -> str:
-    return hashlib.md5(intencao.strip().lower().encode()).hexdigest()[:16]
-
-def _consultar_cache(intencao: str) -> Optional[EntradaCache]:
-    entrada = _cache_sessao.get(_chave_cache(intencao))
-    if not entrada:
-        return None
-    if entrada.falhas_consecutivas >= MAX_FALHAS_CACHE:
-        logger.debug(f"Cache descartado por {MAX_FALHAS_CACHE} falhas: '{intencao[:40]}'")
-        return None
-    if entrada.hits >= 1:
-        logger.info(f"   ⚡ [Cache] Hit para: '{intencao[:50]}'")
-        return entrada
-    return None
-
-def _registrar_sucesso_cache(intencao: str, seletor: Optional[str] = None, coords: Optional[dict] = None, iframe: Optional[str] = None) -> None:
-    chave = _chave_cache(intencao)
-    entrada = _cache_sessao.get(chave, EntradaCache())
-    entrada.hits += 1
-    entrada.falhas_consecutivas = 0
-    if seletor: entrada.seletor = seletor
-    if coords: entrada.coords = coords
-    if iframe: entrada.iframe_src = iframe
-    _cache_sessao[chave] = entrada
-
-def _registrar_falha_cache(intencao: str) -> None:
-    chave = _chave_cache(intencao)
-    entrada = _cache_sessao.get(chave, EntradaCache())
-    entrada.falhas_consecutivas += 1
-    _cache_sessao[chave] = entrada
-
-# ──────────────────────────────────────────────────────────────
 # 🔬 ANÁLISE DE SELETORES E ATRIBUTOS
 # ──────────────────────────────────────────────────────────────
 
@@ -107,13 +172,17 @@ _TAGS_FRAGEIS = {
 }
 
 def _e_seletor_fragil(seletor: str) -> bool:
-    if not seletor: return True
+    """Verifica se o seletor capturado originalmente é frágil e pode quebrar."""
+    if not seletor: 
+        return True
     for prefixo in ("text=", "has-text", "[aria-label=", "[data-testid=", "[id=", "[name=", "[placeholder=", "[role="):
-        if prefixo in seletor: return False
+        if prefixo in seletor: 
+            return False
     tag = seletor.strip().split(':')[0].split('[')[0].split('.')[0].split('>')[0].strip()
     return tag in _TAGS_FRAGEIS
 
 def _extrair_atributo(seletor: str, atributo: str) -> Optional[str]:
+    """Tira um atributo específico de dentro de um seletor CSS string."""
     match = re.search(rf'{atributo}=[\'"]([^\'"]+)[\'"]', seletor)
     return match.group(1) if match else None
 
@@ -124,11 +193,12 @@ def _extrair_atributo(seletor: str, atributo: str) -> Optional[str]:
 def _gerar_candidatos(
     seletor_hint: str, label_curto: str, iframe_hint: Optional[str], acao: str, tipo_elemento: str, html_hint: str
 ) -> list[TentativaLocalizacao]:
+    """Gera até 15 formas diferentes e resilientes de procurar o mesmo elemento na tela."""
     candidatos: list[TentativaLocalizacao] = []
     eh_digitacao = acao in ("digitar_e_enter", "preencher_campo")
-    
     is_tag_generica = label_curto.lower() in _TAGS_FRAGEIS
 
+    # Baseado em texto ou label semântico
     if label_curto and not is_tag_generica:
         if not eh_digitacao:
             candidatos.append(TentativaLocalizacao(seletor=f'text="{label_curto}"', iframe_hint=iframe_hint, exact=True, descricao=f"texto exato '{label_curto}'"))
@@ -142,10 +212,11 @@ def _gerar_candidatos(
             candidatos.append(TentativaLocalizacao(seletor="", label=label_curto, iframe_hint=iframe_hint, descricao=f"label '{label_curto}'"))
 
         candidatos.append(TentativaLocalizacao(seletor=f"[aria-label='{label_curto}']", iframe_hint=iframe_hint, descricao=f"aria-label='{label_curto}'"))
-
+        
         if label_curto != label_curto.lower():
             candidatos.append(TentativaLocalizacao(seletor=f"[aria-label='{label_curto.lower()}']", iframe_hint=iframe_hint, descricao=f"aria-label lowercase"))
 
+    # Baseado nos atributos fortes capturados no HTML
     aria_hint = _extrair_atributo(seletor_hint, "aria-label")
     if aria_hint and aria_hint != label_curto:
         candidatos.append(TentativaLocalizacao(seletor=f"[aria-label='{aria_hint}']", iframe_hint=iframe_hint, descricao=f"aria-label do hint '{aria_hint}'"))
@@ -175,6 +246,7 @@ def _gerar_candidatos(
             if not re.search(r'(ng-|mat-|cdk-|\d{5,})', elem_id):
                 candidatos.append(TentativaLocalizacao(seletor=f"#{elem_id}", iframe_hint=iframe_hint, descricao=f"id='{elem_id}'"))
 
+    # Fallbacks mais frouxos
     if label_curto and not is_tag_generica and not eh_digitacao and len(label_curto) > 3:
         candidatos.append(TentativaLocalizacao(seletor=f">> text={label_curto}", via_pierce=True, iframe_hint=iframe_hint, descricao=f"shadow DOM pierce texto '{label_curto}'"))
         candidatos.append(TentativaLocalizacao(seletor=f"text={label_curto}", iframe_hint=iframe_hint, exact=False, descricao=f"texto parcial '{label_curto}'"))
@@ -186,25 +258,33 @@ def _gerar_candidatos(
 # ──────────────────────────────────────────────────────────────
 
 async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
-    if not iframe_hint or iframe_hint in ("Página Principal", "iframe-cross-origin"): return page
+    """Garante que o Playwright atue dentro do iframe correto, se houver."""
+    if not iframe_hint or iframe_hint in ("Página Principal", "iframe-cross-origin"): 
+        return page
 
     for seletor_iframe in [f"iframe[name='{iframe_hint}']", f"iframe[src*='{iframe_hint}']", f"iframe[id='{iframe_hint}']", f"iframe[title*='{iframe_hint}']"]:
         try:
             fl = page.frame_locator(seletor_iframe)
             await fl.locator("body").wait_for(state="attached", timeout=800)
             return fl
-        except Exception: continue
+        except Exception: 
+            continue
 
     try:
         frames = page.frames
         for frame in frames:
             try:
-                if iframe_hint in frame.url or iframe_hint in frame.name: return frame
-            except Exception: continue
-    except Exception: pass
+                if iframe_hint in frame.url or iframe_hint in frame.name: 
+                    return frame
+            except Exception: 
+                continue
+    except Exception: 
+        pass
+        
     return page
 
 async def _scroll_para_area_esperada(page: Page, coords_relativas: Optional[dict]) -> int:
+    """Faz um scroll preventivo antes de procurar o elemento se ele estava fora da view."""
     try:
         if coords_relativas and coords_relativas.get("y_pct"):
             vp = page.viewport_size or {"width": 1920, "height": 1080}
@@ -214,52 +294,119 @@ async def _scroll_para_area_esperada(page: Page, coords_relativas: Optional[dict
                 await asyncio.sleep(0.3)
         scroll_y = await page.evaluate("() => window.scrollY") or 0
         return int(scroll_y)
-    except Exception: return 0
+    except Exception: 
+        return 0
 
 # ──────────────────────────────────────────────────────────────
-# ✨ HIGHLIGHT VISUAL E EXECUÇÃO FÍSICA
+# ✨ HIGHLIGHT VISUAL COM POINTER ANIMADO (BAIXO PARA CIMA)
 # ──────────────────────────────────────────────────────────────
 
 async def _highlight_elemento(locator, page: Page) -> None:
+    """
+    Desenha um highlight neon em volta do botão e injeta uma Seta Animada 
+    apontando fisicamente para o elemento de BAIXO para CIMA para criar um efeito visual premium.
+    """
     try:
-        await locator.evaluate("""el => { el.style.transition = 'all 0.25s'; el.style.outline = '4px solid #009999'; el.style.boxShadow = '0 0 20px rgba(0,153,153,0.8)'; }""")
-        await asyncio.sleep(1.0)
-        await locator.evaluate("""el => { el.style.outline = ''; el.style.boxShadow = ''; }""")
-    except Exception: pass
+        await locator.evaluate("""el => { 
+            el.style.transition = 'all 0.25s'; 
+            el.style.outline = '3px solid #00e5e5'; 
+            el.style.boxShadow = '0 0 15px rgba(0,229,229,0.5)'; 
+            
+            const rect = el.getBoundingClientRect();
+            
+            // 1. Cria a seta animada
+            const pointer = document.createElement('div');
+            pointer.id = 'senior-temp-pointer';
+            
+            // Centraliza no eixo X do elemento e coloca abaixo dele (eixo Y)
+            pointer.style = `
+                position: fixed;
+                top: ${rect.bottom + 15}px;
+                left: ${rect.left + (rect.width / 2)}px;
+                transform: translateX(-50%);
+                width: 28px; 
+                height: 38px;
+                background: linear-gradient(180deg, #00e5e5 0%, #008888 100%);
+                clip-path: polygon(50% 0%, 0% 45%, 30% 45%, 30% 100%, 70% 100%, 70% 45%, 100% 45%);
+                z-index: 2147483647;
+                animation: bounce-vertical 0.5s infinite alternate ease-in-out;
+                filter: drop-shadow(0 4px 8px rgba(0, 229, 229, 0.5));
+            `;
+            
+            // 2. Injeta a animação CSS vertical no header se não existir
+            if (!document.getElementById('senior-pointer-styles')) {
+                const style = document.createElement('style');
+                style.id = 'senior-pointer-styles';
+                style.innerHTML = `
+                    @keyframes bounce-vertical { 
+                        from { transform: translate(-50%, 0px); } 
+                        to { transform: translate(-50%, -15px); } 
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(pointer);
+            
+            // 3. Remove tudo após a pausa de visualização (1.2 segundos)
+            setTimeout(() => { 
+                if(pointer) pointer.remove(); 
+                el.style.outline = ''; 
+                el.style.boxShadow = ''; 
+            }, 1200);
+        }""")
+        await asyncio.sleep(1.0) # Pausa dramática para o espectador ler o texto e ver a seta
+    except Exception: 
+        pass
 
 async def _highlight_coords(page: Page, x: int, y: int) -> None:
+    """Feedback visual (um pulso circular) para quando o clique for por coordenadas brutas."""
     try:
         await page.evaluate(f"""() => {{
             const dot = document.createElement('div');
-            dot.style.cssText = `position: fixed; left: {x - 18}px; top: {y - 18}px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,153,153,0.5); border: 3px solid #009999; z-index: 999999; pointer-events: none; animation: ping 0.6s ease-out;`;
+            dot.style.cssText = `position: fixed; left: {x - 18}px; top: {y - 18}px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,229,229,0.5); border: 3px solid #00e5e5; z-index: 999999; pointer-events: none; animation: ping 0.6s ease-out;`;
             document.body.appendChild(dot);
             setTimeout(() => dot.remove(), 900);
         }}""")
     except Exception: pass
 
 async def _aguardar_estabilidade(page: Page, timeout_ms: int = 1500) -> None:
-    try: await page.wait_for_load_state("networkidle", timeout=timeout_ms)
-    except Exception: await asyncio.sleep(0.4)
+    try: 
+        await page.wait_for_load_state("networkidle", timeout=timeout_ms)
+    except Exception: 
+        await asyncio.sleep(0.4)
 
 async def _executar_acao(locator, page: Page, acao: str, valor: str) -> None:
+    """Rola a página até o elemento, dá o highlight com seta e executa a ação."""
     try:
         await locator.scroll_into_view_if_needed(timeout=2000)
         await locator.hover(timeout=1500)
-    except Exception: pass
+    except Exception: 
+        pass
 
+    # Invoca a seta mágica
     await _highlight_elemento(locator, page)
 
-    if acao == "duplo_clique": await locator.dblclick(timeout=3000)
+    # Executa o clique ou digitação
+    if acao == "duplo_clique": 
+        await locator.dblclick(timeout=3000)
     elif acao == "digitar_e_enter":
-        await locator.click(timeout=2000); await asyncio.sleep(0.2)
-        await page.keyboard.press("Control+A"); await page.keyboard.press("Backspace")
-        if valor: await page.keyboard.type(valor, delay=40)
+        await locator.click(timeout=2000)
+        await asyncio.sleep(0.2)
+        await page.keyboard.press("Control+A")
+        await page.keyboard.press("Backspace")
+        if valor: 
+            await page.keyboard.type(valor, delay=40)
         await page.keyboard.press("Enter")
     elif acao == "preencher_campo":
-        await locator.click(timeout=2000); await asyncio.sleep(0.2)
-        await page.keyboard.press("Control+A"); await page.keyboard.press("Backspace")
-        if valor: await page.keyboard.type(valor, delay=40)
-    else: await locator.click(timeout=3000)
+        await locator.click(timeout=2000)
+        await asyncio.sleep(0.2)
+        await page.keyboard.press("Control+A")
+        await page.keyboard.press("Backspace")
+        if valor: 
+            await page.keyboard.type(valor, delay=40)
+    else: 
+        await locator.click(timeout=3000)
 
     await _aguardar_estabilidade(page)
 
@@ -268,27 +415,36 @@ async def _executar_acao(locator, page: Page, acao: str, valor: str) -> None:
 # ──────────────────────────────────────────────────────────────
 
 async def _tentar_candidato(page: Page, candidato: TentativaLocalizacao, acao: str, valor: str, timeout_ms: int = 3500) -> bool:
+    """Testa se um dos candidatos do Sniper é o botão certo na tela."""
     try:
         contexto = await _resolver_contexto(page, candidato.iframe_hint)
 
         if not candidato.seletor:
-            if hasattr(contexto, 'get_by_role') and candidato.role and candidato.label: loc = contexto.get_by_role(candidato.role, name=candidato.label).first
-            elif hasattr(contexto, 'get_by_label') and candidato.label: loc = contexto.get_by_label(candidato.label).first
-            elif hasattr(contexto, 'get_by_placeholder') and candidato.placeholder: loc = contexto.get_by_placeholder(candidato.placeholder).first
-            elif hasattr(contexto, 'get_by_title') and candidato.title: loc = contexto.get_by_title(candidato.title).first
+            if hasattr(contexto, 'get_by_role') and candidato.role and candidato.label: 
+                loc = contexto.get_by_role(candidato.role, name=candidato.label).first
+            elif hasattr(contexto, 'get_by_label') and candidato.label: 
+                loc = contexto.get_by_label(candidato.label).first
+            elif hasattr(contexto, 'get_by_placeholder') and candidato.placeholder: 
+                loc = contexto.get_by_placeholder(candidato.placeholder).first
+            elif hasattr(contexto, 'get_by_title') and candidato.title: 
+                loc = contexto.get_by_title(candidato.title).first
             else: return False
         elif candidato.seletor.startswith("text="):
             texto = candidato.seletor[5:].strip('"').strip("'")
             loc = contexto.get_by_text(texto, exact=candidato.exact).first
-        elif candidato.via_pierce: loc = page.locator(candidato.seletor).first
-        else: loc = contexto.locator(candidato.seletor).first
+        elif candidato.via_pierce: 
+            loc = page.locator(candidato.seletor).first
+        else: 
+            loc = contexto.locator(candidato.seletor).first
 
         await loc.wait_for(state="visible", timeout=timeout_ms)
         await _executar_acao(loc, page, acao, valor)
         return True
-    except Exception: return False
+    except Exception: 
+        return False
 
 async def _digitar_no_active_element(page: Page, acao: str, valor: str) -> bool:
+    """Tenta digitar onde o cursor do mouse já estiver piscando."""
     try:
         is_editable = False
         for _ in range(5):
@@ -305,8 +461,8 @@ async def _digitar_no_active_element(page: Page, acao: str, valor: str) -> bool:
         await page.evaluate("""() => {
             const el = document.activeElement;
             el.style.transition = 'all 0.3s';
-            el.style.outline = '4px solid #009999';
-            el.style.boxShadow = '0 0 25px #009999';
+            el.style.outline = '4px solid #00e5e5';
+            el.style.boxShadow = '0 0 25px rgba(0,229,229,0.5)';
         }""")
         await asyncio.sleep(0.8)
 
@@ -318,15 +474,18 @@ async def _digitar_no_active_element(page: Page, acao: str, valor: str) -> bool:
         await asyncio.sleep(0.3)
         try: await page.evaluate("""() => { const el = document.activeElement; if (el) { el.style.outline = ''; el.style.boxShadow = ''; } }""")
         except Exception: pass
+        
         await _aguardar_estabilidade(page)
         return True
-    except Exception: return False
+    except Exception: 
+        return False
 
 # ──────────────────────────────────────────────────────────────
 # 🌐 BUSCA EM TODOS OS FRAMES
 # ──────────────────────────────────────────────────────────────
 
 async def _buscar_em_todos_os_frames(page: Page, candidatos: list[TentativaLocalizacao], acao: str, valor: str) -> Optional[str]:
+    """Se não achar no frame principal, varre a página inteira."""
     try: frames = page.frames
     except Exception: return None
 
@@ -363,7 +522,8 @@ async def _buscar_em_todos_os_frames(page: Page, candidatos: list[TentativaLocal
 # ──────────────────────────────────────────────────────────────
 
 async def _gemini_localizar_elemento(screenshot_atual: bytes, screenshot_ref_b64: Optional[str], descricao_visual: str, intencao: str, contexto_tela: str, viewport: dict, scroll_y: int) -> Optional[dict]:
-    logger.info(f"   👁️  [Gemini Vision] Analisando tela para: '{descricao_visual[:60]}'...")
+    """A Última Esperança: Pede ao Google Gemini para olhar a tela e achar o botão (Auto-Healing)."""
+    logger.info(f"   👁️  [Gemini Vision] Acionando a IA para reparar o script...")
     contents = []
 
     if screenshot_ref_b64:
@@ -398,7 +558,8 @@ ou {{"metodo": "nao_encontrado"}}""")
 
         if resultado.get("metodo") == "nao_encontrado": return None
         return resultado
-    except Exception as exc: return None
+    except Exception as exc: 
+        return None
 
 def _parse_coords(coords):
     try:
@@ -420,15 +581,18 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
         await _highlight_coords(page, x, y)
         await asyncio.sleep(0.3)
 
-        if acao == "duplo_clique": await page.mouse.dblclick(x, y)
-        else: await page.mouse.click(x, y)
+        if acao == "duplo_clique": 
+            await page.mouse.dblclick(x, y)
+        else: 
+            await page.mouse.click(x, y)
 
         if acao in ("digitar_e_enter", "preencher_campo") and valor:
             await asyncio.sleep(0.3)
             await page.keyboard.press("Control+A")
             await page.keyboard.press("Backspace")
             await page.keyboard.type(valor, delay=40)
-            if acao == "digitar_e_enter": await page.keyboard.press("Enter")
+            if acao == "digitar_e_enter": 
+                await page.keyboard.press("Enter")
 
         await _aguardar_estabilidade(page)
         return True
@@ -438,14 +602,19 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
         return False
 
 # ──────────────────────────────────────────────────────────────
-# 🤖 ORQUESTRADOR PRINCIPAL
+# 🤖 ORQUESTRADOR PRINCIPAL (A MÁQUINA DE DECISÃO)
 # ──────────────────────────────────────────────────────────────
 
 async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
+    """
+    Função principal. Roteia a tentativa pelas 6 camadas de fallback 
+    até encontrar o botão e interagir com ele.
+    """
     alvo: dict = acao_tec.get("elemento_alvo", {})
     acao: str = acao_tec.get("acao", "clique")
     intencao: str = acao_tec.get("intencao_semantica", "Ação na interface")
     valor: str = acao_tec.get("valor_input", "") or ""
+    
     label_curto: str = alvo.get("label_curto", "")
     iframe_hint: Optional[str] = alvo.get("iframe_hint")
     seletor_hint: str = alvo.get("seletor_hint", "")
@@ -457,25 +626,24 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
 
     logger.info(f"\n   🎯 Executando: {intencao[:80]}")
 
-    # ── 📜 Scroll preventivo ────────────────────────────────
     scroll_y = await _scroll_para_area_esperada(page, coords_relativas)
 
-    # ── 0. Cache semântico ──────────────────────────────────
+    # ── 0. BRAIN (Memória SQlite de longo prazo - Instantâneo) ───────────
     cache = _consultar_cache(intencao)
     if cache:
         if cache.seletor:
-            cand_cache = TentativaLocalizacao(seletor=cache.seletor, iframe_hint=cache.iframe_src or iframe_hint, descricao="cache semântico")
+            cand_cache = TentativaLocalizacao(seletor=cache.seletor, iframe_hint=cache.iframe_src or iframe_hint, descricao="brain knowledge")
             if await _tentar_candidato(page, cand_cache, acao, valor):
-                _registrar_sucesso_cache(intencao)
+                _registrar_sucesso_cache(intencao) # Reseta as falhas e sobe o Hit
                 return True
             else:
-                _registrar_falha_cache(intencao)
+                _registrar_falha_cache(intencao) # +1 Falha (vai deletar se chegar a 3)
         elif cache.coords:
             if await _clicar_por_coordenadas(page, cache.coords, acao, valor):
                 _registrar_sucesso_cache(intencao)
                 return True
 
-    # ── 1. Foco Nativo e Fallback (Para inputs) ─────────────
+    # ── 1. Foco Nativo e Fallback (Exclusivo para inputs e digitação) ─────────────
     if acao in ("digitar_e_enter", "preencher_campo"):
         logger.info("   ⌨️  [Foco Nativo] Verificando se cursor já está posicionado...")
         if await _digitar_no_active_element(page, acao, valor):
@@ -491,15 +659,13 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 return True
         except Exception: pass
 
-    # ====================================================================
-    # ── 1.5. HEURÍSTICAS SENIOR X (Ícones Mudos, Home, Lixeira) ─────────
-    # ====================================================================
+    # ── 1.5. HEURÍSTICAS SENIOR X (Ícones Mudos da Interface) ─
     is_tag_generica = label_curto.lower() in _TAGS_FRAGEIS
     if is_tag_generica or not label_curto:
         intencao_low = intencao.lower()
         contexto_heuristica = await _resolver_contexto(page, iframe_hint)
         
-        # Heurística: Botão Home / Página Inicial / Raiz
+        # O botão maldito da casinha (Home) e outros atalhos da Senior
         if any(p in intencao_low for p in ["página inicial", "home", "início", "raiz", "dashboard"]):
             logger.info("   🏠 [Senior X] Heurística ativada para ícone Home/Breadcrumb...")
             seletores_home = [
@@ -518,21 +684,22 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         return True
                 except Exception: pass
 
-    # ── Gera todos os candidatos ────────────────────────────
+    # ── Gera todos os candidatos (As dezenas de seletores possíveis) ────────────────
     candidatos = _gerar_candidatos(
         seletor_hint, label_curto, iframe_hint, acao, tipo_elemento, html_hint
     )
 
-    # ── 2. Sniper semântico ─────────────────────────────────
+    # ── 2. Sniper Semântico (Abordagem robusta do Playwright) ─────────────────────────────────
     if candidatos:
         logger.info(f"   🔍 [Sniper] {len(candidatos)} candidatos para '{label_curto}'...")
         for cand in candidatos:
             if await _tentar_candidato(page, cand, acao, valor):
                 logger.info(f"   ✅ [Sniper] Acerto: {cand.descricao}")
+                # O botão foi achado. Salva no banco de dados SQLite para ser imediato da próxima vez!
                 _registrar_sucesso_cache(intencao, seletor=cand.seletor or cand.descricao, iframe=iframe_hint)
                 return True
 
-    # ── 3. Seletor hint original ────────────────────────────
+    # ── 3. Seletor Hint Original (Como foi pego no mapeamento) ────────────────────────────
     if seletor_hint and not _e_seletor_fragil(seletor_hint):
         cand_hint = TentativaLocalizacao(seletor=seletor_hint, iframe_hint=iframe_hint, descricao=f"hint original '{seletor_hint[:40]}'")
         if await _tentar_candidato(page, cand_hint, acao, valor):
@@ -540,7 +707,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
             return True
 
-    # ── 4. Busca em todos os frames ─────────────────────────
+    # ── 4. Busca Profunda em Todos os Frames (Caso a tela tenha modais) ─────────────────────────
     if candidatos:
         logger.info("   🌐 [Todos os Frames] Procurando o elemento em frames filhos...")
         frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
@@ -548,7 +715,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             _registrar_sucesso_cache(intencao, iframe=frame_url)
             return True
 
-    # ── 5. Gemini Vision ────────────────────────────────────
+    # ── 5. Gemini Vision (O Self-Healing Supremo) ────────────────────────────────────
     logger.info("   🤖 [Vision] DOM esgotado. Acionando Gemini Visual...")
     try:
         screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
@@ -573,10 +740,11 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if coords_ia:
                 if await _clicar_por_coordenadas(page, coords_ia, acao, valor):
                     logger.info("   ✅ [Vision] Clique por coordenadas da IA bem-sucedido.")
+                    # Salva as coordenadas no banco para não usar a API de novo
                     _registrar_sucesso_cache(intencao, coords=coords_ia)
                     return True
 
-    # ── 6. Coordenadas relativas da gravação ────────────────
+    # ── 6. Fallback Cego (Coordenadas Relativas Originais) ────────────────
     if coords_relativas and coords_relativas.get("x_pct"):
         logger.info("   📍 [Fallback Final] Coordenadas da gravação original...")
         try:
@@ -589,7 +757,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         except Exception as exc:
             logger.warning(f"Fallback de coordenadas falhou: {exc}")
 
-    # ── 💀 Falha total ───────────────────────────────────────
+    # ── 💀 Falha Total (Elemento não achado) ───────────────────────────────────────
     _registrar_falha_cache(intencao)
     logger.error(f"   💀 [FALHA TOTAL] Impossível executar: '{intencao[:70]}'")
     return False

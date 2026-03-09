@@ -7,323 +7,451 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
         .senior-teal { background-color: #009999; }
         .senior-teal-text { color: #009999; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .nav-item.active { background-color: #e6f5f5; color: #009999; border-right: 3px solid #009999; }
     </style>
 </head>
 <body class="h-screen flex overflow-hidden">
 
     <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-80 hidden flex flex-col items-center justify-center z-[100] transition-opacity">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#009999] mb-6"></div>
-        <h2 id="loading-msg" class="text-white text-2xl font-semibold tracking-wide">Carregando...</h2>
-        <p class="text-gray-400 text-sm mt-2">Acompanhe a execução no seu sistema.</p>
+        <h2 id="loading-msg" class="text-white text-xl font-semibold tracking-wide">Processando...</h2>
+        <p class="text-gray-400 text-sm mt-2 mb-6">Acompanhe a execução no seu sistema.</p>
+        
+        <button onclick="cancelarProcesso()" class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold shadow-lg transition-transform hover:scale-105 flex items-center gap-2">
+            <i class="fas fa-stop-circle"></i> Interromper Processo
+        </button>
     </div>
 
-    <aside class="w-80 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10">
-        <div class="p-6 border-b border-gray-200 senior-teal text-white">
-            <h1 class="text-xl font-bold flex items-center gap-2">
-                <i class="fas fa-graduation-cap"></i> Training OS
-            </h1>
-            <p class="text-sm opacity-80 mt-1">Painel de Controle</p>
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-20">
+        <div class="p-6 border-b border-gray-100 flex items-center gap-3">
+            <div class="w-8 h-8 rounded senior-teal flex items-center justify-center text-white font-bold">
+                <i class="fas fa-bolt"></i>
+            </div>
+            <div>
+                <h1 class="text-md font-bold text-gray-800 leading-tight">Training OS</h1>
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Enterprise Edition</p>
+            </div>
         </div>
         
-        <div class="p-4 border-b border-gray-100 bg-gray-50">
-            <button onclick="abrirModalGravacao()" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-md transition-all flex justify-center items-center gap-2 hover:scale-[1.02]">
-                <i class="fas fa-circle text-[10px] animate-pulse"></i> Gravar Nova Aula
-            </button>
-        </div>
+        <div class="py-4 flex-1">
+            <p class="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu Principal</p>
+            <nav class="space-y-1">
+                <button onclick="mostrarAba('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                    <i class="fas fa-chart-pie w-5 text-center"></i> Visão Geral
+                </button>
+                <button onclick="mostrarAba('studio')" id="nav-studio" class="nav-item active w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                    <i class="fas fa-video w-5 text-center"></i> Estúdio de Criação
+                </button>
+            </nav>
 
-        <div class="p-4 flex-1 flex flex-col min-h-0">
-            <div class="flex justify-between items-center mb-3">
-                <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Biblioteca de Aulas</h2>
-            </div>
-            <div id="lista-roteiros" class="space-y-2 overflow-y-auto flex-1 scrollbar-hide pb-10"></div>
+            <p class="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-8 mb-2">Expansões (Roadmap)</p>
+            <nav class="space-y-1 opacity-60">
+                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Em breve">
+                    <div class="flex items-center gap-3"><i class="fas fa-globe w-5 text-center"></i> Multi-Idiomas</div>
+                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600">BETA</span>
+                </button>
+                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Em breve">
+                    <div class="flex items-center gap-3"><i class="fas fa-shield-alt w-5 text-center"></i> QA Auto-Pilot</div>
+                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600">BETA</span>
+                </button>
+            </nav>
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col h-full bg-gray-50 relative">
-        <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm">
-            <div id="header-title" class="font-semibold text-gray-700 text-lg">Selecione uma aula na lateral</div>
-            
-            <div class="flex gap-3" id="action-buttons" style="display: none;">
-                
-                <button onclick="excluirRoteiro()" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors flex items-center gap-2 border border-red-200" title="Excluir esta aula">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
+    <main id="aba-dashboard" class="flex-1 hidden bg-gray-50 p-8 overflow-y-auto">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Métricas de Inteligência Artificial</h2>
+        
+        <div class="grid grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#009999]">
+                <div class="text-sm font-semibold text-gray-500 uppercase">Aulas Gravadas</div>
+                <div class="text-4xl font-bold text-gray-800 mt-2" id="metric-aulas">0</div>
+            </div>
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-blue-500 relative overflow-hidden">
+                <div class="text-sm font-semibold text-gray-500 uppercase relative z-10">Zero-Touch: Mapeamentos Salvos</div>
+                <div class="text-4xl font-bold text-gray-800 mt-2 relative z-10" id="metric-memoria">0</div>
+                <i class="fas fa-brain absolute -bottom-4 -right-4 text-8xl text-blue-50 opacity-50"></i>
+            </div>
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-green-500">
+                <div class="text-sm font-semibold text-gray-500 uppercase">Acelerações por Memória</div>
+                <div class="text-4xl font-bold text-green-600 mt-2" id="metric-hits">0</div>
+                <p class="text-xs text-gray-400 mt-2">Vezes que a IA pulou a Visão usando o Cache local.</p>
+            </div>
+        </div>
 
-                <button onclick="salvarRoteiro()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition-colors flex items-center gap-2" title="Salvar os textos">
-                    <i class="fas fa-save"></i>
-                </button>
-                
-                <div class="h-8 border-l border-gray-300 mx-1 self-center"></div>
-                
-                <button onclick="executarRobo()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold transition-colors flex items-center gap-2 shadow-md">
-                    <i class="fas fa-robot"></i> 1. Gravar Robô
-                </button>
-                
-                <button onclick="renderizarVideo()" class="px-4 py-2 senior-teal hover:bg-teal-700 text-white rounded-md text-sm font-bold transition-colors flex items-center gap-2 shadow-md">
-                    <i class="fas fa-film"></i> 2. Renderizar
-                </button>
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h3 class="font-bold text-gray-700 mb-4"><i class="fas fa-cogs mr-2 text-gray-400"></i> Como funciona o Auto-Healing (Zero-Touch)?</h3>
+            <p class="text-sm text-gray-600 leading-relaxed">
+                O Training OS possui um banco de dados <b>SQLite</b> embutido que memoriza cada elemento da interface da Senior X. 
+                Quando o sistema original sofre atualizações (mudança de ID, cor ou posição do botão), a nossa engine detecta a falha e aciona o <i>Google Gemini Vision</i> para reparar o fluxo e atualizar o banco de dados local silenciosamente, garantindo a manutenção zero das automações.
+            </p>
+        </div>
+    </main>
 
-                <button id="btn-assistir" onclick="abrirModalVideo()" class="hidden px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-bold transition-colors flex items-center gap-2 shadow-md">
-                    <i class="fas fa-play"></i> Assistir
+    <main id="aba-studio" class="flex-1 flex h-full">
+        
+        <div class="w-80 bg-white border-r border-gray-200 flex flex-col h-full bg-gray-50">
+            <div class="p-4 border-b border-gray-200 bg-white">
+                <button onclick="abrirModalGravacao()" class="w-full py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded shadow transition-all flex justify-center items-center gap-2">
+                    <i class="fas fa-circle text-[8px] animate-pulse"></i> Gravar Mapeamento
                 </button>
             </div>
-        </header>
-
-        <div id="editor-area" class="flex-1 overflow-y-auto p-8 hidden">
-            <div class="max-w-4xl mx-auto space-y-6" id="passos-container"></div>
+            <div id="lista-roteiros" class="space-y-1 p-3 overflow-y-auto flex-1 scrollbar-hide"></div>
         </div>
-        
-        <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-gray-400">
-            <i class="fas fa-project-diagram text-6xl mb-4 opacity-50"></i>
-            <p class="text-lg">Selecione uma aula para revisar a narração da IA</p>
+
+        <div class="flex-1 flex flex-col h-full relative bg-gray-100">
+            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">
+                <div id="header-title" class="font-semibold text-gray-700">Selecione uma aula</div>
+                <div class="flex gap-2" id="action-buttons" style="display: none;">
+                    
+                    <button onclick="excluirRoteiro()" class="px-3 py-1.5 text-red-500 hover:bg-red-50 rounded text-sm transition" title="Excluir aula">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                    
+                    <button onclick="salvarRoteiro()" class="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded text-sm transition" title="Salvar textos">
+                        <i class="fas fa-save"></i> Salvar
+                    </button>
+                    
+                    <div class="h-6 border-l border-gray-300 mx-1 self-center"></div>
+                    
+                    <button onclick="executarRobo()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold shadow-sm transition">
+                        <i class="fas fa-robot mr-1"></i> 1. Gravar Robô
+                    </button>
+                    
+                    <button onclick="renderizarVideo()" class="px-3 py-1.5 senior-teal hover:bg-teal-700 text-white rounded text-sm font-bold shadow-sm transition">
+                        <i class="fas fa-film mr-1"></i> 2. Renderizar
+                    </button>
+                    
+                    <button id="btn-assistir" onclick="abrirModalVideo()" class="hidden px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded text-sm font-bold shadow-sm transition">
+                        <i class="fas fa-play mr-1"></i> Assistir
+                    </button>
+                </div>
+            </header>
+
+            <div id="editor-area" class="flex-1 overflow-y-auto p-6 hidden">
+                <div class="max-w-4xl mx-auto space-y-4" id="passos-container"></div>
+            </div>
+            
+            <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-gray-400">
+                <i class="fas fa-video-slash text-5xl mb-4 opacity-30"></i>
+                <p>Nenhuma aula selecionada</p>
+            </div>
         </div>
     </main>
 
     <div id="modal-gravacao" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-50">
         <div class="bg-white rounded-xl w-full max-w-lg overflow-hidden">
-            <div class="senior-teal p-5 text-white flex justify-between items-center">
-                <h2 class="text-lg font-bold"><i class="fas fa-video mr-2"></i> Configurar Nova Gravação</h2>
-                <button onclick="fecharModalGravacao()"><i class="fas fa-times text-xl"></i></button>
+            <div class="senior-teal p-5 text-white flex justify-between">
+                <h2 class="font-bold">Nova Gravação</h2>
+                <button onclick="fecharModalGravacao()"><i class="fas fa-times"></i></button>
             </div>
-            <div class="p-6 space-y-5">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Título da Aula</label>
-                    <input type="text" id="input-nome-aula" class="w-full p-3 border border-gray-300 rounded-lg outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Objetivo (Para a IA)</label>
-                    <textarea id="input-objetivo" rows="3" class="w-full p-3 border border-gray-300 rounded-lg outline-none resize-none"></textarea>
-                </div>
+            <div class="p-6 space-y-4">
+                <input type="text" id="input-nome-aula" placeholder="Título da Aula" class="w-full p-3 border rounded outline-none">
+                <textarea id="input-objetivo" rows="2" placeholder="Objetivo (O que a IA deve saber)" class="w-full p-3 border rounded outline-none resize-none"></textarea>
             </div>
             <div class="bg-gray-50 p-4 flex justify-end gap-3">
-                <button onclick="fecharModalGravacao()" class="px-5 py-2 text-gray-600 font-medium">Cancelar</button>
-                <button onclick="iniciarGravacao()" class="px-5 py-2 bg-red-600 text-white font-bold rounded-lg shadow">Iniciar</button>
+                <button onclick="fecharModalGravacao()" class="px-4 py-2 text-gray-600 font-medium">Cancelar</button>
+                <button onclick="iniciarGravacao()" class="px-4 py-2 bg-red-600 text-white rounded font-bold">Iniciar</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-video" class="fixed inset-0 bg-black bg-opacity-90 hidden items-center justify-center z-[120]">
-        <div class="bg-white rounded-xl w-[90vw] max-w-6xl overflow-hidden relative">
-            <div class="absolute top-4 right-4 z-10">
-                <button onclick="fecharModalVideo()" class="bg-black bg-opacity-50 text-white hover:bg-opacity-100 rounded-full w-10 h-10 flex items-center justify-center transition">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <video id="video-player" class="w-full h-auto max-h-[85vh] bg-black" controls>
-                Seu navegador não suporta a tag de vídeo.
-            </video>
+    <div id="modal-video" class="fixed inset-0 bg-black bg-opacity-95 hidden items-center justify-center z-[120]">
+        <div class="w-[90vw] max-w-6xl relative">
+            <button onclick="fecharModalVideo()" class="absolute -top-10 right-0 text-white hover:text-gray-300 text-xl">
+                <i class="fas fa-times"></i> Fechar
+            </button>
+            <video id="video-player" class="w-full h-auto bg-black rounded shadow-2xl" controls></video>
         </div>
     </div>
 
-    <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-y-20 opacity-0 flex items-center gap-3 z-[110]">
+    <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white px-6 py-3 rounded shadow-lg transform transition-all duration-300 translate-y-20 opacity-0 flex items-center gap-3 z-[150]">
         <i id="toast-icon" class="fas fa-check-circle text-green-400"></i>
         <span id="toast-msg">Mensagem</span>
     </div>
 
     <script>
-        let roteiroAtual = null;
-        let arquivoAtual = "";
+        // Variáveis de Estado
+        let roteiroAtual = null; 
+        let arquivoAtual = ""; 
         let cacheListaRoteiros = [];
 
+        // Inicialização
         document.addEventListener("DOMContentLoaded", () => {
-            carregarListaRoteiros();
-            setInterval(checarStatusServidor, 2000); 
+            carregarListaRoteiros(); 
+            carregarMetricas();
+            
+            // Loop para atualizar a interface (status do servidor e métricas)
+            setInterval(() => { 
+                checarStatusServidor(); 
+                carregarMetricas(); 
+            }, 2000); 
         });
 
-        async function checarStatusServidor() {
-            try {
-                const res = await fetch('/api/status');
-                const status = await res.json();
-                
-                const overlay = document.getElementById('loading-overlay');
-                const msg = document.getElementById('loading-msg');
-
-                if(status.ocupado) {
-                    overlay.classList.remove('hidden');
-                    msg.innerText = status.mensagem;
-                } else {
-                    overlay.classList.add('hidden');
-                    if(status.erro) {
-                        mostrarToast(status.erro, "error");
-                        await fetch('/api/limpar-status', {method: 'POST'});
-                    }
-                    if(status.sucesso) {
-                        mostrarToast(status.sucesso, "success");
-                        await fetch('/api/limpar-status', {method: 'POST'});
-                        carregarListaRoteiros(); 
-                    }
-                }
-            } catch(e) {}
-        }
-
-        async function carregarListaRoteiros() {
-            try {
-                const response = await fetch('/api/roteiros');
-                const roteiros = await response.json();
-                cacheListaRoteiros = roteiros; // Salva para acessar a URL do vídeo depois
-                
-                const container = document.getElementById('lista-roteiros');
-                
-                let html = '';
-                roteiros.forEach(rot => {
-                    const isSelected = arquivoAtual === rot.arquivo;
-                    // Icone verde se tiver video pronto
-                    const iconeVideo = rot.tem_video ? '<i class="fas fa-check-circle text-green-500 ml-2" title="Vídeo Pronto"></i>' : '';
-                    
-                    html += `
-                    <button onclick="carregarRoteiro('${rot.arquivo}')" class="w-full text-left p-3 rounded-lg border ${isSelected ? 'border-[#009999] bg-teal-50' : 'border-gray-100 hover:border-[#009999]'} transition-all group">
-                        <div class="font-medium ${isSelected ? 'text-[#009999]' : 'text-gray-800'} text-sm truncate flex justify-between items-center">
-                            <span class="truncate">${rot.nome}</span>
-                            ${iconeVideo}
-                        </div>
-                        <div class="text-xs text-gray-500 mt-1">${rot.qtd_passos} passos</div>
-                    </button>`;
-                });
-                container.innerHTML = html;
-
-                // Atualiza a visualização do botão "Assistir" se o arquivo atual terminou de renderizar
-                atualizarBotaoAssistir();
-            } catch(e) {}
-        }
-
-        function atualizarBotaoAssistir() {
-            if(!arquivoAtual) return;
-            const roteiroConfig = cacheListaRoteiros.find(r => r.arquivo === arquivoAtual);
-            const btnAssistir = document.getElementById('btn-assistir');
+        // ==========================================
+        // CONTROLE DA INTERFACE (ABAS E MODAIS)
+        // ==========================================
+        function mostrarAba(aba) {
+            document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+            document.getElementById('nav-' + aba).classList.add('active');
             
-            if(roteiroConfig && roteiroConfig.tem_video) {
-                btnAssistir.classList.remove('hidden');
-                btnAssistir.dataset.url = roteiroConfig.video_url;
+            document.getElementById('aba-dashboard').classList.add('hidden');
+            document.getElementById('aba-studio').classList.add('hidden');
+            
+            if (aba === 'studio') {
+                document.getElementById('aba-studio').classList.remove('hidden');
+                document.getElementById('aba-studio').classList.add('flex');
             } else {
-                btnAssistir.classList.add('hidden');
+                document.getElementById('aba-' + aba).classList.remove('hidden');
             }
         }
 
         function abrirModalVideo() {
-            const btnAssistir = document.getElementById('btn-assistir');
-            const url = btnAssistir.dataset.url;
-            if(!url) return;
-
-            const player = document.getElementById('video-player');
+            const url = document.getElementById('btn-assistir').dataset.url;
+            if (!url) return;
+            
+            const player = document.getElementById('video-player'); 
             player.src = url;
-            document.getElementById('modal-video').classList.remove('hidden');
+            
+            document.getElementById('modal-video').classList.remove('hidden'); 
             document.getElementById('modal-video').classList.add('flex');
+            
             player.play();
         }
 
         function fecharModalVideo() {
-            const player = document.getElementById('video-player');
+            const player = document.getElementById('video-player'); 
             player.pause();
             player.currentTime = 0;
-            document.getElementById('modal-video').classList.add('hidden');
+            
+            document.getElementById('modal-video').classList.add('hidden'); 
             document.getElementById('modal-video').classList.remove('flex');
         }
 
-        async function excluirRoteiro() {
-            if (!arquivoAtual) return;
-            const confirmacao = confirm(`⚠️ ATENÇÃO!\n\nTem certeza que deseja excluir permanentemente a aula "${roteiroAtual.metadata.nome_aula}"?\n\nEsta ação não pode ser desfeita.`);
-            
-            if (confirmacao) {
-                const response = await fetch(`/api/roteiros/${arquivoAtual}`, { method: 'DELETE' });
-                if (response.ok) {
-                    mostrarToast("Aula excluída com sucesso!", "success");
-                    document.getElementById('editor-area').classList.add('hidden');
-                    document.getElementById('empty-state').classList.remove('hidden');
-                    document.getElementById('action-buttons').style.display = 'none';
-                    document.getElementById('header-title').innerText = "Selecione uma aula na lateral";
-                    arquivoAtual = "";
-                    roteiroAtual = null;
-                    carregarListaRoteiros(); 
-                } else {
-                    mostrarToast("Erro ao excluir.", "error");
-                }
+        function abrirModalGravacao() { 
+            document.getElementById('modal-gravacao').classList.remove('hidden'); 
+            document.getElementById('modal-gravacao').classList.add('flex'); 
+        }
+
+        function fecharModalGravacao() { 
+            document.getElementById('modal-gravacao').classList.add('hidden'); 
+            document.getElementById('modal-gravacao').classList.remove('flex'); 
+        }
+
+        // ==========================================
+        // COMUNICAÇÃO COM O BACKEND (API)
+        // ==========================================
+        async function carregarMetricas() {
+            try {
+                const response = await fetch('/api/metricas'); 
+                const data = await response.json();
+                document.getElementById('metric-memoria').innerText = data.total_memorizado;
+                document.getElementById('metric-hits').innerText = data.sucesso_recuperacao;
+            } catch(e) {
+                console.error("Erro ao buscar métricas:", e);
             }
         }
 
-        function abrirModalGravacao() {
-            document.getElementById('input-nome-aula').value = '';
-            document.getElementById('input-objetivo').value = '';
-            document.getElementById('modal-gravacao').classList.remove('hidden');
-            document.getElementById('modal-gravacao').classList.add('flex');
-        }
-        function fecharModalGravacao() {
-            document.getElementById('modal-gravacao').classList.add('hidden');
-            document.getElementById('modal-gravacao').classList.remove('flex');
+        async function checarStatusServidor() {
+            try {
+                const response = await fetch('/api/status'); 
+                const status = await response.json();
+                const overlay = document.getElementById('loading-overlay');
+                
+                if (status.ocupado) { 
+                    overlay.classList.remove('hidden'); 
+                    document.getElementById('loading-msg').innerText = status.mensagem; 
+                } else {
+                    overlay.classList.add('hidden');
+                    
+                    if (status.erro) { 
+                        mostrarToast(status.erro, "error"); 
+                        await fetch('/api/limpar-status', { method: 'POST' }); 
+                    }
+                    
+                    if (status.sucesso) { 
+                        mostrarToast(status.sucesso, "success"); 
+                        await fetch('/api/limpar-status', { method: 'POST' }); 
+                        carregarListaRoteiros(); 
+                    }
+                }
+            } catch(e) {
+                console.error("Erro ao checar status:", e);
+            }
         }
 
-        async function iniciarGravacao() {
-            const nome = document.getElementById('input-nome-aula').value.trim();
-            const obj = document.getElementById('input-objetivo').value.trim();
-            if(!nome) return mostrarToast("Dê um nome para a aula.", "error");
-            fecharModalGravacao();
-            await fetch('/api/gravar', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nome_aula: nome, objetivo: obj })
-            });
+        async function carregarListaRoteiros() {
+            try {
+                const response = await fetch('/api/roteiros'); 
+                cacheListaRoteiros = await response.json();
+                
+                const container = document.getElementById('lista-roteiros');
+                document.getElementById('metric-aulas').innerText = cacheListaRoteiros.length;
+                
+                let html = '';
+                cacheListaRoteiros.forEach(roteiro => {
+                    const isSelected = arquivoAtual === roteiro.arquivo;
+                    const cssClass = isSelected ? 'border-[#009999] bg-white shadow-sm' : 'border-transparent hover:bg-gray-100';
+                    const icon = roteiro.tem_video ? '<i class="fas fa-play-circle text-green-500"></i>' : '<i class="fas fa-file-alt text-gray-300"></i>';
+                    
+                    html += `
+                    <button onclick="carregarRoteiro('${roteiro.arquivo}')" class="w-full text-left p-3 rounded border ${cssClass} transition flex items-center gap-3">
+                        <div class="text-lg">${icon}</div>
+                        <div class="overflow-hidden w-full">
+                            <div class="font-medium text-sm text-gray-800 truncate w-full" title="${roteiro.nome}">${roteiro.nome}</div>
+                            <div class="text-[10px] text-gray-400">${roteiro.qtd_passos} passos</div>
+                        </div>
+                    </button>`;
+                });
+                container.innerHTML = html;
+                
+                atualizarBotaoAssistir();
+            } catch(e) {
+                console.error("Erro ao carregar roteiros:", e);
+            }
+        }
+
+        function atualizarBotaoAssistir() {
+            if (!arquivoAtual) return;
+            const config = cacheListaRoteiros.find(r => r.arquivo === arquivoAtual);
+            const btn = document.getElementById('btn-assistir');
+            
+            if (config && config.tem_video) { 
+                btn.classList.remove('hidden'); 
+                btn.dataset.url = config.video_url; 
+            } else { 
+                btn.classList.add('hidden'); 
+            }
         }
 
         async function carregarRoteiro(arquivo) {
-            arquivoAtual = arquivo;
+            arquivoAtual = arquivo; 
             carregarListaRoteiros(); 
-            const response = await fetch(`/api/roteiros/${arquivo}`);
+            
+            const response = await fetch(`/api/roteiros/${arquivo}`); 
             roteiroAtual = await response.json();
             
-            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('empty-state').classList.add('hidden'); 
             document.getElementById('editor-area').classList.remove('hidden');
-            document.getElementById('action-buttons').style.display = 'flex';
-            document.getElementById('header-title').innerText = roteiroAtual.metadata.nome_aula || arquivo;
-
-            atualizarBotaoAssistir();
+            document.getElementById('action-buttons').style.display = 'flex'; 
+            document.getElementById('header-title').innerText = roteiroAtual.metadata.nome_aula;
+            
+            atualizarBotaoAssistir(); 
             renderizarPassos();
         }
 
+        // ==========================================
+        // FUNÇÕES DO ESTÚDIO DE EDIÇÃO E ROBÔ
+        // ==========================================
         function renderizarPassos() {
-            const container = document.getElementById('passos-container');
+            const container = document.getElementById('passos-container'); 
             container.innerHTML = '';
+            
             roteiroAtual.passos.forEach((passo, index) => {
-                let html = `<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4"><div class="bg-gray-50 px-5 py-3 border-b"><span class="font-bold text-gray-700">Passo ${passo.id_passo}</span></div><div class="p-5"><label class="block text-xs font-bold text-gray-500 uppercase">Fala Principal</label><textarea onchange="atualizarAncora(${index}, this.value)" class="w-full p-3 border rounded-lg outline-none text-sm" rows="2">${passo.pedagogia.ancora || ''}</textarea>`;
+                let html = `
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-2 border-b text-sm font-bold text-gray-700 flex justify-between">
+                        <span>Passo ${passo.id_passo}</span>
+                        ${passo.is_conclusao ? '<span class="text-xs bg-green-100 text-green-700 px-2 rounded">CONCLUSÃO</span>' : ''}
+                    </div>
+                    <div class="p-4">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Âncora Principal</label>
+                        <textarea onchange="roteiroAtual.passos[${index}].pedagogia.ancora=this.value" class="w-full p-2 border rounded outline-none text-sm bg-gray-50 focus:border-[#009999]" rows="2">${passo.pedagogia.ancora || ''}</textarea>
+                `;
                 
-                if(passo.acoes_tecnicas) {
-                    passo.acoes_tecnicas.forEach((acao, i) => {
-                        if(acao.acao !== "concluir_video") {
-                            html += `<div class="mt-3"><label class="block text-xs font-bold text-gray-500 uppercase">Ação: ${acao.acao}</label><textarea onchange="atualizarMicro(${index}, ${i}, this.value)" class="w-full p-2 border rounded-md outline-none text-sm" rows="1">${acao.micro_narracao || ''}</textarea></div>`;
+                if (passo.acoes_tecnicas) {
+                    passo.acoes_tecnicas.forEach((acao, acaoIndex) => {
+                        if (acao.acao !== "concluir_video") {
+                            html += `
+                            <div class="mt-3 pl-3 border-l-2 border-teal-200">
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1" title="${acao.intencao_semantica}">Ação: ${acao.acao}</label>
+                                <textarea onchange="roteiroAtual.passos[${index}].acoes_tecnicas[${acaoIndex}].micro_narracao=this.value" class="w-full p-2 border rounded outline-none text-sm focus:border-[#009999]" rows="1">${acao.micro_narracao || ''}</textarea>
+                            </div>`;
                         }
                     });
                 }
-                html += `</div></div>`;
+                
+                html += `</div></div>`; 
                 container.insertAdjacentHTML('beforeend', html);
             });
         }
 
-        function atualizarAncora(passoIdx, valor) { roteiroAtual.passos[passoIdx].pedagogia.ancora = valor; }
-        function atualizarMicro(passoIdx, acaoIdx, valor) { roteiroAtual.passos[passoIdx].acoes_tecnicas[acaoIdx].micro_narracao = valor; }
-
-        async function salvarRoteiro() {
-            await fetch(`/api/roteiros/${arquivoAtual}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(roteiroAtual) });
-            mostrarToast("Salvo com sucesso!", "success");
+        async function iniciarGravacao() {
+            const nome = document.getElementById('input-nome-aula').value.trim(); 
+            const obj = document.getElementById('input-objetivo').value.trim();
+            
+            if (!nome) return mostrarToast("Dê um nome para a aula.", "error");
+            
+            fecharModalGravacao(); 
+            await fetch('/api/gravar', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ nome_aula: nome, objetivo: obj }) 
+            });
         }
 
-        async function executarRobo() {
-            await salvarRoteiro();
-            await fetch(`/api/executar-robo/${arquivoAtual}`, { method: 'POST' });
+        async function salvarRoteiro() { 
+            await fetch(`/api/roteiros/${arquivoAtual}`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(roteiroAtual) 
+            }); 
+            mostrarToast("Salvo com sucesso!", "success"); 
         }
 
-        async function renderizarVideo() {
-            await salvarRoteiro();
-            await fetch(`/api/renderizar/${arquivoAtual}`, { method: 'POST' });
+        async function excluirRoteiro() { 
+            if (confirm("ATENÇÃO!\nTem certeza que deseja excluir permanentemente esta aula?")) { 
+                await fetch(`/api/roteiros/${arquivoAtual}`, { method: 'DELETE' }); 
+                
+                arquivoAtual = ""; 
+                document.getElementById('editor-area').classList.add('hidden'); 
+                document.getElementById('empty-state').classList.remove('hidden'); 
+                document.getElementById('action-buttons').style.display = 'none'; 
+                document.getElementById('header-title').innerText = "Selecione uma aula";
+                
+                carregarListaRoteiros(); 
+            } 
         }
 
-        function mostrarToast(msg, type) {
-            const toast = document.getElementById('toast');
+        async function executarRobo() { 
+            await salvarRoteiro(); 
+            await fetch(`/api/executar-robo/${arquivoAtual}`, { method: 'POST' }); 
+        }
+
+        async function renderizarVideo() { 
+            await salvarRoteiro(); 
+            await fetch(`/api/renderizar/${arquivoAtual}`, { method: 'POST' }); 
+        }
+
+        // NOVO BOTÃO DE CANCELAMENTO
+        async function cancelarProcesso() {
+            document.getElementById('loading-msg').innerText = "Cancelando e limpando recursos...";
+            await fetch('/api/cancelar', { method: 'POST' });
+        }
+
+        // ==========================================
+        // COMPONENTES (TOAST)
+        // ==========================================
+        function mostrarToast(msg, tipo) {
+            const toast = document.getElementById('toast'); 
             document.getElementById('toast-msg').innerText = msg;
-            toast.querySelector('i').className = type === 'success' ? 'fas fa-check-circle text-green-400' : 'fas fa-exclamation-triangle text-red-400';
-            toast.classList.replace(type === 'success' ? 'bg-red-900' : 'bg-gray-800', type === 'success' ? 'bg-gray-800' : 'bg-red-900');
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => { toast.classList.add('translate-y-20', 'opacity-0'); }, 4000);
+            
+            const icone = toast.querySelector('i');
+            if (tipo === 'success') {
+                icone.className = 'fas fa-check-circle text-green-400';
+                toast.classList.replace('bg-red-900', 'bg-gray-800');
+            } else {
+                icone.className = 'fas fa-exclamation-triangle text-red-400';
+                toast.classList.replace('bg-gray-800', 'bg-red-900');
+            }
+            
+            toast.classList.remove('translate-y-20', 'opacity-0'); 
+            setTimeout(() => { 
+                toast.classList.add('translate-y-20', 'opacity-0'); 
+            }, 4000);
         }
     </script>
 </body>
