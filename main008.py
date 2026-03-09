@@ -1,4 +1,3 @@
-import sys
 import asyncio
 import os
 import json
@@ -7,9 +6,9 @@ import edge_tts
 import pygame
 import logging
 import hashlib
-import re
 from dotenv import load_dotenv
 
+# CARREGA VARIÁVEIS ANTES DE QUALQUER COISA
 load_dotenv() 
 
 from playwright.async_api import async_playwright
@@ -33,22 +32,28 @@ pygame.mixer.set_num_channels(2)
 
 async def safe_evaluate(target, script, arg=None, timeout=3.0):
     try:
-        if arg is not None: coro = target.evaluate(script, arg)
-        else: coro = target.evaluate(script)
+        if arg is not None:
+            coro = target.evaluate(script, arg)
+        else:
+            coro = target.evaluate(script)
         await asyncio.wait_for(coro, timeout=timeout)
         return True
-    except Exception: return False
+    except Exception:
+        return False
 
 async def gerar_audio(texto, id_unico, id_treinamento, voz="pt-BR-FranciscaNeural"):
-    if not texto or not texto.strip(): return None
-    nome_seguro_pasta = re.sub(r'[\\/*?:"<>|]', "", id_treinamento).replace(" ", "_")
-    pasta_audio = os.path.join("audios_gerados", nome_seguro_pasta)
+    if not texto or not texto.strip(): 
+        return None
+        
+    pasta_audio = os.path.join("audios_gerados", id_treinamento)
     os.makedirs(pasta_audio, exist_ok=True)
     
     assinatura = hashlib.md5(texto.encode('utf-8')).hexdigest()[:8]
     arquivo_mp3 = os.path.join(pasta_audio, f"audio_{id_unico}_{assinatura}.mp3")
+    
     if not os.path.exists(arquivo_mp3):
         await edge_tts.Communicate(texto, voz, rate="-12%").save(arquivo_mp3)
+        
     return arquivo_mp3 
 
 def iniciar_reproducao_audio(arquivo_mp3):
@@ -57,13 +62,17 @@ def iniciar_reproducao_audio(arquivo_mp3):
         pygame.mixer.Channel(1).play(som_voz)
 
 async def aguardar_audio_terminar():
-    while pygame.mixer.Channel(1).get_busy(): await asyncio.sleep(0.1) 
+    while pygame.mixer.Channel(1).get_busy(): 
+        await asyncio.sleep(0.1) 
 
 async def exibir_legenda_cinema(page, texto):
-    if not texto or not texto.strip(): return
+    if not texto or not texto.strip(): 
+        return
+        
     script = f"""(texto) => {{
         let existing = document.getElementById('senior-video-subtitle');
         if (existing) existing.remove();
+        
         const sub = document.createElement('div');
         sub.id = 'senior-video-subtitle';
         sub.style = `
@@ -74,7 +83,9 @@ async def exibir_legenda_cinema(page, texto):
             z-index: 2147483647; line-height: 1.4; box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
             border-bottom: 3px solid #009999; opacity: 0; transition: opacity 0.5s ease;
         `;
-        sub.innerHTML = texto; document.documentElement.appendChild(sub);
+        sub.innerHTML = texto; 
+        document.documentElement.appendChild(sub);
+        
         setTimeout(() => sub.style.opacity = '1', 50);
     }}"""
     await safe_evaluate(page, script, arg=texto)
@@ -98,76 +109,65 @@ async def exibir_encerramento_cinema(page):
     }); }"""
     await safe_evaluate(page, script, timeout=5.0)
 
-# ==============================================================
-# 📝 GERADOR DE LEGENDAS (SRT FORMAT)
-# ==============================================================
-def formatar_tempo_srt(segundos_float):
-    horas = int(segundos_float // 3600)
-    minutos = int((segundos_float % 3600) // 60)
-    segundos = int(segundos_float % 60)
-    milisegundos = int(round((segundos_float - int(segundos_float)) * 1000))
-    return f"{horas:02d}:{minutos:02d}:{segundos:02d},{milisegundos:03d}"
-
-def gerar_arquivo_srt(timeline, caminho_srt):
-    with open(caminho_srt, 'w', encoding='utf-8') as f:
-        for idx, item in enumerate(timeline):
-            inicio = formatar_tempo_srt(item["inicio"])
-            fim = formatar_tempo_srt(item["fim"])
-            texto = item["texto"]
-            f.write(f"{idx + 1}\n")
-            f.write(f"{inicio} --> {fim}\n")
-            f.write(f"{texto}\n\n")
-
-def renderizar_video_final(caminho_webm, timeline, nome_arquivo_base, tempo_corte):
+def renderizar_video_final(caminho_webm, timeline, id_treino, tempo_corte):
     print("\n" + "="*50 + "\n🎬 INICIANDO PÓS-PRODUÇÃO (Modo Expresso)...\n" + "="*50)
     try:
         os.makedirs("videos_prontos", exist_ok=True) 
         
+        # 1. Carrega o vídeo original e faz o corte inicial do login
         video = VideoFileClip(caminho_webm).subclip(tempo_corte)
         clipes_de_audio = []
         
+        # O BLOCO DO OVERLAY FOI TOTALMENTE REMOVIDO PARA PERFORMANCE.
+        # Agora o vídeo mantém a resolução e tamanho originais capturados.
+            
+        # 2. Insere a Trilha Sonora (BGM)
         if os.path.exists("trilha.mp3"):
             bgm = AudioFileClip("trilha.mp3").volumex(0.08)
             bgm = afx.audio_loop(bgm, duration=video.duration)
             clipes_de_audio.append(bgm)
             
+        # 3. Insere as falas da IA na minutagem correta
         for item in timeline:
             if os.path.exists(item["arquivo"]): 
                 voz = AudioFileClip(item["arquivo"]).set_start(item["inicio"])
                 clipes_de_audio.append(voz)
         
+        # 4. Junta todos os áudios e anexa ao vídeo
         if clipes_de_audio:
             video = video.set_audio(CompositeAudioClip(clipes_de_audio))
             
-        caminho_final_mp4 = os.path.join("videos_prontos", f"{nome_arquivo_base}.mp4")
-        video.write_videofile(caminho_final_mp4, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", logger='bar')
+        caminho_final = os.path.join("videos_prontos", f"{id_treino}_FINALIZADO.mp4")
+        
+        # 5. Grava o arquivo MP4 final.
+        # Como não há transformação visual (CompositeVideoClip/resize), isso usará muito menos CPU.
+        video.write_videofile(caminho_final, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", logger='bar')
         video.close()
         
-        caminho_final_srt = os.path.join("videos_prontos", f"{nome_arquivo_base}.srt")
-        gerar_arquivo_srt(timeline, caminho_final_srt)
-        
-        print(f"\n🚀 SUCESSO! ARQUIVOS GERADOS:\n🎬 Vídeo: {caminho_final_mp4}\n📝 Legenda: {caminho_final_srt}")
+        print(f"\n🚀 VÍDEO PRONTO EM:\n👉 {caminho_final}")
     except Exception as e: 
         print(f"❌ Erro na Pós-Produção: {e}")
 
 async def executar_roteiro(caminho_json):
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario, senha = os.getenv("SENIOR_USER"), os.getenv("SENIOR_PASS")
+    usuario = os.getenv("SENIOR_USER")
+    senha = os.getenv("SENIOR_PASS")
     
-    if not usuario or not senha: return print("❌ ERRO: Verifique as credenciais no .env")
+    if not usuario or not senha: 
+        print("❌ ERRO: Verifique as credenciais no .env")
+        return
 
-    with open(caminho_json, 'r', encoding='utf-8') as f: roteiro = json.load(f)
-    
-    metadata = roteiro.get("metadata", {})
-    id_treino = metadata.get("id_treinamento", "TREINAMENTO")
-    nome_aula_raw = metadata.get("nome_aula", id_treino)
-    nome_arquivo_base = re.sub(r'[\\/*?:"<>|]', "", nome_aula_raw).replace(" ", "_")
-    
+    with open(caminho_json, 'r', encoding='utf-8') as f: 
+        roteiro = json.load(f)
+        
+    id_treino = roteiro.get("metadata", {}).get("id_treinamento", "TREINAMENTO")
     cfg = roteiro.get("configuracao_gravacao", {"gravar_video": True, "pasta_destino": "videos_gerados", "voz_ia": "pt-BR-FranciscaNeural"})
     voz_escolhida = cfg.get("voz_ia", "pt-BR-FranciscaNeural")
 
     if os.path.exists("trilha.mp3"):
-        pygame.mixer.music.load("trilha.mp3"); pygame.mixer.music.set_volume(0.15); pygame.mixer.music.play(loops=-1)
+        pygame.mixer.music.load("trilha.mp3")
+        pygame.mixer.music.set_volume(0.15)
+        pygame.mixer.music.play(loops=-1)
 
     os.makedirs(cfg.get("pasta_destino", "videos_gerados"), exist_ok=True)
     timeline_audios = []
@@ -175,43 +175,54 @@ async def executar_roteiro(caminho_json):
     tempo_corte_segundos = -1
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False, args=['--start-fullscreen', '--disable-infobars'])
+        browser = await p.chromium.launch(headless=False, args=['--start-maximized'])
         tempo_inicio_contexto = time.time()
-        context = await browser.new_context(no_viewport=True, record_video_dir=cfg.get("pasta_destino", "videos_gerados") if cfg.get("gravar_video", True) else None, record_video_size={"width": 1920, "height": 1080})
+        
+        context = await browser.new_context(
+            no_viewport=True, 
+            record_video_dir=cfg.get("pasta_destino", "videos_gerados") if cfg.get("gravar_video", True) else None, 
+            record_video_size={"width": 1920, "height": 1080}
+        )
         page = await context.new_page()
 
         try:
             print("🔄 Realizando Login na Senior X...")
             await page.goto(SENIOR_URL)
-            await asyncio.sleep(2.0); await page.keyboard.press("Escape")
+            await asyncio.sleep(2.0)
+            await page.keyboard.press("Escape")
             
             await page.get_by_placeholder("usuario@dominio.com.br").fill(usuario)
             await page.get_by_role("button", name="Próximo").click()
-            await asyncio.sleep(0.5); await page.keyboard.press("Escape")
+            await asyncio.sleep(0.5)
+            await page.keyboard.press("Escape")
             
             await page.locator("input[type='password']").fill(senha)
-            await asyncio.sleep(0.5); await page.keyboard.press("Enter")
+            await asyncio.sleep(0.5)
+            await page.keyboard.press("Enter")
             
             await page.wait_for_load_state("load")
-            await asyncio.sleep(7.0); await page.keyboard.press("Escape"); await asyncio.sleep(0.3); await page.keyboard.press("Escape")
+            await asyncio.sleep(7.0)
+            await page.keyboard.press("Escape")
+            await asyncio.sleep(0.3)
+            await page.keyboard.press("Escape")
 
+            # Apenas define o tempo de corte se o login for bem sucedido e não explodir
             tempo_inicio_gravacao = time.time()
             tempo_corte_segundos = tempo_inicio_gravacao - tempo_inicio_contexto
 
-            print("\n🎬 --- GRAVANDO VÍDEO (TELA CHEIA) --- 🎬\n")
+            print("\n🎬 --- GRAVANDO VÍDEO (MOTOR VISION-FIRST) --- 🎬\n")
             
             for passo in roteiro.get("passos", []):
                 id_p = passo.get('id_passo', 'Fim')
-                ancora = passo.get("pedagogia", {}).get("ancora", "")
                 
+                ancora = passo.get("pedagogia", {}).get("ancora", "")
                 if ancora:
                     await exibir_legenda_cinema(page, ancora)
-                    mp3 = await gerar_audio(ancora, f"{id_p}_ancora", nome_arquivo_base, voz_escolhida)
+                    mp3 = await gerar_audio(ancora, f"{id_p}_ancora", id_treino, voz_escolhida)
                     if mp3: 
                         t_atual = time.time() - tempo_inicio_gravacao
-                        duracao = pygame.mixer.Sound(mp3).get_length()
                         iniciar_reproducao_audio(mp3)
-                        timeline_audios.append({"arquivo": mp3, "inicio": t_atual, "fim": t_atual + duracao, "texto": ancora})
+                        timeline_audios.append({"arquivo": mp3, "inicio": t_atual})
                         
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
@@ -223,25 +234,27 @@ async def executar_roteiro(caminho_json):
                     break 
 
                 for i, acao_tec in enumerate(passo.get("acoes_tecnicas", [])):
-                    if acao_tec.get("acao") == "concluir_video": continue
-                    
+                    if acao_tec.get("acao") == "concluir_video":
+                        continue
+                        
                     micro_voz = acao_tec.get("micro_narracao", "")
                     if micro_voz:
                         await exibir_legenda_cinema(page, micro_voz)
-                        mp3 = await gerar_audio(micro_voz, f"{id_p}_micro_{i}", nome_arquivo_base, voz_escolhida)
+                        mp3 = await gerar_audio(micro_voz, f"{id_p}_micro_{i}", id_treino, voz_escolhida)
                         if mp3: 
                             t_atual = time.time() - tempo_inicio_gravacao
-                            duracao = pygame.mixer.Sound(mp3).get_length()
                             iniciar_reproducao_audio(mp3)
-                            timeline_audios.append({"arquivo": mp3, "inicio": t_atual, "fim": t_atual + duracao, "texto": micro_voz})
+                            timeline_audios.append({"arquivo": mp3, "inicio": t_atual})
 
                     await encontrar_e_clicar(page, acao_tec)
+
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
                     await asyncio.sleep(0.5)
                     
         except Exception as e:
-            logging.error(f"\n⚠️ Execução interrompida: {e}")
+            print(f"\n⚠️ Execução interrompida de forma inesperada: {e}")
+            
         finally:
             pygame.mixer.music.stop()
             print("\n✅ Finalizando recursos do navegador...")
@@ -249,62 +262,23 @@ async def executar_roteiro(caminho_json):
                 if cfg.get("gravar_video", True) and not page.is_closed():
                     caminho_video_webm = await page.video.path()
                 await asyncio.sleep(1.0)
-                if not page.is_closed(): await page.close()
+                if not page.is_closed(): 
+                    await page.close()
                 await context.close()
                 await browser.close()
-            except Exception: pass
+            except Exception:
+                pass
             
+            # Segurança total: Apaga o vídeo de login se o fluxo não completou
             if tempo_corte_segundos == -1 and caminho_video_webm and os.path.exists(caminho_video_webm):
                 try: os.remove(caminho_video_webm)
                 except: pass
                 caminho_video_webm = None
 
-    # 🟢 NOVO SISTEMA: Salva o estado da gravação para renderizar depois via Web
     if caminho_video_webm and tempo_corte_segundos > 0:
-        caminho_estado = os.path.join("videos_gerados", f"{nome_arquivo_base}_estado.json")
-        estado = {
-            "caminho_webm": caminho_video_webm,
-            "timeline": timeline_audios,
-            "tempo_corte": tempo_corte_segundos
-        }
-        with open(caminho_estado, 'w', encoding='utf-8') as f:
-            json.dump(estado, f, indent=2)
-        print("✅ Gravação bruta concluída e estado salvo!")
-    else:
-        print("❌ Gravação abortada ou falhou no login.")
-        sys.exit(1) # Avisa a UI que deu erro
+        decisao = input("\n🤔 A gravação visual ficou boa? Enviar para MoviePy? (S/N)\n> ")
+        if decisao.strip().upper() == 'S':
+            renderizar_video_final(caminho_video_webm, timeline_audios, id_treino, tempo_corte_segundos)
 
 if __name__ == "__main__": 
-    caminho_json = sys.argv[1] if len(sys.argv) > 1 else "roteiro.json"
-    
-    if not os.path.exists(caminho_json):
-        print(f"❌ Roteiro não encontrado: {caminho_json}")
-        sys.exit(1)
-        
-    with open(caminho_json, 'r', encoding='utf-8') as f:
-        nome_base = re.sub(r'[\\/*?:"<>|]', "", json.load(f).get("metadata", {}).get("nome_aula", "TREINAMENTO")).replace(" ", "_")
-        
-    caminho_estado = os.path.join("videos_gerados", f"{nome_base}_estado.json")
-
-    # MODO 2: APENAS RENDERIZAR O VÍDEO (MOVIEPY)
-    if "--render" in sys.argv:
-        if not os.path.exists(caminho_estado):
-            print("❌ Estado não encontrado. Rode a gravação do robô primeiro!")
-            sys.exit(1)
-        with open(caminho_estado, 'r', encoding='utf-8') as f:
-            st = json.load(f)
-        renderizar_video_final(st["caminho_webm"], st["timeline"], nome_base, st["tempo_corte"])
-        sys.exit(0)
-        
-    # MODO 1: APENAS GRAVAR A TELA (PLAYWRIGHT)
-    elif "--record" in sys.argv:
-        asyncio.run(executar_roteiro(caminho_json))
-        sys.exit(0)
-        
-    # FALLBACK: RODA TUDO DE UMA VEZ (Modo antigo do terminal)
-    else:
-        asyncio.run(executar_roteiro(caminho_json))
-        if os.path.exists(caminho_estado):
-            with open(caminho_estado, 'r', encoding='utf-8') as f:
-                st = json.load(f)
-            renderizar_video_final(st["caminho_webm"], st["timeline"], nome_base, st["tempo_corte"])
+    asyncio.run(executar_roteiro("roteiro.json"))
