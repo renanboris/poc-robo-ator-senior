@@ -37,61 +37,108 @@
             </div>
         </div>
         
-        <div class="py-4 flex-1">
-            <p class="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu Principal</p>
+        <div class="py-4 flex-1 overflow-y-auto scrollbar-hide">
+            <p class="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-4">Menu Principal</p>
             <nav class="space-y-1">
-                <button onclick="mostrarAba('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                <button onclick="mostrarAba('dashboard')" id="nav-dashboard" class="nav-item active w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
                     <i class="fas fa-chart-pie w-5 text-center"></i> Visão Geral
                 </button>
-                <button onclick="mostrarAba('studio')" id="nav-studio" class="nav-item active w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                <button onclick="mostrarAba('studio')" id="nav-studio" class="nav-item w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
                     <i class="fas fa-video w-5 text-center"></i> Estúdio de Criação
                 </button>
             </nav>
 
             <p class="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-8 mb-2">Expansões (Roadmap)</p>
-            <nav class="space-y-1 opacity-60">
-                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Em breve">
-                    <div class="flex items-center gap-3"><i class="fas fa-globe w-5 text-center"></i> Multi-Idiomas</div>
-                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600">BETA</span>
+            <nav class="space-y-1 opacity-70">
+                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Adoção Digital (Em Breve)">
+                    <div class="flex items-center gap-3"><i class="fas fa-mouse-pointer w-5 text-center"></i> DAP Interativo</div>
+                    <span class="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">BETA</span>
                 </button>
-                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Em breve">
+                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Geração de PDFs (Em Breve)">
+                    <div class="flex items-center gap-3"><i class="fas fa-file-pdf w-5 text-center"></i> Auto-Documentação</div>
+                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold">WIP</span>
+                </button>
+                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Tradução Automática (Em Breve)">
+                    <div class="flex items-center gap-3"><i class="fas fa-globe w-5 text-center"></i> Multi-Idiomas</div>
+                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold">WIP</span>
+                </button>
+                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Testes de Regressão (Em Breve)">
                     <div class="flex items-center gap-3"><i class="fas fa-shield-alt w-5 text-center"></i> QA Auto-Pilot</div>
-                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600">BETA</span>
+                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold">WIP</span>
                 </button>
             </nav>
         </div>
     </aside>
 
-    <main id="aba-dashboard" class="flex-1 hidden bg-gray-50 p-8 overflow-y-auto">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Métricas de Inteligência Artificial</h2>
+    <main id="aba-dashboard" class="flex-1 bg-gray-50 p-8 overflow-y-auto">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Visão Executiva de Produtividade</h2>
         
-        <div class="grid grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-4 gap-6 mb-8">
             <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#009999]">
-                <div class="text-sm font-semibold text-gray-500 uppercase">Aulas Gravadas</div>
+                <div class="text-sm font-semibold text-gray-500 uppercase">Treinamentos</div>
                 <div class="text-4xl font-bold text-gray-800 mt-2" id="metric-aulas">0</div>
             </div>
+            
             <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-blue-500 relative overflow-hidden">
-                <div class="text-sm font-semibold text-gray-500 uppercase relative z-10">Zero-Touch: Mapeamentos Salvos</div>
-                <div class="text-4xl font-bold text-gray-800 mt-2 relative z-10" id="metric-memoria">0</div>
+                <div class="text-sm font-semibold text-gray-500 uppercase relative z-10">Mapeamento IA</div>
+                <div class="text-4xl font-bold text-blue-600 mt-2 relative z-10" id="metric-memoria">0</div>
+                <p class="text-[10px] text-gray-400 mt-1 relative z-10">Elementos em memória.</p>
                 <i class="fas fa-brain absolute -bottom-4 -right-4 text-8xl text-blue-50 opacity-50"></i>
             </div>
+            
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-purple-500">
+                <div class="text-sm font-semibold text-gray-500 uppercase">Horas Poupadas</div>
+                <div class="text-4xl font-bold text-purple-600 mt-2" id="metric-horas">0h</div>
+                <p class="text-[10px] text-gray-400 mt-1">Baseado em 6h manuais por aula.</p>
+            </div>
+
             <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-green-500">
-                <div class="text-sm font-semibold text-gray-500 uppercase">Acelerações por Memória</div>
-                <div class="text-4xl font-bold text-green-600 mt-2" id="metric-hits">0</div>
-                <p class="text-xs text-gray-400 mt-2">Vezes que a IA pulou a Visão usando o Cache local.</p>
+                <div class="text-sm font-semibold text-gray-500 uppercase">Economia Estimada</div>
+                <div class="text-4xl font-bold text-green-600 mt-2" id="metric-dinheiro">R$ 0</div>
+                <p class="text-[10px] text-gray-400 mt-1">Cálculo de HH Sênior.</p>
             </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h3 class="font-bold text-gray-700 mb-4"><i class="fas fa-cogs mr-2 text-gray-400"></i> Como funciona o Auto-Healing (Zero-Touch)?</h3>
-            <p class="text-sm text-gray-600 leading-relaxed">
-                O Training OS possui um banco de dados <b>SQLite</b> embutido que memoriza cada elemento da interface da Senior X. 
-                Quando o sistema original sofre atualizações (mudança de ID, cor ou posição do botão), a nossa engine detecta a falha e aciona o <i>Google Gemini Vision</i> para reparar o fluxo e atualizar o banco de dados local silenciosamente, garantindo a manutenção zero das automações.
-            </p>
+        <div class="flex gap-6">
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm flex-1">
+                <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2"><i class="fas fa-cogs text-gray-400"></i> O Motor Zero-Touch</h3>
+                <p class="text-sm text-gray-600 leading-relaxed mb-4">
+                    O Training OS é alimentado por um banco de dados autônomo. Uma vez que o especialista mapeia a tela, a IA aprende a rota. Se a Senior X sofrer uma atualização (mudança de ID, cor ou posição do botão), nosso Motor de Visão detecta a falha, localiza o novo elemento visualmente e se <b>conserta sozinho</b>.
+                </p>
+                <div class="flex items-center gap-3 bg-gray-50 p-3 rounded border border-gray-100">
+                    <i class="fas fa-bolt text-yellow-500 text-xl"></i>
+                    <div>
+                        <div class="text-sm font-bold text-gray-700">Acelerações por Memória: <span id="metric-hits" class="text-green-600">0</span></div>
+                        <div class="text-xs text-gray-500">Vezes que a IA pulou o processamento visual usando a memória nativa.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm w-1/2">
+                <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2"><i class="fas fa-rocket text-purple-500"></i> Futuro da Plataforma</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 border border-gray-100 rounded bg-gray-50 hover:border-blue-300 transition">
+                        <h4 class="font-bold text-xs text-gray-800"><i class="fas fa-mouse-pointer text-blue-500 mr-1"></i> DAP Interativo</h4>
+                        <p class="text-[10px] text-gray-500 mt-1 leading-tight">Guias flutuantes direto na tela do usuário (Concorrente WalkMe).</p>
+                    </div>
+                    <div class="p-3 border border-gray-100 rounded bg-gray-50 hover:border-red-300 transition">
+                        <h4 class="font-bold text-xs text-gray-800"><i class="fas fa-file-pdf text-red-500 mr-1"></i> Auto-Documentação</h4>
+                        <p class="text-[10px] text-gray-500 mt-1 leading-tight">Geração de apostilas em PDF passo a passo num clique.</p>
+                    </div>
+                    <div class="p-3 border border-gray-100 rounded bg-gray-50 hover:border-green-300 transition">
+                        <h4 class="font-bold text-xs text-gray-800"><i class="fas fa-globe text-green-500 mr-1"></i> Tradução Zero-Click</h4>
+                        <p class="text-[10px] text-gray-500 mt-1 leading-tight">Áudios em Espanhol e Inglês usando a mesma gravação.</p>
+                    </div>
+                    <div class="p-3 border border-gray-100 rounded bg-gray-50 hover:border-yellow-300 transition">
+                        <h4 class="font-bold text-xs text-gray-800"><i class="fas fa-shield-alt text-yellow-500 mr-1"></i> QA Auto-Pilot</h4>
+                        <p class="text-[10px] text-gray-500 mt-1 leading-tight">Execução noturna de roteiros para validar fluxos do Senior X.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
-    <main id="aba-studio" class="flex-1 flex h-full">
+    <main id="aba-studio" class="flex-1 hidden h-full">
         
         <div class="w-80 bg-white border-r border-gray-200 flex flex-col h-full bg-gray-50">
             <div class="p-4 border-b border-gray-200 bg-white">
@@ -103,9 +150,9 @@
         </div>
 
         <div class="flex-1 flex flex-col h-full relative bg-gray-100">
-            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">
-                <div id="header-title" class="font-semibold text-gray-700">Selecione uma aula</div>
-                <div class="flex gap-2" id="action-buttons" style="display: none;">
+            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm overflow-x-auto whitespace-nowrap scrollbar-hide">
+                <div id="header-title" class="font-semibold text-gray-700 min-w-max mr-4">Selecione uma aula</div>
+                <div class="flex gap-2 min-w-max" id="action-buttons" style="display: none;">
                     
                     <button onclick="excluirRoteiro()" class="px-3 py-1.5 text-red-500 hover:bg-red-50 rounded text-sm transition" title="Excluir aula">
                         <i class="fas fa-trash-alt"></i>
@@ -118,16 +165,26 @@
                     <div class="h-6 border-l border-gray-300 mx-1 self-center"></div>
                     
                     <button onclick="executarRobo()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold shadow-sm transition">
-                        <i class="fas fa-robot mr-1"></i> 1. Gravar Robô
+                        <i class="fas fa-robot mr-1"></i> 1. Robô
                     </button>
                     
                     <button onclick="renderizarVideo()" class="px-3 py-1.5 senior-teal hover:bg-teal-700 text-white rounded text-sm font-bold shadow-sm transition">
-                        <i class="fas fa-film mr-1"></i> 2. Renderizar
+                        <i class="fas fa-film mr-1"></i> 2. Vídeo
+                    </button>
+
+                    <button onclick="gerarScorm()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-bold shadow-sm transition">
+                        <i class="fas fa-box-open mr-1"></i> 3. Simulador
                     </button>
                     
+                    <div class="h-6 border-l border-gray-300 mx-1 self-center"></div>
+
                     <button id="btn-assistir" onclick="abrirModalVideo()" class="hidden px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded text-sm font-bold shadow-sm transition">
                         <i class="fas fa-play mr-1"></i> Assistir
                     </button>
+
+                    <a id="btn-baixar-scorm" href="#" download class="hidden px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-bold shadow-sm transition">
+                        <i class="fas fa-download mr-1"></i> SCORM
+                    </a>
                 </div>
             </header>
 
@@ -174,7 +231,6 @@
     </div>
 
     <script>
-        // Variáveis de Estado
         let roteiroAtual = null; 
         let arquivoAtual = ""; 
         let cacheListaRoteiros = [];
@@ -212,13 +268,10 @@
         function abrirModalVideo() {
             const url = document.getElementById('btn-assistir').dataset.url;
             if (!url) return;
-            
             const player = document.getElementById('video-player'); 
             player.src = url;
-            
             document.getElementById('modal-video').classList.remove('hidden'); 
             document.getElementById('modal-video').classList.add('flex');
-            
             player.play();
         }
 
@@ -226,7 +279,6 @@
             const player = document.getElementById('video-player'); 
             player.pause();
             player.currentTime = 0;
-            
             document.getElementById('modal-video').classList.add('hidden'); 
             document.getElementById('modal-video').classList.remove('flex');
         }
@@ -242,13 +294,17 @@
         }
 
         // ==========================================
-        // COMUNICAÇÃO COM O BACKEND (API)
+        // COMUNICAÇÃO COM O BACKEND E DASHBOARD
         // ==========================================
         async function carregarMetricas() {
             try {
                 const response = await fetch('/api/metricas'); 
                 const data = await response.json();
+                
                 document.getElementById('metric-memoria').innerText = data.total_memorizado;
+                document.getElementById('metric-aulas').innerText = data.total_aulas;
+                document.getElementById('metric-horas').innerText = data.horas_poupadas + "h";
+                document.getElementById('metric-dinheiro').innerText = "R$ " + data.dinheiro_poupado.toLocaleString('pt-BR');
                 document.getElementById('metric-hits').innerText = data.sucesso_recuperacao;
             } catch(e) {
                 console.error("Erro ao buscar métricas:", e);
@@ -287,43 +343,56 @@
             try {
                 const response = await fetch('/api/roteiros'); 
                 cacheListaRoteiros = await response.json();
-                
                 const container = document.getElementById('lista-roteiros');
-                document.getElementById('metric-aulas').innerText = cacheListaRoteiros.length;
                 
                 let html = '';
                 cacheListaRoteiros.forEach(roteiro => {
                     const isSelected = arquivoAtual === roteiro.arquivo;
                     const cssClass = isSelected ? 'border-[#009999] bg-white shadow-sm' : 'border-transparent hover:bg-gray-100';
-                    const icon = roteiro.tem_video ? '<i class="fas fa-play-circle text-green-500"></i>' : '<i class="fas fa-file-alt text-gray-300"></i>';
+                    
+                    // Ícones de status de mídia gerada
+                    let badgesMidia = '';
+                    if(roteiro.tem_video) badgesMidia += '<i class="fas fa-play-circle text-teal-500 ml-1" title="Vídeo Pronto"></i>';
+                    if(roteiro.tem_scorm) badgesMidia += '<i class="fas fa-box-open text-purple-500 ml-1" title="SCORM Pronto"></i>';
+                    if(!roteiro.tem_video && !roteiro.tem_scorm) badgesMidia = '<i class="fas fa-file-alt text-gray-300"></i>';
                     
                     html += `
                     <button onclick="carregarRoteiro('${roteiro.arquivo}')" class="w-full text-left p-3 rounded border ${cssClass} transition flex items-center gap-3">
-                        <div class="text-lg">${icon}</div>
+                        <div class="text-sm flex">${badgesMidia}</div>
                         <div class="overflow-hidden w-full">
                             <div class="font-medium text-sm text-gray-800 truncate w-full" title="${roteiro.nome}">${roteiro.nome}</div>
-                            <div class="text-[10px] text-gray-400">${roteiro.qtd_passos} passos</div>
+                            <div class="text-[10px] text-gray-400">${roteiro.qtd_passos} passos mapeados</div>
                         </div>
                     </button>`;
                 });
                 container.innerHTML = html;
                 
-                atualizarBotaoAssistir();
+                atualizarBotoesMidia();
             } catch(e) {
                 console.error("Erro ao carregar roteiros:", e);
             }
         }
 
-        function atualizarBotaoAssistir() {
+        function atualizarBotoesMidia() {
             if (!arquivoAtual) return;
             const config = cacheListaRoteiros.find(r => r.arquivo === arquivoAtual);
-            const btn = document.getElementById('btn-assistir');
             
+            // Controle do Botão de Vídeo
+            const btnVideo = document.getElementById('btn-assistir');
             if (config && config.tem_video) { 
-                btn.classList.remove('hidden'); 
-                btn.dataset.url = config.video_url; 
+                btnVideo.classList.remove('hidden'); 
+                btnVideo.dataset.url = config.video_url; 
             } else { 
-                btn.classList.add('hidden'); 
+                btnVideo.classList.add('hidden'); 
+            }
+
+            // Controle do Botão de Download SCORM
+            const btnScorm = document.getElementById('btn-baixar-scorm');
+            if (config && config.tem_scorm) {
+                btnScorm.classList.remove('hidden');
+                btnScorm.href = config.scorm_url;
+            } else {
+                btnScorm.classList.add('hidden');
             }
         }
 
@@ -339,12 +408,12 @@
             document.getElementById('action-buttons').style.display = 'flex'; 
             document.getElementById('header-title').innerText = roteiroAtual.metadata.nome_aula;
             
-            atualizarBotaoAssistir(); 
+            atualizarBotoesMidia(); 
             renderizarPassos();
         }
 
         // ==========================================
-        // FUNÇÕES DO ESTÚDIO DE EDIÇÃO E ROBÔ
+        // FUNÇÕES DO ESTÚDIO DE EDIÇÃO E GERAÇÃO
         // ==========================================
         function renderizarPassos() {
             const container = document.getElementById('passos-container'); 
@@ -426,7 +495,11 @@
             await fetch(`/api/renderizar/${arquivoAtual}`, { method: 'POST' }); 
         }
 
-        // NOVO BOTÃO DE CANCELAMENTO
+        async function gerarScorm() {
+            await salvarRoteiro();
+            await fetch(`/api/gerar-scorm/${arquivoAtual}`, { method: 'POST' });
+        }
+
         async function cancelarProcesso() {
             document.getElementById('loading-msg').innerText = "Cancelando e limpando recursos...";
             await fetch('/api/cancelar', { method: 'POST' });

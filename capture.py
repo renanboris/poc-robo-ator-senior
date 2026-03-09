@@ -85,7 +85,7 @@ Analise o screenshot e responda com um JSON:
         return {"intencao": f"{acao.capitalize()} em '{label_capturado}'", "descricao_visual": f"Elemento '{label_capturado}'", "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa"}
 
 # ==============================================================
-# 🕵️ RADAR DE CAPTURA JAVASCRIPT
+# 🕵️ RADAR DE CAPTURA JAVASCRIPT (Otimizado para SCORM)
 # ==============================================================
 async def _injetar_em_contexto(contexto):
     script_radar = """() => {
@@ -165,19 +165,36 @@ async def _injetar_em_contexto(contexto):
                 iframe: getFrameIdentifier(), acao: acao, posicao_visual: posicao, html_snapshot: target.outerHTML.substring(0, 300)
             }));
 
-            const originalBg = target.style.backgroundColor;
-            target.style.backgroundColor = acao.includes('clique') ? 'rgba(0,153,153,0.4)' : 'rgba(0,100,255,0.4)';
-            setTimeout(() => target.style.backgroundColor = originalBg, 300);
+            // Feedback visual rápido para o Especialista saber que capturou
+            const originalOutline = target.style.outline;
+            target.style.outline = '2px solid red';
+            setTimeout(() => target.style.outline = originalOutline, 200);
         };
 
-        let clickTimer = null, ultimoEnterTarget = null, ultimoEnterTime = 0;
-        document.addEventListener('click', (e) => { if (e.detail === 1) clickTimer = setTimeout(() => processarEvento(e.target, 'clique'), 250); }, true);
-        document.addEventListener('dblclick', (e) => { clearTimeout(clickTimer); processarEvento(e.target, 'duplo_clique'); }, true);
-        document.addEventListener('keydown', (e) => { if (e.key === 'Enter') { ultimoEnterTarget = e.target; ultimoEnterTime = Date.now(); processarEvento(e.target, 'digitar_e_enter', e.target.value || e.target.innerText || ''); } }, true);
+        // 🟢 ALTERAÇÃO CRÍTICA PARA SCORM: 
+        // Em vez de usar 'click' com delay de 250ms, usamos 'mousedown' instantâneo.
+        // Assim, o print é gerado antes do menu abrir ou a página mudar.
+        document.addEventListener('mousedown', (e) => { 
+            if (e.button !== 0) return; // Apenas botão esquerdo do mouse
+            processarEvento(e.target, 'clique'); 
+        }, true);
+        
+        // Mantém o enter e blur originais
+        let ultimoEnterTarget = null, ultimoEnterTime = 0;
+        document.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter') { 
+                ultimoEnterTarget = e.target; 
+                ultimoEnterTime = Date.now(); 
+                processarEvento(e.target, 'digitar_e_enter', e.target.value || e.target.innerText || ''); 
+            } 
+        }, true);
+        
         document.addEventListener('blur', (e) => {
             let tag = e.target.tagName.toLowerCase();
             if (e.target === ultimoEnterTarget && Date.now() - ultimoEnterTime < 500) return;
-            if ((tag === 'input' || tag === 'textarea' || e.target.isContentEditable) && e.target.value) processarEvento(e.target, 'preencher_campo', e.target.value);
+            if ((tag === 'input' || tag === 'textarea' || e.target.isContentEditable) && e.target.value) {
+                processarEvento(e.target, 'preencher_campo', e.target.value);
+            }
         }, true);
     }"""
     try: await contexto.evaluate(script_radar)
@@ -206,7 +223,7 @@ async def on_capturar_elemento(source, args):
 
         acao = dados.get('acao', 'clique')
         label = (dados['texto_encontrado'] or dados['tag'])[:40]
-        logger.info(f"🎬 [AÇÃO {meu_id_acao}] | {acao.upper()} | {label}")
+        logger.info(f"📸 [FOTO RÁPIDA {meu_id_acao}] | {acao.upper()} | {label}")
 
         screenshot_b64 = None
         vp_w, vp_h = 1920, 1080 
@@ -216,11 +233,13 @@ async def on_capturar_elemento(source, args):
             frame = source.get("frame")
             if frame:
                 page_ref = frame.page
-                screenshot_bytes = await page_ref.screenshot(type="jpeg", quality=60, full_page=False)
+                # Print em JPEG com qualidade 80 para garantir boa visibilidade no SCORM
+                screenshot_bytes = await page_ref.screenshot(type="jpeg", quality=80, full_page=False)
                 screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
                 vp = await page_ref.evaluate("() => ({w: window.innerWidth, h: window.innerHeight})")
                 vp_w, vp_h = vp['w'], vp['h']
-        except Exception: pass
+        except Exception as e: 
+            logger.warning(f"Falha ao tirar print: {e}")
 
         coords = _extrair_coordenadas_relativas(dados.get('posicao_visual', ''), vp_w, vp_h)
 
@@ -286,11 +305,11 @@ async def capturar_cliques_na_tela():
             script_alerta_seguro = """() => {
                 if(document.body) {
                     const div = document.createElement('div');
-                    div.innerHTML = '🎬 GRAVAÇÃO INICIADA!';
-                    div.style.cssText = `position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #e50914; color: white; padding: 15px 30px; font-size: 22px; font-weight: bold; font-family: sans-serif; z-index: 999999; border-radius: 8px; pointer-events: none; transition: opacity 1s ease;`;
+                    div.innerHTML = '🎬 GRAVAÇÃO INICIADA!<br><span style="font-size:14px; font-weight:normal;">Clique de forma calma e firme.</span>';
+                    div.style.cssText = `position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #e50914; color: white; padding: 15px 30px; font-size: 22px; font-weight: bold; font-family: sans-serif; z-index: 999999; border-radius: 8px; pointer-events: none; transition: opacity 1s ease; text-align:center;`;
                     document.body.appendChild(div);
-                    setTimeout(() => div.style.opacity = '0', 3500);
-                    setTimeout(() => div.remove(), 4500);
+                    setTimeout(() => div.style.opacity = '0', 4000);
+                    setTimeout(() => div.remove(), 5000);
                 }
             }"""
             try: await page.evaluate(script_alerta_seguro)
@@ -299,7 +318,7 @@ async def capturar_cliques_na_tela():
         except Exception as e:
             return logger.error(f"❌ Erro crítico no login: {e}")
 
-        logger.info("\n🔴 GRAVAÇÃO INICIADA! Use o sistema. Feche o navegador ao terminar.\n")
+        logger.info("\n🔴 GRAVAÇÃO INICIADA! Use o sistema de forma cadenciada. Feche o navegador ao terminar.\n")
         try:
             while not page.is_closed():
                 await asyncio.sleep(2)
@@ -319,7 +338,6 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
     try:
         with open("aura_prompt.txt", "r", encoding="utf-8") as f: prompt_sistema = f.read()
     except FileNotFoundError:
-        logger.warning("⚠️ aura_prompt.txt não encontrado! Usando fallback.")
         prompt_sistema = PROMPT_FALLBACK
 
     lista_para_ia = []
@@ -379,7 +397,6 @@ async def orquestrador_pos_captura(nome_aula: str, objetivo: str):
 def iniciar_esteira_de_producao():
     print("\n" + "=" * 50 + "\n🎓 SENIOR SISTEMAS — TRAINING OS (CRIADOR DE AULAS)\n" + "=" * 50)
     
-    # 🟢 MODO API: Verifica se o Dashboard Web está chamando o script
     is_auto = "--auto" in sys.argv
     if is_auto:
         nome_aula = sys.argv[1]

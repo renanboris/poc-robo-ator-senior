@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -22,6 +22,8 @@ ROTEIROS_DIR = "roteiros_salvos"
 os.makedirs(ROTEIROS_DIR, exist_ok=True)
 VIDEOS_DIR = "videos_prontos"
 os.makedirs(VIDEOS_DIR, exist_ok=True)
+SCORM_DIR = "scorm_exports"
+os.makedirs(SCORM_DIR, exist_ok=True)
 
 templates = Jinja2Templates(directory="templates")
 
@@ -105,18 +107,34 @@ async def dashboard(request: Request):
 
 @app.get("/api/metricas")
 async def get_metricas():
-    """Consulta o banco SQLite (Brain) para alimentar o Dashboard de Zero-Touch."""
+    """Consulta o banco SQLite e os arquivos para calcular o ROI e a IA."""
     try:
-        if not os.path.exists("brain.db"): 
-            return {"total_memorizado": 0, "sucesso_recuperacao": 0}
+        # 1. Métricas do SQLite (Zero-Touch)
+        total_memorizado = 0
+        sucesso_recuperacao = 0
+        if os.path.exists("brain.db"): 
+            with sqlite3.connect("brain.db") as conn:
+                total_memorizado = conn.execute("SELECT COUNT(*) FROM memoria_semantica").fetchone()[0]
+                sucesso_recuperacao = conn.execute("SELECT SUM(hits) FROM memoria_semantica").fetchone()[0] or 0
+
+        # 2. Métricas de ROI (Negócios)
+        # Assumindo: 1 Roteiro pronto = 6 horas poupadas. 1 hora = R$ 80,00.
+        qtd_aulas = len([f for f in os.listdir(ROTEIROS_DIR) if f.endswith('.json')])
+        horas_poupadas = qtd_aulas * 6
+        dinheiro_poupado = horas_poupadas * 80
             
-        with sqlite3.connect("brain.db") as conn:
-            total = conn.execute("SELECT COUNT(*) FROM memoria_semantica").fetchone()[0]
-            hits = conn.execute("SELECT SUM(hits) FROM memoria_semantica").fetchone()[0] or 0
-            
-        return {"total_memorizado": total, "sucesso_recuperacao": hits}
+        return {
+            "total_memorizado": total_memorizado, 
+            "sucesso_recuperacao": sucesso_recuperacao,
+            "horas_poupadas": horas_poupadas,
+            "dinheiro_poupado": dinheiro_poupado,
+            "total_aulas": qtd_aulas
+        }
     except Exception:
-        return {"total_memorizado": 0, "sucesso_recuperacao": 0}
+        return {
+            "total_memorizado": 0, "sucesso_recuperacao": 0,
+            "horas_poupadas": 0, "dinheiro_poupado": 0, "total_aulas": 0
+        }
 
 @app.get("/api/status")
 async def get_status():
@@ -153,8 +171,11 @@ async def listar_roteiros():
                 nome_aula = dados.get("metadata", {}).get("nome_aula", arquivo.replace(".json", ""))
                 nome_arquivo_base = re.sub(r'[\\/*?:"<>|]', "", nome_aula).replace(" ", "_")
                 
-                # Verifica se já existe um vídeo renderizado para habilitar o botão de Play
+                # Verifica status do Vídeo
                 tem_video = os.path.exists(os.path.join(VIDEOS_DIR, f"{nome_arquivo_base}.mp4"))
+                
+                # Verifica status do pacote SCORM
+                tem_scorm = os.path.exists(os.path.join(SCORM_DIR, f"{nome_arquivo_base}_SCORM.zip"))
                 
                 roteiros.append({
                     "arquivo": arquivo, 
@@ -162,7 +183,9 @@ async def listar_roteiros():
                     "qtd_passos": len(dados.get("passos", [])),
                     "mtime": os.path.getmtime(caminho_completo), 
                     "tem_video": tem_video,
-                    "video_url": f"/videos/{nome_arquivo_base}.mp4" if tem_video else None
+                    "video_url": f"/videos/{nome_arquivo_base}.mp4" if tem_video else None,
+                    "tem_scorm": tem_scorm,
+                    "scorm_url": f"/api/download-scorm/{nome_arquivo_base}" if tem_scorm else None
                 })
         except Exception:
             pass
@@ -226,6 +249,39 @@ async def renderizar_video(arquivo: str):
     comando = [sys.executable, "main.py", os.path.join(ROTEIROS_DIR, arquivo), "--render"]
     threading.Thread(target=executar_processo_bg, args=(comando, "Renderizando vídeo final e extraindo legendas...", "🎉 Vídeo pronto e disponível!")).start()
     return {"status": "iniciado"}
+
+# ==============================================================
+# 📦 SCORM (SIMULADOR INTERATIVO)
+# ==============================================================
+
+@app.post("/api/gerar-scorm/{arquivo}")
+async def gerar_scorm(arquivo: str):
+    """Aciona o scorm_builder.py para empacotar o Simulador SCORM."""
+    if estado_servidor["ocupado"]: 
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+        
+    caminho_json = os.path.join(ROTEIROS_DIR, arquivo)
+    comando = [sys.executable, "scorm_builder.py", caminho_json]
+    
+    threading.Thread(
+        target=executar_processo_bg, 
+        args=(comando, "Montando o Simulador Interativo (SCORM)...", "📦 Pacote SCORM gerado com sucesso!")
+    ).start()
+    return {"status": "iniciado"}
+
+@app.get("/api/download-scorm/{nome_base}")
+async def download_scorm(nome_base: str):
+    """Rota para disparar o download do arquivo ZIP do SCORM para o PC do usuário."""
+    caminho_zip = os.path.join(SCORM_DIR, f"{nome_base}_SCORM.zip")
+    
+    if os.path.exists(caminho_zip):
+        return FileResponse(
+            path=caminho_zip, 
+            filename=f"{nome_base}_SCORM.zip", 
+            media_type='application/zip'
+        )
+        
+    return JSONResponse(status_code=404, content={"erro": "Arquivo SCORM não encontrado."})
 
 # ==============================================================
 # 🚀 PONTO DE ENTRADA DA APLICAÇÃO
