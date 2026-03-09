@@ -20,14 +20,16 @@ O array micro_narracoes deve ter exatamente o mesmo número de itens que ids_aco
 Nunca omita o campo. Cada micro-narração deve ser uma frase completa de 8 a 20 palavras.
 (Ver Guardrail 7 para a exceção de ação única.)
 
-GUARDRAIL 3 — COBERTURA TOTAL E TIPOS DE AÇÃO:
-Todos os id_acao do log devem ser alocados em algum passo ou em "acoes_ignoradas".
-Se uma ação não fizer sentido pedagógico (ex: ESC acidental, foco sem intenção),
-coloque-a em "acoes_ignoradas" no metadata com justificativa clara.
+GUARDRAIL 3 — PROIBIÇÃO DE OMISSÃO (RISCO CRÍTICO DE QUEBRA):
+NUNCA, SOB NENHUMA HIPÓTESE, ignore ou descarte ações do tipo "clique" ou "duplo_clique".
+Se o usuário deu um "duplo_clique" para abrir uma pasta, ESSE PASSO DEVE EXISTIR NO ROTEIRO. 
+Se você omitir a ação técnica do duplo clique achando que a narração já explica tudo, o robô não vai entrar na pasta e a automação vai falhar miseravelmente.
+TODOS os "ids_acoes_tecnicas" de clique e duplo_clique enviados para você DEVEM ser repassados para o JSON final.
+Só coloque em "acoes_ignoradas" ações sem intenção (ex: ESC acidental, blur).
 
 TIPOS DE AÇÃO — COMO TRATAR:
-- "clique"            → ação de navegação ou ativação de elemento
-- "duplo_clique"      → abertura de item (pasta, registro, documento)
+- "clique"            → ação de navegação ou ativação de elemento (NUNCA OMITA)
+- "duplo_clique"      → OBRIGATÓRIO manter para abertura de itens e pastas (NUNCA OMITA)
 - "digitar_e_enter"   → preenchimento de campo confirmado com Enter
 - "preencher_campo"   → preenchimento sem confirmação imediata
   → Se "preencher_campo" vier logo antes de "clique" em Salvar/Confirmar,
@@ -296,6 +298,7 @@ OUTPUT CORRETO:
 ⚠️ AUTO-VALIDAÇÃO — execute mentalmente antes de retornar
 ═══════════════════════════════════════════
 
+□ Você incluiu TODAS as ações do tipo "duplo_clique" e "clique" dentro de algum "ids_acoes_tecnicas"? (NÃO omita!)
 □ Todos os id_acao do log estão em ids_acoes_tecnicas ou acoes_ignoradas?
 □ Nenhum campo "intencao_semantica" ou "elemento_alvo" foi modificado?
 □ Cada passo com 2+ ações tem micro_narracoes com o mesmo número de itens?

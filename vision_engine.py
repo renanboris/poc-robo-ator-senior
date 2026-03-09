@@ -1,289 +1,647 @@
+"""
+vision_engine.py — Motor de localização e execução de ações no browser.
+
+Filosofia: cascata de estratégias do mais barato ao mais caro.
+Cada camada só é acionada se a anterior falhar completamente.
+"""
+
 import asyncio
-import json
 import base64
-import re
-import os
+import hashlib
+import json
 import logging
+import os
+import re
+from dataclasses import dataclass, field
+from typing import Optional
+
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from playwright.async_api import Page, FrameLocator
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Cache semântico da sessão atual
-_cache_sessao = {}
+# ──────────────────────────────────────────────────────────────
+# 📦 ESTRUTURAS DE DADOS
+# ──────────────────────────────────────────────────────────────
 
-# ==============================================================
-# 🔍 UTILITÁRIOS DE SELETOR E CACHE
-# ==============================================================
-def _e_seletor_fragil(seletor: str) -> bool:
-    if not seletor:
-        return True
-    if seletor.startswith("text=") or "has-text" in seletor:
-        return False
-    if "[aria-label=" in seletor or "[data-testid=" in seletor:
-        return False
-    if "[id=" in seletor or "[name=" in seletor or "[placeholder=" in seletor:
-        return False
-        
-    frageis = {
-        'h1', 'h2', 'h3', 'h4', 'span', 'div', 'em', 'p', 'li', 
-        'ul', 'a', 'button', 'input', 'section', 'article', 'td', 'tr'
-    }
-    seletor_limpo = seletor.strip().split(':')[0].split('[')[0].split('.')[0]
-    return seletor_limpo in frageis
+@dataclass
+class EntradaCache:
+    seletor: Optional[str] = None
+    coords: Optional[dict] = None
+    iframe_src: Optional[str] = None
+    hits: int = 0
+    falhas_consecutivas: int = 0  # Penaliza entradas que param de funcionar
 
-def extrair_valor_atributo(seletor: str, atributo: str) -> str | None:
-    match = re.search(rf"{atributo}=['\"]([^'\"]+)['\"]", seletor)
-    return match.group(1) if match else None
+@dataclass
+class TentativaLocalizacao:
+    seletor: str
+    iframe_hint: Optional[str] = None
+    exact: bool = False
+    via_pierce: bool = False          # Shadow DOM
+    role: Optional[str] = None        # Para getByRole
+    label: Optional[str] = None       # Para getByLabel
+    placeholder: Optional[str] = None
+    title: Optional[str] = None
+    descricao: str = ""               # Log humanizado
 
-def gerar_seletores_alternativos(seletor_original: str, label_curto: str, iframe: str | None) -> list[dict]:
-    alternativas = []
-    
-    if label_curto:
-        # A MAGIA DO SNIPER: "exact=True" força o Playwright a achar apenas o texto, 
-        # ignorando a linha inteira da tabela (evitando clicar no checkbox)
-        alternativas.append({
-            "seletor": f'text="{label_curto}"', 
-            "dentro_do_iframe": iframe, 
-            "exact": True
-        })
-        alternativas.append({
-            "seletor": f"[aria-label='{label_curto}']", 
-            "dentro_do_iframe": iframe
-        })
-        
-    aria_label = extrair_valor_atributo(seletor_original, "aria-label")
-    if aria_label and aria_label != label_curto:
-        alternativas.append({
-            "seletor": f"[aria-label='{aria_label.lower()}']", 
-            "dentro_do_iframe": iframe
-        })
-    
-    testid = extrair_valor_atributo(seletor_original, "data-testid")
-    if testid:
-        alternativas.append({
-            "seletor": f"[data-testid='{testid.replace('-', '_')}']", 
-            "dentro_do_iframe": iframe
-        })
-        
-    return alternativas
+# ──────────────────────────────────────────────────────────────
+# 🗃️ CACHE SEMÂNTICO
+# ──────────────────────────────────────────────────────────────
 
-def _consultar_cache(intencao: str) -> dict | None:
-    chave = intencao.strip().lower()[:60]
-    entrada = _cache_sessao.get(chave)
-    if entrada and entrada.get("hits", 0) >= 1:
-        print(f"   ⚡ [Cache] Hit para: '{intencao[:40]}'")
+_cache_sessao: dict[str, EntradaCache] = {}
+
+MAX_FALHAS_CACHE = 3  # Após 3 falhas consecutivas, a entrada é descartada
+
+def _chave_cache(intencao: str) -> str:
+    """Hash MD5 de 16 chars — sem colisão por truncagem de string."""
+    return hashlib.md5(intencao.strip().lower().encode()).hexdigest()[:16]
+
+def _consultar_cache(intencao: str) -> Optional[EntradaCache]:
+    entrada = _cache_sessao.get(_chave_cache(intencao))
+    if not entrada:
+        return None
+    if entrada.falhas_consecutivas >= MAX_FALHAS_CACHE:
+        logger.debug(f"Cache descartado por {MAX_FALHAS_CACHE} falhas: '{intencao[:40]}'")
+        return None
+    if entrada.hits >= 1:
+        logger.info(f"   ⚡ [Cache] Hit para: '{intencao[:50]}'")
         return entrada
     return None
 
-def _atualizar_cache(intencao: str, seletor: str = None, coords: dict = None, iframe: str = None):
-    chave = intencao.strip().lower()[:60]
-    existente = _cache_sessao.get(chave, {"hits": 0})
-    existente["hits"] = existente.get("hits", 0) + 1
-    
-    if seletor: 
-        existente["seletor"] = seletor
-    if coords: 
-        existente["coords"] = coords
-    if iframe: 
-        existente["iframe"] = iframe
-        
-    _cache_sessao[chave] = existente
+def _registrar_sucesso_cache(intencao: str, seletor: Optional[str] = None,
+                              coords: Optional[dict] = None, iframe: Optional[str] = None) -> None:
+    chave = _chave_cache(intencao)
+    entrada = _cache_sessao.get(chave, EntradaCache())
+    entrada.hits += 1
+    entrada.falhas_consecutivas = 0
+    if seletor:
+        entrada.seletor = seletor
+    if coords:
+        entrada.coords = coords
+    if iframe:
+        entrada.iframe_src = iframe
+    _cache_sessao[chave] = entrada
 
-# ==============================================================
-# 🎬 EXECUÇÃO FÍSICA NO BROWSER
-# ==============================================================
-async def _executar_acao_no_locator(locator, page, acao: str, valor: str):
-    try: 
-        await locator.scroll_into_view_if_needed(timeout=3000)
-        await locator.hover(timeout=2000)
-    except Exception: 
-        pass
-        
+def _registrar_falha_cache(intencao: str) -> None:
+    chave = _chave_cache(intencao)
+    entrada = _cache_sessao.get(chave, EntradaCache())
+    entrada.falhas_consecutivas += 1
+    _cache_sessao[chave] = entrada
+
+# ──────────────────────────────────────────────────────────────
+# 🔬 ANÁLISE DE SELETORES
+# ──────────────────────────────────────────────────────────────
+
+_TAGS_FRAGEIS = {
+    'h1','h2','h3','h4','span','div','em','p','li',
+    'ul','a','button','input','section','article','td','tr','svg','i'
+}
+
+def _e_seletor_fragil(seletor: str) -> bool:
+    if not seletor:
+        return True
+    # Seletores semânticos são robustos
+    for prefixo in ("text=", "has-text", "[aria-label=", "[data-testid=",
+                    "[id=", "[name=", "[placeholder=", "[role="):
+        if prefixo in seletor:
+            return False
+    tag = seletor.strip().split(':')[0].split('[')[0].split('.')[0].split('>')[0].strip()
+    return tag in _TAGS_FRAGEIS
+
+def _extrair_atributo(seletor: str, atributo: str) -> Optional[str]:
+    match = re.search(rf'{atributo}=[\'"]([^\'"]+)[\'"]', seletor)
+    return match.group(1) if match else None
+
+# ──────────────────────────────────────────────────────────────
+# 🎯 GERAÇÃO DE CANDIDATOS (SNIPER)
+# ──────────────────────────────────────────────────────────────
+
+def _gerar_candidatos(
+    seletor_hint: str,
+    label_curto: str,
+    iframe_hint: Optional[str],
+    acao: str,
+    tipo_elemento: str,
+    html_hint: str,
+) -> list[TentativaLocalizacao]:
+    candidatos: list[TentativaLocalizacao] = []
+    eh_digitacao = acao in ("digitar_e_enter", "preencher_campo")
+
+    # ── 1. Playwright nativos de alto nível ──────────────────
+    if label_curto:
+        if not eh_digitacao:
+            # getByText exato
+            candidatos.append(TentativaLocalizacao(
+                seletor=f'text="{label_curto}"',
+                iframe_hint=iframe_hint,
+                exact=True,
+                descricao=f"texto exato '{label_curto}'"
+            ))
+
+        role_map = {
+            "button": "button", "link": "link", "menu_item": "menuitem",
+            "checkbox": "checkbox", "tab": "tab", "input": "textbox",
+        }
+        role = role_map.get(tipo_elemento)
+        if role:
+            candidatos.append(TentativaLocalizacao(
+                seletor="", role=role, label=label_curto, iframe_hint=iframe_hint,
+                descricao=f"role={role} name='{label_curto}'"
+            ))
+
+        if eh_digitacao or tipo_elemento in ("input",):
+            candidatos.append(TentativaLocalizacao(
+                seletor="", label=label_curto, iframe_hint=iframe_hint,
+                descricao=f"label '{label_curto}'"
+            ))
+
+        candidatos.append(TentativaLocalizacao(
+            seletor=f"[aria-label='{label_curto}']", iframe_hint=iframe_hint,
+            descricao=f"aria-label='{label_curto}'"
+        ))
+
+        if label_curto != label_curto.lower():
+            candidatos.append(TentativaLocalizacao(
+                seletor=f"[aria-label='{label_curto.lower()}']", iframe_hint=iframe_hint,
+                descricao=f"aria-label lowercase"
+            ))
+
+    # ── 2. Extração do seletor hint ──────────────────────────
+    aria_hint = _extrair_atributo(seletor_hint, "aria-label")
+    if aria_hint and aria_hint != label_curto:
+        candidatos.append(TentativaLocalizacao(seletor=f"[aria-label='{aria_hint}']", iframe_hint=iframe_hint, descricao=f"aria-label do hint '{aria_hint}'"))
+
+    testid = _extrair_atributo(seletor_hint, "data-testid")
+    if testid:
+        candidatos.append(TentativaLocalizacao(seletor=f"[data-testid='{testid}']", iframe_hint=iframe_hint, descricao=f"data-testid='{testid}'"))
+
+    # ── 3. Extração do HTML hint ─────────────────────────────
+    if html_hint:
+        ph_match = re.search(r'placeholder=[\'"]([^\'"]+)[\'"]', html_hint)
+        if ph_match:
+            ph = ph_match.group(1)
+            candidatos.append(TentativaLocalizacao(seletor=f"[placeholder='{ph}']", iframe_hint=iframe_hint, descricao=f"placeholder='{ph}'"))
+
+        title_match = re.search(r'title=[\'"]([^\'"]+)[\'"]', html_hint)
+        if title_match:
+            t = title_match.group(1)
+            candidatos.append(TentativaLocalizacao(seletor=f"[title='{t}']", iframe_hint=iframe_hint, descricao=f"title='{t}'"))
+
+        id_match = re.search(r'\bid=[\'"]([^\'"]+)[\'"]', html_hint)
+        if id_match:
+            elem_id = id_match.group(1)
+            if not re.search(r'(ng-|mat-|cdk-|\d{5,})', elem_id):
+                candidatos.append(TentativaLocalizacao(seletor=f"#{elem_id}", iframe_hint=iframe_hint, descricao=f"id='{elem_id}'"))
+
+    # ── 4. Shadow DOM (pierce) ───────────────────────────────
+    if label_curto and not eh_digitacao:
+        candidatos.append(TentativaLocalizacao(seletor=f">> text={label_curto}", via_pierce=True, iframe_hint=iframe_hint, descricao=f"shadow DOM pierce texto '{label_curto}'"))
+
+    # ── 5. Texto parcial (último recurso textual) ────────────
+    if label_curto and not eh_digitacao and len(label_curto) > 3:
+        candidatos.append(TentativaLocalizacao(seletor=f"text={label_curto}", iframe_hint=iframe_hint, exact=False, descricao=f"texto parcial '{label_curto}'"))
+
+    return candidatos
+
+# ──────────────────────────────────────────────────────────────
+# 🖼️ RESOLUÇÃO DE IFRAME
+# ──────────────────────────────────────────────────────────────
+
+async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
+    """Retorna o contexto de localização correto."""
+    if not iframe_hint or iframe_hint in ("Página Principal", "iframe-cross-origin"):
+        return page
+
+    for seletor_iframe in [
+        f"iframe[name='{iframe_hint}']",
+        f"iframe[src*='{iframe_hint}']",
+        f"iframe[id='{iframe_hint}']",
+        f"iframe[title*='{iframe_hint}']",
+    ]:
+        try:
+            fl = page.frame_locator(seletor_iframe)
+            await fl.locator("body").wait_for(state="attached", timeout=800)
+            return fl
+        except Exception:
+            continue
+
     try:
-        await locator.evaluate("el => { el.style.transition='all 0.3s'; el.style.outline='4px solid #009999'; el.style.boxShadow='0 0 25px #009999'; }")
-        await asyncio.sleep(1.2)
-        await locator.evaluate("el => { el.style.outline=''; el.style.boxShadow=''; }")
-    except Exception: 
+        frames = page.frames
+        for frame in frames:
+            try:
+                if iframe_hint in frame.url or iframe_hint in frame.name:
+                    return frame
+            except Exception:
+                continue
+    except Exception:
         pass
-    
-    if acao == "duplo_clique": 
+
+    logger.debug(f"Iframe '{iframe_hint}' não encontrado. Usando página principal.")
+    return page
+
+# ──────────────────────────────────────────────────────────────
+# ✨ HIGHLIGHT VISUAL E EXECUÇÃO FÍSICA
+# ──────────────────────────────────────────────────────────────
+
+async def _highlight_elemento(locator, page: Page) -> None:
+    try:
+        await locator.evaluate("""el => {
+            el.style.transition = 'all 0.25s';
+            el.style.outline = '4px solid #009999';
+            el.style.boxShadow = '0 0 20px rgba(0,153,153,0.8)';
+        }""")
+        await asyncio.sleep(1.0)
+        await locator.evaluate("el => { el.style.outline = ''; el.style.boxShadow = ''; }")
+    except Exception:
+        pass
+
+async def _highlight_coords(page: Page, x: int, y: int) -> None:
+    try:
+        await page.evaluate(f"""() => {{
+            const dot = document.createElement('div');
+            dot.style.cssText = `
+                position: fixed; left: {x - 18}px; top: {y - 18}px;
+                width: 36px; height: 36px; border-radius: 50%;
+                background: rgba(0,153,153,0.5); border: 3px solid #009999;
+                z-index: 999999; pointer-events: none; animation: ping 0.6s ease-out;
+            `;
+            document.body.appendChild(dot);
+            setTimeout(() => dot.remove(), 900);
+        }}""")
+    except Exception:
+        pass
+
+async def _aguardar_estabilidade(page: Page, timeout_ms: int = 1500) -> None:
+    try:
+        await page.wait_for_load_state("networkidle", timeout=timeout_ms)
+    except Exception:
+        await asyncio.sleep(0.4)
+
+async def _executar_acao(locator, page: Page, acao: str, valor: str) -> None:
+    try:
+        await locator.scroll_into_view_if_needed(timeout=2000)
+        await locator.hover(timeout=1500)
+    except Exception:
+        pass
+
+    await _highlight_elemento(locator, page)
+
+    if acao == "duplo_clique":
         await locator.dblclick(timeout=3000)
     elif acao == "digitar_e_enter":
         await locator.click(timeout=2000)
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.2)
         await page.keyboard.press("Control+A")
         await page.keyboard.press("Backspace")
-        await page.keyboard.type(valor, delay=50)
+        if valor:
+            await page.keyboard.type(valor, delay=40)
         await page.keyboard.press("Enter")
-    else: 
+    elif acao == "preencher_campo":
+        await locator.click(timeout=2000)
+        await asyncio.sleep(0.2)
+        await page.keyboard.press("Control+A")
+        await page.keyboard.press("Backspace")
+        if valor:
+            await page.keyboard.type(valor, delay=40)
+    else:
         await locator.click(timeout=3000)
-        
-    await asyncio.sleep(0.5)
 
-async def _tentar_seletor(page, seletor: str, iframe: str | None, acao: str, valor: str, exact: bool = False) -> bool:
+    await _aguardar_estabilidade(page)
+
+# ──────────────────────────────────────────────────────────────
+# 🔑 TENTATIVA DE SELETOR ÚNICO E FOCO NATIVO
+# ──────────────────────────────────────────────────────────────
+
+async def _tentar_candidato(page: Page, candidato: TentativaLocalizacao, acao: str, valor: str, timeout_ms: int = 3500) -> bool:
     try:
-        contexto = page
-        if iframe and iframe not in ['Página Principal', 'iframe_cross_origin']:
-            contexto = page.frame_locator(f"iframe[name='{iframe}']")
-        
-        if seletor.startswith("text="):
-            texto = seletor.replace("text=", "").replace('"', "").replace("'", "").strip()
-            loc = contexto.get_by_text(texto, exact=exact).first
+        contexto = await _resolver_contexto(page, candidato.iframe_hint)
+
+        if not candidato.seletor:
+            if hasattr(contexto, 'get_by_role') and candidato.role and candidato.label:
+                loc = contexto.get_by_role(candidato.role, name=candidato.label).first
+            elif hasattr(contexto, 'get_by_label') and candidato.label:
+                loc = contexto.get_by_label(candidato.label).first
+            elif hasattr(contexto, 'get_by_placeholder') and candidato.placeholder:
+                loc = contexto.get_by_placeholder(candidato.placeholder).first
+            elif hasattr(contexto, 'get_by_title') and candidato.title:
+                loc = contexto.get_by_title(candidato.title).first
+            else:
+                return False
+        elif candidato.seletor.startswith("text="):
+            texto = candidato.seletor[5:].strip('"').strip("'")
+            loc = contexto.get_by_text(texto, exact=candidato.exact).first
+        elif candidato.via_pierce:
+            loc = page.locator(candidato.seletor).first
         else:
-            loc = contexto.locator(seletor).first
-            
-        await loc.wait_for(state="visible", timeout=4000)
-        await _executar_acao_no_locator(loc, page, acao, valor)
+            loc = contexto.locator(candidato.seletor).first
+
+        await loc.wait_for(state="visible", timeout=timeout_ms)
+        await _executar_acao(loc, page, acao, valor)
         return True
-    except Exception: 
+    except Exception as exc:
         return False
 
-async def _clicar_por_coordenadas(page, coords: dict, acao: str, valor: str) -> bool:
+async def _digitar_no_active_element(page: Page, acao: str, valor: str) -> bool:
+    """O Truque do Cursor: resolve pastas pré-focadas imediatamente."""
     try:
-        x = int(coords["x"])
-        y = int(coords["y"])
-        
-        script_neon = f"""() => {{ 
-            const dot = document.createElement('div'); 
-            dot.style.cssText = `position: fixed; left: {x-15}px; top: {y-15}px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,153,153,0.6); border: 3px solid #009999; z-index: 999999; pointer-events: none;`; 
-            document.body.appendChild(dot); 
-            setTimeout(() => dot.remove(), 800); 
-        }}"""
-        await page.evaluate(script_neon)
-        await asyncio.sleep(0.4)
-        
-        if acao == "duplo_clique": 
-            await page.mouse.dblclick(x, y)
-        else: 
-            await page.mouse.click(x, y)
-            
-        if acao == "digitar_e_enter" and valor:
+        # Loop de espera ativa para o caso de modais lentos
+        is_editable = False
+        for _ in range(5):
+            is_editable = await page.evaluate("""() => {
+                const el = document.activeElement;
+                if (!el || el.tagName === 'BODY') return false;
+                return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ||
+                       el.isContentEditable || el.getAttribute('contenteditable') === 'true';
+            }""")
+            if is_editable: break
             await asyncio.sleep(0.3)
-            await page.keyboard.press("Control+A")
-            await page.keyboard.press("Backspace")
-            await page.keyboard.type(valor, delay=50)
+
+        if not is_editable:
+            return False
+
+        await page.evaluate("""() => {
+            const el = document.activeElement;
+            el.style.transition = 'all 0.3s';
+            el.style.outline = '4px solid #009999';
+            el.style.boxShadow = '0 0 25px #009999';
+        }""")
+        await asyncio.sleep(0.8)
+
+        await page.keyboard.press("Control+A")
+        await page.keyboard.press("Backspace")
+        if valor:
+            await page.keyboard.type(valor, delay=40)
+        if acao == "digitar_e_enter":
             await page.keyboard.press("Enter")
-            
-        await asyncio.sleep(0.5)
+
+        await asyncio.sleep(0.3)
+        try:
+            await page.evaluate("() => { if(document.activeElement) { document.activeElement.style.outline = ''; } }")
+        except Exception: pass
+
+        await _aguardar_estabilidade(page)
         return True
-    except Exception as e:
-        logger.warning(f"Erro ao clicar por coordenadas: {e}")
+    except Exception as exc:
+        logger.debug(f"Active element fallback falhou: {exc}")
         return False
 
-# ==============================================================
-# 👁️ GEMINI VISION — LOCALIZAÇÃO VISUAL
-# ==============================================================
-async def _gemini_localizar_elemento(screenshot_atual: bytes, screenshot_referencia_b64: str | None, descricao_visual: str, intencao: str, contexto_tela: str) -> dict | None:
-    print(f"   👁️  [Gemini Vision] Analisando tela para: '{descricao_visual[:60]}'...")
+# ──────────────────────────────────────────────────────────────
+# 🌐 BUSCA EM TODOS OS FRAMES E GEMINI VISION
+# ──────────────────────────────────────────────────────────────
+
+async def _buscar_em_todos_os_frames(page: Page, candidatos: list[TentativaLocalizacao], acao: str, valor: str) -> Optional[str]:
+    try:
+        frames = page.frames
+    except Exception:
+        return None
+
+    frames_filhos = [f for f in frames if f != page.main_frame]
+
+    for frame in frames_filhos:
+        for candidato in candidatos[:8]:
+            cand_frame = TentativaLocalizacao(
+                seletor=candidato.seletor, iframe_hint=None, exact=candidato.exact,
+                via_pierce=candidato.via_pierce, role=candidato.role, label=candidato.label,
+                placeholder=candidato.placeholder, title=candidato.title, descricao=candidato.descricao,
+            )
+            try:
+                contexto = frame
+                if not cand_frame.seletor:
+                    if hasattr(contexto, 'get_by_role') and cand_frame.role and cand_frame.label:
+                        loc = contexto.get_by_role(cand_frame.role, name=cand_frame.label).first
+                    elif hasattr(contexto, 'get_by_label') and cand_frame.label:
+                        loc = contexto.get_by_label(cand_frame.label).first
+                    else: continue
+                elif cand_frame.seletor.startswith("text="):
+                    texto = cand_frame.seletor[5:].strip('"').strip("'")
+                    loc = contexto.get_by_text(texto, exact=cand_frame.exact).first
+                else:
+                    loc = contexto.locator(cand_frame.seletor).first
+
+                await loc.wait_for(state="visible", timeout=1500)
+                await _executar_acao(loc, page, acao, valor)
+                logger.info(f"   ✅ [Todos os Frames] Encontrado em frame: {frame.url[:60]}")
+                return frame.url
+            except Exception:
+                continue
+    return None
+
+async def _gemini_localizar_elemento(screenshot_atual: bytes, screenshot_ref_b64: Optional[str], descricao_visual: str, intencao: str, contexto_tela: str, viewport: dict, scroll_y: int) -> Optional[dict]:
+    logger.info(f"   👁️  [Gemini Vision] Analisando tela para: '{descricao_visual[:60]}'...")
     contents = []
-    
-    if screenshot_referencia_b64:
+
+    if screenshot_ref_b64:
         try:
-            ref_bytes = base64.b64decode(screenshot_referencia_b64)
-            contents.append(types.Part.from_bytes(data=ref_bytes, mime_type="image/jpeg"))
-            contents.append("IMAGEM 1 — REFERÊNCIA (Como o botão era na gravação):")
-        except Exception: 
-            pass
-            
-    contents.append(types.Part.from_bytes(data=screenshot_atual, mime_type="image/jpeg"))
-    contents.append(f"""IMAGEM 2 — TELA ATUAL:
-Localize este elemento na tela atual:
-- Intenção: {intencao}
+            ref_bytes = base64.b64decode(screenshot_ref_b64)
+            contents.append("IMAGEM 1 — REFERÊNCIA (estado da tela na gravação original):")
+            contents.append(types.Part.from_bytes(data=ref_bytes, mime_type="image/png"))
+        except Exception: pass
+
+    contents.append("IMAGEM 2 — TELA ATUAL (onde o elemento deve ser clicado agora):")
+    contents.append(types.Part.from_bytes(data=screenshot_atual, mime_type="image/png"))
+    contents.append(f"""Você está controlando um navegador com resolução {viewport['width']}x{viewport['height']}px.
+O scroll vertical atual da página é {scroll_y}px.
+
+Localize este elemento na IMAGEM 2 (tela atual):
+- Intenção do usuário: {intencao}
 - Descrição visual: {descricao_visual}
-- Contexto: {contexto_tela}
+- Contexto da tela: {contexto_tela}
 
-Retorne um JSON com 'metodo': 'seletor', 'coordenadas' ou 'nao_encontrado'.""")
-
+Responda ESTRITAMENTE com JSON:
+{{"metodo": "coordenadas", "coordenadas": {{"x": 500, "y": 300}}, "confianca": "alta|media|baixa"}}
+ou
+{{"metodo": "nao_encontrado"}}
+""")
     try:
         resposta = await asyncio.to_thread(
             gemini_client.models.generate_content,
             model="gemini-2.5-flash",
             contents=contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1)
+            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.05),
         )
         resultado = json.loads(resposta.text)
-        
-        if resultado.get("metodo") == "nao_encontrado": 
-            print(f"   ⚠️  [Gemini] A IA não encontrou o elemento na tela atual.")
+
+        if resultado.get("metodo") == "nao_encontrado":
+            logger.warning("   ⚠️  [Gemini] Elemento não encontrado na tela atual.")
             return None
-            
-        print(f"   ✅ [Gemini] Recomendação da IA: {resultado.get('metodo')} | Confiança: {resultado.get('confianca', '?')}")
+
+        logger.info(f"   ✅ [Gemini] Coordenadas recebidas | confiança: {resultado.get('confianca', '?')}")
         return resultado
-    except Exception as e: 
-        logger.error(f"Erro na comunicação com a API de Visão: {e}")
+    except Exception as exc:
+        logger.error(f"Erro na API de Visão Gemini: {exc}")
         return None
 
-# ==============================================================
-# 🤖 ORQUESTRADOR DE RESOLUÇÃO (O SNIPER)
-# ==============================================================
-async def encontrar_e_clicar(page, acao_tec: dict) -> bool:
-    alvo = acao_tec.get("elemento_alvo", {})
-    acao = acao_tec.get("acao", "clique")
-    intencao = acao_tec.get("intencao_semantica", "Ação na interface")
-    valor = acao_tec.get("valor_input", "")
-    label_curto = alvo.get("label_curto", "")
-    iframe_hint = alvo.get("iframe_hint")
-    seletor_hint = alvo.get("seletor_hint", "")
-    descricao_visual = alvo.get("descricao_visual", label_curto)
-    contexto_tela = alvo.get("contexto_tela", "")
+def _parse_coords(coords):
+    """Extração cega de segurança para coordenadas vindas da IA."""
+    try:
+        if isinstance(coords, dict):
+            return int(coords.get('x', 0)), int(coords.get('y', 0))
+        elif isinstance(coords, list):
+            if len(coords) > 0 and isinstance(coords[0], dict):
+                return int(coords[0].get('x', 0)), int(coords[0].get('y', 0))
+            elif len(coords) >= 2:
+                return int(coords[0]), int(coords[1])
+        elif isinstance(coords, str):
+            nums = re.findall(r'\d+', coords)
+            if len(nums) >= 2:
+                return int(nums[0]), int(nums[1])
+    except Exception: pass
+    return 0, 0
 
-    print(f"\n   🎯 Executando: {intencao[:70]}")
+async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> bool:
+    try:
+        x, y = _parse_coords(coords)
+        if x <= 0 or y <= 0: raise ValueError(f"Coordenadas inválidas: x={x}, y={y}")
 
-    # 1. Tentativa no Cache Semântico
-    cache = _consultar_cache(intencao)
-    if cache and cache.get("seletor"):
-        iframe_cache = cache.get("iframe", iframe_hint)
-        if await _tentar_seletor(page, cache["seletor"], iframe_cache, acao, valor): 
-            return True
-        else: 
-            _cache_sessao.pop(intencao.strip().lower()[:60], None)
+        await _highlight_coords(page, x, y)
+        await asyncio.sleep(0.3)
 
-    # 2. O SNIPER SEMÂNTICO (Executa ANTES do seletor genérico para evitar Checkboxes)
-    print(f"   🔍 [Sniper] Buscando o texto exato para '{label_curto}'...")
-    for alt in gerar_seletores_alternativos(seletor_hint, label_curto, iframe_hint):
-        iframe_do_alt = alt.get("dentro_do_iframe", iframe_hint)
-        exact_match = alt.get("exact", False)
-        
-        if await _tentar_seletor(page, alt["seletor"], iframe_do_alt, acao, valor, exact=exact_match):
-            _atualizar_cache(intencao, seletor=alt["seletor"], iframe=iframe_do_alt)
-            print(f"   ✅ [Sniper] Alvo atingido com precisão: {alt['seletor']}")
-            return True
+        if acao == "duplo_clique": await page.mouse.dblclick(x, y)
+        else: await page.mouse.click(x, y)
 
-    # 3. Seletor Original (Fallback rápido, ex: botões com IDs seguros)
-    if not _e_seletor_fragil(seletor_hint):
-        if await _tentar_seletor(page, seletor_hint, iframe_hint, acao, valor):
-            _atualizar_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
-            print(f"   ✅ [Hint] Seletor técnico original funcionou: {seletor_hint}")
-            return True
+        if acao in ("digitar_e_enter", "preencher_campo") and valor:
+            await asyncio.sleep(0.3)
+            await page.keyboard.press("Control+A")
+            await page.keyboard.press("Backspace")
+            await page.keyboard.type(valor, delay=40)
+            if acao == "digitar_e_enter": await page.keyboard.press("Enter")
 
-    # 4. Visão Multimodal (O Último Recurso)
-    print(f"   🤖 [Vision] DOM falhou. Acionando IA Visual para olhar a tela...")
-    try: 
-        screenshot_atual = await page.screenshot(type="jpeg", quality=60)
-    except Exception as e: 
-        logger.warning(f"Página fechada ou congelada antes do screenshot: {e}")
+        await _aguardar_estabilidade(page)
+        return True
+    except Exception as exc:
+        logger.warning(f"Clique por coordenadas falhou: {exc}")
         return False
 
-    resultado = await _gemini_localizar_elemento(
-        screenshot_atual, 
-        alvo.get("screenshot_referencia"), 
-        descricao_visual, 
-        intencao, 
-        contexto_tela
-    )
-    
-    if resultado:
-        if resultado.get("metodo") == "seletor" and resultado.get("seletor"):
-            if await _tentar_seletor(page, resultado["seletor"], iframe_hint, acao, valor):
-                _atualizar_cache(intencao, seletor=resultado["seletor"], iframe=iframe_hint)
+async def _scroll_para_area_esperada(page: Page, coords_relativas: Optional[dict]) -> int:
+    try:
+        if coords_relativas and coords_relativas.get("y_pct"):
+            vp = page.viewport_size or {"width": 1920, "height": 1080}
+            altura_estimada = coords_relativas["y_pct"] * vp["height"] * 2
+            if altura_estimada > vp["height"] * 0.8:
+                await page.evaluate(f"window.scrollTo(0, {max(0, int(altura_estimada - 300))})")
+                await asyncio.sleep(0.3)
+        scroll_y = await page.evaluate("() => window.scrollY") or 0
+        return int(scroll_y)
+    except Exception: return 0
+
+# ──────────────────────────────────────────────────────────────
+# 🤖 ORQUESTRADOR PRINCIPAL
+# ──────────────────────────────────────────────────────────────
+
+async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
+    alvo: dict = acao_tec.get("elemento_alvo", {})
+    acao: str = acao_tec.get("acao", "clique")
+    intencao: str = acao_tec.get("intencao_semantica", "Ação na interface")
+    valor: str = acao_tec.get("valor_input", "") or ""
+    label_curto: str = alvo.get("label_curto", "")
+    iframe_hint: Optional[str] = alvo.get("iframe_hint")
+    seletor_hint: str = alvo.get("seletor_hint", "")
+    descricao_visual: str = alvo.get("descricao_visual", label_curto)
+    contexto_tela: str = alvo.get("contexto_tela", "")
+    tipo_elemento: str = alvo.get("tipo_elemento", "button")
+    html_hint: str = alvo.get("html_hint", "")
+    coords_relativas: Optional[dict] = alvo.get("coordenadas_relativas")
+
+    logger.info(f"\n   🎯 Executando: {intencao[:80]}")
+    scroll_y = await _scroll_para_area_esperada(page, coords_relativas)
+
+    # ── 0. Cache semântico ──────────────────────────────────
+    cache = _consultar_cache(intencao)
+    if cache:
+        if cache.seletor:
+            cand_cache = TentativaLocalizacao(seletor=cache.seletor, iframe_hint=cache.iframe_src or iframe_hint, descricao="cache semântico")
+            if await _tentar_candidato(page, cand_cache, acao, valor):
+                _registrar_sucesso_cache(intencao)
                 return True
-                
-        if resultado.get("metodo") == "coordenadas" and resultado.get("coordenadas"):
-            if await _clicar_por_coordenadas(page, resultado["coordenadas"], acao, valor):
-                _atualizar_cache(intencao, coords=resultado["coordenadas"])
+            else:
+                _registrar_falha_cache(intencao)
+        elif cache.coords:
+            if await _clicar_por_coordenadas(page, cache.coords, acao, valor):
+                _registrar_sucesso_cache(intencao)
                 return True
 
-    print(f"   💀 [FALHA TOTAL] Impossível executar a ação: '{intencao}'")
+    # ── 1. Foco Nativo e Fallback de "Nova pasta" (VEM PRIMEIRO) ──
+    if acao in ("digitar_e_enter", "preencher_campo"):
+        logger.info("   ⌨️  [Foco Nativo] Verificando se o cursor já está posicionado...")
+        if await _digitar_no_active_element(page, acao, valor):
+            logger.info("   ✅ [Foco Nativo] Texto inserido direto no cursor!")
+            return True
+            
+        logger.info("   ⌨️  [Foco Nativo] Buscando div contenteditable genérica (Nova pasta)...")
+        contexto = await _resolver_contexto(page, iframe_hint)
+        # O truque que você usava no seu primeiro script para pegar a Nova pasta
+        try:
+            loc_edit = contexto.locator("[contenteditable='true']")
+            if await loc_edit.count() > 0 and await loc_edit.first.is_visible():
+                await _executar_acao(loc_edit.first, page, acao, valor)
+                return True
+        except Exception: pass
+
+    # ── Gera todos os candidatos do Sniper ────────────────────────────
+    candidatos = _gerar_candidatos(seletor_hint, label_curto, iframe_hint, acao, tipo_elemento, html_hint)
+
+    # ── 2. Sniper semântico ─────────────────────────────────
+    logger.info(f"   🔍 [Sniper] {len(candidatos)} candidatos para '{label_curto}'...")
+    for cand in candidatos:
+        if await _tentar_candidato(page, cand, acao, valor):
+            logger.info(f"   ✅ [Sniper] Acerto: {cand.descricao}")
+            _registrar_sucesso_cache(intencao, seletor=cand.seletor or cand.descricao, iframe=iframe_hint)
+            return True
+
+    # ── 3. Seletor hint original ────────────────────────────
+    if seletor_hint and not _e_seletor_fragil(seletor_hint):
+        cand_hint = TentativaLocalizacao(seletor=seletor_hint, iframe_hint=iframe_hint, descricao=f"hint original '{seletor_hint[:40]}'")
+        if await _tentar_candidato(page, cand_hint, acao, valor):
+            logger.info(f"   ✅ [Hint] Seletor original funcionou: {seletor_hint[:60]}")
+            _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
+            return True
+
+    # ── 4. Busca em todos os frames ─────────────────────────
+    logger.info("   🌐 [Todos os Frames] Procurando o elemento em frames filhos...")
+    frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
+    if frame_url:
+        _registrar_sucesso_cache(intencao, iframe=frame_url)
+        return True
+
+    # ── 5. Gemini Vision ────────────────────────────────────
+    logger.info("   🤖 [Vision] DOM esgotado. Acionando Gemini Visual...")
+    try:
+        screenshot_atual = await page.screenshot(type="png", full_page=False)
+    except Exception as exc:
+        logger.warning(f"Screenshot falhou antes do Gemini: {exc}")
+        screenshot_atual = None
+
+    if screenshot_atual:
+        vp = page.viewport_size or {"width": 1920, "height": 1080}
+        resultado = await _gemini_localizar_elemento(screenshot_atual, alvo.get("screenshot_referencia"), descricao_visual, intencao, contexto_tela, vp, scroll_y)
+
+        if resultado:
+            coords_ia = resultado.get("coordenadas")
+            if coords_ia:
+                if await _clicar_por_coordenadas(page, coords_ia, acao, valor):
+                    logger.info("   ✅ [Vision] Clique por coordenadas da IA bem-sucedido.")
+                    _registrar_sucesso_cache(intencao, coords=coords_ia)
+                    return True
+
+    # ── 6. Coordenadas relativas da gravação ────────────────
+    if coords_relativas and coords_relativas.get("x_pct"):
+        logger.info("   📍 [Fallback Final] Coordenadas da gravação original...")
+        try:
+            vp = page.viewport_size or {"width": 1920, "height": 1080}
+            x = int(coords_relativas["x_pct"] * vp["width"])
+            y = int(coords_relativas["y_pct"] * vp["height"])
+            if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
+                logger.info(f"   ✅ [Fallback Final] Clique em ({x}, {y}) executado.")
+                return True
+        except Exception as exc:
+            logger.warning(f"Fallback de coordenadas falhou: {exc}")
+
+    # ── 💀 Falha total ───────────────────────────────────────
+    _registrar_falha_cache(intencao)
+    logger.error(f"   💀 [FALHA TOTAL] Impossível executar: '{intencao[:70]}'")
     return False

@@ -5,7 +5,12 @@ import time
 import edge_tts
 import pygame
 import logging
+import hashlib
 from dotenv import load_dotenv
+
+# CARREGA VARIÁVEIS ANTES DE QUALQUER COISA
+load_dotenv() 
+
 from playwright.async_api import async_playwright
 from vision_engine import encontrar_e_clicar
 
@@ -16,10 +21,12 @@ if not hasattr(PIL.Image, 'ANTIALIAS'):
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 logging.getLogger('playwright').setLevel(logging.CRITICAL)
 
-from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, ImageClip
-import moviepy.audio.fx as afx
+# ==============================================================
+# 🔧 MOVIEPY V1.X (Padrão Corporativo Estável)
+# ==============================================================
+from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, ImageClip
+import moviepy.audio.fx.all as afx
 
-load_dotenv()
 pygame.mixer.init()
 pygame.mixer.set_num_channels(2)
 
@@ -40,7 +47,9 @@ async def gerar_audio(texto, id_unico, id_treinamento, voz="pt-BR-FranciscaNeura
         
     pasta_audio = os.path.join("audios_gerados", id_treinamento)
     os.makedirs(pasta_audio, exist_ok=True)
-    arquivo_mp3 = os.path.join(pasta_audio, f"audio_{id_unico}.mp3")
+    
+    assinatura = hashlib.md5(texto.encode('utf-8')).hexdigest()[:8]
+    arquivo_mp3 = os.path.join(pasta_audio, f"audio_{id_unico}_{assinatura}.mp3")
     
     if not os.path.exists(arquivo_mp3):
         await edge_tts.Communicate(texto, voz, rate="-12%").save(arquivo_mp3)
@@ -84,33 +93,55 @@ async def exibir_legenda_cinema(page, texto):
 async def remover_legenda(page):
     await safe_evaluate(page, "() => { let e = document.getElementById('senior-video-subtitle'); if(e) e.remove(); }")
 
+async def exibir_encerramento_cinema(page):
+    script = """() => { return new Promise((resolve) => {
+        const renderUI = () => {
+            const overlay = document.createElement('div');
+            overlay.style = `position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(12px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2147483647; opacity: 0; transition: opacity 1s ease;`;
+            overlay.innerHTML = `<lottie-player src="https://lottie.host/76846e87-566d-49b8-b3d0-90a6290d22ec/5sys94coTA.json" background="transparent" speed="1" style="width: 250px; height: 250px;" autoplay></lottie-player><h1 style="margin-top: -10px; color: #ffffff; font-size: 38px; font-family: sans-serif; font-weight: bold; text-shadow: 0 4px 15px rgba(0,0,0,0.5);">Treinamento Concluído</h1>`;
+            document.documentElement.appendChild(overlay);
+            setTimeout(() => overlay.style.opacity = '1', 50); resolve(true); 
+        };
+        if (!document.querySelector('script[src*="lottie-player"]')) {
+            const script = document.createElement('script'); script.src = 'https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js';
+            script.onload = renderUI; document.head.appendChild(script);
+        } else { renderUI(); }
+    }); }"""
+    await safe_evaluate(page, script, timeout=5.0)
+
 def renderizar_video_final(caminho_webm, timeline, id_treino, tempo_corte):
-    print("\n" + "="*50 + "\n🎬 INICIANDO PÓS-PRODUÇÃO CINEMATOGRÁFICA...\n" + "="*50)
+    print("\n" + "="*50 + "\n🎬 INICIANDO PÓS-PRODUÇÃO (Modo Expresso)...\n" + "="*50)
     try:
-        # A correção vital para impedir falhas de diretório no final do processo
         os.makedirs("videos_prontos", exist_ok=True) 
         
-        video = VideoFileClip(caminho_webm).subclipped(tempo_corte)
+        # 1. Carrega o vídeo original e faz o corte inicial do login
+        video = VideoFileClip(caminho_webm).subclip(tempo_corte)
         clipes_de_audio = []
         
-        if os.path.exists("overlay.png"):
-            video_redimensionado = video.resized(0.85).with_position('center')
-            overlay = ImageClip("overlay.png").with_duration(video.duration)
-            video = CompositeVideoClip([video_redimensionado, overlay], size=(1920, 1080))
+        # O BLOCO DO OVERLAY FOI TOTALMENTE REMOVIDO PARA PERFORMANCE.
+        # Agora o vídeo mantém a resolução e tamanho originais capturados.
             
+        # 2. Insere a Trilha Sonora (BGM)
         if os.path.exists("trilha.mp3"):
-            bgm = AudioFileClip("trilha.mp3").with_effects([afx.MultiplyVolume(0.08), afx.AudioLoop(duration=video.duration)])
+            bgm = AudioFileClip("trilha.mp3").volumex(0.08)
+            bgm = afx.audio_loop(bgm, duration=video.duration)
             clipes_de_audio.append(bgm)
             
+        # 3. Insere as falas da IA na minutagem correta
         for item in timeline:
             if os.path.exists(item["arquivo"]): 
-                clipes_de_audio.append(AudioFileClip(item["arquivo"]).with_start(item["inicio"]))
+                voz = AudioFileClip(item["arquivo"]).set_start(item["inicio"])
+                clipes_de_audio.append(voz)
         
+        # 4. Junta todos os áudios e anexa ao vídeo
         if clipes_de_audio:
-            video = video.with_audio(CompositeAudioClip(clipes_de_audio))
+            video = video.set_audio(CompositeAudioClip(clipes_de_audio))
             
         caminho_final = os.path.join("videos_prontos", f"{id_treino}_FINALIZADO.mp4")
-        video.write_videofile(caminho_final, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", logger=None)
+        
+        # 5. Grava o arquivo MP4 final.
+        # Como não há transformação visual (CompositeVideoClip/resize), isso usará muito menos CPU.
+        video.write_videofile(caminho_final, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", logger='bar')
         video.close()
         
         print(f"\n🚀 VÍDEO PRONTO EM:\n👉 {caminho_final}")
@@ -141,7 +172,7 @@ async def executar_roteiro(caminho_json):
     os.makedirs(cfg.get("pasta_destino", "videos_gerados"), exist_ok=True)
     timeline_audios = []
     caminho_video_webm = None
-    tempo_corte_segundos = 0
+    tempo_corte_segundos = -1
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False, args=['--start-maximized'])
@@ -198,10 +229,14 @@ async def executar_roteiro(caminho_json):
                     await asyncio.sleep(0.5)
 
                 if passo.get('is_conclusao', False) or (not passo.get("acoes_tecnicas") and passo.get('id_passo') == roteiro.get("passos")[-1].get('id_passo')):
-                    await asyncio.sleep(3.0)
+                    await exibir_encerramento_cinema(page)
+                    await asyncio.sleep(4.0)
                     break 
 
                 for i, acao_tec in enumerate(passo.get("acoes_tecnicas", [])):
+                    if acao_tec.get("acao") == "concluir_video":
+                        continue
+                        
                     micro_voz = acao_tec.get("micro_narracao", "")
                     if micro_voz:
                         await exibir_legenda_cinema(page, micro_voz)
@@ -211,8 +246,7 @@ async def executar_roteiro(caminho_json):
                             iniciar_reproducao_audio(mp3)
                             timeline_audios.append({"arquivo": mp3, "inicio": t_atual})
 
-                    if acao_tec.get("acao") != "concluir_video":
-                        await encontrar_e_clicar(page, acao_tec)
+                    await encontrar_e_clicar(page, acao_tec)
 
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
@@ -232,8 +266,14 @@ async def executar_roteiro(caminho_json):
                     await page.close()
                 await context.close()
                 await browser.close()
-            except Exception as fechar_erro:
-                logging.debug(f"Erro silencioso ao fechar o navegador: {fechar_erro}")
+            except Exception:
+                pass
+            
+            # Segurança total: Apaga o vídeo de login se o fluxo não completou
+            if tempo_corte_segundos == -1 and caminho_video_webm and os.path.exists(caminho_video_webm):
+                try: os.remove(caminho_video_webm)
+                except: pass
+                caminho_video_webm = None
 
     if caminho_video_webm and tempo_corte_segundos > 0:
         decisao = input("\n🤔 A gravação visual ficou boa? Enviar para MoviePy? (S/N)\n> ")
