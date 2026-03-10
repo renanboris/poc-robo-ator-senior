@@ -52,7 +52,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
     estado_servidor["sucesso"] = ""
 
     try:
-        # Força o Python filho a usar UTF-8 para não quebrar com caracteres especiais e emojis no Windows
+        # Força o Python filho a usar UTF-8 para não quebrar com caracteres especiais e emojis
         env_vars = os.environ.copy()
         env_vars["PYTHONIOENCODING"] = "utf-8"
         
@@ -70,16 +70,18 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
         # Aguarda terminar e captura as saídas do terminal
         stdout, stderr = processo_atual.communicate()
         
-        # Verifica se o processo falhou ou foi abortado/cancelado
+        # Verifica se o processo falhou
         if processo_atual.returncode != 0:
-            linhas_erro = stderr.strip().split('\n')
-            erro_curto = linhas_erro[-1] if linhas_erro and linhas_erro[-1] else "Processo abortado."
+            # Pega o último print real do Python (seja no stdout ou stderr)
+            todas_as_linhas = (stdout + "\n" + stderr).strip().split('\n')
+            erro_real = [linha for linha in todas_as_linhas if linha.strip()][-1] if todas_as_linhas else "Erro desconhecido."
             
-            # Se for cancelamento manual ou interrupção de teclado, exibe mensagem amigável
-            if "KeyboardInterrupt" in stderr or processo_atual.returncode == 1 or processo_atual.returncode < 0:
-                estado_servidor["erro"] = "Execução cancelada pelo usuário."
+            # Só considera cancelamento se o processo foi literalmente assassinado (< 0) ou interrompido pelo teclado
+            if "KeyboardInterrupt" in stderr or processo_atual.returncode < 0:
+                estado_servidor["erro"] = "Execução interrompida pelo usuário."
             else:
-                estado_servidor["erro"] = f"Falha: {erro_curto}"
+                # Agora sim, se faltar o .env ou o playwright, a mensagem exata aparecerá no painel!
+                estado_servidor["erro"] = f"Falha: {erro_real}"
         else:
             estado_servidor["sucesso"] = msg_sucesso
             
@@ -291,4 +293,5 @@ if __name__ == "__main__":
     print("🚀 SENIOR TRAINING OS - SERVIDOR INICIADO")
     print("👉 Acesse no navegador: http://localhost:8000")
     print("="*50 + "\n")
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    # Removido o reload=True para estabilizar o servidor (não reiniciar sozinho ao gerar arquivos)
+    uvicorn.run("app:app", host="0.0.0.0", port=8000)

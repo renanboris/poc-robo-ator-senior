@@ -387,9 +387,11 @@ async def _executar_acao(locator, page: Page, acao: str, valor: str) -> None:
     # Invoca a seta mágica
     await _highlight_elemento(locator, page)
 
-    # Executa o clique ou digitação
+    # Executa o clique ou digitação (AGORA COM CLIQUE DIREITO!)
     if acao == "duplo_clique": 
         await locator.dblclick(timeout=3000)
+    elif acao == "clique_direito":
+        await locator.click(button="right", timeout=3000)
     elif acao == "digitar_e_enter":
         await locator.click(timeout=2000)
         await asyncio.sleep(0.2)
@@ -583,6 +585,8 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
 
         if acao == "duplo_clique": 
             await page.mouse.dblclick(x, y)
+        elif acao == "clique_direito":
+            await page.mouse.click(x, y, button="right")
         else: 
             await page.mouse.click(x, y)
 

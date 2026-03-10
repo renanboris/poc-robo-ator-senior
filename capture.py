@@ -45,15 +45,27 @@ async def buscar_contexto_pinecone(objetivo_aula: str) -> str:
     return await asyncio.to_thread(_buscar_pinecone_sync, objetivo_aula)
 
 # ==============================================================
-# 📐 EXTRAÇÃO E ANÁLISE SEMÂNTICA DA IA
+# 📐 EXTRAÇÃO E ANÁLISE SEMÂNTICA DA IA (COM DIMENSÕES REAIS)
 # ==============================================================
 def _extrair_coordenadas_relativas(posicao_str: str, viewport_w: int, viewport_h: int) -> dict:
+    """
+    Agora calcula não apenas o centro exato do botão, mas também a LARGURA e ALTURA 
+    relativas para permitir que o SCORM desenhe a caixa delimitadora perfeita.
+    """
     try:
         partes = dict(p.split(':') for p in posicao_str.split(','))
-        cx = int(partes['x']) + int(partes['w']) / 2
-        cy = int(partes['y']) + int(partes['h']) / 2
-        return {"x_pct": round(cx / viewport_w, 4), "y_pct": round(cy / viewport_h, 4)}
-    except Exception: return {"x_pct": 0.5, "y_pct": 0.5}
+        w = int(partes['w'])
+        h = int(partes['h'])
+        cx = int(partes['x']) + w / 2
+        cy = int(partes['y']) + h / 2
+        return {
+            "x_pct": round(cx / viewport_w, 4), 
+            "y_pct": round(cy / viewport_h, 4),
+            "w_pct": round(w / viewport_w, 4),
+            "h_pct": round(h / viewport_h, 4)
+        }
+    except Exception: 
+        return {"x_pct": 0.5, "y_pct": 0.5, "w_pct": 0.05, "h_pct": 0.05}
 
 async def _analisar_elemento_com_gemini(screenshot_bytes: bytes, html_snapshot: str, label_capturado: str, coords: dict, acao: str) -> dict:
     prompt = f"""Você é um analista de UX documentando uma sessão de uso do sistema Senior X.
@@ -85,12 +97,43 @@ Analise o screenshot e responda com um JSON:
         return {"intencao": f"{acao.capitalize()} em '{label_capturado}'", "descricao_visual": f"Elemento '{label_capturado}'", "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa"}
 
 # ==============================================================
-# 🕵️ RADAR DE CAPTURA JAVASCRIPT (Otimizado para SCORM)
+# 🕵️ RADAR DE CAPTURA JAVASCRIPT & UI (REC WIDGET)
 # ==============================================================
 async def _injetar_em_contexto(contexto):
     script_radar = """() => {
         if (window.__radarInjetado) return;
         window.__radarInjetado = true;
+        
+        // 🔴 INJEÇÃO DO WIDGET 'REC' (Apenas no frame principal)
+        if (window === window.top && !document.getElementById('senior-rec-widget')) {
+            const recWidget = document.createElement('div');
+            recWidget.id = 'senior-rec-widget';
+            recWidget.style = `
+                position: fixed; bottom: 30px; right: 30px; 
+                background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); 
+                border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; 
+                padding: 10px 20px; display: flex; align-items: center; gap: 10px; 
+                z-index: 2147483647; font-family: 'Segoe UI', sans-serif; 
+                box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: none;
+            `;
+            recWidget.innerHTML = `
+                <div style="width: 12px; height: 12px; background-color: #ef4444; border-radius: 50%; animation: pulse-red 1.5s infinite;"></div>
+                <div style="color: white; font-size: 13px; font-weight: bold; letter-spacing: 1px;">MAPEAMENTO ATIVO</div>
+            `;
+            
+            if (!document.getElementById('senior-rec-styles')) {
+                const style = document.createElement('style');
+                style.id = 'senior-rec-styles';
+                style.innerHTML = `@keyframes pulse-red { 
+                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 
+                    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 
+                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } 
+                }`;
+                document.head.appendChild(style);
+            }
+            document.documentElement.appendChild(recWidget);
+        }
+
         const escapeStr = (s) => s ? s.replace(/'/g, "\\'") : '';
 
         const getElementName = (el) => {
@@ -171,15 +214,16 @@ async def _injetar_em_contexto(contexto):
             setTimeout(() => target.style.outline = originalOutline, 200);
         };
 
-        // 🟢 ALTERAÇÃO CRÍTICA PARA SCORM: 
-        // Em vez de usar 'click' com delay de 250ms, usamos 'mousedown' instantâneo.
-        // Assim, o print é gerado antes do menu abrir ou a página mudar.
+        // 🟢 Detecta Clique Esquerdo (0) e Direito (2) no momento EXATO do aperto
         document.addEventListener('mousedown', (e) => { 
-            if (e.button !== 0) return; // Apenas botão esquerdo do mouse
-            processarEvento(e.target, 'clique'); 
+            if (e.button === 0) {
+                processarEvento(e.target, 'clique'); 
+            } else if (e.button === 2) {
+                processarEvento(e.target, 'clique_direito');
+            }
         }, true);
         
-        // Mantém o enter e blur originais
+        // Mantém o enter e blur originais para digitação
         let ultimoEnterTarget = null, ultimoEnterTime = 0;
         document.addEventListener('keydown', (e) => { 
             if (e.key === 'Enter') { 

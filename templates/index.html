@@ -1,174 +1,232 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Senior Training OS</title>
+    <title>Senior Training OS | Enterprise</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        // Configuração Tailwind com Verde Senior e Modo Escuro
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        senior: {
+                            DEFAULT: '#009999',
+                            light: '#00e5e5',
+                            dark: '#006666'
+                        },
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
-        .senior-teal { background-color: #009999; }
-        .senior-teal-text { color: #009999; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .nav-item.active { background-color: #e6f5f5; color: #009999; border-right: 3px solid #009999; }
+        
+        /* Estilos de Navegação */
+        .nav-item { transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background-color: rgba(0, 153, 153, 0.05); }
+        .dark .nav-item:hover { background-color: rgba(255, 255, 255, 0.05); }
+        
+        .nav-item.active { 
+            background-color: rgba(0, 153, 153, 0.1); 
+            border-left: 3px solid #009999; 
+            color: #009999; 
+            font-weight: 600;
+        }
+        .dark .nav-item.active { 
+            color: #00e5e5; 
+        }
+
+        /* Classes Utilitárias Light/Dark */
+        .glass-card { transition: all 0.3s; }
+        .dark .glass-card { background: #1e293b; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); }
+        .light .glass-card { background: #ffffff; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+
+        .progress-bg { background: #e2e8f0; }
+        .dark .progress-bg { background: #334155; }
     </style>
 </head>
-<body class="h-screen flex overflow-hidden">
+<body class="h-screen flex bg-gray-50 text-slate-800 dark:bg-slate-850 dark:text-slate-200 transition-colors duration-300">
 
-    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-80 hidden flex flex-col items-center justify-center z-[100] transition-opacity">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#009999] mb-6"></div>
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-90 hidden flex flex-col items-center justify-center z-[100] transition-opacity backdrop-blur-sm">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-senior mb-6"></div>
         <h2 id="loading-msg" class="text-white text-xl font-semibold tracking-wide">Processando...</h2>
-        <p class="text-gray-400 text-sm mt-2 mb-6">Acompanhe a execução no seu sistema.</p>
-        
-        <button onclick="cancelarProcesso()" class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold shadow-lg transition-transform hover:scale-105 flex items-center gap-2">
+        <p class="text-slate-400 text-sm mt-2 mb-6">Acompanhe a execução no seu sistema.</p>
+        <button onclick="cancelarProcesso()" class="px-6 py-2.5 bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/40 rounded-full font-bold transition-all flex items-center gap-2">
             <i class="fas fa-stop-circle"></i> Interromper Processo
         </button>
     </div>
 
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-20">
-        <div class="p-6 border-b border-gray-100 flex items-center gap-3">
-            <div class="w-8 h-8 rounded senior-teal flex items-center justify-center text-white font-bold">
-                <i class="fas fa-bolt"></i>
+    <aside class="w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col h-full shadow-xl z-20 flex-shrink-0 transition-colors duration-300">
+        <div class="p-6 border-b border-gray-200 dark:border-slate-800 flex items-center gap-3">
+            <div class="w-8 h-8 rounded bg-senior flex items-center justify-center text-white font-bold shadow-lg shadow-senior/30">
+                <i class="fas fa-bolt text-sm"></i>
             </div>
             <div>
-                <h1 class="text-md font-bold text-gray-800 leading-tight">Training OS</h1>
-                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Enterprise Edition</p>
+                <h1 class="text-md font-bold text-slate-800 dark:text-slate-100 leading-tight tracking-wide">Training OS</h1>
+                <p class="text-[9px] text-senior uppercase tracking-widest font-bold">Knowledge Platform</p>
             </div>
         </div>
         
         <div class="py-4 flex-1 overflow-y-auto scrollbar-hide">
-            <p class="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-4">Menu Principal</p>
             <nav class="space-y-1">
-                <button onclick="mostrarAba('dashboard')" id="nav-dashboard" class="nav-item active w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
-                    <i class="fas fa-chart-pie w-5 text-center"></i> Visão Geral
+                <button onclick="mostrarAba('overview')" id="nav-overview" class="nav-item active w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">
+                    <i class="fas fa-chart-pie w-5 text-center"></i> Overview
                 </button>
-                <button onclick="mostrarAba('studio')" id="nav-studio" class="nav-item w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
-                    <i class="fas fa-video w-5 text-center"></i> Estúdio de Criação
+                <button onclick="mostrarAba('studio')" id="nav-studio" class="nav-item w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">
+                    <i class="fas fa-video w-5 text-center"></i> Production Studio
                 </button>
             </nav>
 
-            <p class="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-8 mb-2">Expansões (Roadmap)</p>
-            <nav class="space-y-1 opacity-70">
-                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Adoção Digital (Em Breve)">
-                    <div class="flex items-center gap-3"><i class="fas fa-mouse-pointer w-5 text-center"></i> DAP Interativo</div>
-                    <span class="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">BETA</span>
+            <p class="px-6 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-8 mb-2">Roadmap Estratégico</p>
+            <nav class="space-y-1 opacity-60">
+                <button class="w-full flex items-center justify-between px-6 py-2 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed" title="Em breve">
+                    <div class="flex items-center gap-3"><i class="fas fa-project-diagram w-4 text-center"></i> Knowledge Graph</div>
+                    <span class="text-[8px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-500 font-bold">BETA</span>
                 </button>
-                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Geração de PDFs (Em Breve)">
-                    <div class="flex items-center gap-3"><i class="fas fa-file-pdf w-5 text-center"></i> Auto-Documentação</div>
-                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold">WIP</span>
+                <button class="w-full flex items-center justify-between px-6 py-2 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed">
+                    <div class="flex items-center gap-3"><i class="fas fa-comments w-4 text-center"></i> AI Coach (DAP)</div>
                 </button>
-                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Tradução Automática (Em Breve)">
-                    <div class="flex items-center gap-3"><i class="fas fa-globe w-5 text-center"></i> Multi-Idiomas</div>
-                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold">WIP</span>
-                </button>
-                <button class="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-500 cursor-not-allowed" title="Testes de Regressão (Em Breve)">
-                    <div class="flex items-center gap-3"><i class="fas fa-shield-alt w-5 text-center"></i> QA Auto-Pilot</div>
-                    <span class="text-[9px] bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold">WIP</span>
+                <button class="w-full flex items-center justify-between px-6 py-2 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed">
+                    <div class="flex items-center gap-3"><i class="fas fa-file-pdf w-4 text-center"></i> Auto Documentação</div>
                 </button>
             </nav>
+        </div>
+        
+        <div class="p-4 border-t border-gray-200 dark:border-slate-800 flex justify-between items-center">
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 flex items-center justify-center">
+                    <i class="fas fa-user text-slate-400 text-xs"></i>
+                </div>
+                <div class="text-xs">
+                    <p class="font-bold text-slate-700 dark:text-slate-200">Admin</p>
+                    <p class="text-slate-500">v2.4.0</p>
+                </div>
+            </div>
+            <button onclick="toggleTheme()" class="text-slate-400 hover:text-senior transition-colors w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center">
+                <i id="theme-icon" class="fas fa-moon"></i>
+            </button>
         </div>
     </aside>
 
-    <main id="aba-dashboard" class="flex-1 bg-gray-50 p-8 overflow-y-auto">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Visão Executiva de Produtividade</h2>
+    <main id="aba-overview" class="flex-1 p-8 overflow-y-auto">
+        <header class="mb-8">
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">Plataforma de Escala de Conhecimento</h2>
+            <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Visão Executiva de Produtividade e Automação</p>
+        </header>
         
-        <div class="grid grid-cols-4 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#009999]">
-                <div class="text-sm font-semibold text-gray-500 uppercase">Treinamentos</div>
-                <div class="text-4xl font-bold text-gray-800 mt-2" id="metric-aulas">0</div>
+        <div class="grid grid-cols-4 gap-4 mb-8">
+            <div class="glass-card p-5 rounded-xl border-t-2 border-t-senior bg-white dark:bg-slate-800">
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Treinamentos</div>
+                <div class="text-3xl font-bold text-slate-800 dark:text-slate-100 mt-2" id="metric-aulas">0</div>
             </div>
-            
-            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-blue-500 relative overflow-hidden">
-                <div class="text-sm font-semibold text-gray-500 uppercase relative z-10">Mapeamento IA</div>
-                <div class="text-4xl font-bold text-blue-600 mt-2 relative z-10" id="metric-memoria">0</div>
-                <p class="text-[10px] text-gray-400 mt-1 relative z-10">Elementos em memória.</p>
-                <i class="fas fa-brain absolute -bottom-4 -right-4 text-8xl text-blue-50 opacity-50"></i>
+            <div class="glass-card p-5 rounded-xl border-t-2 border-t-blue-500 bg-white dark:bg-slate-800 relative overflow-hidden">
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider relative z-10">Mapeamento IA (Elementos)</div>
+                <div class="text-3xl font-bold text-blue-500 dark:text-blue-400 mt-2 relative z-10" id="metric-memoria">0</div>
+                <i class="fas fa-brain absolute -bottom-4 -right-4 text-6xl text-blue-500/10"></i>
             </div>
-            
-            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-purple-500">
-                <div class="text-sm font-semibold text-gray-500 uppercase">Horas Poupadas</div>
-                <div class="text-4xl font-bold text-purple-600 mt-2" id="metric-horas">0h</div>
-                <p class="text-[10px] text-gray-400 mt-1">Baseado em 6h manuais por aula.</p>
+            <div class="glass-card p-5 rounded-xl border-t-2 border-t-purple-500 bg-white dark:bg-slate-800">
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Horas Poupadas</div>
+                <div class="text-3xl font-bold text-purple-500 dark:text-purple-400 mt-2" id="metric-horas">0h</div>
             </div>
-
-            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-green-500">
-                <div class="text-sm font-semibold text-gray-500 uppercase">Economia Estimada</div>
-                <div class="text-4xl font-bold text-green-600 mt-2" id="metric-dinheiro">R$ 0</div>
-                <p class="text-[10px] text-gray-400 mt-1">Cálculo de HH Sênior.</p>
+            <div class="glass-card p-5 rounded-xl border-t-2 border-t-emerald-500 bg-white dark:bg-slate-800">
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Economia Estimada</div>
+                <div class="text-3xl font-bold text-emerald-500 dark:text-emerald-400 mt-2" id="metric-dinheiro">R$ 0</div>
+                <div class="text-[10px] text-emerald-600 dark:text-emerald-500/70 mt-1 font-medium">Cálculo Baseado em HH Sênior</div>
             </div>
         </div>
 
-        <div class="flex gap-6">
-            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm flex-1">
-                <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2"><i class="fas fa-cogs text-gray-400"></i> O Motor Zero-Touch</h3>
-                <p class="text-sm text-gray-600 leading-relaxed mb-4">
-                    O Training OS é alimentado por um banco de dados autônomo. Uma vez que o especialista mapeia a tela, a IA aprende a rota. Se a Senior X sofrer uma atualização (mudança de ID, cor ou posição do botão), nosso Motor de Visão detecta a falha, localiza o novo elemento visualmente e se <b>conserta sozinho</b>.
-                </p>
-                <div class="flex items-center gap-3 bg-gray-50 p-3 rounded border border-gray-100">
-                    <i class="fas fa-bolt text-yellow-500 text-xl"></i>
-                    <div>
-                        <div class="text-sm font-bold text-gray-700">Acelerações por Memória: <span id="metric-hits" class="text-green-600">0</span></div>
-                        <div class="text-xs text-gray-500">Vezes que a IA pulou o processamento visual usando a memória nativa.</div>
+        <div class="grid grid-cols-2 gap-6 mb-8">
+            <div class="glass-card bg-white dark:bg-slate-800 p-6 rounded-xl">
+                <h3 class="font-bold text-slate-700 dark:text-slate-200 mb-6 flex items-center gap-2">
+                    <i class="fas fa-tachometer-alt text-slate-400"></i> Velocidade de Produção
+                </h3>
+                
+                <div class="mb-4">
+                    <div class="flex justify-between text-xs mb-1 text-slate-500 dark:text-slate-400">
+                        <span>Método Manual Tradicional</span>
+                        <span class="font-bold text-slate-600 dark:text-slate-300">6 horas / aula</span>
                     </div>
+                    <div class="progress-bg h-4 rounded-full overflow-hidden">
+                        <div class="bg-slate-400 dark:bg-slate-600 w-full h-full"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <div class="flex justify-between text-xs mb-1 text-slate-500 dark:text-slate-400">
+                        <span class="text-senior font-bold">Training OS</span>
+                        <span class="font-bold text-senior">15 min / aula</span>
+                    </div>
+                    <div class="progress-bg h-4 rounded-full overflow-hidden">
+                        <div class="bg-senior w-[4%] h-full shadow-[0_0_10px_rgba(0,153,153,0.5)]"></div>
+                    </div>
+                </div>
+
+                <div class="bg-senior/10 border border-senior/20 rounded-lg p-3 text-center">
+                    <span class="text-senior font-bold text-lg">↓ 96% de Redução de Tempo</span>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Impacto direto no Time-to-Market de novos módulos.</p>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm w-1/2">
-                <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2"><i class="fas fa-rocket text-purple-500"></i> Futuro da Plataforma</h3>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="p-3 border border-gray-100 rounded bg-gray-50 hover:border-blue-300 transition">
-                        <h4 class="font-bold text-xs text-gray-800"><i class="fas fa-mouse-pointer text-blue-500 mr-1"></i> DAP Interativo</h4>
-                        <p class="text-[10px] text-gray-500 mt-1 leading-tight">Guias flutuantes direto na tela do usuário (Concorrente WalkMe).</p>
+            <div class="glass-card bg-white dark:bg-slate-800 p-6 rounded-xl">
+                <h3 class="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                    <i class="fas fa-cogs text-slate-400"></i> Motor Zero-Touch (Auto-Cura)
+                </h3>
+                <p class="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                    A IA memoriza elementos da Senior X visualmente e em banco de dados. Quando o sistema original sofre atualizações estruturais, o robô repara o fluxo localizando os novos botões por inteligência artificial.
+                </p>
+                <div class="flex justify-between items-end border-t border-gray-200 dark:border-slate-700 pt-4">
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Recuperações bem-sucedidas pela IA</div>
+                        <div class="text-2xl font-bold text-senior" id="metric-hits">0</div>
                     </div>
-                    <div class="p-3 border border-gray-100 rounded bg-gray-50 hover:border-red-300 transition">
-                        <h4 class="font-bold text-xs text-gray-800"><i class="fas fa-file-pdf text-red-500 mr-1"></i> Auto-Documentação</h4>
-                        <p class="text-[10px] text-gray-500 mt-1 leading-tight">Geração de apostilas em PDF passo a passo num clique.</p>
-                    </div>
-                    <div class="p-3 border border-gray-100 rounded bg-gray-50 hover:border-green-300 transition">
-                        <h4 class="font-bold text-xs text-gray-800"><i class="fas fa-globe text-green-500 mr-1"></i> Tradução Zero-Click</h4>
-                        <p class="text-[10px] text-gray-500 mt-1 leading-tight">Áudios em Espanhol e Inglês usando a mesma gravação.</p>
-                    </div>
-                    <div class="p-3 border border-gray-100 rounded bg-gray-50 hover:border-yellow-300 transition">
-                        <h4 class="font-bold text-xs text-gray-800"><i class="fas fa-shield-alt text-yellow-500 mr-1"></i> QA Auto-Pilot</h4>
-                        <p class="text-[10px] text-gray-500 mt-1 leading-tight">Execução noturna de roteiros para validar fluxos do Senior X.</p>
-                    </div>
+                    <i class="fas fa-shield-alt text-senior/20 text-4xl"></i>
                 </div>
             </div>
         </div>
     </main>
 
     <main id="aba-studio" class="flex-1 hidden h-full">
-        
-        <div class="w-80 bg-white border-r border-gray-200 flex flex-col h-full bg-gray-50">
-            <div class="p-4 border-b border-gray-200 bg-white">
-                <button onclick="abrirModalGravacao()" class="w-full py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded shadow transition-all flex justify-center items-center gap-2">
-                    <i class="fas fa-circle text-[8px] animate-pulse"></i> Gravar Mapeamento
+        <div class="w-80 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col h-full flex-shrink-0 transition-colors duration-300">
+            <div class="p-4 border-b border-gray-200 dark:border-slate-800">
+                <button onclick="abrirModalGravacao()" class="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded shadow-lg shadow-red-500/20 transition-all flex justify-center items-center gap-2">
+                    <i class="fas fa-circle text-[10px] animate-pulse"></i> Iniciar Mapeamento
                 </button>
             </div>
-            <div id="lista-roteiros" class="space-y-1 p-3 overflow-y-auto flex-1 scrollbar-hide"></div>
+            <div class="p-3 text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-gray-50 dark:bg-slate-900">Treinamentos Salvos</div>
+            <div id="lista-roteiros" class="space-y-1 p-3 overflow-y-auto flex-1 scrollbar-hide bg-gray-50 dark:bg-slate-900">
+                </div>
         </div>
 
-        <div class="flex-1 flex flex-col h-full relative bg-gray-100">
-            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm overflow-x-auto whitespace-nowrap scrollbar-hide">
-                <div id="header-title" class="font-semibold text-gray-700 min-w-max mr-4">Selecione uma aula</div>
+        <div class="flex-1 flex flex-col h-full relative bg-gray-100 dark:bg-slate-850 transition-colors duration-300">
+            <header class="h-16 glass-card bg-white dark:bg-slate-800 flex items-center justify-between px-6 shadow-sm z-10 border-b border-gray-200 dark:border-slate-700 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                <div id="header-title" class="font-semibold text-slate-700 dark:text-slate-200 min-w-max mr-4">Selecione uma aula</div>
+                
                 <div class="flex gap-2 min-w-max" id="action-buttons" style="display: none;">
-                    
-                    <button onclick="excluirRoteiro()" class="px-3 py-1.5 text-red-500 hover:bg-red-50 rounded text-sm transition" title="Excluir aula">
+                    <button onclick="excluirRoteiro()" class="px-3 py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded text-sm transition" title="Excluir aula">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                     
-                    <button onclick="salvarRoteiro()" class="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded text-sm transition" title="Salvar textos">
+                    <button onclick="salvarRoteiro()" class="px-3 py-1.5 text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-sm transition" title="Salvar textos">
                         <i class="fas fa-save"></i> Salvar
                     </button>
                     
-                    <div class="h-6 border-l border-gray-300 mx-1 self-center"></div>
+                    <div class="h-6 border-l border-gray-300 dark:border-slate-600 mx-1 self-center"></div>
                     
                     <button onclick="executarRobo()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold shadow-sm transition">
                         <i class="fas fa-robot mr-1"></i> 1. Robô
                     </button>
                     
-                    <button onclick="renderizarVideo()" class="px-3 py-1.5 senior-teal hover:bg-teal-700 text-white rounded text-sm font-bold shadow-sm transition">
+                    <button onclick="renderizarVideo()" class="px-3 py-1.5 bg-senior hover:bg-senior-dark text-white rounded text-sm font-bold shadow-sm transition">
                         <i class="fas fa-film mr-1"></i> 2. Vídeo
                     </button>
 
@@ -176,13 +234,13 @@
                         <i class="fas fa-box-open mr-1"></i> 3. Simulador
                     </button>
                     
-                    <div class="h-6 border-l border-gray-300 mx-1 self-center"></div>
+                    <div class="h-6 border-l border-gray-300 dark:border-slate-600 mx-1 self-center"></div>
 
-                    <button id="btn-assistir" onclick="abrirModalVideo()" class="hidden px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded text-sm font-bold shadow-sm transition">
-                        <i class="fas fa-play mr-1"></i> Assistir
+                    <button id="btn-assistir" onclick="abrirModalVideo()" class="hidden px-3 py-1.5 bg-slate-800 dark:bg-slate-900 text-white rounded text-sm font-bold shadow-sm border border-slate-700 transition hover:bg-slate-700">
+                        <i class="fas fa-play text-senior-light mr-1"></i> Assistir
                     </button>
 
-                    <a id="btn-baixar-scorm" href="#" download class="hidden px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-bold shadow-sm transition">
+                    <a id="btn-baixar-scorm" href="#" download class="hidden px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-sm font-bold shadow-sm transition">
                         <i class="fas fa-download mr-1"></i> SCORM
                     </a>
                 </div>
@@ -192,42 +250,48 @@
                 <div class="max-w-4xl mx-auto space-y-4" id="passos-container"></div>
             </div>
             
-            <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-gray-400">
-                <i class="fas fa-video-slash text-5xl mb-4 opacity-30"></i>
-                <p>Nenhuma aula selecionada</p>
+            <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600">
+                <i class="fas fa-layer-group text-6xl mb-4 opacity-30"></i>
+                <p>Nenhuma operação selecionada no estúdio.</p>
             </div>
         </div>
     </main>
 
-    <div id="modal-gravacao" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl w-full max-w-lg overflow-hidden">
-            <div class="senior-teal p-5 text-white flex justify-between">
-                <h2 class="font-bold">Nova Gravação</h2>
+    <div id="modal-gravacao" class="fixed inset-0 bg-slate-900 bg-opacity-80 hidden items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white dark:bg-slate-800 rounded-xl w-full max-w-lg overflow-hidden border border-gray-200 dark:border-slate-700 shadow-2xl">
+            <div class="bg-senior p-5 text-white flex justify-between">
+                <h2 class="font-bold flex items-center gap-2"><i class="fas fa-record-vinyl animate-pulse"></i> Novo Mapeamento</h2>
                 <button onclick="fecharModalGravacao()"><i class="fas fa-times"></i></button>
             </div>
             <div class="p-6 space-y-4">
-                <input type="text" id="input-nome-aula" placeholder="Título da Aula" class="w-full p-3 border rounded outline-none">
-                <textarea id="input-objetivo" rows="2" placeholder="Objetivo (O que a IA deve saber)" class="w-full p-3 border rounded outline-none resize-none"></textarea>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Nome do Treinamento</label>
+                    <input type="text" id="input-nome-aula" placeholder="Ex: Emitir Nota Fiscal" class="w-full p-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded outline-none focus:border-senior dark:focus:border-senior transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Objetivo (Contexto para IA)</label>
+                    <textarea id="input-objetivo" rows="2" placeholder="Descreva o que este fluxo faz no Senior X..." class="w-full p-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded outline-none resize-none focus:border-senior dark:focus:border-senior transition-colors"></textarea>
+                </div>
             </div>
-            <div class="bg-gray-50 p-4 flex justify-end gap-3">
-                <button onclick="fecharModalGravacao()" class="px-4 py-2 text-gray-600 font-medium">Cancelar</button>
-                <button onclick="iniciarGravacao()" class="px-4 py-2 bg-red-600 text-white rounded font-bold">Iniciar</button>
+            <div class="bg-gray-50 dark:bg-slate-850 p-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
+                <button onclick="fecharModalGravacao()" class="px-4 py-2 text-slate-600 dark:text-slate-400 font-medium hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition">Cancelar</button>
+                <button onclick="iniciarGravacao()" class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded font-bold transition shadow-lg shadow-red-500/20">Gravar Tela</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-video" class="fixed inset-0 bg-black bg-opacity-95 hidden items-center justify-center z-[120]">
+    <div id="modal-video" class="fixed inset-0 bg-black bg-opacity-95 hidden items-center justify-center z-[120] backdrop-blur-md">
         <div class="w-[90vw] max-w-6xl relative">
-            <button onclick="fecharModalVideo()" class="absolute -top-10 right-0 text-white hover:text-gray-300 text-xl">
-                <i class="fas fa-times"></i> Fechar
+            <button onclick="fecharModalVideo()" class="absolute -top-12 right-0 text-slate-300 hover:text-white text-lg font-bold flex items-center gap-2 transition">
+                <i class="fas fa-times-circle"></i> Fechar Player
             </button>
-            <video id="video-player" class="w-full h-auto bg-black rounded shadow-2xl" controls></video>
+            <video id="video-player" class="w-full h-auto bg-black rounded border border-slate-800 shadow-2xl" controls></video>
         </div>
     </div>
 
-    <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white px-6 py-3 rounded shadow-lg transform transition-all duration-300 translate-y-20 opacity-0 flex items-center gap-3 z-[150]">
-        <i id="toast-icon" class="fas fa-check-circle text-green-400"></i>
-        <span id="toast-msg">Mensagem</span>
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-4 rounded-lg shadow-2xl transform transition-all duration-300 translate-y-20 opacity-0 flex items-center gap-3 z-[150] border border-slate-700">
+        <i id="toast-icon" class="fas fa-check-circle text-emerald-400 text-xl"></i>
+        <span id="toast-msg" class="font-medium">Mensagem</span>
     </div>
 
     <script>
@@ -235,12 +299,33 @@
         let arquivoAtual = ""; 
         let cacheListaRoteiros = [];
 
+        // Lógica de Tema Escuro/Claro
+        function applyTheme() {
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon').classList.replace('fa-moon', 'fa-sun');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('theme-icon').classList.replace('fa-sun', 'fa-moon');
+            }
+        }
+        
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                localStorage.theme = 'light';
+            } else {
+                localStorage.theme = 'dark';
+            }
+            applyTheme();
+        }
+
         // Inicialização
         document.addEventListener("DOMContentLoaded", () => {
+            applyTheme();
             carregarListaRoteiros(); 
             carregarMetricas();
             
-            // Loop para atualizar a interface (status do servidor e métricas)
+            // Loop de Polling
             setInterval(() => { 
                 checarStatusServidor(); 
                 carregarMetricas(); 
@@ -254,15 +339,10 @@
             document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
             document.getElementById('nav-' + aba).classList.add('active');
             
-            document.getElementById('aba-dashboard').classList.add('hidden');
-            document.getElementById('aba-studio').classList.add('hidden');
+            document.querySelectorAll('main').forEach(m => m.classList.add('hidden'));
             
-            if (aba === 'studio') {
-                document.getElementById('aba-studio').classList.remove('hidden');
-                document.getElementById('aba-studio').classList.add('flex');
-            } else {
-                document.getElementById('aba-' + aba).classList.remove('hidden');
-            }
+            const alvo = document.getElementById('aba-' + aba);
+            if(alvo) alvo.classList.remove('hidden');
         }
 
         function abrirModalVideo() {
@@ -322,21 +402,17 @@
                     document.getElementById('loading-msg').innerText = status.mensagem; 
                 } else {
                     overlay.classList.add('hidden');
-                    
                     if (status.erro) { 
                         mostrarToast(status.erro, "error"); 
                         await fetch('/api/limpar-status', { method: 'POST' }); 
                     }
-                    
                     if (status.sucesso) { 
                         mostrarToast(status.sucesso, "success"); 
                         await fetch('/api/limpar-status', { method: 'POST' }); 
                         carregarListaRoteiros(); 
                     }
                 }
-            } catch(e) {
-                console.error("Erro ao checar status:", e);
-            }
+            } catch(e) {}
         }
 
         async function carregarListaRoteiros() {
@@ -348,52 +424,45 @@
                 let html = '';
                 cacheListaRoteiros.forEach(roteiro => {
                     const isSelected = arquivoAtual === roteiro.arquivo;
-                    const cssClass = isSelected ? 'border-[#009999] bg-white shadow-sm' : 'border-transparent hover:bg-gray-100';
+                    // Estilização condicional baseada na seleção
+                    const cssClass = isSelected 
+                        ? 'border-senior bg-white dark:bg-slate-800 shadow-sm' 
+                        : 'border-transparent hover:bg-gray-200 dark:hover:bg-slate-800/50';
                     
-                    // Ícones de status de mídia gerada
                     let badgesMidia = '';
-                    if(roteiro.tem_video) badgesMidia += '<i class="fas fa-play-circle text-teal-500 ml-1" title="Vídeo Pronto"></i>';
-                    if(roteiro.tem_scorm) badgesMidia += '<i class="fas fa-box-open text-purple-500 ml-1" title="SCORM Pronto"></i>';
-                    if(!roteiro.tem_video && !roteiro.tem_scorm) badgesMidia = '<i class="fas fa-file-alt text-gray-300"></i>';
+                    if(roteiro.tem_video) badgesMidia += '<i class="fas fa-play-circle text-blue-500 dark:text-blue-400 ml-1" title="Vídeo Pronto"></i>';
+                    if(roteiro.tem_scorm) badgesMidia += '<i class="fas fa-box-open text-purple-500 dark:text-purple-400 ml-1" title="SCORM Pronto"></i>';
+                    if(!roteiro.tem_video && !roteiro.tem_scorm) badgesMidia = '<i class="fas fa-file-alt text-slate-400 dark:text-slate-600"></i>';
                     
                     html += `
-                    <button onclick="carregarRoteiro('${roteiro.arquivo}')" class="w-full text-left p-3 rounded border ${cssClass} transition flex items-center gap-3">
+                    <button onclick="carregarRoteiro('${roteiro.arquivo}')" class="w-full text-left p-3 rounded-lg border ${cssClass} transition flex items-center gap-3 mb-1">
                         <div class="text-sm flex">${badgesMidia}</div>
                         <div class="overflow-hidden w-full">
-                            <div class="font-medium text-sm text-gray-800 truncate w-full" title="${roteiro.nome}">${roteiro.nome}</div>
-                            <div class="text-[10px] text-gray-400">${roteiro.qtd_passos} passos mapeados</div>
+                            <div class="font-medium text-sm text-slate-800 dark:text-slate-200 truncate w-full" title="${roteiro.nome}">${roteiro.nome}</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-500">${roteiro.qtd_passos} passos mapeados</div>
                         </div>
                     </button>`;
                 });
                 container.innerHTML = html;
-                
                 atualizarBotoesMidia();
-            } catch(e) {
-                console.error("Erro ao carregar roteiros:", e);
-            }
+            } catch(e) {}
         }
 
         function atualizarBotoesMidia() {
             if (!arquivoAtual) return;
             const config = cacheListaRoteiros.find(r => r.arquivo === arquivoAtual);
             
-            // Controle do Botão de Vídeo
             const btnVideo = document.getElementById('btn-assistir');
             if (config && config.tem_video) { 
                 btnVideo.classList.remove('hidden'); 
                 btnVideo.dataset.url = config.video_url; 
-            } else { 
-                btnVideo.classList.add('hidden'); 
-            }
+            } else { btnVideo.classList.add('hidden'); }
 
-            // Controle do Botão de Download SCORM
             const btnScorm = document.getElementById('btn-baixar-scorm');
             if (config && config.tem_scorm) {
                 btnScorm.classList.remove('hidden');
                 btnScorm.href = config.scorm_url;
-            } else {
-                btnScorm.classList.add('hidden');
-            }
+            } else { btnScorm.classList.add('hidden'); }
         }
 
         async function carregarRoteiro(arquivo) {
@@ -421,23 +490,25 @@
             
             roteiroAtual.passos.forEach((passo, index) => {
                 let html = `
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-gray-50 px-4 py-2 border-b text-sm font-bold text-gray-700 flex justify-between">
-                        <span>Passo ${passo.id_passo}</span>
-                        ${passo.is_conclusao ? '<span class="text-xs bg-green-100 text-green-700 px-2 rounded">CONCLUSÃO</span>' : ''}
+                <div class="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden mb-4">
+                    <div class="bg-gray-50 dark:bg-slate-900 px-4 py-3 border-b border-gray-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-300 flex justify-between items-center">
+                        <span class="flex items-center gap-2"><i class="fas fa-shoe-prints text-senior"></i> Passo ${passo.id_passo}</span>
+                        ${passo.is_conclusao ? '<span class="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded uppercase">Conclusão</span>' : ''}
                     </div>
                     <div class="p-4">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Âncora Principal</label>
-                        <textarea onchange="roteiroAtual.passos[${index}].pedagogia.ancora=this.value" class="w-full p-2 border rounded outline-none text-sm bg-gray-50 focus:border-[#009999]" rows="2">${passo.pedagogia.ancora || ''}</textarea>
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Narração / Âncora Principal</label>
+                        <textarea onchange="roteiroAtual.passos[${index}].pedagogia.ancora=this.value" class="w-full p-3 border border-gray-300 dark:border-slate-600 rounded bg-gray-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none text-sm focus:border-senior dark:focus:border-senior transition-colors" rows="2">${passo.pedagogia.ancora || ''}</textarea>
                 `;
                 
                 if (passo.acoes_tecnicas) {
                     passo.acoes_tecnicas.forEach((acao, acaoIndex) => {
                         if (acao.acao !== "concluir_video") {
                             html += `
-                            <div class="mt-3 pl-3 border-l-2 border-teal-200">
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1" title="${acao.intencao_semantica}">Ação: ${acao.acao}</label>
-                                <textarea onchange="roteiroAtual.passos[${index}].acoes_tecnicas[${acaoIndex}].micro_narracao=this.value" class="w-full p-2 border rounded outline-none text-sm focus:border-[#009999]" rows="1">${acao.micro_narracao || ''}</textarea>
+                            <div class="mt-4 pl-4 border-l-2 border-senior/50">
+                                <label class="block text-[10px] font-bold text-senior dark:text-senior-light uppercase mb-1 flex items-center gap-1" title="${acao.intencao_semantica}">
+                                    <i class="fas fa-mouse-pointer"></i> Ação: ${acao.acao}
+                                </label>
+                                <textarea onchange="roteiroAtual.passos[${index}].acoes_tecnicas[${acaoIndex}].micro_narracao=this.value" class="w-full p-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none text-sm focus:border-senior transition-colors" rows="1">${acao.micro_narracao || ''}</textarea>
                             </div>`;
                         }
                     });
@@ -451,7 +522,6 @@
         async function iniciarGravacao() {
             const nome = document.getElementById('input-nome-aula').value.trim(); 
             const obj = document.getElementById('input-objetivo').value.trim();
-            
             if (!nome) return mostrarToast("Dê um nome para a aula.", "error");
             
             fecharModalGravacao(); 
@@ -472,15 +542,13 @@
         }
 
         async function excluirRoteiro() { 
-            if (confirm("ATENÇÃO!\nTem certeza que deseja excluir permanentemente esta aula?")) { 
+            if (confirm("ATENÇÃO!\nTem certeza que deseja excluir permanentemente este treinamento?")) { 
                 await fetch(`/api/roteiros/${arquivoAtual}`, { method: 'DELETE' }); 
-                
                 arquivoAtual = ""; 
                 document.getElementById('editor-area').classList.add('hidden'); 
                 document.getElementById('empty-state').classList.remove('hidden'); 
                 document.getElementById('action-buttons').style.display = 'none'; 
                 document.getElementById('header-title').innerText = "Selecione uma aula";
-                
                 carregarListaRoteiros(); 
             } 
         }
@@ -511,20 +579,18 @@
         function mostrarToast(msg, tipo) {
             const toast = document.getElementById('toast'); 
             document.getElementById('toast-msg').innerText = msg;
-            
             const icone = toast.querySelector('i');
+            
             if (tipo === 'success') {
-                icone.className = 'fas fa-check-circle text-green-400';
-                toast.classList.replace('bg-red-900', 'bg-gray-800');
+                icone.className = 'fas fa-check-circle text-emerald-400 text-xl';
+                toast.classList.replace('border-red-500', 'border-slate-700');
             } else {
-                icone.className = 'fas fa-exclamation-triangle text-red-400';
-                toast.classList.replace('bg-gray-800', 'bg-red-900');
+                icone.className = 'fas fa-exclamation-triangle text-red-500 text-xl';
+                toast.classList.replace('border-slate-700', 'border-red-500');
             }
             
             toast.classList.remove('translate-y-20', 'opacity-0'); 
-            setTimeout(() => { 
-                toast.classList.add('translate-y-20', 'opacity-0'); 
-            }, 4000);
+            setTimeout(() => { toast.classList.add('translate-y-20', 'opacity-0'); }, 4000);
         }
     </script>
 </body>
