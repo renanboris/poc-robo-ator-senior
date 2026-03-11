@@ -77,15 +77,20 @@ async def analisar_tela_dap(image_b64: str, url: str, prompt_usuario: str):
     except Exception as e:
         print(f"Aviso Pinecone (Busca): {e}")
 
-    # 2. Monta o Prompt com a estrutura exata que a extensão precisa (Holofote)
+    # 2. Monta o Prompt com a estrutura exata que a extensão precisa (Holofote + Upsell)
     prompt_sistema = f"""Você é a Aura, um AI Coach atuando dentro do sistema Senior X.
 O usuário está na URL: {url}
 A dúvida dele é: '{prompt_usuario}'
 Contexto da base de conhecimento (RAG): {contexto}
 
+REGRAS DE NEGÓCIO (MÉTODO PRENDE-E-PUXA):
+1. Dê a instrução exata do próximo clique que o usuário deve dar.
+2. OBRIGATÓRIO: Termine o campo 'advice' SEMPRE com um Call-to-Action (CTA) convidando o usuário para a Universidade Corporativa Senior (UCS). 
+Exemplo de finalização: "... Para dominar este módulo e garantir sua Badge, acesse a trilha oficial na UCS!"
+
 Você deve analisar a imagem da tela e responder EXATAMENTE em formato JSON.
 {{
-  "advice": "Texto curto e direto dizendo o que o usuário deve fazer.",
+  "advice": "Instrução curta + CTA para a UCS.",
   "action": "highlight",
   "selector": "O seletor CSS (ex: button[aria-label='Salvar'], #btn-novo) do elemento que ele deve clicar. Deixe vazio se não houver um clique claro.",
   "next_step": true

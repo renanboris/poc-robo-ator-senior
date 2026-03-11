@@ -5,10 +5,14 @@ import shutil
 import re
 from pathlib import Path
 
+# ─── FUNÇÃO ALINHADA COM O BACKEND ───
+def limpar_nome(nome: str) -> str:
+    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
+
 def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
     """
     Lê o JSON do treinamento e empacota num arquivo .zip SCORM 1.2
-    com um simulador interativo em HTML/JS moderno (Navegação Livre e Posicionamento Perfeito).
+    com um simulador interativo em HTML/JS moderno.
     """
     os.makedirs(pasta_destino, exist_ok=True)
     
@@ -17,8 +21,10 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
 
     metadata = roteiro.get("metadata", {})
     nome_aula_raw = metadata.get("nome_aula", "Simulador Senior")
-    id_treino = metadata.get("id_treinamento", "TREINAMENTO")
-    nome_arquivo_base = re.sub(r'[\\/*?:"<>|]', "", nome_aula_raw).replace(" ", "_")
+    id_treino = metadata.get("id_treinamento", nome_aula_raw)
+    
+    # Usa a função higienizadora idêntica ao app.py
+    nome_arquivo_base = limpar_nome(id_treino)
     
     # Prepara pasta temporária para montar o SCORM
     temp_dir = Path(f"temp_scorm_{nome_arquivo_base}")
@@ -27,7 +33,7 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
     temp_dir.mkdir()
 
     # 1. Copia os áudios usados neste treinamento
-    pasta_audio_origem = Path("audios_gerados") / re.sub(r'[\\/*?:"<>|]', "", id_treino).replace(" ", "_")
+    pasta_audio_origem = Path("audios_gerados") / nome_arquivo_base
     audio_dir_dest = temp_dir / "audios"
     audio_dir_dest.mkdir()
     
@@ -74,12 +80,20 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
         id_p = passo.get('id_passo', idx + 1)
         ancora = passo.get("pedagogia", {}).get("ancora", "")
         
+        # PROCURA A PRIMEIRA IMAGEM DISPONÍVEL NESTE PASSO PARA USAR NA ÂNCORA (Fim da tela preta)
+        img_step = None
+        for acao in passo.get("acoes_tecnicas", []):
+            ref = acao.get("elemento_alvo", {}).get("screenshot_referencia")
+            if ref:
+                img_step = ref
+                break
+        
         if ancora:
             slides.append({
                 "tipo": "ancora",
                 "texto": ancora,
                 "audio_id": f"{id_p}_ancora",
-                "imagem_b64": None
+                "imagem_b64": img_step
             })
             
         for i, acao in enumerate(passo.get("acoes_tecnicas", [])):
@@ -144,21 +158,23 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
         /* Zonas Interativas (Totalmente invisíveis por padrão) */
         .interactive-zone {{
             position: absolute; transform: translate(-50%, -50%);
-            border-radius: 6px; z-index: 10;
+            border-radius: 4px; z-index: 10;
             background: transparent; border: 2px solid transparent;
             transition: box-shadow 0.2s ease, border 0.2s ease;
         }}
         
         #hotspot-btn {{ cursor: pointer; }}
         
+        /* NOVO ESTILO DO INPUT: Clean e alinhado */
         #hotspot-input {{
-            background: rgba(255, 255, 255, 0.95); border: 2px solid #00e5e5; outline: none;
-            padding: 0 10px; font-size: 14px; font-family: inherit; color: #1f2937;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); border-radius: 4px;
+            background: rgba(255, 255, 255, 0.98); 
+            border: 2px solid #00e5e5; outline: none;
+            padding: 0 8px; font-size: 14px; font-family: inherit; color: #1f2937;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); 
         }}
-        #hotspot-input:focus {{ box-shadow: 0 0 0 3px rgba(0, 229, 229, 0.3); }}
+        #hotspot-input:focus {{ box-shadow: 0 0 0 3px rgba(0, 229, 229, 0.4); }}
 
-        /* Estética Elegante do Hint (Borda suave, sem preenchimento verde duro) */
+        /* Estética Elegante do Hint */
         .hint-active {{
             animation: pulse-border 1.5s infinite alternate !important;
             border: 2px dashed rgba(0, 229, 229, 0.8) !important;
@@ -226,7 +242,7 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
         <div id="wrong-click-area"></div>
         
         <div id="hotspot-btn" class="interactive-zone" style="display:none;"></div>
-        <input type="text" id="hotspot-input" class="interactive-zone" style="display:none;" placeholder="Digite e aperte Enter..." autocomplete="off">
+        <input type="text" id="hotspot-input" class="interactive-zone" style="display:none;" autocomplete="off">
         
         <div id="error-mask"></div>
         
@@ -273,7 +289,6 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
             const btn = document.getElementById('hotspot-btn');
             const inp = document.getElementById('hotspot-input');
             
-            // Reseta estilos de acerto e dica
             btn.style.display = 'none';
             btn.classList.remove('hint-active', 'success-glow');
             inp.style.display = 'none';
@@ -295,19 +310,27 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
             const btnPrev = document.getElementById('btn-prev');
             const btnHint = document.getElementById('btn-hint');
 
-            // Controle do botão voltar
             btnPrev.disabled = (index === 0);
-            
             instructionBar.style.display = 'flex';
             instructionText.innerHTML = slide.texto || "Aguarde...";
 
+            // LÓGICA DE MANUTENÇÃO DA IMAGEM DE FUNDO (Evita a tela preta)
             if (slide.imagem_b64) {{
-                // TELA INTERATIVA
-                btnHint.style.display = 'flex';
                 bgImage.src = "data:image/jpeg;base64," + slide.imagem_b64;
                 bgImage.style.display = 'block';
+            }} else if (!bgImage.src) {{
+                bgImage.style.display = 'none';
+            }}
+
+            // LÓGICA DO TIPO DE SLIDE
+            if (slide.tipo === 'ancora') {{
+                instructionPrefix.innerHTML = "💡 EXPLICAÇÃO:";
+                instructionPrefix.style.color = "#94a3b8";
+                btnHint.style.display = 'none';
+                // As áreas interativas já foram escondidas no início da função
+            }} else {{
+                btnHint.style.display = 'flex';
                 
-                // Prefixo Visual
                 if (slide.acao === 'clique_direito') {{
                     instructionPrefix.innerHTML = "🖱️ CLIQUE DIREITO:";
                     instructionPrefix.style.color = "#fbbf24"; 
@@ -322,15 +345,13 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                     instructionPrefix.style.color = "#00e5e5"; 
                 }}
                 
-                bgImage.onload = () => {{
-                    // 🟢 O CÁLCULO MÁGICO DO OBJECT-FIT (Posicionamento Perfeito)
+                const posicionarHotspot = () => {{
                     const container = document.getElementById('container');
                     const imgRatio = bgImage.naturalWidth / bgImage.naturalHeight;
                     const containerRatio = container.clientWidth / container.clientHeight;
                     
                     let renderWidth, renderHeight, offsetX = 0, offsetY = 0;
                     
-                    // Descobre as dimensões reais da imagem renderizada na tela
                     if (containerRatio > imgRatio) {{
                         renderHeight = container.clientHeight;
                         renderWidth = renderHeight * imgRatio;
@@ -341,18 +362,18 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                         offsetY = (container.clientHeight - renderHeight) / 2;
                     }}
 
-                    // Aplica as porcentagens sobre a área visível real
                     const xPix = offsetX + (slide.x_pct * renderWidth);
                     const yPix = offsetY + (slide.y_pct * renderHeight);
                     
-                    // Gordurinha de segurança de +16px para facilitar o acerto
-                    const wPix = Math.max((slide.w_pct || 0) * renderWidth + 16, 40);
-                    const hPix = Math.max((slide.h_pct || 0) * renderHeight + 16, 40);
+                    // Removido os 16px inflados que causavam desalinhamento em inputs
+                    const wPix = Math.max((slide.w_pct || 0) * renderWidth, 24);
+                    const hPix = Math.max((slide.h_pct || 0) * renderHeight, 24);
                     
                     let activeZone;
 
                     if (slide.acao === 'digitar_e_enter' || slide.acao === 'preencher_campo') {{
                         activeZone = inp;
+                        inp.placeholder = slide.valor_input ? "Digite: " + slide.valor_input : "Digite aqui...";
                         inp.onkeydown = (e) => {{
                             if (e.key === 'Enter') {{
                                 const valorEsperado = (slide.valor_input || "").trim().toLowerCase();
@@ -381,32 +402,31 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
 
                     activeZone.style.left = xPix + 'px';
                     activeZone.style.top = yPix + 'px';
-                    activeZone.style.width = wPix + 'px';
-                    activeZone.style.height = hPix + 'px';
+                    
+                    // Adiciona um respiro flexível de 8px nas bordas externas
+                    activeZone.style.width = (wPix + 8) + 'px';
+                    activeZone.style.height = (hPix + 8) + 'px';
                     activeZone.style.display = 'block';
                     
                     if(activeZone === inp) inp.focus();
                     
-                    // Auto-Dica discreta após 7 segundos de inatividade
                     hintTimeout = setTimeout(() => {{
                         if(activeZone === btn) btn.classList.add('hint-active');
                     }}, 7000);
                 }};
-            }} else {{
-                // TELA DE ÂNCORA (Só texto)
-                instructionPrefix.innerHTML = "💡 PRESTE ATENÇÃO:";
-                instructionPrefix.style.color = "#94a3b8";
-                btnHint.style.display = 'none';
-                bgImage.style.display = 'none';
+
+                // Garante que a imagem está carregada antes de calcular os pixels
+                if (bgImage.complete) {{
+                    posicionarHotspot();
+                }} else {{
+                    bgImage.onload = posicionarHotspot;
+                }}
             }}
         }}
 
         function acertouAcao(elemento) {{
-            // Animação de sucesso (Glow Esmeralda)
             elemento.classList.remove('hint-active');
             elemento.classList.add('success-glow');
-            
-            // Avança após a animação de meio segundo
             setTimeout(proximoSlide, 500);
         }}
 

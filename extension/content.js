@@ -89,6 +89,42 @@
             if (e.key === 'Enter') { e.stopPropagation(); dispararAnaliseIA(); }
         });
         document.getElementById('aura-speech-bubble').addEventListener('mousedown', e => e.stopPropagation());
+
+        // ─── MOTOR DE PROATIVIDADE (IDLE TIMER) ───
+        let tempoInativo = 0;
+        const TEMPO_LIMITE_SEGUNDOS = 30; // Dispara após 30 segundos parado
+
+        function resetarCronometro() {
+            tempoInativo = 0;
+        }
+
+        // Escuta qualquer atividade do usuário para provar que ele não está travado
+        document.addEventListener('mousemove', resetarCronometro);
+        document.addEventListener('keypress', resetarCronometro);
+        document.addEventListener('click', resetarCronometro);
+        document.addEventListener('scroll', resetarCronometro);
+
+        // Verifica a inatividade a cada 1 segundo
+        setInterval(() => {
+            tempoInativo++;
+            
+            if (tempoInativo === TEMPO_LIMITE_SEGUNDOS) {
+                const bubbleElement = document.getElementById('aura-speech-bubble');
+                // Só chama se o balão não estiver já aberto e conversando
+                if (bubbleElement && !bubbleElement.classList.contains('active')) {
+                    exibirBalaoAura("Vejo que você parou nesta tela. Precisa de alguma ajuda para continuar? 🤔", [
+                        { label: "Sim, me ajude", action: () => dispararAnaliseIA("O que devo fazer nesta tela?") },
+                        { 
+                            label: "Não, obrigado", 
+                            action: () => { 
+                                bubbleElement.classList.remove('active'); 
+                                resetarCronometro(); 
+                            } 
+                        }
+                    ]);
+                }
+            }
+        }, 1000);
     }
 
     function exibirBalaoAura(texto, opcoes = []) {
@@ -141,9 +177,9 @@
         }, 400);
     }
 
-    function dispararAnaliseIA() {
+    function dispararAnaliseIA(textoOpcional) {
         const inputEl = document.getElementById('aura-prompt-input');
-        const prompt  = (inputEl?.value || '').trim() || "O que devo fazer nesta tela?";
+        const prompt  = textoOpcional || (inputEl?.value || '').trim() || "O que devo fazer nesta tela?";
 
         exibirBalaoAura("Analisando a tela... Só um momento! 🔍", []);
         

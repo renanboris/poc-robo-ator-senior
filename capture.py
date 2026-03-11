@@ -22,6 +22,13 @@ _id_acao_global = 0
 _lock_id = None 
 
 # ==============================================================
+# 🛠️ FUNÇÃO DE HIGIENIZAÇÃO GLOBAL (Alinhada com app.py)
+# ==============================================================
+def limpar_nome(nome: str) -> str:
+    """Garante que o nome do JSON gerado seja idêntico ao esperado pelo sistema."""
+    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
+
+# ==============================================================
 # 📚 RAG E PINECONE
 # ==============================================================
 def _buscar_pinecone_sync(objetivo_aula: str) -> str:
@@ -48,10 +55,6 @@ async def buscar_contexto_pinecone(objetivo_aula: str) -> str:
 # 📐 EXTRAÇÃO E ANÁLISE SEMÂNTICA DA IA (COM DIMENSÕES REAIS)
 # ==============================================================
 def _extrair_coordenadas_relativas(posicao_str: str, viewport_w: int, viewport_h: int) -> dict:
-    """
-    Agora calcula não apenas o centro exato do botão, mas também a LARGURA e ALTURA 
-    relativas para permitir que o SCORM desenhe a caixa delimitadora perfeita.
-    """
     try:
         partes = dict(p.split(':') for p in posicao_str.split(','))
         w = int(partes['w'])
@@ -214,15 +217,38 @@ async def _injetar_em_contexto(contexto):
             setTimeout(() => target.style.outline = originalOutline, 200);
         };
 
-        // 🟢 Detecta Clique Esquerdo (0) e Direito (2) no momento EXATO do aperto
+        // ── LÓGICA DE DEBOUNCE PARA PREVENIR DUPLO CLIQUE SENDO LIDO COMO 2 CLIQUES ──
+        let clickTimeout = null;
+
         document.addEventListener('mousedown', (e) => { 
-            if (e.button === 0) {
-                processarEvento(e.target, 'clique'); 
-            } else if (e.button === 2) {
+            // O botão direito (2) é acionado instantaneamente
+            if (e.button === 2) {
                 processarEvento(e.target, 'clique_direito');
+                return;
+            }
+            
+            // O botão esquerdo (0) usa debounce para aguardar um possível duplo clique
+            if (e.button === 0) {
+                if (clickTimeout !== null) {
+                    clearTimeout(clickTimeout);
+                    clickTimeout = null;
+                    return; // Aborta o clique simples, o dblclick vai assumir
+                }
+                
+                clickTimeout = setTimeout(() => {
+                    processarEvento(e.target, 'clique');
+                    clickTimeout = null;
+                }, 250); // Aguarda 250ms
             }
         }, true);
         
+        document.addEventListener('dblclick', (e) => {
+            // Mata o timer do clique simples para não registrar duplicado
+            clearTimeout(clickTimeout); 
+            clickTimeout = null;
+            processarEvento(e.target, 'duplo_clique');
+        }, true);
+
         // Mantém o enter e blur originais para digitação
         let ultimoEnterTarget = null, ultimoEnterTime = 0;
         document.addEventListener('keydown', (e) => { 
@@ -277,7 +303,6 @@ async def on_capturar_elemento(source, args):
             frame = source.get("frame")
             if frame:
                 page_ref = frame.page
-                # Print em JPEG com qualidade 80 para garantir boa visibilidade no SCORM
                 screenshot_bytes = await page_ref.screenshot(type="jpeg", quality=80, full_page=False)
                 screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
                 vp = await page_ref.evaluate("() => ({w: window.innerWidth, h: window.innerHeight})")
@@ -421,7 +446,8 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
             roteiro_final["passos"].append(passo_mesclado)
 
         os.makedirs("roteiros_salvos", exist_ok=True)
-        nome_arquivo_base = re.sub(r'[\\/*?:"<>|]', "", nome_aula).replace(" ", "_")
+        # Usa a função de higienização oficial para garantir compatibilidade
+        nome_arquivo_base = limpar_nome(nome_aula)
         caminho_roteiro = os.path.join("roteiros_salvos", f"{nome_arquivo_base}.json")
 
         with open(caminho_roteiro, 'w', encoding='utf-8') as f: 
