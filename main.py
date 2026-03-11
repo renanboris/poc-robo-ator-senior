@@ -386,6 +386,16 @@ async def executar_roteiro(caminho_json: str) -> None:
     global _audio_manifest
     _audio_manifest.clear()
 
+    # 🧹 LIMPEZA DE CACHE: Apaga os áudios antigos para forçar a regravação com o novo texto
+    import shutil
+    pasta_audio_cache = os.path.join("audios_gerados", nome_arquivo_base)
+    if os.path.exists(pasta_audio_cache):
+        try:
+            shutil.rmtree(pasta_audio_cache)
+        except Exception as e:
+            logging.warning(f"Não foi possível limpar o cache de áudio: {e}")
+    os.makedirs(pasta_audio_cache, exist_ok=True)
+
     # Trilha sonora de fundo
     if os.path.exists("trilha.mp3"):
         pygame.mixer.music.load("trilha.mp3")
@@ -432,7 +442,7 @@ async def executar_roteiro(caminho_json: str) -> None:
             await page.keyboard.press("Enter")
 
             await page.wait_for_load_state("load")
-            await asyncio.sleep(6.0)
+            await asyncio.sleep(8.0)
             await page.keyboard.press("Escape")
             await asyncio.sleep(0.3)
             await page.keyboard.press("Escape")
@@ -451,7 +461,7 @@ async def executar_roteiro(caminho_json: str) -> None:
                 id_p = passo.get("id_passo", idx + 1)
                 
                 # 🧠 APLICAÇÃO DO COGNITIVE LOAD TIERING
-                pausa_inteligente = float(passo.get("pause_sugerida", 3.5))
+                pausa_inteligente = float(passo.get("pause_sugerida", 1.5))
 
                 await atualizar_progress_bar(page, idx + 1, total_passos, nome_aula_raw)
 

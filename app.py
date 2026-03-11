@@ -3,7 +3,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Streamin
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 import uvicorn
 import os
 import json
@@ -14,6 +15,7 @@ import asyncio
 import re
 import sqlite3
 import uuid
+import logging
 
 # 🟢 Importa o motor de inteligência do DAP (Aura)
 import dap_engine
@@ -62,15 +64,7 @@ app.mount("/videos", StaticFiles(directory=VIDEOS_DIR), name="videos")
 estado_servidor = {
     "ocupado": False, 
     "mensagem": "", 
-    "erro": "", 
-    "sucesso": ""
-}
-processo_atual = None
-
-estado_servidor = {
-    "ocupado": False, 
-    "mensagem": "", 
-    "progresso": None, # 🟢 NOVO CAMPO: Se for None, a barra fica "vai e vem"
+    "progresso": None, 
     "erro": "", 
     "sucesso": ""
 }
@@ -96,7 +90,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
             text=True, 
             encoding='utf-8', 
             errors='replace', 
-            bufsize=1, # 🟢 Faz a leitura linha a linha (Real-Time)
+            bufsize=1, # Leitura linha a linha (Real-Time)
             env=env_vars
         )
         
@@ -107,7 +101,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
             if linha_limpa:
                 linhas_log.append(linha_limpa)
                 
-                # 🟢 Captura a porcentagem enviada pelo nosso CustomRenderLogger
+                # 🟢 Captura a porcentagem enviada pelo CustomRenderLogger
                 if "PROGRESSO:" in linha_limpa:
                     try:
                         pct = int(linha_limpa.split("PROGRESSO:")[1].strip())
@@ -126,7 +120,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
                     break
                     
             if processo_atual.returncode < 0 or "KeyboardInterrupt" in "".join(linhas_log):
-                estado_servidor["erro"] = "Execução interrompida pelo usuário."
+                estado_servidor["erro"] = "Execução interrompida pelo utilizador."
             else:
                 estado_servidor["erro"] = f"Falha: {erro_real}"
         else:
@@ -140,8 +134,55 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
         processo_atual = None
 
 # ==============================================================
-# 🚀 MODELOS DE DADOS
+# 🚀 MODELOS DE DADOS (CONTRATOS PYDANTIC)
 # ==============================================================
+
+# Definições robustas para garantir que o JSON do roteiro nunca quebre
+class ElementoAlvo(BaseModel):
+    descricao_visual: Optional[str] = ""
+    contexto_tela: Optional[str] = ""
+    tipo_elemento: Optional[str] = "button"
+    confianca_captura: Optional[str] = "media"
+    label_curto: Optional[str] = ""
+    coordenadas_relativas: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    seletor_hint: Optional[str] = ""
+    iframe_hint: Optional[str] = None
+    html_hint: Optional[str] = ""
+    screenshot_referencia: Optional[str] = None
+
+class AcaoTecnica(BaseModel):
+    acao: str
+    intencao_semantica: Optional[str] = ""
+    elemento_alvo: Optional[ElementoAlvo] = Field(default_factory=ElementoAlvo)
+    valor_input: Optional[str] = ""
+    micro_narracao: Optional[str] = ""
+    seletor_css: Optional[str] = ""
+
+class Pedagogia(BaseModel):
+    ancora: Optional[str] = ""
+    tooltip_dap: Optional[str] = ""
+
+class PassoRoteiro(BaseModel):
+    id_passo: int
+    tipo_passo: Optional[str] = "operacao"
+    peso_narrativo: Optional[int] = 2
+    pause_sugerida: Optional[float] = 2.5
+    pedagogia: Optional[Pedagogia] = Field(default_factory=Pedagogia)
+    alerta_instrutor: Optional[str] = None
+    is_conclusao: Optional[bool] = False
+    acoes_tecnicas: Optional[List[AcaoTecnica]] = Field(default_factory=list)
+
+class ConfiguracaoGravacao(BaseModel):
+    gravar_video: bool = True
+    pasta_destino: str = "videos_gerados"
+    voz_ia: str = "pt-BR-FranciscaNeural"
+
+class RoteiroBase(BaseModel):
+    metadata: Dict[str, Any]
+    configuracao_gravacao: Optional[ConfiguracaoGravacao] = None
+    passos: List[PassoRoteiro]
+
+# Modelos de requisição simples
 class NovaAulaReq(BaseModel):
     nome_aula: str
     objetivo: str
@@ -195,11 +236,24 @@ async def get_status():
 
 @app.get("/api/status-stream")
 async def status_stream(request: Request):
+    """
+    Mantém uma ligação em tempo real (SSE) com o front-end.
+    🟢 MATADOR DE ZUMBIS: Se detetar que o utilizador fechou a janela, 
+    cancela o processo automaticamente.
+    """
     async def event_generator():
+        global processo_atual
         last_state = None
         while True:
             if await request.is_disconnected():
+                logging.info("🔌 Usuário desconectado! Verificando processos zumbis...")
+                if processo_atual and processo_atual.poll() is None:
+                    logging.warning("🧟 Janela fechada! Aniquilando processo zumbi...")
+                    processo_atual.terminate()
+                    estado_servidor["ocupado"] = False
+                    estado_servidor["erro"] = "Cancelado: Ligação com o navegador perdida."
                 break
+                
             current_state = estado_servidor.copy()
             if current_state != last_state:
                 yield f"data: {json.dumps(current_state)}\n\n"
@@ -242,7 +296,7 @@ async def listar_roteiros():
                 tem_video = os.path.exists(os.path.join(VIDEOS_DIR, f"{nome_arquivo_base}.mp4"))
                 tem_scorm = os.path.exists(os.path.join(SCORM_DIR, f"{nome_arquivo_base}_SCORM.zip"))
                 tem_pdf = os.path.exists(os.path.join(PDF_DIR, f"{nome_arquivo_base}_Playbook.pdf"))
-                tem_coach = dados.get("metadata", {}).get("ingestado_dap", False) # 👈 Adiciona isso
+                tem_coach = dados.get("metadata", {}).get("ingestado_dap", False)
                 
                 roteiros.append({
                     "arquivo": arquivo, 
@@ -253,7 +307,7 @@ async def listar_roteiros():
                     "tem_video": tem_video,
                     "tem_scorm": tem_scorm,
                     "tem_pdf": tem_pdf,
-                    "tem_coach": tem_coach, # 👈 Adiciona isso aqui também
+                    "tem_coach": tem_coach,
                     "video_url": f"/videos/{nome_arquivo_base}.mp4" if tem_video else None,
                     "scorm_url": f"/api/download-scorm/{nome_arquivo_base}" if tem_scorm else None,
                     "pdf_url": f"/api/download-pdf/{nome_arquivo_base}" if tem_pdf else None
@@ -273,8 +327,12 @@ async def get_roteiro(arquivo: str):
         return JSONResponse(status_code=404, content={"erro": "Arquivo não encontrado"})
 
 @app.post("/api/roteiros/{arquivo}")
-async def salvar_roteiro(arquivo: str, request: Request):
-    dados = await request.json()
+async def salvar_roteiro(arquivo: str, roteiro: RoteiroBase):
+    """
+    🟢 Rota com tipagem estrita via Pydantic. 
+    Garante que o JSON está perfeitamente formatado antes de escrever no disco.
+    """
+    dados = roteiro.model_dump() if hasattr(roteiro, "model_dump") else roteiro.dict()
     with open(os.path.join(ROTEIROS_DIR, arquivo), 'w', encoding='utf-8') as f: 
         json.dump(dados, f, indent=2, ensure_ascii=False)
     return {"status": "sucesso"}
@@ -293,7 +351,7 @@ async def gravar_aula(req: NovaAulaReq):
         return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
         
     comando = [sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"]
-    threading.Thread(target=executar_processo_bg, args=(comando, "Mapeando a tela no Senior X...", "✅ Mapeamento salvo com sucesso.")).start()
+    threading.Thread(target=executar_processo_bg, args=(comando, "Mapeando a Tela no Senior X...", "✅ Mapeamento guardado com sucesso.")).start()
     return {"status": "iniciado"}
 
 @app.post("/api/executar-robo/{arquivo}")
@@ -439,7 +497,7 @@ async def renomear_roteiro(arquivo: str, req: RenomearReq):
 async def analyze_screen(req: DapRequest):
     """
     Recebe a imagem da tela e o contexto da Extensão Chrome (Aura)
-    e invoca a IA para orientar o usuário em tempo real.
+    e invoca a IA para orientar o utilizador em tempo real.
     """
     resultado = await dap_engine.analisar_tela_dap(req.image, req.url, req.prompt)
     return resultado
@@ -459,7 +517,6 @@ async def ingestar_no_dap(arquivo: str):
         
     res = dap_engine.ingestar_para_pinecone(dados)
     
-    # 👇 A MÁGICA: Anota no JSON que a Aura já aprendeu essa aula
     if "metadata" not in dados:
         dados["metadata"] = {}
     dados["metadata"]["ingestado_dap"] = True
@@ -472,6 +529,6 @@ async def ingestar_no_dap(arquivo: str):
 if __name__ == "__main__":
     print("\n" + "="*50)
     print("🚀 SENIOR TRAINING OS INICIADO")
-    print("👉 Acesse no navegador: http://localhost:8000")
+    print("👉 Aceda no navegador: http://localhost:8000")
     print("="*50 + "\n")
     uvicorn.run("app:app", host="0.0.0.0", port=8000)

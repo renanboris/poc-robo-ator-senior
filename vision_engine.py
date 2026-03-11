@@ -34,7 +34,7 @@ from playwright.async_api import Page
 load_dotenv()
 
 logger = logging.getLogger(__name__)
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+gemini_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # ──────────────────────────────────────────────────────────────
 # 🧠 O "BRAIN" - MEMÓRIA DE LONGO PRAZO (SQLITE)

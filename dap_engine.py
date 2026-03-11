@@ -1,122 +1,149 @@
 import os
 import json
-from google import genai
-from google.genai import types
-from pinecone import Pinecone
+import base64
+import logging
+import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuração de APIs
-api_key = os.getenv("GEMINI_API_KEY")
-pinecone_key = os.getenv("PINECONE_API_KEY")
+from pinecone import Pinecone
+from openai import OpenAI
+from google import genai
+from google.genai import types
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("aura_engine")
+
+# =========================================================
+# CONFIGURAÇÃO
+# =========================================================
+OPENAI_EMBED_MODEL = "text-embedding-3-large" 
+GEMINI_LLM_MODEL = "gemini-2.5-flash"
+TARGET_DIM = 3072
+TOP_K = 5
+SCORE_THRESHOLD = 0.45 
+
+# =========================================================
+# CLIENTES
+# =========================================================
+client_openai = None
 gemini_client = None
-if api_key:
-    gemini_client = genai.Client(api_key=api_key)
+pinecone_index = None
 
-# ─── FUNÇÃO 1: INGESTAR CONHECIMENTO (DO ROTEIRO PARA O PINECONE) ───
-def ingestar_para_pinecone(dados_roteiro: dict):
-    if not pinecone_key: return {"status": "ignorado", "motivo": "Sem chave Pinecone"}
-    
-    metadata = dados_roteiro.get("metadata", {})
-    nome_aula = metadata.get("nome_aula", "Treinamento")
-    
-    # Extrai todo o texto útil do roteiro para criar o "Manual" da IA
-    textos = []
-    for passo in dados_roteiro.get("passos", []):
-        textos.append(passo.get("pedagogia", {}).get("ancora", ""))
-        for acao in passo.get("acoes_tecnicas", []):
-            textos.append(acao.get("intencao_semantica", ""))
-            textos.append(acao.get("micro_narracao", ""))
-            
-    textos = [t for t in textos if t.strip()]
-    if not textos: return {"status": "vazio"}
+try:
+    oa_key = os.getenv("OPENAI_API_KEY")
+    if oa_key:
+        client_openai = OpenAI(api_key=oa_key)
+        logger.info("OpenAI Conectada (Memória Estável)")
+        
+    g_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if g_key:
+        gemini_client = genai.Client(api_key=g_key)
+        logger.info("Gemini Engine Pronto (Visão Computacional)")
+        
+    pc_key = os.getenv("PINECONE_API_KEY")
+    idx_name = os.getenv("PINECONE_INDEX_NAME")
+    if pc_key and idx_name:
+        pc = Pinecone(api_key=pc_key)
+        pinecone_index = pc.Index(idx_name)
+except Exception as e:
+    logger.error(f"Erro na inicialização: {e}")
 
-    # Junta o texto em blocos de contexto e envia pro Pinecone (RAG)
+# =========================================================
+# MEMÓRIA VETORIAL (OPENAI)
+# =========================================================
+
+def gerar_embedding(texto: str):
     try:
-        pc = Pinecone(api_key=pinecone_key)
-        index = pc.Index(os.getenv("PINECONE_INDEX_NAME", "senior-dap"))
-        
-        texto_completo = " | ".join(textos)
-        
-        # Usa o modelo de embedding mais recente
-        resposta_embed = gemini_client.models.embed_content(
-            model="text-embedding-004", 
-            contents=[texto_completo]
+        response = client_openai.embeddings.create(
+            input=texto,
+            model=OPENAI_EMBED_MODEL,
+            dimensions=TARGET_DIM
         )
-        vetor = resposta_embed.embeddings[0].values
-        
-        index.upsert(vectors=[{
-            "id": f"dap_{nome_aula.replace(' ', '_')}",
-            "values": vetor,
-            "metadata": {"source": nome_aula, "text": texto_completo}
-        }])
-        return {"status": "sucesso", "indexado": nome_aula}
+        return response.data[0].embedding
     except Exception as e:
-        print(f"Erro no Pinecone Ingest: {e}")
-        return {"status": "erro", "detalhe": str(e)}
+        logger.error(f"Erro Embedding: {e}")
+        raise e
 
-# ─── FUNÇÃO 2: ANALISAR A TELA (RESPONDER PARA A EXTENSÃO) ───
-async def analisar_tela_dap(image_b64: str, url: str, prompt_usuario: str):
-    # 1. Busca contexto no Pinecone (se existir)
-    contexto = ""
+def buscar_contexto(prompt_usuario: str):
+    if not pinecone_index or not client_openai: return None
     try:
-        if pinecone_key:
-            pc = Pinecone(api_key=pinecone_key)
-            index = pc.Index(os.getenv("PINECONE_INDEX_NAME", "senior-dap"))
-            
-            resposta_embed = gemini_client.models.embed_content(
-                model="text-embedding-004", 
-                contents=[prompt_usuario]
-            )
-            vetor_busca = resposta_embed.embeddings[0].values
-            
-            resultados = index.query(vector=vetor_busca, top_k=2, include_metadata=True)
-            contexto = " ".join([m['metadata'].get('text', '') for m in resultados['matches'] if 'metadata' in m])
+        query_embedding = gerar_embedding(prompt_usuario)
+        resultados = pinecone_index.query(
+            vector=query_embedding,
+            top_k=TOP_K,
+            include_metadata=True
+        )
+        contextos = []
+        for match in resultados.matches:
+            if match.score < SCORE_THRESHOLD: continue
+            md = match.metadata
+            contextos.append(f"MANUAL TÉCNICO: {md.get('aula')}\nCONDIÇÃO: {md.get('texto')}\nDICA AURA: {md.get('tooltip')}")
+        return "\n\n---\n\n".join(contextos) if contextos else None
     except Exception as e:
-        print(f"Aviso Pinecone (Busca): {e}")
+        logger.error(f"Erro RAG: {e}")
+        return None
 
-    # 2. Monta o Prompt com a estrutura exata que a extensão precisa (Holofote + Upsell)
-    prompt_sistema = f"""Você é a Aura, um AI Coach atuando dentro do sistema Senior X.
-O usuário está na URL: {url}
-A dúvida dele é: '{prompt_usuario}'
-Contexto da base de conhecimento (RAG): {contexto}
+# =========================================================
+# CÉREBRO DA AURA (GEMINI VISION)
+# =========================================================
 
-REGRAS DE NEGÓCIO (MÉTODO PRENDE-E-PUXA):
-1. Dê a instrução exata do próximo clique que o usuário deve dar.
-2. OBRIGATÓRIO: Termine o campo 'advice' SEMPRE com um Call-to-Action (CTA) convidando o usuário para a Universidade Corporativa Senior (UCS). 
-Exemplo de finalização: "... Para dominar este módulo e garantir sua Badge, acesse a trilha oficial na UCS!"
+def _analisar_sync(image_b64: str, url: str, prompt_usuario: str):
+    # Recupera o que foi ensinado no Training OS
+    contexto_rag = buscar_contexto(prompt_usuario) or "Utiliza apenas a tua visão e inteligência nativa para ajudar."
 
-Você deve analisar a imagem da tela e responder EXATAMENTE em formato JSON.
+    try:
+        if "," in image_b64:
+            image_b64 = image_b64.split(",")[1]
+        image_bytes = base64.b64decode(image_b64)
+
+        # 🟢 PROMPT NUCLEAR: Define identidade, proíbe o "Pronto" e força o pensamento
+        prompt_sistema = f"""Você é a Aura, a assistente virtual e guia oficial da Senior Sistemas.
+Você está a conversar com o Renan. A sua missão é ser uma mentora técnica presente e amigável.
+
+PERSONALIDADE:
+- Moderna, ágil, profissional e muito prestativa.
+- NUNCA use saudações datadas ou informais como "Tudo joia".
+- É ESTRITAMENTE PROIBIDO responder apenas "Pronto!", "Ok" ou frases com menos de 15 palavras.
+
+CONHECIMENTO RECUPERADO (Base de Treinamentos):
+{contexto_rag}
+
+INSTRUÇÕES DE RESPOSTA:
+1. Comece sempre por analisar internamente o que o Renan precisa (no campo 'analise_interna').
+2. Na 'mensagem', forneça uma orientação completa. Se precisar clicar em algo, descreva a posição (ex: "no menu lateral esquerdo", "no ícone de engrenagem no topo").
+3. Se for uma saudação, apresente-se como Aura e diga que está pronta para navegar no Senior X.
+
+RETORNE OBRIGATORIAMENTE ESTE JSON:
 {{
-  "advice": "Instrução curta + CTA para a UCS.",
-  "action": "highlight",
-  "selector": "O seletor CSS (ex: button[aria-label='Salvar'], #btn-novo) do elemento que ele deve clicar. Deixe vazio se não houver um clique claro.",
-  "next_step": true
+  "analise_interna": "Pense aqui primeiro: O que estou a ver na tela? O que o Renan pediu? Como o manual ajuda?",
+  "mensagem": "Sua resposta final amigável, instrutiva e completa para o Renan (mínimo de 2 frases).",
+  "coordenadas": null
 }}"""
 
-    # 3. Chama o Gemini Vision
-    try:
-        import base64
-        image_bytes = base64.b64decode(image_b64.split(",")[1] if "," in image_b64 else image_b64)
-        
         resposta = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=GEMINI_LLM_MODEL,
             contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type="image/png"), 
-                prompt_sistema
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                f"URL: {url}\nRenan pergunta: {prompt_usuario}"
             ],
             config=types.GenerateContentConfig(
-                response_mime_type="application/json", 
-                temperature=0.1
+                system_instruction=prompt_sistema,
+                response_mime_type="application/json",
+                temperature=0.7 # 🟢 Aumentado para maior naturalidade e criatividade
             )
         )
-        return json.loads(resposta.text)
+
+        # Extraímos apenas o campo 'mensagem' para o frontend
+        dados = json.loads(resposta.text)
+        return {"mensagem": dados.get("mensagem", "Olá, Renan! Como posso ajudar?"), "coordenadas": None}
+
     except Exception as e:
-        print(f"Erro Gemini: {e}")
-        return {
-            "advice": "Desculpe, tive um problema de visão e não consegui analisar a tela. 🤕",
-            "action": "none",
-            "selector": ""
-        }
+        logger.error(f"Erro Vision: {e}")
+        return {"mensagem": "Olá, Renan! Tive um pequeno problema ao processar a tua imagem. Podes descrever o que precisas?", "coordenadas": None}
+
+async def analisar_tela_dap(image_b64: str, url: str, prompt_usuario: str):
+    if not gemini_client or not client_openai:
+        return {"mensagem": "Motores de IA desconectados.", "coordenadas": None}
+    return await asyncio.to_thread(_analisar_sync, image_b64, url, prompt_usuario)

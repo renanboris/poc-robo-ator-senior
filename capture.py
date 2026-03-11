@@ -16,7 +16,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+gemini_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 cliques_capturados = []
 _id_acao_global = 0
 _lock_id = None 

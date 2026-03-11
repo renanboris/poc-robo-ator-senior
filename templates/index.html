@@ -1139,9 +1139,15 @@ html.light .theme-opt.active {
 
 <div id="loading-overlay">
   <div class="loader-ring"></div>
-  <div class="loader-title">Processando<span id="loader-pct" style="color: var(--cyan); margin-left: 8px; font-family: var(--font-mono);"></span></div>
+  
+  <div class="loader-title" style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+    <span>Processando</span>
+    <span id="loader-pct" style="color: var(--cyan); font-family: var(--font-mono); font-size: 28px; min-height: 28px;"></span>
+  </div>
+  
   <div class="loader-msg" id="loading-msg">Aguarde enquanto o sistema executa a operação.</div>
   <div class="loader-progress"><div class="loader-progress-fill"></div></div>
+  
   <button class="btn btn-ghost" onclick="cancelarProcesso()" style="pointer-events:auto">
     ✕ &nbsp;Interromper
   </button>

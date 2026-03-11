@@ -1,34 +1,36 @@
-# Ambientes Virtuais (Não queremos subir isso, é muito pesado)
+# Ambientes Virtuais Python
 venv/
 env/
-
-# Variáveis de Ambiente e Senhas (CRÍTICO: Nunca subir o .env)
 .env
 
-# Scripts de teste locais com dados sensíveis
-teste_api*
-
-# Arquivos temporários do Python
+# Arquivos compilados e cache do Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
 
-# Sessão do Navegador do Playwright (Onde ficam seus cookies de login)
-sessao_chrome_senior/
+# 🔴 DADOS SENSÍVEIS E MEMÓRIA DO ROBÔ (NÃO COMMITAR!)
+brain.db
+brain.db-journal
 
-# Arquivos do VS Code (Opcional, mas mantém o repositório limpo)
-.vscode/
-
-# Vídeos e Prints gravados pelo Playwright e MoviePy
-test-results/
-videos/
-*.mp4
-*.webm
-*.png
-
-# Arquivos de Mídia e Pós-Produção do Training OS
+# 🔴 ARTEFATOS DE RUNTIME E PRODUÇÃO (O lixo gerado pelos testes)
+roteiros_salvos/
+audios_gerados/
 videos_gerados/
 videos_prontos/
-audios_gerados/
-roteiro.json
+scorm_exports/
+documentacao_pdf/
+
+# Tipos de arquivos de mídia e logs
+*.mp4
+*.webm
+*.mp3
+*.wav
+*.zip
+*.pdf
+*.log
+
+# Arquivos temporários do OS
+.DS_Store
+Thumbs.db

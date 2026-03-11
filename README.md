@@ -1,26 +1,75 @@
-# 🎓 Senior Sistemas - Training OS (Auto Training Generator)
+# 🎓 Senior Training OS & Aura DAP
 
-Um motor avançado de Inteligência Artificial para a Universidade Corporativa da Senior Sistemas. 
-Este sistema transforma o conhecimento tácito de um instrutor em treinamentos corporativos completos (Vídeo, Áudio, Legendas e JSON Universal para DAP) de forma 100% automatizada.
+**Um ecossistema completo de autoria de treinamentos corporativos guiado por Inteligência Artificial, construído nativamente para o Senior X.**
 
+---
 
+## 🚀 A Revolução na Criação de Conhecimento
 
-## 🚀 Como Funciona (A Arquitetura)
+Criar treinamentos de software tradicionais é um processo exaustivo. Gravar a tela, editar vídeos, roteirizar, narrar, exportar para LMS e documentar em PDF costuma levar cerca de **6 horas para cada aula de 5 minutos**. Pior ainda: quando a interface do sistema atualiza, todo esse material é perdido.
 
-O **Training OS** foi construído com a filosofia de *Self-Documenting Software* e está dividido em 4 módulos principais:
+O **Senior Training OS** inova ao inverter essa lógica. Você não "edita" um treinamento; você **ensina a máquina uma única vez**. 
 
-1. **Capture Engine (O Mapeador):** Usa Playwright e um Radar JS injetado ("Raio-X") para capturar cliques, inputs e interações do instrutor no Senior X, contornando elementos invisíveis e IDs dinâmicos.
-2. **Intent Engine (Aura IA + Pinecone RAG):** O motor de Design Instrucional. Analisa o log bruto, consulta a documentação técnica da Senior num Banco Vetorial (Pinecone) e agrupa ações num **Universal Lesson JSON**.
-3. **Playback Engine (Estúdio ao Vivo):** Recria as ações no navegador aplicando um "Holofote" corporativo (`#009999`), injeta legendas nativas no HTML e toca a narração gerada (Edge-TTS + Pygame) em tempo real.
-4. **Render Engine (Ilha de Edição):** Usa o MoviePy para aplicar a tesoura (cortar tempo de login), aplicar a moldura (`overlay.png`), mixar trilha sonora (`trilha.mp3`) e concatenar o Lottie final (`outro.mp4`).
+**⏱️ O Benchmark:** De **6 horas** de trabalho manual para **15 minutos** de processamento automatizado.
 
-## 🛠️ Configuração do Ambiente (Setup)
+### 🎯 Os 4 Pilares de Saída (Outputs)
+A partir de um único mapeamento feito pelo Especialista, o sistema gera automaticamente:
+1. **🎬 Vídeo Narrado (MP4):** Captura em alta fidelidade com cursor humanizado e narração neural (TTS) perfeitamente sincronizada com o *Cognitive Load Tiering*.
+2. **🕹️ Simulador SCORM (ZIP):** Um player interativo HTML/JS com navegação livre, permitindo que o usuário "clique" na tela simulada antes de usar o sistema real.
+3. **📔 Digital Playbook (PDF):** Documentação técnica formatada como E-book, contendo os *screenshots*, as áreas de clique mapeadas e o passo a passo escrito.
+4. **🤖 Coach IA / DAP (Pinecone RAG):** O mesmo roteiro que gera os vídeos alimenta o banco vetorial da **Aura**. Quando o usuário acessa o Senior X e tem dúvidas, a extensão da Aura injeta *tooltips* e dicas visuais na tela em tempo real.
 
-### Pré-requisitos
-- Python 3.10+ instalado.
-- Chaves de API do Google Gemini (`google-genai`) e Pinecone.
+---
 
-### Instalação Passo a Passo
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/renanboris/poc-robo-ator-senior.git
+## 🧠 Arquitetura do Sistema (Engines Independentes)
+
+A separação de responsabilidades permite que o sistema escale sem gargalos:
+
+```text
+[ Especialista usa o Senior X ] ──> [ capture.py ] ──> (Log Técnico de Intenções)
+                                          │
+                                          ▼
+                                 [ Aura (Gemini) ] ──> (Roteiro Pedagógico JSON)
+                                          │
+       ┌──────────────────────┬───────────┴─────────┬─────────────────────┐
+       ▼                      ▼                     ▼                     ▼
+  [ main.py ]         [ scorm_builder.py ]  [ pdf_builder.py ]    [ dap_engine.py ]
+ (Vídeo & Áudio)      (Simulador SCORM)     (E-book PDF)         (Pinecone Vetorial)
+       │                      │                     │                     │
+       ▼                      ▼                     ▼                     ▼
+ [ Render MP4 ]         [ LMS Export ]        [ Confluence ]       [ Aura Extension ]
+
+ ⚙️ Módulos Principais
+app.py: O coração do sistema. Backend FastAPI assíncrono que serve o Dashboard Web, faz a gestão de concorrência e o ciclo de vida dos processos (com proteção Anti-Zombie).
+
+capture.py: O "Olho". Injeta um radar DOM no navegador para capturar coordenadas exatas, metadados HTML e screenshots da ação do usuário.
+
+vision_engine.py: O "Localizador". Utiliza estratégias de Self-Healing com 6 camadas de fallback (Selectors > Aria > Text > Gemini Vision) para garantir que o robô encontre o botão mesmo que o frontend do Senior X sofra alterações.
+
+cursor_engine.py: O "Ator". Aplica matemática de curvas de Bézier Cúbicas para simular o movimento humano do rato (Overshoot, Jitter, Desvio), impedindo que o vídeo pareça mecânico.
+
+Aura Prompt: O "Designer Instrucional". Aplica a teoria de aprendizagem Cognitive Load Tiering (Sweller, 1988). A inteligência decide o "peso" de cada ação (1, 2 ou 3) e calibra o nível de detalhes narrados e o tempo de pausa do robô automaticamente.
+
+🛡️ Segurança e Resiliência (Enterprise-Grade)
+Desenvolvido para ambientes corporativos, o Training OS inclui:
+
+Zero-Touch Self-Healing: O banco de dados local (brain.db) constrói uma "memória muscular" da interface. Se um botão mudar de XPath, a IA visualiza o novo ecrã e corrige o clique automaticamente, registrando a correção para o futuro.
+
+Contratos Pydantic Estritos: Cada passo, intenção e coordenada é rigorosamente validado antes de ser persistido.
+
+Higiene de Dados: Nenhuma credencial ou base local é commitada no repositório. O conhecimento vetorial fica segregado e seguro no Pinecone corporativo.
+
+🛠️ Como Iniciar
+Instalação das Dependências:
+
+Bash
+pip install -r requirements.txt
+playwright install
+Configuração de Variáveis (.env):
+Configure as chaves da API (Gemini, Pinecone) e credenciais de acesso padrão no ficheiro .env.
+
+Iniciar o Training OS:
+
+Bash
+python app.py
+Acesse o Dashboard interativo em http://localhost:8000.
