@@ -1,0 +1,91 @@
+# =========================
+# Build results
+# =========================
+bin/
+obj/
+
+# =========================
+# Visual Studio / VS Code
+# =========================
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# =========================
+# Rider / JetBrains
+# =========================
+.idea/
+*.sln.iml
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+secrets.json
+
+# =========================
+# Test results
+# =========================
+TestResults/
+coverage/
+coverage.*
+
+# =========================
+# NuGet
+# =========================
+*.nupkg
+.nuget/
+
+# =========================
+# ASP.NET Core
+# =========================
+appsettings.Development.json
+appsettings.Production.json
+
+# =========================
+# Publish / Artifacts
+# =========================
+publish/
+artifacts/
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# =========================
+# Node (se tiver frontend)
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Docker
+# =========================
+docker-compose.override.yml
+
+# =========================
+# Coverage tools
+# =========================
+*.coverage
+*.coveragexml

@@ -1,0 +1,175 @@
+/* style.css - Aura Senior Success Hub */
+/* Todos os estilos usam !important para blindagem contra o CSS do Senior X */
+
+/* ─── Container principal ─── */
+#aura-floating-container {
+    position: fixed !important;
+    bottom: 50px !important;
+    right: 50px !important;
+    width: 200px !important;
+    height: 200px !important;
+    z-index: 2147483647 !important;
+    cursor: grab !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    user-select: none !important;
+}
+
+#aura-floating-container:active {
+    cursor: grabbing !important;
+}
+
+/* ─── Player Lottie ─── */
+#aura-lottie-player {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+}
+
+/* ─── Balão de fala ─── */
+/* ─── Balão de fala ─── */
+#aura-speech-bubble {
+    display: none !important;
+    position: absolute !important;
+    bottom: 80% !important; /* 🟢 Abaixamos o balão (era 110%) */
+    right: 15px !important; /* 🟢 Centralizamos melhor */
+    width: 280px !important;
+    background-color: #ffffff !important;
+    border: 2px solid #00ddb3 !important;
+    border-radius: 16px !important;
+    padding: 16px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    color: #1f2937 !important;
+    cursor: default !important;
+}
+
+#aura-speech-bubble.active {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    animation: aura-pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+}
+
+@keyframes aura-pop-in {
+    0%   { opacity: 0; transform: scale(0.9) translateY(10px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Seta do balão */
+#aura-speech-bubble::after {
+    content: '' !important;
+    position: absolute !important;
+    bottom: -10px !important;
+    right: 35px !important; /* 🟢 Alinhamos a seta direto pra cabeça dela */
+    border-width: 10px 10px 0 !important;
+    border-style: solid !important;
+    border-color: #00ddb3 transparent transparent transparent !important;
+    display: block !important;
+    width: 0 !important;
+}
+
+/* ─── Input e Textos ─── */
+.aura-text {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    margin: 0 !important;
+    font-weight: 500 !important;
+}
+
+.aura-input-wrapper {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 4px !important;
+}
+
+#aura-prompt-input {
+    flex: 1 !important;
+    padding: 8px 12px !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 20px !important;
+    font-size: 12px !important;
+    font-family: inherit !important;
+    outline: none !important;
+    transition: all 0.2s !important;
+    background: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+#aura-prompt-input:focus {
+    border-color: #00ddb3 !important;
+    box-shadow: 0 0 0 3px rgba(0,221,179,0.12) !important;
+}
+
+.aura-btn-send {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    background-color: #00ddb3 !important;
+    color: #ffffff !important;
+    border: none !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    transition: transform 0.1s ease !important;
+}
+.aura-btn-send:hover { transform: scale(1.05) !important; }
+
+/* ─── Botões de opção (Antigos) ─── */
+.aura-options {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    justify-content: flex-start !important;
+}
+
+.aura-btn {
+    background-color: #00ddb3 !important;
+    color: #ffffff !important;
+    border: none !important;
+    padding: 7px 14px !important;
+    border-radius: 20px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: background 0.15s ease, transform 0.1s ease !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
+    outline: none !important;
+}
+.aura-btn:hover { background-color: #00c49f !important; transform: translateY(-1px) !important; }
+
+/* ─── HUD SONAR NÉON (O Holofote) ─── */
+#aura-sonar-highlight {
+    position: fixed !important;
+    width: 56px !important; 
+    height: 56px !important;
+    border: 2px solid #00e5e5 !important;
+    border-radius: 50% !important;
+    z-index: 2147483647 !important;
+    pointer-events: none !important;
+    transform: translate(-50%, -50%) !important;
+    box-shadow: 0 0 20px rgba(0,229,229,0.6), inset 0 0 15px rgba(0,229,229,0.5) !important;
+    animation: aura-hud-pulse 1.5s infinite cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#aura-sonar-highlight::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important; left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 8px !important; height: 8px !important;
+    background: #ffffff !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 10px #ffffff, 0 0 20px #00e5e5 !important;
+}
+
+@keyframes aura-hud-pulse {
+    0% { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
