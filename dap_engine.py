@@ -37,31 +37,73 @@ TARGET_DIM          = 3072
 TOP_K               = 5
 SCORE_THRESHOLD     = 0.45
 
-# Cache Rápido com Segurança (Evita Memory Leak e Race Conditions)
-_CACHE_TTL_SEGUNDOS = 300   # 5 minutos por entrada
-_CACHE_MAX_TAMANHO  = 200   # descarta mais antigas ao atingir o limite
-_resposta_cache: dict[str, tuple[dict, float]] = {}   
+import sqlite3
+
+# =========================================================
+# CACHE PERSISTENTE (SQLite) - SPRINT 3
+# =========================================================
+_CACHE_TTL_SEGUNDOS = 2592000  # 30 DIAS (30 * 24 * 60 * 60)
+_CACHE_MAX_REGISTOS = 5000     # Limite de segurança de tamanho
+_DB_CACHE_FILE = "aura_cache.db"
 _cache_lock = threading.Lock()
 
+def _init_db_cache():
+    """Cria a tabela de cache no SQLite se não existir."""
+    with _cache_lock:
+        with sqlite3.connect(_DB_CACHE_FILE) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS dap_cache (
+                    cache_key TEXT PRIMARY KEY,
+                    resposta_json TEXT,
+                    timestamp REAL
+                )
+            """)
+            conn.commit()
+
+_init_db_cache()
+
+def _limpar_cache_antigo(conn):
+    """Limpeza Híbrida: Por tempo (30 dias) e por Tamanho (Máx 5000)."""
+    # 1. Limpa os que passaram de 30 dias
+    limite_tempo = time.time() - _CACHE_TTL_SEGUNDOS
+    conn.execute("DELETE FROM dap_cache WHERE timestamp < ?", (limite_tempo,))
+    
+    # 2. Limpa os mais antigos se ultrapassar 5.000 registos
+    conn.execute(f"""
+        DELETE FROM dap_cache 
+        WHERE cache_key NOT IN (
+            SELECT cache_key FROM dap_cache 
+            ORDER BY timestamp DESC 
+            LIMIT {_CACHE_MAX_REGISTOS}
+        )
+    """)
 
 def _cache_get(key: str) -> dict | None:
     with _cache_lock:
-        entry = _resposta_cache.get(key)
-        if not entry:
-            return None
-        resultado, ts = entry
-        if time.time() - ts > _CACHE_TTL_SEGUNDOS:
-            del _resposta_cache[key]
-            return None
-        return resultado
-
+        try:
+            with sqlite3.connect(_DB_CACHE_FILE) as conn:
+                _limpar_cache_antigo(conn)
+                cursor = conn.execute("SELECT resposta_json FROM dap_cache WHERE cache_key = ?", (key,))
+                row = cursor.fetchone()
+                if row:
+                    return json.loads(row[0])
+        except Exception as e:
+            logger.error(f"Erro ao ler cache SQLite: {e}")
+    return None
 
 def _cache_set(key: str, valor: dict) -> None:
     with _cache_lock:
-        if len(_resposta_cache) >= _CACHE_MAX_TAMANHO:
-            chave_mais_antiga = min(_resposta_cache, key=lambda k: _resposta_cache[k][1])
-            del _resposta_cache[chave_mais_antiga]
-        _resposta_cache[key] = (valor, time.time())
+        try:
+            with sqlite3.connect(_DB_CACHE_FILE) as conn:
+                resposta_str = json.dumps(valor, ensure_ascii=False)
+                agora = time.time()
+                conn.execute("""
+                    INSERT OR REPLACE INTO dap_cache (cache_key, resposta_json, timestamp)
+                    VALUES (?, ?, ?)
+                """, (key, resposta_str, agora))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Erro ao gravar cache SQLite: {e}")
 
 
 # =========================================================

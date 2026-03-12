@@ -1,11 +1,12 @@
-// content.js - Interface da Aura (Mundo MAIN) com Olho Biônico e Memória
-// Atualizações: Spotlight centralizado, Fallback Híbrido em Iframes, Histórico de Conversa (Contexto).
+// content.js - Interface da Aura (Mundo MAIN) com Olho Biônico, Memória e Typewriter
+// Atualizações: Spotlight centralizado, Fallback Híbrido, Histórico de Conversa e Efeito de Digitação.
 
 (function() {
     console.log("Aura: Iniciando interface...");
 
-    // 🟢 SPRINT 1: Memória de Curto Prazo (Janela deslizante)
+    // 🟢 SPRINT 1 & 3: Memória de Curto Prazo e Controlo de Digitação
     let historicoAura = [];
+    let auraTypingInterval = null;
 
     // 🟢 CAÇADORA DE NOMES DINÂMICA
     function descobrirNomeUsuario() {
@@ -109,7 +110,7 @@
             if (bubble.classList.contains('active')) {
                 bubble.classList.remove('active');
             } else {
-                exibirBalaoAura("Precisa de ajuda com esta tela?", []);
+                exibirBalaoAura("Precisa de ajuda com esta tela?", [], false);
             }
         });
 
@@ -169,25 +170,30 @@
                 historicoAura = []; 
                 
                 if (bubble.classList.contains('active')) {
-                    exibirBalaoAura(`Olá, ${descobrirNomeUsuario()}! Precisa de ajuda nesta nova tela?`, []);
+                    exibirBalaoAura(`Olá, ${descobrirNomeUsuario()}! Precisa de ajuda nesta nova tela?`, [], false);
                 }
             }, 300);
         });
         observerSPA.observe(document.body, { childList: true, subtree: true });
 
-        // 🟢 PRE-CAPTURE: Avisa o bridge para tirar screenshot em cache silenciosamente
+        // PRE-CAPTURE
         document.getElementById('aura-prompt-input').addEventListener('focus', () => {
             window.postMessage({ type: "AURA_PRE_CAPTURE" }, window.location.origin);
         });
     }
 
-    function exibirBalaoAura(texto, opcoes = []) {
+    // 🟢 SPRINT 3: MOTOR TYPEWRITER (Efeito Máquina de Escrever)
+    function exibirBalaoAura(texto, opcoes = [], efeitoDigitacao = true) {
         const bubble = document.getElementById('aura-speech-bubble');
         if (!bubble) return;
 
-        bubble.querySelector('.aura-text').innerText = texto;
+        const textEl = bubble.querySelector('.aura-text');
         const optDiv = bubble.querySelector('.aura-options');
+        
         optDiv.innerHTML = '';
+        optDiv.style.opacity = '0';
+        optDiv.style.transition = 'opacity 0.4s ease';
+        optDiv.style.pointerEvents = 'none';
 
         opcoes.forEach(opt => {
             const btn = document.createElement('button');
@@ -201,6 +207,28 @@
         });
 
         bubble.classList.add('active');
+
+        if (auraTypingInterval) clearInterval(auraTypingInterval);
+
+        if (efeitoDigitacao) {
+            textEl.innerHTML = ''; 
+            let i = 0;
+            // Velocidade da digitação: 25ms por letra
+            auraTypingInterval = setInterval(() => {
+                textEl.innerHTML += texto.charAt(i);
+                i++;
+                if (i >= texto.length) {
+                    clearInterval(auraTypingInterval);
+                    // Revela os chips ao terminar de digitar
+                    optDiv.style.opacity = '1';
+                    optDiv.style.pointerEvents = 'auto';
+                }
+            }, 25); 
+        } else {
+            textEl.innerHTML = texto;
+            optDiv.style.opacity = '1';
+            optDiv.style.pointerEvents = 'auto';
+        }
     }
 
     // =========================================================
@@ -223,7 +251,7 @@
         let elementosMapeados = new Set();
 
         for (let index = 0; index < elementos.length; index++) {
-            if (domList.length >= 80) break; // Limite de sanidade da IA
+            if (domList.length >= 80) break; 
 
             const el = elementos[index];
             const rect = el.getBoundingClientRect();
@@ -254,13 +282,13 @@
                 el = frameDoc.querySelector(seletorCSS);
                 if (el) return { elemento: el, frame: frame };
             } catch (e) {
-                // Erro de CORS — ignoramos
+                // Erro de CORS
             }
         }
         return null;
     }
 
-    // 🟢 BACKDROP TEMPORÁRIO (Auto-destruição em 5s)
+    // 🟢 BACKDROP TEMPORÁRIO
     function criarBackdrop(rect, frameTop, frameLeft) {
         document.getElementById('aura-backdrop')?.remove();
         const backdrop = document.createElement('div');
@@ -292,7 +320,7 @@
         }, 5000);
     }
 
-    // 🟢 HOLOFOTE CENTRALIZADO (Position: Fixed)
+    // 🟢 HOLOFOTE CENTRALIZADO
     function aplicarHolofoteDom(auraIdOuSeletor, isSeletor = false) {
         document.getElementById('aura-sonar-highlight')?.remove();
         document.getElementById('aura-backdrop')?.remove();
@@ -367,11 +395,10 @@
         const payload = event.data.payload || {};
         const textoResposta = payload.mensagem || payload.advice || "Desculpe, não consegui processar a resposta.";
 
-        // 🟢 SPRINT 1: Salva a resposta da Aura na Memória
+        // Salva a resposta da Aura na Memória
         historicoAura.push({ autor: "Aura", texto: textoResposta });
-        if (historicoAura.length > 4) historicoAura.shift(); // Mantém apenas as últimas 4 interações
+        if (historicoAura.length > 4) historicoAura.shift(); 
 
-        // Mapeia sugestões rápidas (Chips)
         let sugestoes = [];
         if (payload.sugestoes && Array.isArray(payload.sugestoes)) {
             sugestoes = payload.sugestoes.map(s => ({
@@ -383,9 +410,9 @@
             }));
         }
 
+        // Exibe o balão com EFEITO DE DIGITAÇÃO ativado (true é o padrão)
         exibirBalaoAura(textoResposta, sugestoes);
 
-        // Lógica Híbrida de Highlight: Brain (CSS) > Visão (DOM ID)
         if (payload.seletor_css) {
             console.log("Aura: Tentando usar memória muscular (Brain/JSON):", payload.seletor_css);
             let matchAlvo = null;
@@ -400,7 +427,6 @@
                 aplicarHolofoteDom(payload.seletor_css, true);
             } else if (payload.elemento_id != null) {
                 console.warn("Aura: Seletor CSS não encontrado. Acionando Plano B (Visão da IA)...");
-                console.log("Aura: Usando leitura dinâmica de DOM: ID", payload.elemento_id);
                 aplicarHolofoteDom(payload.elemento_id, false);
             } else {
                 console.warn("Aura: Plano B também falhou. Nenhum elemento encontrado.");
@@ -417,21 +443,20 @@
     });
 
     // =========================================================
-    // 🟢 DISPARO PARA A IA (ENVIO DE CONTEXTO)
+    // 🟢 DISPARO PARA A IA
     // =========================================================
     function dispararAnaliseIA(textoOpcional) {
         const inputEl = document.getElementById('aura-prompt-input');
         const prompt  = textoOpcional || (inputEl?.value || '').trim() || "O que devo fazer nesta tela?";
 
-        // Limpa o holofote anterior
         document.getElementById('aura-sonar-highlight')?.remove();
         document.getElementById('aura-backdrop')?.remove();
 
-        // 🟢 SPRINT 1: Salva a pergunta do utilizador na Memória
         historicoAura.push({ autor: "Utilizador", texto: prompt });
         if (historicoAura.length > 4) historicoAura.shift(); 
 
-        exibirBalaoAura("Estou a analisar a interface... Só um momento! 🔍", []);
+        // 🟢 Passa `false` para a mensagem de sistema NÃO ter efeito de digitação lenta
+        exibirBalaoAura("Estou a analisar a interface... Só um momento! 🔍", [], false);
         if (inputEl) inputEl.value = '';
 
         const extratoDOM = capturarDOMParaIA();
@@ -444,7 +469,7 @@
             dom_context: extratoDOM,
             user_name:   nomeReal,
             tenant_id:   "senior_default",
-            historico:   historicoAura // 🟢 O Array voa para o Python!
+            historico:   historicoAura 
         }, window.location.origin);
     }
 
