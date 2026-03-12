@@ -1,5 +1,4 @@
 /* style.css - Aura Senior Success Hub */
-/* Todos os estilos usam !important para blindagem contra o CSS do Senior X */
 
 /* ─── Container principal ─── */
 #aura-floating-container {
@@ -30,12 +29,11 @@
 }
 
 /* ─── Balão de fala ─── */
-/* ─── Balão de fala ─── */
 #aura-speech-bubble {
     display: none !important;
     position: absolute !important;
-    bottom: 80% !important; /* 🟢 Abaixamos o balão (era 110%) */
-    right: 15px !important; /* 🟢 Centralizamos melhor */
+    bottom: 80% !important;
+    right: 15px !important;
     width: 280px !important;
     background-color: #ffffff !important;
     border: 2px solid #00ddb3 !important;
@@ -64,7 +62,7 @@
     content: '' !important;
     position: absolute !important;
     bottom: -10px !important;
-    right: 35px !important; /* 🟢 Alinhamos a seta direto pra cabeça dela */
+    right: 35px !important;
     border-width: 10px 10px 0 !important;
     border-style: solid !important;
     border-color: #00ddb3 transparent transparent transparent !important;
@@ -121,55 +119,41 @@
 }
 .aura-btn-send:hover { transform: scale(1.05) !important; }
 
-/* ─── Botões de opção (Antigos) ─── */
-.aura-options {
+/* ─── Sugestões Rápidas (Chips) ─── */
+#aura-speech-bubble .aura-options {
     display: flex !important;
     flex-wrap: wrap !important;
-    gap: 6px !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+    padding-top: 10px !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
     justify-content: flex-start !important;
 }
 
 .aura-btn {
-    background-color: #00ddb3 !important;
-    color: #ffffff !important;
-    border: none !important;
-    padding: 7px 14px !important;
+    background: rgba(0, 230, 118, 0.1) !important;
+    border: 1px solid #00E676 !important;
+    color: #00E676 !important;
+    padding: 5px 14px !important;
     border-radius: 20px !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
     cursor: pointer !important;
-    transition: background 0.15s ease, transform 0.1s ease !important;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
-    outline: none !important;
-}
-.aura-btn:hover { background-color: #00c49f !important; transform: translateY(-1px) !important; }
-
-/* ─── HUD SONAR NÉON (O Holofote) ─── */
-#aura-sonar-highlight {
-    position: fixed !important;
-    width: 56px !important; 
-    height: 56px !important;
-    border: 2px solid #00e5e5 !important;
-    border-radius: 50% !important;
-    z-index: 2147483647 !important;
-    pointer-events: none !important;
-    transform: translate(-50%, -50%) !important;
-    box-shadow: 0 0 20px rgba(0,229,229,0.6), inset 0 0 15px rgba(0,229,229,0.5) !important;
-    animation: aura-hud-pulse 1.5s infinite cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transition: all 0.2s ease !important;
+    white-space: nowrap !important;
+    pointer-events: auto !important;
 }
 
-#aura-sonar-highlight::after {
-    content: '' !important;
-    position: absolute !important;
-    top: 50% !important; left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    width: 8px !important; height: 8px !important;
-    background: #ffffff !important;
-    border-radius: 50% !important;
-    box-shadow: 0 0 10px #ffffff, 0 0 20px #00e5e5 !important;
+.aura-btn:hover {
+    background: #00E676 !important;
+    color: #000 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 10px rgba(0, 230, 118, 0.3) !important;
 }
 
-@keyframes aura-hud-pulse {
-    0% { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+/* Animação do Holofote (Spotlight) */
+@keyframes aura-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.04); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
 }

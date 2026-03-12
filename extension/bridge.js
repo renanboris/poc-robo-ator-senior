@@ -1,4 +1,5 @@
 // bridge.js - A Ponte Veloz (Mundo ISOLATED)
+// ✅ CORRIGIDO: Handler de AURA_PRE_CAPTURE adicionado — agora o pre-capture funciona de verdade
 
 (function() {
     document.documentElement.setAttribute('data-aura-id', chrome.runtime.id);
@@ -6,20 +7,45 @@
 
     window.addEventListener("message", (event) => {
         if (event.origin !== window.location.origin) return;
-        if (!event.data || event.data.type !== "AURA_CAPTURE") return;
+        if (!event.data) return;
+
+        // 🟢 PREVENÇÃO DE CRASH: Verifica se a extensão ainda está viva
+        if (!chrome?.runtime?.id) {
+            console.warn("Aura Bridge: A extensão foi recarregada. Por favor, dê um F5 na página.");
+            return;
+        }
+
+        // ✅ FIX: Handler do Pre-Capture — antes esta mensagem era ignorada silenciosamente
+        // content.js envia AURA_PRE_CAPTURE ao focar no input, mas o bridge não escutava.
+        // Resultado: o cache de screenshot nunca era preenchido, perdendo os 500ms de ganho.
+        if (event.data.type === "AURA_PRE_CAPTURE") {
+            try {
+                chrome.runtime.sendMessage({ action: "pre_capture" });
+                console.log("Aura Bridge: Pre-capture solicitado ao background.");
+            } catch (err) {
+                console.warn("Aura Bridge: Falha ao solicitar pre-capture:", err.message);
+            }
+            return;
+        }
+
+        // Handler principal da análise completa
+        if (event.data.type !== "AURA_CAPTURE") return;
 
         try {
             chrome.runtime.sendMessage({
-                action: "analisar_agora",
-                url:    event.data.url,
-                prompt: event.data.prompt || "O que devo fazer nesta tela?"
+                action:      "analisar_agora",
+                url:         event.data.url,
+                prompt:      event.data.prompt      || "O que devo fazer nesta tela?",
+                dom_context: event.data.dom_context || "",
+                user_name:   event.data.user_name   || "Utilizador",
+                tenant_id:   event.data.tenant_id   || "senior_default"
             }, (response) => {
-                
+
                 if (chrome.runtime.lastError) {
                     console.warn("Aura Bridge Erro:", chrome.runtime.lastError.message);
                     window.postMessage({
                         type: "AURA_RESPONSE",
-                        payload: { advice: "A Aura está acordando... Tente de novo em um segundo! 🔄" }
+                        payload: { mensagem: "A Aura está acordando... Tente de novo em um segundo! 🔄" }
                     }, window.location.origin);
                     return;
                 }
@@ -28,7 +54,7 @@
                     console.warn("Aura Bridge: Resposta undefined recebida.");
                     window.postMessage({
                         type: "AURA_RESPONSE",
-                        payload: { advice: "Hum, não recebi resposta do cérebro. O servidor Python está ligado? 🤔" }
+                        payload: { mensagem: "Hum, não recebi resposta do cérebro. O servidor Python está ligado? 🤔" }
                     }, window.location.origin);
                     return;
                 }
@@ -42,7 +68,7 @@
             console.error("Aura Bridge Crash:", err);
             window.postMessage({
                 type: "AURA_RESPONSE",
-                payload: { advice: "Erro interno de comunicação na extensão." }
+                payload: { mensagem: "Erro interno de comunicação na extensão. Dê um F5 na página." }
             }, window.location.origin);
         }
     });
