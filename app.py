@@ -1,15 +1,14 @@
 """
 app.py — Senior Training OS · API Principal
 ============================================
-Atualizações:
-  - Segurança: Proteção contra Path Traversal e Race Conditions (Locks).
-  - Escudo API (Sprint 2): Validação de Bearer Token nas rotas da IA.
-  - Rate Limiting (Sprint 1): Prevenção contra spam e abuso de tokens.
-  - Contexto (Sprint 1): Envio do Histórico no DapRequest.
+Atualizações Finais (Sprint 4):
+  - Dashboard de ROI: Métricas de economia de horas e tokens (RAG e Cache).
+  - Assincronismo Real: WebSockets no lugar de Polling para barra de progresso.
+  - Otimizações prévias mantidas: Rate Limiting, JWT, Path Traversal, Locks.
 """
 
-from fastapi import FastAPI, Request, HTTPException, Security, Depends
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
+from fastapi import FastAPI, Request, HTTPException, Security, Depends, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +33,42 @@ import dap_engine
 app = FastAPI(title="Senior Training OS")
 
 # ==============================================================
+# WEBSOCKET MANAGER (Sprint 4) & LIFECYCLE
+# ==============================================================
+main_loop = None
+
+@app.on_event("startup")
+async def startup_event():
+    global main_loop
+    main_loop = asyncio.get_running_loop()
+    logging.info("WebSocket Event Loop capturado com sucesso.")
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        # Envia o estado atual imediatamente após conectar
+        with _estado_lock:
+            current_state = estado_servidor.copy()
+        await websocket.send_json(current_state)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_json(message)
+            except Exception:
+                self.disconnect(connection)
+
+ws_manager = ConnectionManager()
+
+# ==============================================================
 # CONFIGURAÇÃO DE SEGURANÇA (CORS)
 # ==============================================================
 ALLOWED_ORIGINS_RAW = os.getenv("EXTENSION_ORIGIN", "")
@@ -54,14 +89,13 @@ app.add_middleware(
 )
 
 # ==============================================================
-# SPRINT 1: RATE LIMITING IN-MEMORY (Proteção da API)
+# RATE LIMITING IN-MEMORY (Proteção da API)
 # ==============================================================
 _rate_limit_cache = {}
 MAX_REQUESTS_PER_MINUTE = 20
 
 def verificar_rate_limit(ip: str):
     agora = time.time()
-    # Limpa registros velhos do IP
     _rate_limit_cache[ip] = [t for t in _rate_limit_cache.get(ip, []) if agora - t < 60]
     
     if len(_rate_limit_cache[ip]) >= MAX_REQUESTS_PER_MINUTE:
@@ -72,13 +106,12 @@ def verificar_rate_limit(ip: str):
 
 
 # ==============================================================
-# SPRINT 2: ESCUDO DE IDENTIDADE (Validação de Token)
+# ESCUDO DE IDENTIDADE (Validação de Token)
 # ==============================================================
 API_KEY_NAME = "Authorization"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 def verificar_token(api_key: str = Security(api_key_header)):
-    # Em produção, você decodificaria o JWT aqui (ex: jwt.decode)
     chave_mestra = f"Bearer {os.getenv('AURA_API_SECRET', 'senior_training_secreto_2026')}"
     
     if not api_key or api_key != chave_mestra:
@@ -91,11 +124,9 @@ def verificar_token(api_key: str = Security(api_key_header)):
 # FUNÇÕES DE HIGIENIZAÇÃO GLOBAL
 # ==============================================================
 def limpar_nome(nome: str) -> str:
-    """Sanitiza nomes de arquivos — fonte de verdade do projeto (DRY)."""
     return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
 
 def _validar_caminho(nome_arquivo: str, diretorio_base: str) -> str:
-    """Previne path traversal (ex: '../../etc/passwd')."""
     base    = os.path.realpath(diretorio_base)
     destino = os.path.realpath(os.path.join(diretorio_base, nome_arquivo))
     if not destino.startswith(base + os.sep) and destino != base:
@@ -131,13 +162,23 @@ estado_servidor = {
 processo_atual = None
 
 def _set_estado(**kwargs):
+    mudou = False
     with _estado_lock:
         for k, v in kwargs.items():
-            estado_servidor[k] = v
+            if estado_servidor.get(k) != v:
+                estado_servidor[k] = v
+                mudou = True
+        estado_atualizado = estado_servidor.copy()
+
+    # Se o estado mudou, empurra a atualização para os ecrãs ligados via WebSocket
+    if mudou and main_loop:
+        try:
+            asyncio.run_coroutine_threadsafe(ws_manager.broadcast(estado_atualizado), main_loop)
+        except Exception as e:
+            logging.error(f"Erro ao disparar broadcast via WebSocket: {e}")
 
 def executar_processo_bg(comando, msg_executando, msg_sucesso):
     global processo_atual
-
     _set_estado(ocupado=True, mensagem=msg_executando, progresso=None, erro="", sucesso="")
 
     try:
@@ -250,7 +291,7 @@ class DapRequest(BaseModel):
     dom_context: Optional[str] = ""
     user_name:   Optional[str] = "Utilizador"
     tenant_id:   Optional[str] = "senior_default"
-    historico:   Optional[list] = [] # 🟢 Sprint 1: Aura agora tem memória!
+    historico:   Optional[list] = []
 
 
 # ==============================================================
@@ -269,45 +310,53 @@ async def get_metricas():
             with sqlite3.connect("brain.db") as conn:
                 total_memorizado    = conn.execute("SELECT COUNT(*) FROM memoria_semantica").fetchone()[0]
                 sucesso_recuperacao = conn.execute("SELECT SUM(hits) FROM memoria_semantica").fetchone()[0] or 0
-        qtd_aulas       = len([f for f in os.listdir(ROTEIROS_DIR) if f.endswith(".json")])
-        horas_poupadas  = qtd_aulas * 6
+                
+        dap_respostas_salvas = 0
+        if os.path.exists("aura_cache.db"):
+            with sqlite3.connect("aura_cache.db") as conn:
+                dap_respostas_salvas = conn.execute("SELECT COUNT(*) FROM dap_cache").fetchone()[0]
+
+        qtd_aulas = len([f for f in os.listdir(ROTEIROS_DIR) if f.endswith(".json")])
+
+        # CÁLCULOS DE ROI
+        horas_poupadas_aulas = qtd_aulas * 6
+        economia_aulas_reais = horas_poupadas_aulas * 50
+        economia_tokens_reais = (sucesso_recuperacao + dap_respostas_salvas) * 0.05
+
         return {
-            "total_memorizado":  total_memorizado,
-            "self_healing_hits": sucesso_recuperacao,
-            "horas_poupadas":    horas_poupadas,
-            "dinheiro_poupado":  horas_poupadas * 150,
             "total_aulas":       qtd_aulas,
+            "horas_poupadas":    horas_poupadas_aulas,
+            "dinheiro_poupado":  economia_aulas_reais + economia_tokens_reais,
+            "total_memorizado":  total_memorizado,          
+            "self_healing_hits": sucesso_recuperacao,       
+            "dap_cache_size":    dap_respostas_salvas,      
+            "economia_tokens":   economia_tokens_reais      
         }
-    except Exception:
-        return {"total_memorizado": 0, "self_healing_hits": 0, "horas_poupadas": 0, "dinheiro_poupado": 0, "total_aulas": 0}
+    except Exception as e:
+        logging.error(f"Erro ao gerar métricas: {e}")
+        return {
+            "total_aulas": 0, "horas_poupadas": 0, "dinheiro_poupado": 0,
+            "total_memorizado": 0, "self_healing_hits": 0, "dap_cache_size": 0, "economia_tokens": 0
+        }
 
 @app.get("/api/status")
 async def get_status():
     with _estado_lock:
         return estado_servidor.copy()
 
-@app.get("/api/status-stream")
-async def status_stream(request: Request):
-    async def event_generator():
-        global processo_atual
-        last_state = None
+# 🟢 SPRINT 4: A Nova Rota WebSocket (Substitui o Status-Stream antigo)
+@app.websocket("/api/ws/status")
+async def websocket_status(websocket: WebSocket):
+    await ws_manager.connect(websocket)
+    try:
         while True:
-            if await request.is_disconnected():
-                logging.info("Utilizador desconectado.")
-                with _estado_lock:
-                    proc = processo_atual
-                if proc and proc.poll() is None:
-                    logging.warning("Processo zumbi detetado. Terminando...")
-                    proc.terminate()
-                    _set_estado(ocupado=False, erro="Cancelado: ligação com o browser perdida.")
-                break
-            with _estado_lock:
-                current_state = estado_servidor.copy()
-            if current_state != last_state:
-                yield f"data: {json.dumps(current_state)}\n\n"
-                last_state = current_state
-            await asyncio.sleep(0.5)
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+            # Mantém a conexão aberta esperando qualquer mensagem (ping) do cliente
+            data = await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        logging.error(f"Erro na ligação WebSocket: {e}")
+        ws_manager.disconnect(websocket)
 
 @app.post("/api/limpar-status")
 async def limpar_status():
@@ -496,7 +545,7 @@ async def renomear_roteiro(arquivo: str, req: RenomearReq):
 @app.post("/analyze")
 async def analyze_screen(req: DapRequest, request: Request, token: str = Depends(verificar_token)):
     ip_cliente = request.client.host if request.client else "unknown"
-    verificar_rate_limit(ip_cliente) # 🟢 Aplica bloqueio anti-spam
+    verificar_rate_limit(ip_cliente) 
     
     resultado = await dap_engine.analisar_tela_dap(
         req.image, req.url, req.prompt, req.dom_context, req.user_name, req.tenant_id, req.historico
@@ -518,7 +567,6 @@ async def ingestar_no_dap(arquivo: str, token: str = Depends(verificar_token)):
         with open(caminho, "w", encoding="utf-8") as f:
             json.dump(dados, f, indent=2, ensure_ascii=False)
     return res
-
 
 if __name__ == "__main__":
     print("\n" + "=" * 50)

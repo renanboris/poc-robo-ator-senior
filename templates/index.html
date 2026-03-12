@@ -2584,5 +2584,46 @@ document.querySelectorAll('.modal-backdrop').forEach(el => {
   el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("A iniciar conexão com o motor da Aura...");
+
+    // Descobre automaticamente se está em http ou https para o WebSocket
+    const protocolo = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/status`;
+    
+    // Liga o tubo invisível ao Python
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+        console.log("🟢 Conectado ao servidor via WebSocket com sucesso!");
+    };
+
+    ws.onmessage = (event) => {
+        const estado = JSON.parse(event.data);
+        
+        // ---------------------------------------------------------
+        // AQUI VOCÊ LIGA COM A SUA INTERFACE VISUAL (HTML)
+        // ---------------------------------------------------------
+        if (estado.ocupado) {
+            console.log(`⏳ A trabalhar: ${estado.mensagem} | Progresso: ${estado.progresso || 0}%`);
+            
+            // Exemplo de como você ligaria a uma barra do seu HTML:
+            // document.getElementById('texto-status').innerText = estado.mensagem;
+            // document.getElementById('barra-progresso').style.width = estado.progresso + '%';
+            
+        } else if (estado.sucesso) {
+            console.log(`✅ Concluído: ${estado.sucesso}`);
+            
+        } else if (estado.erro) {
+            console.error(`❌ Erro: ${estado.erro}`);
+        }
+    };
+
+    ws.onclose = () => {
+        console.log("🔴 Conexão WebSocket encerrada. Atualize a página se precisar reconectar.");
+    };
+});
+</script>
 </body>
 </html>

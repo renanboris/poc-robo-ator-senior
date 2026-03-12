@@ -229,7 +229,7 @@ def _e_seletor_fragil(seletor: str) -> bool:
 def _extrair_atributo(seletor: str, atributo: str) -> Optional[str]:
     match = re.search(rf"{atributo}=[\'\"]([\'\",]+)[\'\"<>]", seletor)
     if not match:
-        match = re.search(rf"{atributo}=[\'\""]([^\'\""]+)[\'\""]", seletor)
+        match = re.search(rf"{atributo}=['\"]([^'\"]+)['\"]", seletor)
     return match.group(1) if match else None
 
 

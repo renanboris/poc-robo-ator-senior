@@ -2,45 +2,18 @@
 capture.py — Senior Training OS · Motor de Captura
 ====================================================
 Correcoes aplicadas:
-
-  [BUG-1] CRITICO — Embedding incompatível com o índice Pinecone
-    ANTES: gemini_client.models.embed_content(model="gemini-embedding-001")
-    Gemini embedding-001 gera vetores de ~768 dimensões. O índice Pinecone é
-    populado por dap_engine.py com OpenAI text-embedding-3-large (3072d).
-    Dimensões incompatíveis → erro de dimensão ou, pior, 0 de similaridade.
-    AGORA: OpenAI text-embedding-3-large 3072d — mesmo modelo do dap_engine.
-
-  [BUG-2] ALTO — gemini_client sem guard de chave ausente
-    ANTES: genai.Client(api_key=os.getenv("GOOGLE_API_KEY")) no nível do módulo
-    → crash com AttributeError confuso se GOOGLE_API_KEY não estiver no .env
-    AGORA: guard + warning se chave ausente; funções dependentes retornam fallback.
-
-  [BUG-3] MÉDIO — wait_for_load_state sem timeout
-    ANTES: await page.wait_for_load_state("load") → hang indefinido se login falhar.
-    AGORA: timeout=30_000 ms.
-
-  [BUG-4] MÉDIO — CLI --auto: índices posicionais assumem sys.argv[1/2]
-    ANTES: nome_aula = sys.argv[1]; objetivo = sys.argv[2]
-    Se o usuário passa "capture.py --auto Nome Objetivo", sys.argv[1] == "--auto"
-    e nome_aula == "--auto", objetivo == "Nome".
-    AGORA: filtra flags antes de indexar os argumentos posicionais.
-
-  [BUG-5] BAIXO — Browser não fechado em erro crítico de login
-    ANTES: return logger.error(...) retorna silenciosamente sem browser.close()
-    AGORA: await browser.close() garantido antes de retornar.
-
-  [BUG-6] BAIXO — limpar_nome duplicada (DRY violation)
-    Mantida localmente como fallback; tenta importar de app.py primeiro.
+  - Removida a importação cruzada de app.py (Isolamento total do script operário).
+  - Try/Except global com flush=True para garantir que o painel leia erros reais.
 """
 
 import asyncio
 import os
 import json
 import base64
-import subprocess
 import sys
 import logging
 import re
+import traceback
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 from google import genai
@@ -52,7 +25,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# [BUG-2] FIX: guards de chave — sem crash no import
 _g_key = os.getenv("GOOGLE_API_KEY")
 gemini_client = genai.Client(api_key=_g_key) if _g_key else None
 if not gemini_client:
@@ -63,47 +35,26 @@ _openai_client = OpenAI(api_key=_oa_key) if _oa_key else None
 if not _openai_client:
     logger.warning("OPENAI_API_KEY ausente. RAG Pinecone desativado.")
 
-cliques_capturados: list = []
-_id_acao_global: int    = 0
-_lock_id: asyncio.Lock  = None  # criado dentro do event loop em capturar_cliques_na_tela
-
-
-# ==============================================================
-# [BUG-6] FIX: limpar_nome importada de app.py (DRY)
-# ==============================================================
-try:
-    from app import limpar_nome
-except ImportError:
-    def limpar_nome(nome: str) -> str:
-        return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
-
-
-# ==============================================================
-# RAG E PINECONE
-# [BUG-1] FIX: OpenAI text-embedding-3-large — mesmo modelo de dap_engine
-# ==============================================================
 OPENAI_EMBED_MODEL = "text-embedding-3-large"
 TARGET_DIM         = 3072
 
+cliques_capturados: list = []
+_id_acao_global: int    = 0
+_lock_id: asyncio.Lock  = None
+
+# Isolamento: Função limpa e local, sem importar app.py
+def limpar_nome(nome: str) -> str:
+    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
 
 def _gerar_embedding_openai(texto: str) -> list[float]:
-    """Mesmo modelo e dimensão usados por dap_engine.ingestar_para_pinecone."""
-    resp = _openai_client.embeddings.create(
-        input=texto, model=OPENAI_EMBED_MODEL, dimensions=TARGET_DIM
-    )
+    resp = _openai_client.embeddings.create(input=texto, model=OPENAI_EMBED_MODEL, dimensions=TARGET_DIM)
     return resp.data[0].embedding
-
 
 def _buscar_pinecone_sync(objetivo_aula: str) -> str:
     chave_pinecone = os.getenv("PINECONE_API_KEY")
     nome_index     = os.getenv("PINECONE_INDEX_NAME")
-
-    if not chave_pinecone or not nome_index:
+    if not chave_pinecone or not nome_index or not _openai_client:
         return "Nenhum contexto adicional."
-    if not _openai_client:
-        return "Nenhum contexto adicional (OpenAI nao configurado)."
-
-    logger.info("Consultando o manual da Senior no Pinecone...")
     try:
         pc        = Pinecone(api_key=chave_pinecone)
         index     = pc.Index(nome_index)
@@ -112,24 +63,15 @@ def _buscar_pinecone_sync(objetivo_aula: str) -> str:
             vector=embedding, top_k=3, include_metadata=True,
             namespace=os.getenv("DEFAULT_TENANT_ID", "senior_default"),
         )
-        textos = [
-            m["metadata"].get("texto", "") or m["metadata"].get("text", "")
-            for m in resultado.get("matches", [])
-            if "metadata" in m
-        ]
+        textos = [m["metadata"].get("texto", "") or m["metadata"].get("text", "") for m in resultado.get("matches", []) if "metadata" in m]
         return "\n...\n".join(t for t in textos if t) or "Nenhum contexto."
     except Exception as e:
         logger.warning(f"Aviso Pinecone: {e}")
         return "Nenhum contexto adicional."
 
-
 async def buscar_contexto_pinecone(objetivo_aula: str) -> str:
     return await asyncio.to_thread(_buscar_pinecone_sync, objetivo_aula)
 
-
-# ==============================================================
-# EXTRACAO E ANALISE SEMANTICA
-# ==============================================================
 def _extrair_coordenadas_relativas(posicao_str: str, viewport_w: int, viewport_h: int) -> dict:
     try:
         partes = dict(p.split(":") for p in posicao_str.split(","))
@@ -143,18 +85,13 @@ def _extrair_coordenadas_relativas(posicao_str: str, viewport_w: int, viewport_h
     except Exception:
         return {"x_pct": 0.5, "y_pct": 0.5, "w_pct": 0.05, "h_pct": 0.05}
 
-
-async def _analisar_elemento_com_gemini(
-    screenshot_bytes: bytes, html_snapshot: str, label_capturado: str, coords: dict, acao: str
-) -> dict:
+async def _analisar_elemento_com_gemini(screenshot_bytes: bytes, html_snapshot: str, label_capturado: str, coords: dict, acao: str) -> dict:
     fallback = {
         "intencao": f"{acao.capitalize()} em '{label_capturado}'",
         "descricao_visual": f"Elemento '{label_capturado}'",
         "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa",
     }
-    if not gemini_client:
-        return fallback
-
+    if not gemini_client: return fallback
     prompt = f"""Voce e um analista de UX documentando uma sessao de uso do sistema Senior X.
 O usuario realizou a acao '{acao}' no elemento com label: '{label_capturado}'.
 HTML do elemento clicado: {html_snapshot[:250]}
@@ -176,17 +113,13 @@ Analise o screenshot e responda com um JSON:
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1),
         )
         resultado = json.loads(resposta.text)
-        resultado.setdefault("intencao",        fallback["intencao"])
+        resultado.setdefault("intencao", fallback["intencao"])
         resultado.setdefault("descricao_visual", fallback["descricao_visual"])
-        resultado.setdefault("contexto_tela",    "Desconhecido")
+        resultado.setdefault("contexto_tela", "Desconhecido")
         return resultado
     except Exception:
         return fallback
 
-
-# ==============================================================
-# RADAR DE CAPTURA JAVASCRIPT
-# ==============================================================
 async def _injetar_em_contexto(contexto):
     script_radar = """() => {
         if (window.__radarInjetado) return;
@@ -209,7 +142,7 @@ async def _injetar_em_contexto(contexto):
             const tag = el.tagName.toLowerCase();
             const isEditable = tag === 'input' || tag === 'textarea' || el.getAttribute('contenteditable') === 'true';
             if (isEditable) return el.placeholder || el.name || el.title || 'Campo de entrada';
-            const text = el.innerText?.trim().replace(/\n/g, ' ') || '';
+            const text = el.innerText?.trim().replace(/\\n/g, ' ') || '';
             if (text && text.length > 0 && text.length < 100) return text;
             let cur = el;
             for (let i = 0; i < 4; i++) {
@@ -231,17 +164,17 @@ async def _injetar_em_contexto(contexto):
                 if (aria) return `[aria-label='${aria}']`;
                 const name = cur.getAttribute('name');
                 if (name && name.length < 40) return `[name='${name}']`;
-                if (cur.id && !cur.id.match(/^[\d\-_]/) && !cur.id.match(/ng-|mat-|cdk-/)) return `[id='${cur.id}']`;
+                if (cur.id && !cur.id.match(/^[\\d\\-_]/) && !cur.id.match(/ng-|mat-|cdk-/)) return `[id='${cur.id}']`;
                 cur = cur.parentElement;
             }
             const ph = el.getAttribute('placeholder');
             if (ph) return `[placeholder='${ph}']`;
             const role = el.getAttribute('role');
             if (role && role !== 'presentation') {
-                const t = el.innerText?.trim().replace(/\n/g, ' ') || '';
+                const t = el.innerText?.trim().replace(/\\n/g, ' ') || '';
                 if (t && t.length < 50) return `[role='${role}']:has-text('${t}')`;
             }
-            const txt = el.innerText?.trim().replace(/\n/g, ' ') || '';
+            const txt = el.innerText?.trim().replace(/\\n/g, ' ') || '';
             if (txt && txt.length > 1 && txt.length < 50) return `text="${txt}"`;
             const parentAria = el.closest('[aria-label]')?.getAttribute('aria-label');
             if (parentAria) return `[aria-label='${parentAria}'] ${el.tagName.toLowerCase()}`;
@@ -305,24 +238,17 @@ async def _injetar_em_contexto(contexto):
     except Exception:
         pass
 
-
 async def injetar_radar_event_driven(page):
     await _injetar_em_contexto(page)
-
     async def injetar_com_delay(frame):
         try:
             await asyncio.sleep(0.5)
             await _injetar_em_contexto(frame)
         except Exception:
             pass
-
     page.on("frameattached",  lambda frame: asyncio.create_task(injetar_com_delay(frame)))
     page.on("framenavigated", lambda frame: asyncio.create_task(injetar_com_delay(frame)))
 
-
-# ==============================================================
-# HANDLER DE CAPTURA
-# ==============================================================
 async def on_capturar_elemento(source, args):
     global _id_acao_global, _lock_id
     async with _lock_id:
@@ -383,20 +309,16 @@ async def on_capturar_elemento(source, args):
     except Exception as e:
         logger.error(f"Erro ao processar captura: {e}")
 
-
-# ==============================================================
-# SESSAO DE GRAVACAO NO BROWSER
-# ==============================================================
 async def capturar_cliques_na_tela():
     global _lock_id
-    _lock_id = asyncio.Lock()  # criado dentro do event loop correto
+    _lock_id = asyncio.Lock()
 
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
     usuario    = os.getenv("SENIOR_USER")
     senha      = os.getenv("SENIOR_PASS")
 
     if not usuario or not senha:
-        logger.error("Credenciais ausentes no .env (SENIOR_USER / SENIOR_PASS).")
+        print("ERRO FATAL: Credenciais ausentes no .env (SENIOR_USER / SENIOR_PASS).", flush=True)
         return
 
     async with async_playwright() as p:
@@ -406,40 +328,69 @@ async def capturar_cliques_na_tela():
 
         await context.expose_binding("capturarElemento", on_capturar_elemento, handle=True)
         logger.info("Abrindo Senior X para Mapeamento...")
+        print("A iniciar o navegador e a tentar login...", flush=True)
 
         try:
             await page.goto(SENIOR_URL)
-            await asyncio.sleep(2.0); await page.keyboard.press("Escape")
-            await page.get_by_placeholder("usuario@dominio.com.br").fill(usuario)
-            await page.get_by_role("button", name="Proximo").click()
-            await asyncio.sleep(0.5); await page.keyboard.press("Escape")
-            await page.locator("input[type='password']").fill(senha)
-            await asyncio.sleep(0.5); await page.keyboard.press("Enter")
-            # [BUG-3] FIX: timeout explicito
-            await page.wait_for_load_state("load", timeout=30_000)
-            await asyncio.sleep(1.0)
-            await injetar_radar_event_driven(page)
+            await asyncio.sleep(2.0)
+            await page.keyboard.press("Escape")
+            
+            # 1. Tenta preencher o usuário de forma flexível
+            campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
+            await campo_usr.wait_for(state="visible", timeout=10000)
+            await campo_usr.fill(usuario)
+            await asyncio.sleep(0.5)
 
+            # 2. Tenta clicar no botão Próximo/Continuar, se não achar, aperta Enter
             try:
-                await page.evaluate("""() => {
-                    if (!document.body) return;
-                    const d = document.createElement('div');
-                    d.innerHTML = 'GRAVACAO INICIADA!<br><span style="font-size:14px;font-weight:normal;">Clique de forma calma e firme.</span>';
-                    d.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#e50914;color:white;padding:15px 30px;font-size:22px;font-weight:bold;font-family:sans-serif;z-index:999999;border-radius:8px;pointer-events:none;transition:opacity 1s ease;text-align:center;';
-                    document.body.appendChild(d);
-                    setTimeout(() => d.style.opacity='0', 4000);
-                    setTimeout(() => d.remove(), 5000);
-                }""")
+                await page.locator("button:has-text('Próximo'), button:has-text('Proximo'), button:has-text('Continuar')").first.click(timeout=3000)
             except Exception:
-                pass
+                await page.keyboard.press("Enter")
+            
+            # 3. Aguarda pacificamente o campo de senha aparecer (até 10 segundos)
+            campo_senha = page.locator("input[type='password']").first
+            await campo_senha.wait_for(state="visible", timeout=10000)
+            await campo_senha.fill(senha)
+            await asyncio.sleep(0.5)
+            await page.keyboard.press("Enter")
+            
+            # 4. Aguarda a tela inicial da Senior carregar
+            print("Login efetuado. A aguardar carregamento do painel...", flush=True)
+            await page.wait_for_load_state("load", timeout=30_000)
+            await asyncio.sleep(2.0)
 
         except Exception as e:
-            # [BUG-5] FIX: fecha o browser antes de retornar
-            logger.error(f"Erro critico no login: {e}")
-            await browser.close()
-            return
+            logger.warning(f"O auto-login falhou/travou: {e}")
+            print("AVISO: O robô não conseguiu fazer o login automático. Por favor, conclua o login manualmente na janela do Chrome!", flush=True)
+            try:
+                # O robô senta e espera pacientemente até 60 segundos para você fazer o login na mão
+                await page.wait_for_load_state("networkidle", timeout=60000)
+                await asyncio.sleep(3.0) # Dá um respiro após você logar
+            except Exception as ex:
+                print("ERRO FATAL: Tempo esgotado para login manual.", flush=True)
+                await browser.close()
+                return
 
-        logger.info("GRAVACAO INICIADA! Use o sistema de forma cadenciada. Feche o navegador ao terminar.")
+        # =========================================================
+        # INJEÇÃO DO RADAR DE EVENTOS (Onde a mágica de fato começa)
+        # =========================================================
+        await injetar_radar_event_driven(page)
+
+        try:
+            await page.evaluate("""() => {
+                if (!document.body) return;
+                const d = document.createElement('div');
+                d.innerHTML = 'GRAVACAO INICIADA!<br><span style="font-size:14px;font-weight:normal;">Clique de forma calma e firme.</span>';
+                d.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#e50914;color:white;padding:15px 30px;font-size:22px;font-weight:bold;font-family:sans-serif;z-index:999999;border-radius:8px;pointer-events:none;transition:opacity 1s ease;text-align:center;';
+                document.body.appendChild(d);
+                setTimeout(() => d.style.opacity='0', 4000);
+                setTimeout(() => d.remove(), 5000);
+            }""")
+        except Exception:
+            pass
+
+        print("GRAVACAO INICIADA! Use o sistema de forma cadenciada. Feche o navegador ao terminar.", flush=True)
+        
         try:
             while not page.is_closed():
                 await asyncio.sleep(2)
@@ -451,10 +402,6 @@ async def capturar_cliques_na_tela():
         except Exception:
             pass
 
-
-# ==============================================================
-# AURA — PROCESSAMENTO SEMANTICO
-# ==============================================================
 def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, contexto_rag: str):
     if not gemini_client:
         logger.error("Gemini nao configurado. Impossivel gerar roteiro.")
@@ -535,49 +482,48 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
         logger.error(f"Erro na mesclagem final do Roteiro: {e}")
         return None
 
-
 async def orquestrador_pos_captura(nome_aula: str, objetivo: str):
     contexto_rag = await buscar_contexto_pinecone(objetivo)
     return await asyncio.to_thread(_invocar_aura_sync, nome_aula, objetivo, cliques_capturados, contexto_rag)
 
-
-# ==============================================================
-# PONTO DE ENTRADA
-# ==============================================================
 def iniciar_esteira_de_producao():
-    print("\n" + "=" * 50 + "\nSENIOR SISTEMAS — TRAINING OS\n" + "=" * 50)
+    try:
+        print("\n" + "=" * 50 + "\nSENIOR SISTEMAS — TRAINING OS\n" + "=" * 50, flush=True)
 
-    is_auto = "--auto" in sys.argv
+        is_auto = "--auto" in sys.argv
 
-    if is_auto:
-        # [BUG-4] FIX: filtra flags antes de indexar posicionais
-        args_posicionais = [a for a in sys.argv[1:] if not a.startswith("--")]
-        if len(args_posicionais) < 2:
-            logger.error("Modo --auto requer: capture.py <nome_aula> <objetivo> --auto")
-            sys.exit(1)
-        nome_aula = args_posicionais[0]
-        objetivo  = args_posicionais[1]
-        logger.info(f"Iniciado via Dashboard | Aula: {nome_aula}")
-    else:
-        nome_aula = input("Qual e o nome desta aula? (Ex: Criando Pastas e Subpastas)\n> ")
-        objetivo  = input("Qual e o objetivo do treinamento?\n> ")
-
-    asyncio.run(capturar_cliques_na_tela())
-
-    if not cliques_capturados:
-        logger.warning("Nenhuma acao capturada. Encerrando.")
-        sys.exit(1)
-
-    logger.info(f"{len(cliques_capturados)} acoes capturadas. Processando Roteiro...")
-    caminho_roteiro_gerado = asyncio.run(orquestrador_pos_captura(nome_aula, objetivo))
-
-    if caminho_roteiro_gerado:
         if is_auto:
-            logger.info("Roteiro gerado! O Dashboard sera atualizado automaticamente.")
+            args_posicionais = [a for a in sys.argv[1:] if not a.startswith("--")]
+            if len(args_posicionais) < 2:
+                print("ERRO FATAL: Modo --auto requer: capture.py <nome_aula> <objetivo> --auto", flush=True)
+                sys.exit(1)
+            nome_aula = args_posicionais[0]
+            objetivo  = args_posicionais[1]
+            logger.info(f"Iniciado via Dashboard | Aula: {nome_aula}")
         else:
-            if input("\nTudo pronto! Iniciar o Motor de Gravacao? (S/N)\n> ").strip().upper() == "S":
-                subprocess.run([sys.executable, "main.py", caminho_roteiro_gerado])
+            nome_aula = input("Qual e o nome desta aula? (Ex: Criando Pastas e Subpastas)\n> ")
+            objetivo  = input("Qual e o objetivo do treinamento?\n> ")
 
+        asyncio.run(capturar_cliques_na_tela())
+
+        if not cliques_capturados:
+            print("AVISO: Nenhuma acao capturada. O navegador foi fechado sem interacoes.", flush=True)
+            sys.exit(1)
+
+        logger.info(f"{len(cliques_capturados)} acoes capturadas. Processando Roteiro...")
+        caminho_roteiro_gerado = asyncio.run(orquestrador_pos_captura(nome_aula, objetivo))
+
+        if caminho_roteiro_gerado:
+            if is_auto:
+                logger.info("Roteiro gerado! O Dashboard sera atualizado automaticamente.")
+            else:
+                if input("\nTudo pronto! Iniciar o Motor de Gravacao? (S/N)\n> ").strip().upper() == "S":
+                    import subprocess
+                    subprocess.run([sys.executable, "main.py", caminho_roteiro_gerado])
+    except Exception as e:
+        print(f"ERRO FATAL DE EXECUCAO: {e}", flush=True)
+        traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     iniciar_esteira_de_producao()
