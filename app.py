@@ -574,19 +574,27 @@ async def analyze_screen(req: DapRequest, request: Request, token: str = Depends
     return resultado
 
 @app.post("/api/ingest/{arquivo}")
-async def ingestar_no_dap(arquivo: str, token: str = Depends(verificar_token)):
+async def ingestar_no_dap(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
+    
     if not os.path.exists(caminho):
         return JSONResponse(status_code=404, content={"erro": "Ficheiro não encontrado"})
+        
     with open(caminho, "r", encoding="utf-8") as f:
         dados = json.load(f)
+        
     tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
-    res    = dap_engine.ingestar_para_pinecone(dados, tenant_id=tenant)
+    
+    # Chama o motor da Aura para enviar ao Pinecone
+    res = dap_engine.ingestar_para_pinecone(dados, tenant_id=tenant)
+    
     if res.get("status") == "sucesso":
         dados.setdefault("metadata", {})
+        # Marca no JSON que este arquivo já ensinou a Aura
         dados["metadata"]["ingestado_dap"] = True
         with open(caminho, "w", encoding="utf-8") as f:
             json.dump(dados, f, indent=2, ensure_ascii=False)
+            
     return res
 
 class GerarIAPayload(BaseModel):

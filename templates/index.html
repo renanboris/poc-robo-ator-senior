@@ -496,6 +496,82 @@ body::after {
   animation: fade-up 0.5s 0.15s var(--ease-out) both;
 }
 
+/* ─── HUB GRID: RAG + Roadmap Estratégico ─── */
+.hub-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  animation: fade-up 0.5s 0.2s var(--ease-out) both;
+}
+
+.hub-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+.hub-card-accent {
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.hub-card-title {
+  margin: 0 0 6px;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.hub-card-desc {
+  font-size: 12px; color: var(--text-2);
+  margin-bottom: 18px; line-height: 1.6;
+}
+
+/* Drop zone */
+.drop-zone {
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-sm);
+  padding: 28px 16px; text-align: center;
+  background: var(--bg-3); cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.drop-zone:hover { border-color: var(--blue); background: var(--blue-dim); }
+.drop-zone-icon { font-size: 26px; margin-bottom: 10px; }
+.drop-zone-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.drop-zone-sub { font-size: 11px; color: var(--text-3); margin-top: 5px; }
+
+.rag-footer {
+  margin-top: 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; font-weight: 600;
+}
+.rag-status {
+  color: var(--green);
+  display: flex; align-items: center; gap: 6px;
+}
+.rag-status-dot {
+  width: 6px; height: 6px;
+  background: var(--green); border-radius: 50%;
+  box-shadow: 0 0 6px var(--green);
+}
+.rag-count {
+  color: var(--text-3);
+  background: var(--surface-2);
+  padding: 3px 10px; border-radius: 99px;
+}
+
+/* Roadmap phases */
+.phase-list { display: flex; flex-direction: column; gap: 18px; }
+.phase-item { display: flex; gap: 12px; align-items: flex-start; }
+.phase-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.phase-name {
+  font-size: 13px; font-weight: 600;
+}
+.phase-desc { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+
+@media (max-width: 1024px) {
+  .hub-grid { grid-template-columns: 1fr; }
+}
+
 /* Chart card */
 .chart-area {
   position: relative; height: 180px; padding: 16px 20px;
@@ -1451,11 +1527,11 @@ html.light .theme-opt.active {
               <div class="roadmap-content">
                 <div class="roadmap-feat">
                   AI Coach DAP
-                  <span class="roadmap-badge badge-soon">Q3 2026</span>
+                  <span class="roadmap-badge badge-soon">Q3 2025</span>
                 </div>
                 <div class="roadmap-eta">Assistente contextual em sobreposição na tela</div>
                 <div class="roadmap-progress">
-                  <div class="roadmap-progress-fill" style="width:75%;background:var(--amber)" data-pct="0.25"></div>
+                  <div class="roadmap-progress-fill" style="width:25%;background:var(--amber)" data-pct="0.25"></div>
                 </div>
               </div>
             </div>
@@ -1493,74 +1569,81 @@ html.light .theme-opt.active {
           </div>
         </div>
 
-      </div> <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; animation: fade-up 0.5s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;">
-        
-            <div style="border: 1px solid rgba(59,130,246,0.3); padding: 24px; border-radius: var(--radius); background: var(--surface); color: white; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--blue);"></div>
-                <h3 style="margin-top: 0; color: var(--blue); display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
-                    📚 Base de Conhecimento (RAG)
-                </h3>
-                <p style="font-size: 12px; color: var(--text-2); margin-top: 8px; margin-bottom: 20px; line-height: 1.5;">
-                    Faça upload de Manuais PDF ou Políticas. A Aura (IA) lerá os documentos e aprenderá os fluxos automaticamente para gerar novas aulas Zero-Touch.
-                </p>
-                
-                <div style="border: 1px dashed var(--border-2); border-radius: var(--radius-sm); padding: 30px; text-align: center; background: var(--bg-3); cursor: pointer; transition: all 0.3s;" onmouseover="this.style.borderColor='var(--blue)'; this.style.background='var(--blue-dim)';" onmouseout="this.style.borderColor='var(--border-2)'; this.style.background='var(--bg-3)';">
-                    <div style="font-size: 28px; margin-bottom: 12px;">☁️</div>
-                    <strong style="color: var(--text); font-size: 13px;">Arraste manuais em PDF aqui</strong>
-                    <div style="font-size: 11px; color: var(--text-3); margin-top: 6px;">Sincronização direta com Vector DB (Pinecone)</div>
-                </div>
-                
-                <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 600;">
-                    <span style="color: var(--green); display: flex; align-items: center; gap: 6px;">
-                        <span style="width:6px; height:6px; background:var(--green); border-radius:50%; box-shadow:0 0 6px var(--green);"></span>
-                        Motor Pinecone: Online
-                    </span>
-                    <span style="color: var(--text-3); background: var(--surface-2); padding: 4px 10px; border-radius: 99px;">14 Manuais Indexados</span>
-                </div>
-            </div>
-        
-            <div style="border: 1px solid rgba(139,92,246,0.3); padding: 24px; border-radius: var(--radius); background: var(--surface); color: white; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--violet);"></div>
-                <h3 style="margin-top: 0; color: var(--violet); display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
-                    🚀 Roadmap Estratégico (Training OS)
-                </h3>
-                <p style="font-size: 12px; color: var(--text-2); margin-top: 8px; margin-bottom: 24px;">
-                    Evolução contínua da arquitetura do produto para as próximas fases.
-                </p>
-        
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    
-                    <div style="display: flex; gap: 12px; align-items: flex-start;">
-                        <div style="color: var(--green); font-size: 16px; margin-top: -2px;">✅</div>
-                        <div>
-                            <strong style="color: var(--text); font-size: 13px;">Fase 5: Automação Zero-Touch</strong>
-                            <div style="font-size: 11px; color: var(--text-3); margin-top: 3px;">Geração de aulas 100% via IA usando Biblioteca de Peças de Lego.</div>
-                        </div>
-                    </div>
-        
-                    <div style="display: flex; gap: 12px; align-items: flex-start;">
-                        <div style="color: var(--amber); font-size: 16px; margin-top: -2px;">⏳</div>
-                        <div>
-                            <strong style="color: var(--amber); font-size: 13px;">Fase 6: Dry-Run Engine (Validador)</strong>
-                            <div style="font-size: 11px; color: var(--text-3); margin-top: 3px;">Testes invisíveis massivos para garantir que atualizações do Senior X não quebrem roteiros antigos.</div>
-                        </div>
-                    </div>
-        
-                    <div style="display: flex; gap: 12px; align-items: flex-start;">
-                        <div style="color: var(--text-3); font-size: 16px; margin-top: -2px;">🔒</div>
-                        <div>
-                            <strong style="color: var(--text-3); font-size: 13px;">Fase 7: Auto-Healing Visual</strong>
-                            <div style="font-size: 11px; color: var(--text-3); margin-top: 3px;">Se um botão mudar de lugar, a IA re-mapeia as coordenadas em tempo real durante a gravação.</div>
-                        </div>
-                    </div>
-        
-                </div>
-            </div>
-        
+      </div>
+
+      <!-- ✦ Base de Conhecimento (RAG) + Roadmap Estratégico ✦ -->
+      <div class="hub-grid">
+
+        <!-- Card: RAG / Knowledge Base -->
+        <div class="hub-card" style="border: 1px solid rgba(59,130,246,0.3);">
+          <div class="hub-card-accent" style="background: var(--blue);"></div>
+          <h3 class="hub-card-title" style="color: var(--blue);">
+            📚 Base de Conhecimento (RAG)
+          </h3>
+          <p class="hub-card-desc">
+            Faça upload de Manuais PDF ou Políticas. A Aura lerá os documentos e aprenderá os fluxos
+            automaticamente para gerar novas aulas Zero-Touch.
+          </p>
+
+          <div class="drop-zone" onclick="document.getElementById('rag-file-input').click()"
+               ondragover="event.preventDefault(); this.classList.add('hover')"
+               ondragleave="this.classList.remove('hover')"
+               ondrop="handleRagDrop(event)">
+            <div class="drop-zone-icon">☁️</div>
+            <div class="drop-zone-label">Arraste manuais em PDF aqui</div>
+            <div class="drop-zone-sub">Sincronização direta com Vector DB (Pinecone)</div>
+          </div>
+          <input type="file" id="rag-file-input" accept=".pdf" multiple style="display:none"
+                 onchange="uploadRagFiles(this.files)">
+
+          <div class="rag-footer">
+            <span class="rag-status">
+              <span class="rag-status-dot"></span>
+              Motor Pinecone: Online
+            </span>
+            <span class="rag-count" id="rag-count">14 Manuais Indexados</span>
+          </div>
         </div>
+
+        <!-- Card: Roadmap Estratégico -->
+        <div class="hub-card" style="border: 1px solid rgba(139,92,246,0.3);">
+          <div class="hub-card-accent" style="background: var(--violet);"></div>
+          <h3 class="hub-card-title" style="color: var(--violet);">
+            🚀 Roadmap Estratégico
+          </h3>
+          <p class="hub-card-desc">
+            Evolução contínua da arquitetura do produto para as próximas fases.
+          </p>
+
+          <div class="phase-list">
+            <div class="phase-item">
+              <div class="phase-icon">✅</div>
+              <div>
+                <div class="phase-name" style="color: var(--text);">Fase 5: Automação Zero-Touch</div>
+                <div class="phase-desc">Geração de aulas 100% via IA usando Biblioteca de Peças de Lego.</div>
+              </div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-icon">⏳</div>
+              <div>
+                <div class="phase-name" style="color: var(--amber);">Fase 6: Dry-Run Engine (Validador)</div>
+                <div class="phase-desc">Testes invisíveis massivos para garantir que atualizações do Senior X não quebrem roteiros antigos.</div>
+              </div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-icon">🔒</div>
+              <div>
+                <div class="phase-name" style="color: var(--text-3);">Fase 7: Auto-Healing Visual</div>
+                <div class="phase-desc">Se um botão mudar de lugar, a IA re-mapeia as coordenadas em tempo real durante a gravação.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
     </div><div class="tab-page" id="page-studio">
-      
-    
+
       <div id="studio-sidebar">
         <div class="studio-sidebar-header">
           <button class="btn-record" onclick="abrirModalGravacao()">
@@ -2743,6 +2826,43 @@ function exportarKPIs() {
   window.URL.revokeObjectURL(url);
   
   toast('Relatório CSV exportado com sucesso!', 'success');
+}
+
+// ════════════════════════════════════════
+// RAG — UPLOAD DE MANUAIS PDF
+// ════════════════════════════════════════
+function handleRagDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('hover');
+  const files = event.dataTransfer.files;
+  if (files.length) uploadRagFiles(files);
+}
+
+async function uploadRagFiles(files) {
+  const pdfFiles = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+  if (!pdfFiles.length) {
+    toast('Apenas arquivos PDF são aceitos.', 'error');
+    return;
+  }
+  toast(`Enviando ${pdfFiles.length} manual(is) para a Aura...`, 'info');
+
+  const formData = new FormData();
+  pdfFiles.forEach(f => formData.append('files', f));
+
+  try {
+    const r = await fetch('/api/upload-manual', { method: 'POST', body: formData });
+    const d = await r.json();
+    if (r.ok) {
+      toast(`✅ ${d.indexados || pdfFiles.length} manual(is) indexado(s) com sucesso!`, 'success');
+      if (d.total_manuais !== undefined) {
+        document.getElementById('rag-count').textContent = `${d.total_manuais} Manuais Indexados`;
+      }
+    } else {
+      toast('Erro ao indexar: ' + (d.erro || 'falha desconhecida'), 'error');
+    }
+  } catch {
+    toast('Falha na comunicação com o servidor.', 'error');
+  }
 }
 
 // Close modals on backdrop click

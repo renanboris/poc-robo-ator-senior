@@ -24,6 +24,7 @@ from pinecone import Pinecone
 from openai import OpenAI
 from google import genai
 from google.genai import types
+import sqlite3
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aura_engine")
@@ -36,8 +37,6 @@ GEMINI_LLM_MODEL    = "gemini-2.5-flash"
 TARGET_DIM          = 3072
 TOP_K               = 5
 SCORE_THRESHOLD     = 0.45
-
-import sqlite3
 
 # =========================================================
 # CACHE PERSISTENTE (SQLite) - SPRINT 3
