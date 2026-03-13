@@ -385,28 +385,27 @@ async def _scroll_para_area_esperada(page: Page, coords_relativas: Optional[dict
 # ──────────────────────────────────────────────────────────────
 # HIGHLIGHT VISUAL
 # ──────────────────────────────────────────────────────────────
-async def _highlight_elemento(locator, page: Page) -> None:
+async def _highlight_elemento(locator, page) -> None:
     try:
         await locator.evaluate("""el => {
-            el.style.transition = 'all 0.25s';
-            el.style.outline = '3px solid #00e5e5';
-            el.style.boxShadow = '0 0 15px rgba(0,229,229,0.5)';
-            const rect = el.getBoundingClientRect();
-            const pointer = document.createElement('div');
-            pointer.id = 'senior-temp-pointer';
-            pointer.style.cssText = `position:fixed;top:${rect.bottom+15}px;left:${rect.left+(rect.width/2)}px;transform:translateX(-50%);width:28px;height:38px;background:linear-gradient(180deg,#00e5e5 0%,#008888 100%);clip-path:polygon(50% 0%,0% 45%,30% 45%,30% 100%,70% 100%,70% 45%,100% 45%);z-index:2147483647;animation:bounce-vertical 0.5s infinite alternate ease-in-out;filter:drop-shadow(0 4px 8px rgba(0,229,229,0.5));`;
-            if (!document.getElementById('senior-pointer-styles')) {
-                const st = document.createElement('style'); st.id = 'senior-pointer-styles';
-                st.innerHTML = '@keyframes bounce-vertical{from{transform:translate(-50%,0px)}to{transform:translate(-50%,-15px)}}';
-                document.head.appendChild(st);
-            }
-            document.body.appendChild(pointer);
+            // Focamos APENAS no elemento exato, sem invadir o CSS dos pais
+            const alvoVisual = el;
+            
+            const oldOutline = alvoVisual.style.outline;
+            const oldBoxShadow = alvoVisual.style.boxShadow;
+            const oldBorderRadius = alvoVisual.style.borderRadius;
+
+            alvoVisual.style.outline = '2px solid #00e5e5';
+            alvoVisual.style.boxShadow = '0 0 8px rgba(0,229,229,0.5)';
+            alvoVisual.style.borderRadius = '4px';
+            
             setTimeout(() => {
-                if (pointer) pointer.remove();
-                el.style.outline = ''; el.style.boxShadow = '';
+                alvoVisual.style.outline = oldOutline; 
+                alvoVisual.style.boxShadow = oldBoxShadow;
+                alvoVisual.style.borderRadius = oldBorderRadius;
             }, 1200);
         }""")
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(0.2)
     except Exception:
         pass
 
@@ -430,15 +429,93 @@ async def _aguardar_estabilidade(page: Page, timeout_ms: int = 2000) -> None:
         await asyncio.sleep(0.4)
 
 
-async def _executar_acao(locator, page: Page, acao: str, valor: str) -> None:
+async def _executar_acao(locator, page, acao: str, valor: str) -> None:
     try:
         await locator.scroll_into_view_if_needed(timeout=2000)
-        await locator.hover(timeout=1500)
+    except Exception:
+        pass
+
+    # 1. O Mouse viaja suavemente até ao centro exato
+    try:
+        box = await locator.bounding_box(timeout=1000)
+        if box:
+            cx = box["x"] + box["width"] / 2
+            cy = box["y"] + box["height"] / 2
+            from cursor_engine import mover_cursor_humanizado
+            await page.evaluate("() => { const c = document.getElementById('robo-cursor'); if(c) c.style.opacity = '1'; }")
+            await mover_cursor_humanizado(page, cx, cy)
+            
+            # 🟢 A PEÇA QUE FALTAVA: O Hover estabilizador
+            # Como o rato já está em (cx, cy), não há teleporte visual. 
+            # Ele apenas protege contra o bug de "Abre e logo Fecha" do Angular.
+            await locator.hover(timeout=2000)
     except Exception:
         pass
 
     await _highlight_elemento(locator, page)
 
+    # 2. AUTO-DETECT DE UPLOAD (A Mágica Cinematográfica)
+    is_file = False
+    try:
+        html_do_botao = await locator.evaluate("el => el.outerHTML", timeout=1000)
+        if 'type="file"' in html_do_botao.lower() or 'upload' in html_do_botao.lower():
+            is_file = True
+    except Exception:
+        pass
+
+    if acao == "upload" or is_file:
+        import tempfile
+        import os
+        nome_arquivo = valor if valor else "documento_treinamento.pdf"
+        nome_arquivo = nome_arquivo.split("\\")[-1].split("/")[-1] 
+        
+        tmp_path = os.path.join(tempfile.gettempdir(), nome_arquivo)
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(f"{nome_arquivo.upper()}\n\nLorem ipsum dolor sit amet. Este documento é uma simulação.")
+        
+        await page.evaluate(f"""(nome) => {{
+            const overlay = document.createElement('div');
+            overlay.id = 'senior-upload-overlay';
+            overlay.style.cssText = `
+                position:fixed; top:0; left:0; width:100vw; height:100vh;
+                background:rgba(15,23,42,0.92); backdrop-filter:blur(8px);
+                display:flex; flex-direction:column; align-items:center; justify-content:center;
+                z-index:2147483647; color:#fff; font-family:'Segoe UI', sans-serif;
+                opacity:0; transition:opacity 0.6s ease;
+            `;
+            overlay.innerHTML = `
+                <div style="font-size:64px; margin-bottom:15px; animation: bounce-vertical 1s infinite alternate;">📁</div>
+                <h2 style="font-weight:400; font-size:28px; margin:0;">Buscando arquivo local no computador...</h2>
+                <p style="color:#00e5e5; font-size:22px; font-weight:bold; margin-top:20px; letter-spacing:1px;">Selecionando: ${{nome}}</p>
+            `;
+            document.body.appendChild(overlay);
+            setTimeout(() => overlay.style.opacity = '1', 50);
+        }}""", nome_arquivo)
+        
+        await asyncio.sleep(2.5)
+        
+        try:
+            await locator.set_input_files(tmp_path, timeout=2000)
+        except Exception:
+            try:
+                async with page.expect_file_chooser(timeout=5000) as fc_info:
+                    await locator.click(timeout=2000)
+                file_chooser = await fc_info.value
+                await file_chooser.set_files(tmp_path)
+            except Exception:
+                pass
+        
+        await page.evaluate("""() => {
+            const overlay = document.getElementById('senior-upload-overlay');
+            if(overlay) {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 600);
+            }
+        }""")
+        await asyncio.sleep(0.5)
+        return
+
+    # 3. CLIQUES PADRÃO E SEGUROS (Sem force=True)
     if acao == "duplo_clique":
         await locator.dblclick(timeout=3000)
     elif acao == "clique_direito":

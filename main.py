@@ -8,6 +8,7 @@ Correcoes aplicadas:
   - page.video.path() verificado antes de usar
   - Threads de audio protegidas com try/except individual
   - wait_for_load_state com timeout explicito
+  - LOGIN HÍBRIDO (Resiliente e com Fallback Humano)
 """
 
 import sys
@@ -106,9 +107,9 @@ async def gerar_audio(
     if not texto or not texto.strip():
         return None
 
-    texto_falado = re.sub(r"(?i)\becm_ged\b", "E C M gedi", texto)
-    texto_falado = re.sub(r"\bGED\b", "gedi", texto_falado)
-    texto_falado = re.sub(r"\bged\b", "gedi", texto_falado)
+    texto_falado = re.sub(r"(?i)\becm_ged\b", "E C M gédi", texto)
+    texto_falado = re.sub(r"\bGED\b", "gédi", texto_falado)
+    texto_falado = re.sub(r"\bged\b", "gédi", texto_falado)
     texto_falado = texto_falado.replace("Senior X", "Senior X")
 
     nome_pasta  = limpar_nome(id_treinamento)
@@ -332,18 +333,10 @@ def _validar_roteiro_gravacao(roteiro: dict) -> list[str]:
 async def clicar_com_animacao(page, acao_tec: dict) -> None:
     await garantir_cursor_visivel(page)
 
-    acao_tipo = acao_tec.get("acao", "")
-
-    if acao_tipo not in ["digitar_e_enter", "preencher_campo"]:
-        coords = await obter_coords_acao(page, acao_tec)
-        if coords:
-            await page.evaluate("() => { const c = document.getElementById('robo-cursor'); if(c) c.style.opacity = '1'; }")
-            await mover_cursor_humanizado(page, coords["x"], coords["y"])
-            await asyncio.sleep(0.5)
-
+    # 🟢 O Mouse não "some" mais!
+    # E a viagem (Curva Bézier) foi movida para dentro do vision_engine.py,
+    # para garantir sincronia milimétrica com o elemento real e evitar pulos.
     await encontrar_e_clicar(page, acao_tec)
-    await page.evaluate("() => { const c = document.getElementById('robo-cursor'); if(c) c.style.opacity = '0'; }")
-
 
 # ==============================================================
 # MOTOR DE EXECUCAO PRINCIPAL
@@ -411,24 +404,54 @@ async def executar_roteiro(caminho_json: str) -> None:
         page = await context.new_page()
         await instalar_cursor(page)
 
+        # ---------------------------------------------------------
+        # 🟢 NOVO MOTOR DE LOGIN HÍBRIDO (Resiliente)
+        # ---------------------------------------------------------
+        print("A iniciar o robô e a tentar login no Senior X...", flush=True)
         try:
-            print("Realizando Login na Senior X...")
             await page.goto(SENIOR_URL)
             await asyncio.sleep(2.0)
             await page.keyboard.press("Escape")
 
-            await page.get_by_placeholder("usuario@dominio.com.br").fill(usuario)
-            await page.get_by_role("button", name="Proximo").click()
+            # 1. Tenta preencher o usuário
+            campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
+            await campo_usr.wait_for(state="visible", timeout=10000)
+            await campo_usr.fill(usuario)
             await asyncio.sleep(0.5)
-            await page.keyboard.press("Escape")
 
-            await page.locator("input[type='password']").fill(senha)
+            # 2. Tenta clicar em Próximo ou aperta Enter
+            try:
+                await page.locator("button:has-text('Próximo'), button:has-text('Proximo'), button:has-text('Continuar')").first.click(timeout=3000)
+            except Exception:
+                await page.keyboard.press("Enter")
+
+            # 3. Aguarda a senha
+            campo_senha = page.locator("input[type='password']").first
+            await campo_senha.wait_for(state="visible", timeout=10000)
+            await campo_senha.fill(senha)
             await asyncio.sleep(0.5)
             await page.keyboard.press("Enter")
 
-            # FIX: timeout explicito para nao travar indefinidamente
+            print("Login efetuado. A aguardar carregamento do painel para gravar...", flush=True)
             await page.wait_for_load_state("load", timeout=30_000)
-            await asyncio.sleep(8.0)
+            await asyncio.sleep(2.0)
+
+        except Exception as e:
+            logging.warning(f"O auto-login do Robô falhou: {e}")
+            print("AVISO: O robô não conseguiu logar. Por favor, conclua o login manualmente na janela do Chrome em até 60 segundos!", flush=True)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=60000)
+                await asyncio.sleep(3.0)
+            except Exception:
+                print("ERRO FATAL: Tempo esgotado para login manual.", flush=True)
+                await browser.close()
+                return
+        # ---------------------------------------------------------
+        # FIM DO BLOCO DE LOGIN
+        # ---------------------------------------------------------
+
+        try:
+            # Pula os modais caso ainda existam após o carregamento
             await page.keyboard.press("Escape")
             await asyncio.sleep(0.3)
             await page.keyboard.press("Escape")
@@ -440,7 +463,7 @@ async def executar_roteiro(caminho_json: str) -> None:
             h = await page.evaluate("() => window.innerHeight")
             await page.mouse.move(w / 2, h / 2)
 
-            print("\nGRAVANDO VIDEO E AUDIOS\n")
+            print("\nGRAVANDO VIDEO E AUDIOS\n", flush=True)
 
             for idx, passo in enumerate(passos_lista):
                 id_p              = passo.get("id_passo", idx + 1)
@@ -504,7 +527,10 @@ async def executar_roteiro(caminho_json: str) -> None:
                     await clicar_com_animacao(page, acao_tec)
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
-                    await asyncio.sleep(pausa_inteligente)
+                    
+                    # 🟢 REDUTOR DE TEMPO MORTO (Deixa o robô ágil e natural)
+                    pausa_real = min(pausa_inteligente * 0.3, 0.8)
+                    await asyncio.sleep(pausa_real)
 
         except Exception as e:
             pygame.mixer.stop()
@@ -545,9 +571,9 @@ async def executar_roteiro(caminho_json: str) -> None:
                 "timeline":     timeline_audios,
                 "tempo_corte":  tempo_corte_segundos,
             }, f, indent=2)
-        print("Gravacao bruta concluida. Estado salvo.")
+        print("Gravacao bruta concluida. Estado salvo.", flush=True)
     else:
-        print("Operacao abortada.")
+        print("Operacao abortada.", flush=True)
         sys.exit(1)
 
 

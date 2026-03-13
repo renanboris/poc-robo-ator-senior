@@ -264,49 +264,55 @@ async def mover_cursor_humanizado(
 
 async def obter_coords_acao(page, acao_tec: dict) -> Optional[dict]:
     """
-    Resolve as coordenadas de tela do elemento-alvo de uma acao tecnica
-    usando o seletor armazenado, para que o cursor se mova antes do clique.
-
-    [BUG-1] FIX: A estrutura de acao_tec e:
-        {
-            "acao": "clique",
-            "elemento_alvo": {
-                "seletor_hint": "[aria-label='Salvar']",  ← chave correta
-                ...
-            }
-        }
-    O codigo original buscava acao_tec.get("seletor_css") / acao_tec.get("seletor")
-    — chaves que nao existem nessa estrutura — e retornava None sempre.
+    Resolve as coordenadas absolutas de tela do elemento-alvo, 
+    somando os offsets de Iframe automaticamente via FrameLocator.
     """
-    # [BUG-1] FIX: busca no nivel e chave corretos
-    alvo    = acao_tec.get("elemento_alvo", {})
-    seletor = alvo.get("seletor_hint") or alvo.get("seletor_css") or alvo.get("seletor")
-
-    if not seletor or seletor == "body":
-        return None
+    alvo        = acao_tec.get("elemento_alvo", {})
+    seletor     = alvo.get("seletor_hint") or alvo.get("seletor_css") or alvo.get("seletor")
+    iframe_hint = alvo.get("iframe_hint")
+    coords_rel  = alvo.get("coordenadas_relativas")
 
     async def _bbox_centro(locator):
         try:
-            if await locator.is_visible(timeout=1500):
-                box = await locator.bounding_box()
+            if await locator.count() > 0 and await locator.first.is_visible(timeout=1000):
+                box = await locator.first.bounding_box()
                 if box:
-                    return {
-                        "x": box["x"] + box["width"] / 2,
-                        "y": box["y"] + box["height"] / 2,
-                    }
+                    # bounding_box de FrameLocator devolve coordenadas absolutas da tela principal!
+                    return {"x": box["x"] + box["width"] / 2, "y": box["y"] + box["height"] / 2}
         except Exception:
             pass
         return None
 
-    # Tenta na pagina principal primeiro
-    coords = await _bbox_centro(page.locator(seletor).first)
-    if coords:
-        return coords
+    if seletor and seletor != "body":
+        # 1. Tenta na página principal
+        if not iframe_hint or iframe_hint in ("Pagina Principal", "Página Principal"):
+            coords = await _bbox_centro(page.locator(seletor))
+            if coords: return coords
+        else:
+            # 2. Tenta via FrameLocator (Ele soma as margens do Iframe automaticamente!)
+            try:
+                fl = page.frame_locator(f"iframe[name='{iframe_hint}']")
+                coords = await _bbox_centro(fl.locator(seletor))
+                if coords: return coords
+            except Exception:
+                pass
+            try:
+                fl = page.frame_locator(f"iframe[src*='{iframe_hint}']")
+                coords = await _bbox_centro(fl.locator(seletor))
+                if coords: return coords
+            except Exception:
+                pass
 
-    # Fallback: varre todos os frames
-    for frame in page.frames:
-        coords = await _bbox_centro(frame.locator(seletor).first)
-        if coords:
-            return coords
+    # 3. Fallback Infalível: Usar a coordenada em % capturada no momento da gravação!
+    # A coordenada relativa é viewport-based, ou seja, foge da armadilha do Iframe.
+    if coords_rel and coords_rel.get("x_pct"):
+        try:
+            vp = page.viewport_size or {"width": 1920, "height": 1080}
+            return {
+                "x": coords_rel["x_pct"] * vp["width"],
+                "y": coords_rel["y_pct"] * vp["height"]
+            }
+        except Exception:
+            pass
 
     return None

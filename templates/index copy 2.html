@@ -578,59 +578,6 @@ body::after {
 }
 .btn-record:hover { background: rgba(239,68,68,0.2); box-shadow: 0 0 20px rgba(239,68,68,0.15); }
 
-.btn-ai {
-  width: 100%;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 9px 10px; margin-top: 8px;
-  background: var(--cyan-dim);
-  border: 1px solid rgba(0,229,229,0.25);
-  border-radius: var(--radius-sm);
-  color: var(--cyan);
-  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
-  cursor: pointer; letter-spacing: 0.4px;
-  transition: all 0.2s;
-}
-.btn-ai:hover { background: rgba(0,229,229,0.15); box-shadow: 0 0 20px rgba(0,229,229,0.12); }
-
-/* AI modal progress bar */
-.ai-progress-bar {
-  height: 3px; background: var(--surface-3); border-radius: 99px; overflow: hidden;
-  margin-top: 4px;
-}
-.ai-progress-fill {
-  height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet));
-  border-radius: 99px;
-  animation: indeterminate 1.8s ease infinite;
-  transform-origin: left;
-}
-.ai-status-box {
-  margin-top: 12px; padding: 12px 14px;
-  background: var(--bg-3); border: 1px solid var(--border-2);
-  border-radius: var(--radius-xs);
-  font-size: 12px; color: var(--text-2);
-  display: none; gap: 10px; align-items: flex-start;
-  line-height: 1.6;
-}
-.ai-status-box.visible { display: flex; }
-.ai-status-icon { flex-shrink: 0; font-size: 15px; margin-top: 1px; }
-.ai-status-text { flex: 1; }
-.ai-status-label {
-  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
-  color: var(--text-3); margin-bottom: 3px;
-}
-.ai-status-box.success { border-color: rgba(16,185,129,0.3); background: var(--green-dim); }
-.ai-status-box.success .ai-status-icon { color: var(--green); }
-.ai-status-box.success .ai-status-text { color: var(--text); }
-.ai-status-box.error   { border-color: rgba(239,68,68,0.3); background: var(--red-dim); }
-.ai-status-box.error   .ai-status-icon { color: var(--red); }
-.ai-status-box.error   .ai-status-text { color: var(--text); }
-.ai-status-box.loading { border-color: rgba(0,229,229,0.2); }
-.ai-status-box.loading .ai-status-icon { color: var(--cyan); }
-
-/* Sparkle icon animation */
-@keyframes sparkle { 0%,100%{transform:scale(1) rotate(0deg)} 50%{transform:scale(1.2) rotate(15deg)} }
-.btn-ai:hover .btn-ai-icon { animation: sparkle 0.6s ease; }
-
 .rec-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--red);
@@ -1451,11 +1398,11 @@ html.light .theme-opt.active {
               <div class="roadmap-content">
                 <div class="roadmap-feat">
                   AI Coach DAP
-                  <span class="roadmap-badge badge-soon">Q3 2026</span>
+                  <span class="roadmap-badge badge-soon">Q3 2025</span>
                 </div>
                 <div class="roadmap-eta">Assistente contextual em sobreposição na tela</div>
                 <div class="roadmap-progress">
-                  <div class="roadmap-progress-fill" style="width:75%;background:var(--amber)" data-pct="0.25"></div>
+                  <div class="roadmap-progress-fill" style="width:25%;background:var(--amber)" data-pct="0.25"></div>
                 </div>
               </div>
             </div>
@@ -1493,83 +1440,14 @@ html.light .theme-opt.active {
           </div>
         </div>
 
-      </div> <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; animation: fade-up 0.5s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;">
-        
-            <div style="border: 1px solid rgba(59,130,246,0.3); padding: 24px; border-radius: var(--radius); background: var(--surface); color: white; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--blue);"></div>
-                <h3 style="margin-top: 0; color: var(--blue); display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
-                    📚 Base de Conhecimento (RAG)
-                </h3>
-                <p style="font-size: 12px; color: var(--text-2); margin-top: 8px; margin-bottom: 20px; line-height: 1.5;">
-                    Faça upload de Manuais PDF ou Políticas. A Aura (IA) lerá os documentos e aprenderá os fluxos automaticamente para gerar novas aulas Zero-Touch.
-                </p>
-                
-                <div style="border: 1px dashed var(--border-2); border-radius: var(--radius-sm); padding: 30px; text-align: center; background: var(--bg-3); cursor: pointer; transition: all 0.3s;" onmouseover="this.style.borderColor='var(--blue)'; this.style.background='var(--blue-dim)';" onmouseout="this.style.borderColor='var(--border-2)'; this.style.background='var(--bg-3)';">
-                    <div style="font-size: 28px; margin-bottom: 12px;">☁️</div>
-                    <strong style="color: var(--text); font-size: 13px;">Arraste manuais em PDF aqui</strong>
-                    <div style="font-size: 11px; color: var(--text-3); margin-top: 6px;">Sincronização direta com Vector DB (Pinecone)</div>
-                </div>
-                
-                <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 600;">
-                    <span style="color: var(--green); display: flex; align-items: center; gap: 6px;">
-                        <span style="width:6px; height:6px; background:var(--green); border-radius:50%; box-shadow:0 0 6px var(--green);"></span>
-                        Motor Pinecone: Online
-                    </span>
-                    <span style="color: var(--text-3); background: var(--surface-2); padding: 4px 10px; border-radius: 99px;">14 Manuais Indexados</span>
-                </div>
-            </div>
-        
-            <div style="border: 1px solid rgba(139,92,246,0.3); padding: 24px; border-radius: var(--radius); background: var(--surface); color: white; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--violet);"></div>
-                <h3 style="margin-top: 0; color: var(--violet); display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
-                    🚀 Roadmap Estratégico (Training OS)
-                </h3>
-                <p style="font-size: 12px; color: var(--text-2); margin-top: 8px; margin-bottom: 24px;">
-                    Evolução contínua da arquitetura do produto para as próximas fases.
-                </p>
-        
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    
-                    <div style="display: flex; gap: 12px; align-items: flex-start;">
-                        <div style="color: var(--green); font-size: 16px; margin-top: -2px;">✅</div>
-                        <div>
-                            <strong style="color: var(--text); font-size: 13px;">Fase 5: Automação Zero-Touch</strong>
-                            <div style="font-size: 11px; color: var(--text-3); margin-top: 3px;">Geração de aulas 100% via IA usando Biblioteca de Peças de Lego.</div>
-                        </div>
-                    </div>
-        
-                    <div style="display: flex; gap: 12px; align-items: flex-start;">
-                        <div style="color: var(--amber); font-size: 16px; margin-top: -2px;">⏳</div>
-                        <div>
-                            <strong style="color: var(--amber); font-size: 13px;">Fase 6: Dry-Run Engine (Validador)</strong>
-                            <div style="font-size: 11px; color: var(--text-3); margin-top: 3px;">Testes invisíveis massivos para garantir que atualizações do Senior X não quebrem roteiros antigos.</div>
-                        </div>
-                    </div>
-        
-                    <div style="display: flex; gap: 12px; align-items: flex-start;">
-                        <div style="color: var(--text-3); font-size: 16px; margin-top: -2px;">🔒</div>
-                        <div>
-                            <strong style="color: var(--text-3); font-size: 13px;">Fase 7: Auto-Healing Visual</strong>
-                            <div style="font-size: 11px; color: var(--text-3); margin-top: 3px;">Se um botão mudar de lugar, a IA re-mapeia as coordenadas em tempo real durante a gravação.</div>
-                        </div>
-                    </div>
-        
-                </div>
-            </div>
-        
-        </div>
+      </div>
     </div><div class="tab-page" id="page-studio">
-      
-    
+
       <div id="studio-sidebar">
         <div class="studio-sidebar-header">
           <button class="btn-record" onclick="abrirModalGravacao()">
             <div class="rec-dot"></div>
             Novo Mapeamento
-          </button>
-          <button class="btn-ai" onclick="abrirModalGerarIA()">
-            <span class="btn-ai-icon">✨</span>
-            Gerar com Aura IA
           </button>
         </div>
         <div class="studio-list-label" style="padding-bottom: 4px;">Treinamentos Salvos</div>
@@ -1739,50 +1617,6 @@ html.light .theme-opt.active {
 <div id="modal-video">
   <button class="video-close" onclick="fecharVideo()">✕ &nbsp;Fechar</button>
   <video id="video-player" controls></video>
-</div>
-
-<!-- ══════════ MODAL: GERAR AULA COM IA ══════════ -->
-<div class="modal-backdrop" id="modal-gerar-ia">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-header">
-      <div class="modal-icon" style="background:var(--cyan-dim);color:var(--cyan);font-size:18px">✨</div>
-      <div>
-        <div class="modal-title">Gerar Aula com Aura IA</div>
-        <div class="modal-subtitle">Descreva o objetivo — a IA monta o roteiro completo</div>
-      </div>
-      <button class="modal-close" onclick="fecharModalGerarIA()" aria-label="Fechar">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-field">
-        <label for="ai-nome-aula">Nome do Treinamento</label>
-        <input type="text" id="ai-nome-aula" placeholder="Ex: Criar Pasta Logística no GED" autocomplete="off">
-      </div>
-      <div class="modal-field">
-        <label for="ai-objetivo-aula">Objetivo do Treinamento</label>
-        <textarea id="ai-objetivo-aula" rows="3" placeholder="Descreva o que o usuário aprenderá. Ex: Criar uma pasta no GED chamada Logística e mover documentos para ela."></textarea>
-      </div>
-
-      <!-- Status box (hidden until running) -->
-      <div class="ai-status-box loading" id="ai-status-box">
-        <div class="ai-status-icon" id="ai-status-icon">⏳</div>
-        <div class="ai-status-text">
-          <div class="ai-status-label" id="ai-status-label">Processando</div>
-          <div id="ai-status-msg">Iniciando...</div>
-          <div class="ai-progress-bar" id="ai-progress-wrap" style="display:none">
-            <div class="ai-progress-fill"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="fecharModalGerarIA()" id="btn-cancelar-ia">Cancelar</button>
-      <button class="btn btn-cyan" onclick="gerarRoteiroIA()" id="btn-gerar-ia"
-              style="display:flex;align-items:center;gap:8px">
-        <span>✨</span>
-        <span id="btn-gerar-ia-label">Gerar Roteiro</span>
-      </button>
-    </div>
-  </div>
 </div>
 
 <div id="toast-container"></div>
@@ -2749,142 +2583,6 @@ function exportarKPIs() {
 document.querySelectorAll('.modal-backdrop').forEach(el => {
   el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
-
-// ════════════════════════════════════════
-// GERAR AULA COM AURA IA
-// ════════════════════════════════════════
-let _aiCycleTimer = null;
-
-const _aiMensagens = [
-  { icon: '📚', label: 'Memória',    text: 'Lendo os manuais da Senior e buscando contexto relevante…' },
-  { icon: '🧩', label: 'Montagem',  text: 'Selecionando peças de Lego do repositório de ações validadas…' },
-  { icon: '🧠', label: 'Síntese',   text: 'A Aura está estruturando a sequência pedagógica do roteiro…' },
-  { icon: '✍️', label: 'Escrita',   text: 'Gerando narrações e tooltips para cada passo do treinamento…' },
-  { icon: '🔗', label: 'Linkagem',  text: 'Vinculando ações técnicas ao roteiro final com micro-narrações…' },
-  { icon: '💾', label: 'Salvando',  text: 'Persistindo o roteiro em disco e indexando na base de dados…' },
-];
-
-function _setAiStatus(tipo, icon, label, msg, mostrarBarra = false) {
-  const box    = document.getElementById('ai-status-box');
-  const elIcon = document.getElementById('ai-status-icon');
-  const elLbl  = document.getElementById('ai-status-label');
-  const elMsg  = document.getElementById('ai-status-msg');
-  const barra  = document.getElementById('ai-progress-wrap');
-
-  box.className = `ai-status-box visible ${tipo}`;
-  elIcon.textContent = icon;
-  elLbl.textContent  = label;
-  elMsg.textContent  = msg;
-  barra.style.display = mostrarBarra ? 'block' : 'none';
-}
-
-function _iniciarCicloMensagens() {
-  let idx = 0;
-  const proxima = () => {
-    const m = _aiMensagens[idx % _aiMensagens.length];
-    _setAiStatus('loading', m.icon, m.label, m.text, true);
-    idx++;
-  };
-  proxima();
-  _aiCycleTimer = setInterval(proxima, 3500);
-}
-
-function _pararCicloMensagens() {
-  if (_aiCycleTimer) { clearInterval(_aiCycleTimer); _aiCycleTimer = null; }
-}
-
-function abrirModalGerarIA() {
-  // Limpa estado anterior
-  document.getElementById('ai-nome-aula').value    = '';
-  document.getElementById('ai-objetivo-aula').value = '';
-  document.getElementById('ai-status-box').className = 'ai-status-box';
-  document.getElementById('btn-gerar-ia').disabled  = false;
-  document.getElementById('btn-gerar-ia-label').textContent = 'Gerar Roteiro';
-  document.getElementById('btn-cancelar-ia').textContent = 'Cancelar';
-  _pararCicloMensagens();
-  abrirModal('modal-gerar-ia');
-  setTimeout(() => document.getElementById('ai-nome-aula').focus(), 120);
-}
-
-function fecharModalGerarIA() {
-  _pararCicloMensagens();
-  fecharModal('modal-gerar-ia');
-}
-
-async function gerarRoteiroIA() {
-  const nomeAula = document.getElementById('ai-nome-aula').value.trim();
-  const objetivo = document.getElementById('ai-objetivo-aula').value.trim();
-
-  // Validação com toast ao invés de alert
-  if (!nomeAula) {
-    toast('Preencha o nome do treinamento antes de gerar.', 'error');
-    document.getElementById('ai-nome-aula').focus();
-    return;
-  }
-  if (!objetivo) {
-    toast('Descreva o objetivo do treinamento para que a IA tenha contexto.', 'error');
-    document.getElementById('ai-objetivo-aula').focus();
-    return;
-  }
-
-  const btn      = document.getElementById('btn-gerar-ia');
-  const btnLabel = document.getElementById('btn-gerar-ia-label');
-  const btnCancelar = document.getElementById('btn-cancelar-ia');
-
-  // Estado: processando
-  btn.disabled       = true;
-  btnLabel.textContent = 'Gerando…';
-  btnCancelar.textContent = 'Fechar';
-  _iniciarCicloMensagens();
-
-  try {
-    const resposta = await fetch('/api/gerar-ia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome_aula: nomeAula, objetivo: objetivo }),
-    });
-
-    _pararCicloMensagens();
-    const dados = await resposta.json();
-
-    if (resposta.ok && dados.status === 'sucesso') {
-      _setAiStatus(
-        'success', '✅', 'Concluído',
-        `Roteiro "${dados.arquivo || nomeAula}" gerado! Clique em "Abrir Roteiro" para editá-lo.`
-      );
-
-      // Troca botões para abrir o roteiro gerado
-      btnLabel.textContent  = 'Abrir Roteiro';
-      btn.disabled          = false;
-      btn.onclick           = () => {
-        fecharModalGerarIA();
-        showTab('studio');
-        if (dados.arquivo) carregarRoteiro(dados.arquivo);
-        carregarRoteiros();
-        // Restaura o onclick original para próxima vez
-        btn.onclick = () => gerarRoteiroIA();
-      };
-
-      // Atualiza a lista de roteiros em background
-      carregarRoteiros();
-      carregarMetricas();
-      toast(`✨ Roteiro "${nomeAula}" gerado com sucesso!`, 'success');
-
-    } else {
-      _setAiStatus('error', '❌', 'Erro ao gerar', dados.erro || 'Falha desconhecida. Tente novamente.');
-      btnLabel.textContent = 'Tentar novamente';
-      btn.disabled         = false;
-      btn.onclick          = () => gerarRoteiroIA();
-    }
-
-  } catch (erro) {
-    _pararCicloMensagens();
-    _setAiStatus('error', '❌', 'Sem conexão', 'Não foi possível comunicar com o servidor. Verifique se o backend está rodando.');
-    btnLabel.textContent = 'Tentar novamente';
-    btn.disabled         = false;
-    btn.onclick          = () => gerarRoteiroIA();
-  }
-}
 </script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -2892,7 +2590,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Descobre automaticamente se está em http ou https para o WebSocket
     const protocolo = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocolo}//${window.location.host}/api/ws/status`;
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/status`;
     
     // Liga o tubo invisível ao Python
     const ws = new WebSocket(wsUrl);

@@ -71,6 +71,9 @@ REGRA DE OURO DO PESO:
   devem ser peso 2 ou 1. Nunca explique o mesmo "por quê" duas vezes.
   A segunda pasta segue o mesmo gesto da primeira — o usuário já aprendeu.
 
+REGRA DE ESTILO E VOCABULÁRIO (CRÍTICO):
+- NUNCA use a expressão "acionando o menu de contexto" ou "menu de contexto".
+- Substitua SEMPRE por "clicando com o botão direito do mouse".
 
 ═══════════════════════════════════════════
 🚫 GUARDRAILS ABSOLUTOS (nunca viole)

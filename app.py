@@ -27,6 +27,8 @@ import sqlite3
 import uuid
 import logging
 import time
+import generator_engine
+import lego_builder
 
 import dap_engine
 
@@ -441,6 +443,25 @@ async def gravar_aula(req: NovaAulaReq):
                      "A mapear o ecrã no Senior X...", "Mapeamento guardado com sucesso.")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
+@app.post("/api/gerar-ia")
+async def gerar_roteiro_via_prompt(req: NovaAulaReq):
+    # Envia a tarefa pesada para rodar em background (thread) para não travar o FastAPI
+    try:
+        resultado = await asyncio.to_thread(
+            generator_engine.gerar_roteiro_ia_sync, 
+            req.nome_aula, 
+            req.objetivo
+        )
+        
+        if resultado.get("status") == "sucesso":
+            # Dispara um evento WebSocket avisando que a aula mágica nasceu!
+            _set_estado(sucesso=f"Aula '{req.nome_aula}' gerada por IA com sucesso!")
+            return {"status": "sucesso", "arquivo": resultado.get("arquivo")}
+        else:
+            return JSONResponse(status_code=500, content={"erro": resultado.get("mensagem")})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"erro": str(e)})
+
 @app.post("/api/executar-robo/{arquivo}")
 async def executar_robo(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
@@ -567,6 +588,67 @@ async def ingestar_no_dap(arquivo: str, token: str = Depends(verificar_token)):
         with open(caminho, "w", encoding="utf-8") as f:
             json.dump(dados, f, indent=2, ensure_ascii=False)
     return res
+
+class GerarIAPayload(BaseModel):
+    nome_aula: str
+    objetivo:  str
+
+@app.post("/api/gerar-ia")
+async def gerar_aula_com_ia(payload: GerarIAPayload):
+    """
+    Gera um roteiro completo via Gemini + RAG + biblioteca de ações.
+    Chamado pelo botão "✨ Gerar com Aura IA" do Training OS.
+    """
+    nome  = payload.nome_aula.strip()
+    obj   = payload.objetivo.strip()
+
+    if not nome or not obj:
+        return JSONResponse(
+            status_code=422,
+            content={"erro": "nome_aula e objetivo são obrigatórios."},
+        )
+
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+
+    # Executa em thread para não bloquear o event loop do FastAPI
+    loop = asyncio.get_event_loop()
+    resultado = await loop.run_in_executor(
+        None,
+        lambda: generator_engine.gerar_roteiro_ia_sync(nome, obj, tenant),
+    )
+
+    if resultado.get("status") == "sucesso":
+        # Atualiza métricas para o Overview refletir a nova aula gerada
+        carregarMetricas_bg()
+        return JSONResponse(status_code=200, content=resultado)
+    else:
+        return JSONResponse(
+            status_code=500,
+            content={"erro": resultado.get("mensagem", "Erro desconhecido.")},
+        )
+
+
+@app.post("/api/rebuild-library")
+async def rebuild_library():
+    """
+    Reconstrói a biblioteca de ações varrendo todos os roteiros salvos.
+    Deve ser executado sempre que novos treinamentos forem validados e
+    antes de usar o gerador de IA pela primeira vez.
+    """
+    loop = asyncio.get_event_loop()
+    resultado = await loop.run_in_executor(None, lego_builder.construir_biblioteca)
+
+    if resultado.get("status") == "sucesso":
+        return JSONResponse(status_code=200, content=resultado)
+    else:
+        return JSONResponse(status_code=500, content=resultado)
+
+
+def carregarMetricas_bg():
+    """Dispara atualização de métricas em background sem bloquear o endpoint."""
+    # A rota /api/metricas já lê do disco — não há estado a sincronizar.
+    # Esta função existe para garantir que logs/cache interno sejam atualizados.
+    pass  # extensível futuramente com invalidação de cache Redis, etc.
 
 if __name__ == "__main__":
     print("\n" + "=" * 50)
