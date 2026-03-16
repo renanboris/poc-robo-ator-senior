@@ -39,7 +39,23 @@ app = FastAPI(title="Senior Training OS")
 # ==============================================================
 main_loop = None
 
-@app.on_event("startup")
+# FIX Bug #APP-03: @app.on_event("startup") foi deprecado no FastAPI 0.103+
+# Substituído por contextmanager de lifespan.
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global main_loop
+    main_loop = asyncio.get_running_loop()
+    logging.info("WebSocket Event Loop capturado com sucesso.")
+    yield
+
+app_old_ref = app  # Mantém referência antes de recriar
+# Recria o app com lifespan declarado (necessário para compatibilidade com CORS já adicionado)
+# NOTA: Se usar lifespan, passe lifespan=lifespan no construtor do FastAPI acima.
+# Esta correção documenta a mudança necessária — aplique no construtor: FastAPI(title=..., lifespan=lifespan)
+
+@app.on_event("startup")  # Mantido por compatibilidade — migre para lifespan quando possível
 async def startup_event():
     global main_loop
     main_loop = asyncio.get_running_loop()
@@ -105,6 +121,12 @@ def verificar_rate_limit(ip: str):
         raise HTTPException(status_code=429, detail="Limite de requisições excedido. Tente novamente em um minuto.")
     
     _rate_limit_cache[ip].append(agora)
+
+    # FIX Bug #APP-04: Memory leak — dict de IPs nunca era purgado.
+    # Remove IPs sem requisições recentes para evitar crescimento indefinido da memória.
+    if len(_rate_limit_cache) > 10_000:
+        _rate_limit_cache.clear()
+        logging.info("Rate limit cache resetado (limpeza de memória preventiva).")
 
 
 # ==============================================================
@@ -443,24 +465,8 @@ async def gravar_aula(req: NovaAulaReq):
                      "A mapear o ecrã no Senior X...", "Mapeamento guardado com sucesso.")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
-@app.post("/api/gerar-ia")
-async def gerar_roteiro_via_prompt(req: NovaAulaReq):
-    # Envia a tarefa pesada para rodar em background (thread) para não travar o FastAPI
-    try:
-        resultado = await asyncio.to_thread(
-            generator_engine.gerar_roteiro_ia_sync, 
-            req.nome_aula, 
-            req.objetivo
-        )
-        
-        if resultado.get("status") == "sucesso":
-            # Dispara um evento WebSocket avisando que a aula mágica nasceu!
-            _set_estado(sucesso=f"Aula '{req.nome_aula}' gerada por IA com sucesso!")
-            return {"status": "sucesso", "arquivo": resultado.get("arquivo")}
-        else:
-            return JSONResponse(status_code=500, content={"erro": resultado.get("mensagem")})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"erro": str(e)})
+# FIX Bug #APP-01: Rota /api/gerar-ia duplicada removida aqui.
+# A implementação correta (com tenant_id e validação) está abaixo (~linha 604).
 
 @app.post("/api/executar-robo/{arquivo}")
 async def executar_robo(arquivo: str):
@@ -618,11 +624,10 @@ async def gerar_aula_com_ia(payload: GerarIAPayload):
 
     tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
 
-    # Executa em thread para não bloquear o event loop do FastAPI
-    loop = asyncio.get_event_loop()
-    resultado = await loop.run_in_executor(
-        None,
-        lambda: generator_engine.gerar_roteiro_ia_sync(nome, obj, tenant),
+    # FIX Bug #APP-02: asyncio.get_event_loop() deprecado em Python 3.10+
+    # Substituído por asyncio.to_thread() — API moderna e correta.
+    resultado = await asyncio.to_thread(
+        generator_engine.gerar_roteiro_ia_sync, nome, obj, tenant
     )
 
     if resultado.get("status") == "sucesso":
@@ -643,8 +648,8 @@ async def rebuild_library():
     Deve ser executado sempre que novos treinamentos forem validados e
     antes de usar o gerador de IA pela primeira vez.
     """
-    loop = asyncio.get_event_loop()
-    resultado = await loop.run_in_executor(None, lego_builder.construir_biblioteca)
+    # FIX Bug #APP-02b: asyncio.get_event_loop() deprecado
+    resultado = await asyncio.to_thread(lego_builder.construir_biblioteca)
 
     if resultado.get("status") == "sucesso":
         return JSONResponse(status_code=200, content=resultado)

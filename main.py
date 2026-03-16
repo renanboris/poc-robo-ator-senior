@@ -296,18 +296,22 @@ def renderizar_video_final(
         mp4_path = os.path.join("videos_prontos", f"{nome_arquivo_base}.mp4")
         srt_path = os.path.join("videos_prontos", f"{nome_arquivo_base}.srt")
 
-        video.write_videofile(
-            mp4_path,
-            codec="libx264",
-            audio_codec="aac",
-            fps=24,
-            preset="ultrafast",
-            logger=CustomRenderLogger(),
-        )
-        video.close()
-
-        gerar_arquivo_srt(timeline, srt_path)
-        print(f"SUCESSO! Video: {mp4_path}")
+        try:
+            video.write_videofile(
+                mp4_path,
+                codec="libx264",
+                audio_codec="aac",
+                fps=24,
+                preset="ultrafast",
+                logger=CustomRenderLogger(),
+            )
+            gerar_arquivo_srt(timeline, srt_path)
+            print(f"SUCESSO! Video: {mp4_path}")
+        finally:
+            # FIX Bug #MAIN-01: VideoFileClip.close() agora está em finally — garante
+            # que o handle do arquivo .webm seja sempre liberado, mesmo se
+            # write_videofile falhar. Sem isso, o .webm fica bloqueado no Windows.
+            video.close()
 
     except Exception as e:
         print(f"Erro na Pos-Producao: {e}")

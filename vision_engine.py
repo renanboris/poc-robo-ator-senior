@@ -39,6 +39,11 @@ Correcoes aplicadas:
   [BUG-4] MÉDIO — _init_db() chamado no nivel do modulo sem try/except
     ANTES: crash na importacao se o diretorio corrente nao tiver permissao de escrita.
     AGORA: _init_db() com try/except; erro logado, modulo importa normalmente.
+    
+  [PERFORMANCE-1] — Adicionado slots=True em TentativaLocalizacao para economia de RAM.
+  [PERFORMANCE-2] — Ativado modo WAL no SQLite para alta concorrência sem bloqueio.
+  [PERFORMANCE-3] — DB queries migradas para threads assíncronas (asyncio.to_thread).
+  [FEATURE-1] — Delay de 1s injetado antes do Enter em todas as ações digitar_e_enter.
 """
 
 import asyncio
@@ -75,10 +80,17 @@ MAX_FALHAS_CACHE = 3
 
 
 def _init_db():
-    """Inicializa o banco de dados SQLite. Erro de permissao e logado, nao propagado."""
+    """Inicializa o banco de dados SQLite com otimizações de alta concorrência."""
     # [BUG-4] FIX: try/except para nao crashar na importacao
     try:
         with sqlite3.connect(DB_PATH) as conn:
+            # [OTIMIZAÇÃO] Permite leituras e escritas simultâneas (Adeus Database Locked)
+            conn.execute("PRAGMA journal_mode = WAL;")
+            # [OTIMIZAÇÃO] Reduz as esperas do disco (bom para ambientes efêmeros)
+            conn.execute("PRAGMA synchronous = NORMAL;")
+            # [OTIMIZAÇÃO] Aumenta a memória em cache para buscas mais rápidas
+            conn.execute("PRAGMA cache_size = -64000;") 
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS memoria_semantica (
                     hash_intencao TEXT PRIMARY KEY,
@@ -194,7 +206,8 @@ def _registrar_falha_cache(intencao: str):
 # ──────────────────────────────────────────────────────────────
 # ESTRUTURAS DE CANDIDATOS (SNIPER)
 # ──────────────────────────────────────────────────────────────
-@dataclass
+# [OTIMIZAÇÃO] slots=True para economizar RAM na geração de dezenas de instâncias
+@dataclass(slots=True)
 class TentativaLocalizacao:
     seletor: str
     iframe_hint: Optional[str] = None
@@ -227,9 +240,13 @@ def _e_seletor_fragil(seletor: str) -> bool:
 
 
 def _extrair_atributo(seletor: str, atributo: str) -> Optional[str]:
-    match = re.search(rf"{atributo}=[\'\"]([\'\",]+)[\'\"<>]", seletor)
-    if not match:
-        match = re.search(rf"{atributo}=['\"]([^'\"]+)['\"]", seletor)
+    """
+    Extrai o valor de um atributo de uma string de seletor.
+    Usa um regex limpo que captura tudo entre as aspas do atributo,
+    evitando a quebra silenciosa de seletores CSS.
+    """
+    # ✅ CORRETO: Pega exatamente o que está dentro das aspas (simples ou duplas)
+    match = re.search(rf"{atributo}=['\"]([^'\"]+)['\"]", seletor)
     return match.group(1) if match else None
 
 
@@ -446,8 +463,6 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
             await mover_cursor_humanizado(page, cx, cy)
             
             # 🟢 A PEÇA QUE FALTAVA: O Hover estabilizador
-            # Como o rato já está em (cx, cy), não há teleporte visual. 
-            # Ele apenas protege contra o bug de "Abre e logo Fecha" do Angular.
             await locator.hover(timeout=2000)
     except Exception:
         pass
@@ -527,6 +542,10 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
         await page.keyboard.press("Backspace")
         if valor:
             await page.keyboard.type(valor, delay=40)
+            
+        # [INJEÇÃO] Aguarda 1 segundo exato para o Angular respirar
+        await asyncio.sleep(1) 
+        
         await page.keyboard.press("Enter")
     elif acao == "preencher_campo":
         await locator.click(timeout=2000)
@@ -604,6 +623,10 @@ async def _digitar_no_active_element(page: Page, acao: str, valor: str) -> bool:
         if valor:
             await page.keyboard.type(valor, delay=40)
         if acao == "digitar_e_enter":
+            
+            # [INJEÇÃO] Delay para o Enter no active element
+            await asyncio.sleep(1) 
+            
             await page.keyboard.press("Enter")
         await asyncio.sleep(0.3)
         try:
@@ -756,6 +779,10 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
             await page.keyboard.press("Backspace")
             await page.keyboard.type(valor, delay=40)
             if acao == "digitar_e_enter":
+                
+                # [INJEÇÃO] Delay para o Enter via IA Visual/Coordenadas
+                await asyncio.sleep(1) 
+                
                 await page.keyboard.press("Enter")
 
         await _aguardar_estabilidade(page)
@@ -792,7 +819,10 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # ── 0. BRAIN (Memoria SQLite de longo prazo) ──────────────────────────────
     # [BUG-3] FIX: flag impede double-registration de falha
     brain_registrou_falha = False
-    cache = _consultar_cache(intencao)
+    
+    # [OTIMIZAÇÃO] Delegamos a leitura síncrona do disco para uma thread paralela
+    cache = await asyncio.to_thread(_consultar_cache, intencao)
+    
     if cache:
         if cache.seletor:
             cand_cache = TentativaLocalizacao(
@@ -801,17 +831,17 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 descricao="brain knowledge",
             )
             if await _tentar_candidato(page, cand_cache, acao, valor):
-                _registrar_sucesso_cache(intencao)
+                await asyncio.to_thread(_registrar_sucesso_cache, intencao)
                 return True
             else:
-                _registrar_falha_cache(intencao)
+                await asyncio.to_thread(_registrar_falha_cache, intencao)
                 brain_registrou_falha = True
         elif cache.coords:
             if await _clicar_por_coordenadas(page, cache.coords, acao, valor):
-                _registrar_sucesso_cache(intencao)
+                await asyncio.to_thread(_registrar_sucesso_cache, intencao)
                 return True
             else:
-                _registrar_falha_cache(intencao)
+                await asyncio.to_thread(_registrar_falha_cache, intencao)
                 brain_registrou_falha = True
 
     # ── 1. Foco Nativo (exclusivo para inputs) ────────────────────────────────
@@ -849,7 +879,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     if await loc.count() > 0 and await loc.is_visible():
                         await _executar_acao(loc, page, acao, valor)
                         logger.info("   [Heuristica] Icone Home atingido com sucesso.")
-                        _registrar_sucesso_cache(intencao, seletor=sel, iframe=iframe_hint)
+                        await asyncio.to_thread(_registrar_sucesso_cache, intencao, seletor=sel, iframe=iframe_hint)
                         return True
                 except Exception:
                     pass
@@ -864,7 +894,8 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if await _tentar_candidato(page, cand, acao, valor):
                 logger.info(f"   [Sniper] Acerto: {cand.descricao}")
                 # [BUG-2] FIX: passa apenas cand.seletor (None quando vazio, nao cand.descricao)
-                _registrar_sucesso_cache(
+                await asyncio.to_thread(
+                    _registrar_sucesso_cache,
                     intencao,
                     seletor=cand.seletor if cand.seletor else None,
                     iframe=iframe_hint,
@@ -879,7 +910,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         )
         if await _tentar_candidato(page, cand_hint, acao, valor):
             logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
-            _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
+            await asyncio.to_thread(_registrar_sucesso_cache, intencao, seletor=seletor_hint, iframe=iframe_hint)
             return True
 
     # ── 4. Busca Profunda em Todos os Frames ──────────────────────────────────
@@ -887,7 +918,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         logger.info("   [Todos os Frames] Procurando o elemento em frames filhos...")
         frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
         if frame_url:
-            _registrar_sucesso_cache(intencao, iframe=frame_url)
+            await asyncio.to_thread(_registrar_sucesso_cache, intencao, iframe=frame_url)
             return True
 
     # ── 5. Gemini Vision (Self-Healing Supremo) ───────────────────────────────
@@ -914,7 +945,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if coords_ia:
                 if await _clicar_por_coordenadas(page, coords_ia, acao, valor):
                     logger.info("   [Vision] Clique por coordenadas da IA bem-sucedido.")
-                    _registrar_sucesso_cache(intencao, coords=coords_ia)
+                    await asyncio.to_thread(_registrar_sucesso_cache, intencao, coords=coords_ia)
                     return True
 
     # ── 6. Fallback Cego (Coordenadas Relativas Originais) ───────────────────
@@ -933,6 +964,6 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # ── Falha Total ───────────────────────────────────────────────────────────
     # [BUG-3] FIX: registra falha apenas se o Brain nao registrou uma neste ciclo
     if not brain_registrou_falha:
-        _registrar_falha_cache(intencao)
+        await asyncio.to_thread(_registrar_falha_cache, intencao)
     logger.error(f"   [FALHA TOTAL] Impossivel executar: '{intencao[:70]}'")
     return False

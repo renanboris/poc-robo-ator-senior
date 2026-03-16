@@ -1,58 +1,12 @@
-// content.js - Interface da Aura (Mundo MAIN) com Olho Biônico
+// content.js - Interface da Aura (Mundo MAIN) com Olho Biônico, Motor GPS, Feedback Premium e Badge Notification
 
 function injetarEstilosAura() {
     if (document.getElementById('aura-css-styles')) return;
     const style = document.createElement('style');
     style.id = 'aura-css-styles';
-    // Este bloco só contém regras que o style.css externo NÃO consegue aplicar
-    // por limitações de especificidade dentro do shadow DOM / ERP.
-    // Cores e identidade visual → definidas no style.css (fonte da verdade).
     style.innerHTML = `
-        #aura-speech-bubble .aura-options {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            gap: 8px !important;
-            margin-top: 4px !important;
-            padding-top: 10px !important;
-            border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
-        }
-
-        /* Esconde a área de chips quando não há opções — evita gap visual */
-        #aura-speech-bubble .aura-options:empty {
-            display: none !important;
-            padding-top: 0 !important;
-            border-top: none !important;
-        }
-
-        .aura-btn {
-            background: rgba(0, 221, 179, 0.08) !important;
-            border: 1px solid rgba(0, 221, 179, 0.4) !important;
-            color: #007a6b !important;
-            padding: 5px 13px !important;
-            border-radius: 100px !important;
-            font-size: 12px !important;
-            font-weight: 500 !important;
-            cursor: pointer !important;
-            white-space: nowrap !important;
-            pointer-events: auto !important;
-            transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease !important;
-            font-family: inherit !important;
-            outline: none !important;
-        }
-
-        .aura-btn:hover {
-            background: #00ddb3 !important;
-            border-color: #00ddb3 !important;
-            color: #ffffff !important;
-            transform: translateY(-2px) !important;
-            box-shadow: 0 4px 10px rgba(0, 221, 179, 0.3) !important;
-        }
-
-        @keyframes aura-pulse {
-            0%   { transform: scale(1);    opacity: 1;   }
-            50%  { transform: scale(1.04); opacity: 0.8; }
-            100% { transform: scale(1);    opacity: 1;   }
-        }
+        #aura-speech-bubble .aura-options:empty { display: none !important; padding-top: 0 !important; border-top: none !important; }
+        @keyframes aura-pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.04); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
     `;
     document.head.appendChild(style);
 }
@@ -60,32 +14,20 @@ function injetarEstilosAura() {
 (function() {
     console.log("Aura: Iniciando interface...");
 
-    // 🟢 CAÇADORA DE NOMES DINÂMICA
+    let roteiroAtivo = null;
+    let passoAtualIndex = 0;
+    let modoPilotoAutomatico = false;
+    let auraTypingInterval = null;
+
     function descobrirNomeUsuario() {
         try {
-            // Tentativa 1: Buscar no DOM (Classes comuns de perfis no Senior X / Sistemas Corporativos)
-            const seletoresNome = document.querySelectorAll('.user-name, .profile-name, [data-testid="user-name"], .header-user span, [aria-label*="perfil de"]');
+            const seletoresNome = document.querySelectorAll('.user-name, .profile-name, [data-testid="user-name"], .header-user span');
             for (let el of seletoresNome) {
                 let texto = el.innerText || el.textContent;
-                if (texto && texto.trim().length > 2) {
-                    return texto.trim().split(' ')[0]; // Devolve apenas o primeiro nome (Ex: "Renan Silva" -> "Renan")
-                }
+                if (texto && texto.trim().length > 2) return texto.trim().split(' ')[0]; 
             }
-
-            // Tentativa 2: Buscar no LocalStorage (Sistemas modernos guardam o user lá)
-            for (let i = 0; i < localStorage.length; i++) {
-                let key = localStorage.key(i);
-                if (key.toLowerCase().includes('user') || key.toLowerCase().includes('profile')) {
-                    let obj = JSON.parse(localStorage.getItem(key));
-                    if (obj && (obj.name || obj.nome || obj.firstName)) {
-                        let nomeCompleto = obj.name || obj.nome || obj.firstName;
-                        return nomeCompleto.split(' ')[0];
-                    }
-                }
-            }
-        } catch (e) { console.warn("Aura: Não foi possível caçar o nome dinâmico."); }
-
-        return "Utilizador"; // Fallback seguro
+        } catch (e) { }
+        return "Utilizador"; 
     }
 
     async function obterExtensionId(tentativas = 0) {
@@ -97,30 +39,39 @@ function injetarEstilosAura() {
     }
 
     async function iniciarAura() {
-        injetarEstilosAura(); // 🟢 Garante que o CSS existe antes de criar a UI
+        injetarEstilosAura(); 
         const extensionId = await obterExtensionId();
         if (!extensionId || !window.customElements) return;
 
-        try {
-            await window.customElements.whenDefined('dotlottie-player');
-        } catch (e) {
-            console.error("Aura: dotlottie-player não disponível.", e);
-            return;
-        }
+        try { await window.customElements.whenDefined('dotlottie-player'); } 
+        catch (e) { return; }
 
         const auraContainer = document.createElement('div');
         auraContainer.id = 'aura-floating-container';
 
-        // FIX #2 — O player vem PRIMEIRO no DOM.
-        // Antes a bubble era o 1º filho do flex-column: quando aparecia, empurrava o player
-        // para baixo. Agora o player é a âncora imóvel e a bubble flutua ACIMA dele via
-        // position:absolute no CSS (bottom: 100% + right: 0).
         auraContainer.innerHTML = `
+            <div id="aura-notification-badge" class="aura-badge">1</div>
             <dotlottie-player id="aura-lottie-player" src="chrome-extension://${extensionId}/aura.json" background="transparent" speed="1"></dotlottie-player>
             <div id="aura-speech-bubble">
                 <button class="aura-btn-close" id="aura-btn-close" aria-label="Fechar">✕</button>
-                <div class="aura-text">Olá, sou a Aura! Como posso te ajudar nesta tela?</div>
-                <div class="aura-input-wrapper">
+                
+                <div class="aura-text-wrapper">
+                    <div class="aura-text">Olá, sou a Aura! Como posso te ajudar nesta tela?</div>
+                    
+                    <div id="aura-feedback-container" class="aura-feedback-wrapper" style="display: none;">
+                        <div id="aura-feedback-actions" style="display: flex; gap: 6px;">
+                            <button class="aura-btn-feedback" id="aura-btn-like" title="Útil">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                            </button>
+                            <button class="aura-btn-feedback" id="aura-btn-dislike" title="Incorreto">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path></svg>
+                            </button>
+                        </div>
+                        <span id="aura-feedback-msg" class="aura-feedback-msg" style="display:none;"></span>
+                    </div>
+                </div>
+
+                <div class="aura-input-wrapper" id="aura-input-container">
                     <input type="text" id="aura-prompt-input" placeholder="Ex: Como eu crio uma pasta?" autocomplete="off">
                     <button class="aura-btn-send" id="aura-btn-ask">➜</button>
                 </div>
@@ -129,146 +80,104 @@ function injetarEstilosAura() {
         `;
         document.documentElement.appendChild(auraContainer);
 
+        function verificarVisibilidadeDAP() {
+            const url = window.location.href.toLowerCase();
+            const isLogin = url.includes('login') || url.includes('auth');
+            auraContainer.style.display = isLogin ? 'none' : 'block';
+        }
+        setInterval(verificarVisibilidadeDAP, 1000);
+        verificarVisibilidadeDAP();
+
         let isDragging = false, wasDragged = false;
         let startX, startY, initialX, initialY;
 
         const player = document.getElementById('aura-lottie-player');
         const bubble = document.getElementById('aura-speech-bubble');
-
-        // ─── CONTROLE DE ANIMAÇÃO ─────────────────────────────────────────────────
-        // Regra: a animação só toca em dois momentos:
-        //   1. Entrada no sistema — toca UMA vez e para no frame final (idle)
-        //   2. Clique no player   — toca UMA vez e para (confirma a interação)
-        //
-        // NÃO toca em: hover, drag, passagem de mouse, proatividade do idle timer.
-        //
-        // dotlottie-player API:
-        //   .play()        — inicia
-        //   .stop()        — volta ao frame 0
-        //   .pause()       — congela no frame atual
-        //   evento 'complete' — disparado ao terminar (quando não está em loop)
+        const badge = document.getElementById('aura-notification-badge');
 
         let _animacaoRodando = false;
-
         function tocarAnimacaoUmaVez() {
             if (_animacaoRodando) return;
             _animacaoRodando = true;
-            player.stop();  // Reinicia do frame 0 — necessário pois pause() congela no último frame
+            player.stop();  
             player.play();
         }
 
-        // Para no último frame quando termina (congela no frame final em vez de voltar ao 0)
-        player.addEventListener('complete', () => {
-            _animacaoRodando = false;
-            player.pause(); // Congela no frame final — visual "acordado" mas parado
-        });
+        player.addEventListener('complete', () => { _animacaoRodando = false; player.pause(); });
+        player.addEventListener('ready', () => tocarAnimacaoUmaVez());
+        setTimeout(() => { if (!_animacaoRodando) tocarAnimacaoUmaVez(); }, 400);
 
-        // 1. Entrada no sistema: toca uma vez após o player estar pronto
-        player.addEventListener('ready', () => {
-            tocarAnimacaoUmaVez();
-        });
-        // Fallback: alguns builds do dotlottie-player não emitem 'ready' — usa setTimeout
-        setTimeout(() => {
-            if (!_animacaoRodando) tocarAnimacaoUmaVez();
-        }, 400);
-
-        // ─── DRAG & DROP ──────────────────────────────────────────────────────────
         player.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            wasDragged = false;
-
-            startX = e.clientX;
-            startY = e.clientY;
-
-            // FIX #1 — offsetLeft/offsetTop retorna 0 em position:fixed sem left declarado.
-            // getBoundingClientRect() retorna a posição VISUAL real na viewport, sempre correta.
+            isDragging = true; wasDragged = false; startX = e.clientX; startY = e.clientY;
             const rect = auraContainer.getBoundingClientRect();
-            initialX = rect.left;
-            initialY = rect.top;
-
-            // Ancora imediatamente em left/top para que o drag funcione em 2D.
-            // Sem isso, right/bottom conflitam com left/top durante o movimento.
-            auraContainer.style.left   = initialX + 'px';
-            auraContainer.style.top    = initialY + 'px';
-            auraContainer.style.right  = 'auto';
-            auraContainer.style.bottom = 'auto';
-
+            initialX = rect.left; initialY = rect.top;
+            auraContainer.style.left = initialX + 'px'; auraContainer.style.top = initialY + 'px';
+            auraContainer.style.right = 'auto'; auraContainer.style.bottom = 'auto';
             e.preventDefault();
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
+            const dx = e.clientX - startX; const dy = e.clientY - startY;
             if (Math.abs(dx) > 3 || Math.abs(dy) > 3) wasDragged = true;
-
-            const maxX = window.innerWidth  - auraContainer.offsetWidth;
-            const maxY = window.innerHeight - auraContainer.offsetHeight;
-
+            const maxX = window.innerWidth - 170; const maxY = window.innerHeight - 170;
             auraContainer.style.left = Math.max(8, Math.min(initialX + dx, maxX - 8)) + 'px';
             auraContainer.style.top  = Math.max(8, Math.min(initialY + dy, maxY - 8)) + 'px';
-            // A bubble segue automaticamente — position:absolute relativa ao container
         });
 
-        document.addEventListener('mouseup', () => {
-            // FIX #3 — garante que isDragging é limpo mesmo que o mouseup ocorra sobre a bubble.
-            // Antes, soltar o mouse sobre a bubble não limpava o flag.
-            isDragging = false;
-        });
+        document.addEventListener('mouseup', () => isDragging = false);
+        bubble.addEventListener('mousedown', (e) => e.stopPropagation());
 
-        // FIX #4 — A bubble NÃO deve iniciar drag.
-        // Antes: stopPropagation bloqueava a propagação para o container, mas não impedia
-        // que um drag iniciado no player e solto sobre a bubble continuasse movendo.
-        // Agora: o drag só começa no player e o mousedown da bubble não faz nada com o drag.
-        bubble.addEventListener('mousedown', (e) => {
-            e.stopPropagation(); // Impede que cliques na bubble movam o container
-        });
-
+        // FIX DUPLO CLIQUE NO MASCOTE
         player.addEventListener('click', (e) => {
             if (wasDragged) { wasDragged = false; return; }
-
-            // 2. Clique real: toca a animação uma vez como feedback de interação
             tocarAnimacaoUmaVez();
+            proatividadeSilenciada = false;
+            badge.classList.remove('active');
+
+            if (_autoCloseTimeout) { 
+                clearTimeout(_autoCloseTimeout); 
+                _autoCloseTimeout = null; 
+            }
 
             if (bubble.classList.contains('active')) {
                 bubble.classList.remove('active');
             } else {
-                exibirBalaoAura("Precisa de ajuda com esta tela?", []);
+                exibirBalaoAura("Precisa de ajuda com esta tela?", [], true, false);
             }
         });
 
-        document.getElementById('aura-btn-ask').addEventListener('pointerdown', (e) => {
-            e.preventDefault(); e.stopPropagation(); dispararAnaliseIA();
-        });
-        document.getElementById('aura-prompt-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.stopPropagation(); dispararAnaliseIA(); }
-        });
+        document.getElementById('aura-btn-ask').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); dispararAnaliseIA(); });
+        document.getElementById('aura-prompt-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.stopPropagation(); dispararAnaliseIA(); } });
 
-        // Botão fechar — fecha a bubble sem interação com o player
         document.getElementById('aura-btn-close').addEventListener('click', (e) => {
-            e.stopPropagation();
-            bubble.classList.remove('active');
+            e.stopPropagation(); bubble.classList.remove('active'); roteiroAtivo = null; proatividadeSilenciada = true;
+            if (_autoCloseTimeout) { clearTimeout(_autoCloseTimeout); _autoCloseTimeout = null; }
+            document.getElementById('aura-sonar-highlight')?.remove(); document.getElementById('aura-backdrop')?.remove();
         });
 
-        // Fechar o balão clicando fora dele (em qualquer lugar do documento)
-        document.addEventListener('click', (e) => {
-            const bubble = document.getElementById('aura-speech-bubble');
-            const container = document.getElementById('aura-floating-container');
-            if (!bubble || !container) return;
-            // Se o clique não foi dentro do container, fecha o balão
-            if (!container.contains(e.target) && bubble.classList.contains('active')) {
-                bubble.classList.remove('active');
-            }
+        const btnLike = document.getElementById('aura-btn-like');
+        const btnDislike = document.getElementById('aura-btn-dislike');
+        const actionsDiv = document.getElementById('aura-feedback-actions');
+        const msgDiv = document.getElementById('aura-feedback-msg');
+
+        btnLike.addEventListener('click', () => {
+            actionsDiv.style.display = 'none'; msgDiv.style.display = 'block'; msgDiv.style.color = '#007a6b'; msgDiv.innerText = 'Obrigado pelo feedback!';
         });
 
-        // ─── MOTOR DE PROATIVIDADE (IDLE TIMER) ──────────────────────────────────
+        btnDislike.addEventListener('click', () => {
+            actionsDiv.style.display = 'none'; msgDiv.style.display = 'block'; msgDiv.style.color = '#ef4444'; msgDiv.innerText = 'Reportado. Vou melhorar!';
+            const ultimaPergunta = document.getElementById('aura-prompt-input')?.value || "última pergunta";
+            window.postMessage({ type: "AURA_FEEDBACK_NEGATIVE", prompt: ultimaPergunta }, window.location.origin);
+        });
+
+        // ─── MOTOR DE PROATIVIDADE COM BADGE ──────────────────────────────
         let tempoInativo = 0;
-        const TEMPO_LIMITE_SEGUNDOS = 30;
-
-        // FIX #5 — throttle no resetarCronometro.
-        // mousemove dispara ~60x/s dentro do ERP. Sem throttle, chamamos
-        // resetarCronometro centenas de vezes por segundo desnecessariamente.
+        const TEMPO_LIMITE_SEGUNDOS = 15;
         let _throttleTimer = null;
+        let _autoCloseTimeout = null; 
+        let proatividadeSilenciada = false; 
+
         function resetarCronometro() {
             if (_throttleTimer) return;
             tempoInativo = 0;
@@ -277,26 +186,52 @@ function injetarEstilosAura() {
 
         document.addEventListener('mousemove', resetarCronometro);
         document.addEventListener('keypress', resetarCronometro);
-        document.addEventListener('click',     resetarCronometro);
-        document.addEventListener('scroll',    resetarCronometro);
+        document.addEventListener('scroll', resetarCronometro);
+        
+        document.addEventListener('click', () => {
+            resetarCronometro();
+            const bubbleElement = document.getElementById('aura-speech-bubble');
+            if (bubbleElement && bubbleElement.classList.contains('active') && _autoCloseTimeout) {
+                clearTimeout(_autoCloseTimeout);
+                _autoCloseTimeout = null;
+                bubbleElement.classList.remove('active');
+                badge.classList.add('active'); 
+                proatividadeSilenciada = true; 
+            }
+        });
 
         setInterval(() => {
             tempoInativo++;
-            if (tempoInativo === TEMPO_LIMITE_SEGUNDOS) {
+            if (tempoInativo === TEMPO_LIMITE_SEGUNDOS && !proatividadeSilenciada) {
                 const bubbleElement = document.getElementById('aura-speech-bubble');
+                
                 if (bubbleElement && !bubbleElement.classList.contains('active')) {
-                    exibirBalaoAura("Vejo que você parou nesta tela. Precisa de alguma ajuda para continuar? 🤔", [
-                        { label: "Sim, me ajude",  action: () => dispararAnaliseIA("O que devo fazer nesta tela?") },
-                        { label: "Não, obrigado",  action: () => { bubbleElement.classList.remove('active'); resetarCronometro(); } }
-                    ]);
+                    tocarAnimacaoUmaVez();
+                    
+                    exibirBalaoAura("Vejo que você parou nesta tela. Precisa de alguma ajuda para continuar?", [
+                        { label: "Sim, me ajude", action: () => { 
+                            if (_autoCloseTimeout) { clearTimeout(_autoCloseTimeout); _autoCloseTimeout = null; }
+                            exibirBalaoAura("Ótimo! O que você gostaria de fazer?", [], true, false);
+                            document.getElementById('aura-prompt-input').focus();
+                        }},
+                        { label: "Não, obrigado", action: () => { 
+                            if (_autoCloseTimeout) { clearTimeout(_autoCloseTimeout); _autoCloseTimeout = null; }
+                            bubbleElement.classList.remove('active'); proatividadeSilenciada = true; resetarCronometro(); 
+                        }}
+                    ], false, true); 
+                    
+                    _autoCloseTimeout = setTimeout(() => {
+                        if (bubbleElement.classList.contains('active')) {
+                            bubbleElement.classList.remove('active');
+                            badge.classList.add('active'); 
+                            proatividadeSilenciada = true; 
+                            resetarCronometro();
+                        }
+                    }, 12000);
                 }
             }
         }, 1000);
 
-        // FIX #6 — debounce no MutationObserver do SPA.
-        // { childList: true, subtree: true } dispara para CADA mutação no DOM do ERP
-        // (spinners, tooltips, validações de campo) — potencialmente centenas por segundo.
-        // Debounce de 300ms agrupa todas as mutações em uma única verificação de URL.
         let urlAtual = window.location.href;
         let _spaDebounce = null;
         const observerSPA = new MutationObserver(() => {
@@ -305,311 +240,334 @@ function injetarEstilosAura() {
                 _spaDebounce = null;
                 if (urlAtual !== window.location.href) {
                     urlAtual = window.location.href;
-                    console.log("Aura: Troca de tela Angular detetada. Limpando contexto antigo...");
-                    document.getElementById('aura-sonar-highlight')?.remove();
-                    document.getElementById('aura-backdrop')?.remove();
-                    const bubbleEl = document.getElementById('aura-speech-bubble');
-                    if (bubbleEl?.classList.contains('active')) {
-                        exibirBalaoAura(`Olá, ${descobrirNomeUsuario()}! Precisa de ajuda nesta nova tela?`, []);
+                    document.getElementById('aura-sonar-highlight')?.remove(); document.getElementById('aura-backdrop')?.remove();
+                    proatividadeSilenciada = false; badge.classList.remove('active');
+                    if (_autoCloseTimeout) { clearTimeout(_autoCloseTimeout); _autoCloseTimeout = null; }
+                    
+                    if (!roteiroAtivo) {
+                        const bubbleEl = document.getElementById('aura-speech-bubble');
+                        if (bubbleEl?.classList.contains('active')) {
+                            exibirBalaoAura(`Olá, ${descobrirNomeUsuario()}! Precisa de ajuda nesta nova tela?`, [], true, false);
+                        }
                     }
                 }
             }, 300);
         });
         observerSPA.observe(document.body, { childList: true, subtree: true });
 
-        // 🟢 PRE-CAPTURE: Tira a "foto" milissegundos antes de o utilizador enviar a pergunta
-        document.getElementById('aura-prompt-input').addEventListener('focus', () => {
-            // Avisa o background.js para tirar a screenshot agora e guardar em cache silenciosamente
-            window.postMessage({ type: "AURA_PRE_CAPTURE" }, window.location.origin);
-        });
+        document.getElementById('aura-prompt-input').addEventListener('focus', () => { window.postMessage({ type: "AURA_PRE_CAPTURE" }, window.location.origin); });
     }
 
-    // ─── POSICIONAMENTO DA BUBBLE ─────────────────────────────────────────────
-    // Definida no escopo do IIFE para ser acessível tanto em iniciarAura (drag,
-    // resize) quanto em exibirBalaoAura (ao abrir o balão).
-    // Usa getElementById para não depender de variáveis de closure.
-    function exibirBalaoAura(texto, opcoes = []) {
+    // =========================================================
+    // 🟢 RENDERIZADOR DO BALÃO
+    // =========================================================
+    function exibirBalaoAura(texto, opcoes = [], efeitoDigitacao = true, ocultarInput = false) {
         const bubble = document.getElementById('aura-speech-bubble');
         if (!bubble) return;
 
-        bubble.querySelector('.aura-text').innerText = texto;
+        texto = texto || ""; // Trava Anti-Crash
+
+        const fbContainer = document.getElementById('aura-feedback-container');
+        if (fbContainer) {
+            fbContainer.classList.remove('show-feedback');
+        }
+
+        const textEl = bubble.querySelector('.aura-text');
         const optDiv = bubble.querySelector('.aura-options');
-        optDiv.innerHTML = '';
+        
+        if (ocultarInput) { bubble.classList.add('no-input'); } 
+        else { bubble.classList.remove('no-input'); }
+
+        optDiv.innerHTML = ''; optDiv.style.opacity = '0'; optDiv.style.pointerEvents = 'none';
+        _reativarInputs();
 
         opcoes.forEach(opt => {
-            const btn = document.createElement('button');
-            btn.className = 'aura-btn';
-            btn.innerText = opt.label;
-            btn.addEventListener('click', (e) => { e.stopPropagation(); opt.action(); });
-            optDiv.appendChild(btn);
+            const btn = document.createElement('button'); btn.className = 'aura-btn'; btn.innerText = opt.label;
+            btn.addEventListener('click', (e) => { e.stopPropagation(); opt.action(); }); optDiv.appendChild(btn);
         });
 
-        // Posicionamento tratado 100% por CSS (position:absolute no container fixed)
         bubble.classList.add('active');
+
+        let textoFormatado = texto.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');            
+
+        if (auraTypingInterval) clearInterval(auraTypingInterval);
+
+        if (efeitoDigitacao && !textoFormatado.includes('<br>')) {
+            textEl.innerHTML = ''; let i = 0;
+            auraTypingInterval = setInterval(() => {
+                textEl.innerHTML += textoFormatado.charAt(i); i++;
+                if (i >= textoFormatado.length) { clearInterval(auraTypingInterval); optDiv.style.opacity = '1'; optDiv.style.pointerEvents = 'auto'; }
+            }, 25); 
+        } else {
+            textEl.style.opacity = '0'; textEl.innerHTML = textoFormatado;
+            setTimeout(() => { textEl.style.opacity = '1'; }, 50); optDiv.style.opacity = '1'; optDiv.style.pointerEvents = 'auto';
+        }
     }
 
     // =========================================================
-    // 👁️ O OLHO BIÔNICO DA AURA (Fase 1)
+    // 🟢 BUSCA NATIVA E SEMÂNTICA (Padrão Enterprise via XPath)
     // =========================================================
+    function encontrarElementoNaTela(alvo) {
+        if (!alvo) return null;
 
-    function capturarDOMParaIA() {
-        // Limpa mapeamentos antigos para não poluir
-        document.querySelectorAll('[data-aura-map]').forEach(e => e.removeAttribute('data-aura-map'));
+        // 1. TENTATIVA A: Busca direta via seletor CSS clássico (O mais rápido)
+        // O try/catch ignora erros se a IA inventar pseudo-seletores como :contains
+        try {
+            let el = document.querySelector(alvo);
+            if (el && el.offsetParent !== null) return { elemento: el, frame: null };
+        } catch(e) {} 
 
-        // FIX E — exclui o próprio container da Aura da captura.
-        // Sem isso, o player Lottie, o botão fechar, os chips e o input da Aura
-        // apareciam na lista enviada para a IA como "elementos interativos do ERP".
-        const auraContainer = document.getElementById('aura-floating-container');
+        // 2. TENTATIVA B: Busca Semântica por Texto Visível (XPath Nativo do Chrome)
+        // Se a busca CSS falhou, vamos extrair o texto para procurar na tela.
+        let textoLimpo = alvo;
+        if (alvo.includes(':contains(')) {
+            // Extrai a palavra de dentro do :contains('Palavra')
+            const match = alvo.match(/:contains\(['"]?(.*?)['"]?\)/);
+            if (match) textoLimpo = match[1];
+        } else {
+            // Remove pontos ou hashtags iniciais se a IA mandou uma classe/id errada
+            textoLimpo = alvo.replace(/^[.#]/, "").trim(); 
+        }
 
-        const seletores = [
-            "button", "a", "input", "select",
-            "[role='button']", "[role='menuitem']", "[role='tab']", "[role='link']",
-            "[class*='btn']", "[class*='button']", "[class*='action']", "[class*='icon']",
-            "[tabindex]:not([tabindex='-1'])",
-            "[ng-click]", "[onclick]",
-            "*:not(div):not(span):not(p):not(body):not(html)"
-        ].join(", ");
-
-        const elementos = document.querySelectorAll(seletores);
-        let domList = [];
-        let elementosMapeados = new Set();
-
-        elementos.forEach((el, index) => {
-            // Ignora qualquer elemento que pertença à UI da Aura
-            if (auraContainer && auraContainer.contains(el)) return;
-
-            const rect = el.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.top <= window.innerHeight) {
-                let texto = el.innerText || el.textContent || el.value || el.getAttribute("aria-label") || el.getAttribute("title") || "";
-                texto = texto.trim().substring(0, 40).replace(/\n/g, " ");
-
-                if (texto && texto.length > 1 && !elementosMapeados.has(texto)) {
-                    elementosMapeados.add(texto);
-                    el.setAttribute('data-aura-map', index);
-                    domList.push(`[ID: ${index}] TIPO: ${el.tagName.toLowerCase()} | TEXTO: "${texto}"`);
+        if (textoLimpo && textoLimpo.length > 2) {
+            try {
+                const txtLower = textoLimpo.toLowerCase();
+                // O XPath varre a tela à procura de links, botões ou itens de menu que contenham a palavra (case-insensitive)
+                const xpath = `//a[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ', 'abcdefghijklmnopqrstuvwxyzáéíóúàèìòùâêîôûãõç'), '${txtLower}')] | //button[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ', 'abcdefghijklmnopqrstuvwxyzáéíóúàèìòùâêîôûãõç'), '${txtLower}')] | //*[contains(@class, 'menu-item') and contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ', 'abcdefghijklmnopqrstuvwxyzáéíóúàèìòùâêîôûãõç'), '${txtLower}')] | //*[contains(@role, 'button') and contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ', 'abcdefghijklmnopqrstuvwxyzáéíóúàèìòùâêîôûãõç'), '${txtLower}')]`;
+                
+                const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                let elXPath = result.singleNodeValue;
+                
+                // Verifica se achou e se o elemento não está invisível no Angular (display: none)
+                if (elXPath && elXPath.offsetParent !== null) {
+                    return { elemento: elXPath, frame: null };
                 }
-            }
-        });
+            } catch(e) {}
+        }
 
-        return "ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:\n" + domList.join("\n");
-    }
-
-// 🟢 CAÇADOR DE ELEMENTOS (Invade Iframes se necessário)
-    function encontrarElementoNaTela(seletorCSS) {
-        // 1. Tenta na página principal
-        let el = document.querySelector(seletorCSS);
-        if (el) return { elemento: el, frame: null };
-
-        // 2. Tenta dentro dos Iframes
+        // 3. TENTATIVA C: Busca Extrema dentro de Iframes (Fallbacks)
         const iframes = document.querySelectorAll('iframe');
         for (let frame of iframes) {
             try {
                 const frameDoc = frame.contentDocument || frame.contentWindow.document;
-                el = frameDoc.querySelector(seletorCSS);
-                if (el) return { elemento: el, frame: frame };
-            } catch (e) {
-                // Erro de CORS (Iframe de outro domínio), ignoramos
-            }
+                let el = frameDoc.querySelector(alvo);
+                if (el && el.offsetParent !== null) return { elemento: el, frame: frame };
+            } catch (e) {}
         }
-        return null;
+        
+        return null; // Retorna null para o GPS tentar novamente nos próximos milissegundos
     }
 
-    // 🟢 BACKDROP TEMPORÁRIO (Auto-destruição em 5 segundos)
     function criarBackdrop(rect, frameTop, frameLeft) {
         document.getElementById('aura-backdrop')?.remove();
-        const backdrop = document.createElement('div');
+        const backdrop = document.createElement('div'); 
         backdrop.id = 'aura-backdrop';
         
-        // Estilo com clip-path para o spotlight
+        // pointer-events: none garante que NADA fique bloqueado.
         backdrop.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.6); z-index: 999998; pointer-events: none;
-            clip-path: polygon(
-                0% 0%, 0% 100%, 
-                ${frameLeft + rect.left}px 100%, 
-                ${frameLeft + rect.left}px ${frameTop + rect.top}px, 
-                ${frameLeft + rect.right}px ${frameTop + rect.top}px, 
-                ${frameLeft + rect.right}px ${frameTop + rect.bottom}px, 
-                ${frameLeft + rect.left}px ${frameTop + rect.bottom}px, 
-                ${frameLeft + rect.left}px 100%, 
-                100% 100%, 100% 0%
-            );
-            transition: opacity 0.5s ease;
-            opacity: 1;
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+            background: rgba(0,0,0,0.6); z-index: 999998; pointer-events: none; 
+            clip-path: polygon(0% 0%, 0% 100%, ${frameLeft + rect.left}px 100%, ${frameLeft + rect.left}px ${frameTop + rect.top}px, ${frameLeft + rect.right}px ${frameTop + rect.top}px, ${frameLeft + rect.right}px ${frameTop + rect.bottom}px, ${frameLeft + rect.left}px ${frameTop + rect.bottom}px, ${frameLeft + rect.left}px 100%, 100% 100%, 100% 0%); 
+            transition: opacity 1s ease; opacity: 1;
         `;
         document.body.appendChild(backdrop);
-
-        // ⏱️ AUTO-RELEASE: Remove o efeito após 5 segundos para não travar o utilizador
-        setTimeout(() => {
-            if (backdrop) {
-                backdrop.style.opacity = '0';
-                setTimeout(() => backdrop.remove(), 500);
-            }
-        }, 5000);
+        
+        // 🟢 FASE 1 (Atenção): O fundo escuro some após 3.5 segundos para libertar a visão do ERP
+        setTimeout(() => { 
+            if (backdrop) { 
+                backdrop.style.opacity = '0'; 
+                setTimeout(() => backdrop.remove(), 1000); 
+            } 
+        }, 3500);
     }
 
-    // 🟢 HOLOFOTE CENTRALIZADO
     function aplicarHolofoteDom(auraIdOuSeletor, isSeletor = false) {
-        document.getElementById('aura-sonar-highlight')?.remove();
+        document.getElementById('aura-sonar-highlight')?.remove(); 
         document.getElementById('aura-backdrop')?.remove();
         
         if (!auraIdOuSeletor) return;
-
+        
         let match = isSeletor ? encontrarElementoNaTela(auraIdOuSeletor) : encontrarElementoNaTela(`[data-aura-map="${auraIdOuSeletor}"]`);
-
         if (!match || !match.elemento) return;
-
-        const el = match.elemento;
-        const frame = match.frame;
-
+        
+        const el = match.elemento; 
+        const frame = match.frame; 
+        
+        // Faz o scroll suave para o botão
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
+        
+        // Esperamos 500ms para o scroll terminar antes de desenhar
         setTimeout(() => {
-            const rect = el.getBoundingClientRect();
+            const rect = el.getBoundingClientRect(); 
             let fTop = 0, fLeft = 0;
+            if (frame) { const fRect = frame.getBoundingClientRect(); fTop = fRect.top; fLeft = fRect.left; }
             
-            if (frame) {
-                const fRect = frame.getBoundingClientRect();
-                fTop = fRect.top;
-                fLeft = fRect.left;
-            }
-
-            // Ativa o Spotlight temporário
             criarBackdrop(rect, fTop, fLeft);
-
-            const highlight = document.createElement('div');
+            
+            const highlight = document.createElement('div'); 
             highlight.id = 'aura-sonar-highlight';
-            
-            // 🟢 AJUSTE DE CENTRALIZAÇÃO:
-            // Calculamos o topo e esquerda somando o scroll e compensando a borda
-            const top = rect.top + fTop + window.scrollY;
+            const top = rect.top + fTop + window.scrollY; 
             const left = rect.left + fLeft + window.scrollX;
-
-            highlight.style.cssText = `
-                position: absolute;
-                top: ${top - 6}px; 
-                left: ${left - 6}px;
-                width: ${rect.width + 12}px; 
-                height: ${rect.height + 12}px;
-                border: 4px solid #00E676; 
-                border-radius: 8px;
-                box-shadow: 0 0 20px #00E676, inset 0 0 10px #00E676;
-                z-index: 999999; 
-                pointer-events: none;
-                animation: aura-pulse 1.5s infinite;
-                transition: opacity 0.5s ease;
-            `;
             
+            highlight.style.cssText = `
+                position: absolute; top: ${top - 6}px; left: ${left - 6}px; 
+                width: ${rect.width + 12}px; height: ${rect.height + 12}px; 
+                border: 4px solid #00E676; border-radius: 8px; 
+                box-shadow: 0 0 20px #00E676, inset 0 0 10px #00E676; 
+                z-index: 999999; pointer-events: none; 
+                animation: aura-pulse 1.5s infinite; transition: opacity 0.5s ease;
+            `;
             document.body.appendChild(highlight);
-
-            // ⏱️ AUTO-CLEANUP: Remove o sonar junto com o backdrop
-            setTimeout(() => {
-                if (highlight) {
-                    highlight.style.opacity = '0';
-                    setTimeout(() => highlight.remove(), 500);
-                }
-            }, 5500);
-
-            // Se o utilizador clicar antes do tempo, remove imediatamente
-            el.addEventListener('click', () => {
-                document.getElementById('aura-sonar-highlight')?.remove();
-                document.getElementById('aura-backdrop')?.remove();
+            
+            // 🟢 FASE 2 (Sinalização): A luz verde pisca por 15 longos segundos
+            const hideTimeout = setTimeout(() => { 
+                if (highlight) { 
+                    highlight.style.opacity = '0'; 
+                    setTimeout(() => highlight.remove(), 500); 
+                } 
+            }, 15000);
+            
+            // 🟢 FASE 3 (Ação do Utilizador): Se ele clicar no botão, limpamos a luz instantaneamente
+            el.addEventListener('click', () => { 
+                clearTimeout(hideTimeout);
+                document.getElementById('aura-sonar-highlight')?.remove(); 
+                document.getElementById('aura-backdrop')?.remove(); 
             }, { once: true });
             
         }, 500);
     }
 
-    // ─── LISTENER DE MENSAGENS (único — AURA_RESPONSE) ───────────────────────
+// =========================================================
+    // 🟢 2. INICIAR ROTEIRO (Trava Anti-Fantasma)
+    // =========================================================
+    function iniciarRoteiro(payloadRoteiro, autoPilot = false) {
+        roteiroAtivo = payloadRoteiro; 
+        passoAtualIndex = 0; 
+        
+        // 🟢 TRAVA FÍSICA: Ignora a IA e obriga o Piloto Automático a ficar Desligado
+        modoPilotoAutomatico = false; 
+        
+        executarPassoAtual();
+    }
+
+    // ✅ FUNÇÃO RESTAURADA: Esta função tinha sumido do seu código!
+    function executarPassoAtual() {
+        if (!roteiroAtivo || passoAtualIndex >= roteiroAtivo.length) {
+            roteiroAtivo = null; 
+            exibirBalaoAura("Chegámos ao fim do processo! Agora é contigo. ✨", [], true, false);
+            return;
+        }
+        const passo = roteiroAtivo[passoAtualIndex];
+        const msgPasso = passo.mensagem || `Siga para o passo ${passoAtualIndex + 1}...`; // Trava anti-crash
+        
+        exibirBalaoAura(msgPasso, [], true, true); 
+        farejarBotao(passo, 0);
+    }
+
+// =========================================================
+    // 🟢 3. BUSCA COM PACIÊNCIA
+    // =========================================================
+    function farejarBotao(passo, tentativas) {
+        // 🟢 AUMENTAMOS PARA 40 TENTATIVAS (12 Segundos). 
+        // Dá tempo de sobra para a animação do menu Angular abrir!
+        if (tentativas > 40) {
+            exibirBalaoAura("Parece que a página demorou a carregar ou o botão mudou. Queres tentar de novo? 🤔", [], true, false);
+            roteiroAtivo = null; 
+            return;
+        }
+
+        let match = null;
+        
+        if (passo.elemento_id != null) {
+            match = encontrarElementoNaTela(`[data-aura-map="${passo.elemento_id}"]`);
+        } 
+        
+        if (!match && passo.seletor_css) {
+            match = encontrarElementoNaTela(passo.seletor_css);
+        }
+
+        if (match && match.elemento) {
+            let alvo = passo.elemento_id != null ? passo.elemento_id : passo.seletor_css;
+            aplicarHolofoteDom(alvo, passo.elemento_id == null); 
+            
+            match.elemento.addEventListener('click', () => { 
+                passoAtualIndex++; 
+                // Espera 800ms para a tela nova carregar antes de procurar o próximo botão
+                setTimeout(executarPassoAtual, 800); 
+            }, { once: true });
+            
+            // O Piloto Automático está desativado na raiz, mas a lógica de segurança fica aqui
+            if (modoPilotoAutomatico && passoAtualIndex < roteiroAtivo.length) { 
+                setTimeout(() => { if (roteiroAtivo) match.elemento.click(); }, 2000); 
+            }
+        } else { 
+            // Tenta de novo daqui a 300 milissegundos
+            setTimeout(() => farejarBotao(passo, tentativas + 1), 300); 
+        }
+    }
+
+    // =========================================================
+    // ─── COMUNICAÇÃO (Listeners e Disparos)
+    // =========================================================
     window.addEventListener("message", (event) => {
         if (event.origin !== window.location.origin) return;
-
         if (event.data.type === "AURA_RESPONSE") {
             const payload = event.data.payload || {};
-
-            // FIX D — re-habilita inputs assim que a resposta chega
             _reativarInputs();
 
-            // Texto — aceita tanto "mensagem" quanto "advice" (compatibilidade retroativa)
             const textoResposta = payload.mensagem || payload.advice || "Desculpe, não consegui processar a resposta.";
-
-            // Chips de sugestão
             let sugestoes = [];
             if (payload.sugestoes && Array.isArray(payload.sugestoes)) {
-                sugestoes = payload.sugestoes.map(s => ({
-                    label: s,
-                    action: () => {
-                        document.getElementById('aura-sonar-highlight')?.remove();
-                        document.getElementById('aura-backdrop')?.remove();
-                        dispararAnaliseIA(s);
-                    }
-                }));
+                sugestoes = payload.sugestoes.map(s => ({ label: s, action: () => { document.getElementById('aura-sonar-highlight')?.remove(); document.getElementById('aura-backdrop')?.remove(); dispararAnaliseIA(s); } }));
             }
 
-            exibirBalaoAura(textoResposta, sugestoes);
-
-            // Lógica híbrida: Brain (seletor CSS gravado) → Fallback visual (DOM ID)
-            if (payload.seletor_css) {
-                console.log("Aura: Usando memória muscular (Brain):", payload.seletor_css);
+            if (payload.roteiro && Array.isArray(payload.roteiro)) {
                 document.getElementById('aura-sonar-highlight')?.remove();
-                let matchAlvo = null;
-                try { matchAlvo = encontrarElementoNaTela(payload.seletor_css); }
-                catch(e) { console.warn("Aura: Seletor CSS inválido:", payload.seletor_css); }
-
-                if (matchAlvo?.elemento) {
-                    console.log("Aura: Elemento encontrado pelo CSS (inclui iframes).");
-                    aplicarHolofoteDom(payload.seletor_css, true);
-                } else {
-                    console.warn("Aura: Seletor não encontrado. Acionando Plano B (DOM visual)...");
-                    if (payload.elemento_id != null) {
-                        aplicarHolofoteDom(payload.elemento_id, false);
-                    } else {
-                        console.warn("Aura: Plano B também falhou. Nenhum elemento identificado.");
-                    }
-                }
-            } else if (payload.elemento_id != null) {
-                console.log("Aura: Usando DOM visual, ID:", payload.elemento_id);
-                aplicarHolofoteDom(payload.elemento_id, false);
+                iniciarRoteiro(payload.roteiro, payload.piloto_automatico === true);
             } else {
-                document.getElementById('aura-sonar-highlight')?.remove();
+                roteiroAtivo = null; 
+                exibirBalaoAura(textoResposta, sugestoes, true, false); 
+                
+                const fbContainer = document.getElementById('aura-feedback-container');
+                if (fbContainer) { 
+                    fbContainer.classList.add('show-feedback');
+                    document.getElementById('aura-feedback-actions').style.display = 'flex'; 
+                    document.getElementById('aura-feedback-msg').style.display = 'none'; 
+                }
+
+                if (payload.seletor_css) {
+                    let matchAlvo = null; try { matchAlvo = encontrarElementoNaTela(payload.seletor_css); } catch(e) {}
+                    if (matchAlvo?.elemento) aplicarHolofoteDom(payload.seletor_css, true);
+                    else if (payload.elemento_id != null) aplicarHolofoteDom(payload.elemento_id, false);
+                } else if (payload.elemento_id != null) { aplicarHolofoteDom(payload.elemento_id, false);
+                } else { document.getElementById('aura-sonar-highlight')?.remove(); }
             }
         }
     });
 
     function dispararAnaliseIA(textoOpcional) {
-        const inputEl = document.getElementById('aura-prompt-input');
+        const inputEl = document.getElementById('aura-prompt-input'); 
         const btnEnviar = document.getElementById('aura-btn-ask');
         const prompt  = textoOpcional || (inputEl?.value || '').trim() || "O que devo fazer nesta tela?";
-
-        // FIX C — desabilita inputs durante o processamento para evitar envios duplos
-        if (inputEl)  { inputEl.value = ''; inputEl.disabled = true; }
+        
+        if (inputEl)  { inputEl.value = ''; inputEl.disabled = true; } 
         if (btnEnviar) btnEnviar.disabled = true;
 
-        exibirBalaoAura("Estou a analisar a interface... Só um momento! 🔍", []);
+        const fbContainer = document.getElementById('aura-feedback-container');
+        if (fbContainer) fbContainer.classList.remove('show-feedback');
 
-        const extratoDOM = capturarDOMParaIA();
-        const nomeReal   = descobrirNomeUsuario();
+        const loadingHTML = `<div class="aura-typing-dots"><span></span><span></span><span></span></div>`;
+        exibirBalaoAura(loadingHTML, [], false, true); 
 
-        window.postMessage({
-            type:        "AURA_CAPTURE",
-            url:         window.location.href,
-            prompt:      prompt,
-            dom_context: extratoDOM,
-            user_name:   nomeReal,
-            tenant_id:   "senior_default"
-        }, window.location.origin);
+        const extratoDOM = capturarDOMParaIA(); const nomeReal = descobrirNomeUsuario();
+        window.postMessage({ type: "AURA_CAPTURE", url: window.location.href, prompt: prompt, dom_context: extratoDOM, user_name: nomeReal, tenant_id: "senior_default" }, window.location.origin);
     }
 
     function _reativarInputs() {
-        const inputEl   = document.getElementById('aura-prompt-input');
-        const btnEnviar = document.getElementById('aura-btn-ask');
-        if (inputEl)   inputEl.disabled   = false;
-        if (btnEnviar) btnEnviar.disabled = false;
-        if (inputEl)   inputEl.focus();
+        const inputEl = document.getElementById('aura-prompt-input'); const btnEnviar = document.getElementById('aura-btn-ask');
+        if (inputEl) inputEl.disabled = false; if (btnEnviar) btnEnviar.disabled = false; if (inputEl) inputEl.focus();
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', iniciarAura);
-    } else {
-        iniciarAura();
-    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', iniciarAura); } 
+    else { iniciarAura(); }
 })();

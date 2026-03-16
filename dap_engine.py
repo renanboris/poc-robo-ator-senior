@@ -77,11 +77,20 @@ def _limpar_cache_antigo(conn):
         )
     """)
 
+# FIX Bug #DAP-02: _limpar_cache_antigo executava 2 DELETEs pesados a cada request.
+# Throttle: limpeza apenas 1x/hora usando timestamp global.
+_ultima_limpeza_cache: float = 0.0
+_INTERVALO_LIMPEZA_S: float = 3600.0  # 1 hora
+
 def _cache_get(key: str) -> dict | None:
+    global _ultima_limpeza_cache
     with _cache_lock:
         try:
             with sqlite3.connect(_DB_CACHE_FILE) as conn:
-                _limpar_cache_antigo(conn)
+                agora = time.time()
+                if agora - _ultima_limpeza_cache > _INTERVALO_LIMPEZA_S:
+                    _limpar_cache_antigo(conn)
+                    _ultima_limpeza_cache = agora
                 cursor = conn.execute("SELECT resposta_json FROM dap_cache WHERE cache_key = ?", (key,))
                 row = cursor.fetchone()
                 if row:
@@ -299,7 +308,10 @@ def _analisar_sync(
 ) -> dict:
 
     # 1. Verifica Cache (Considera o hash do DOM para evitar stale cache entre telas)
-    dom_hash  = str(abs(hash(dom_context)))[:12]
+    # FIX Bug #DAP-01: hash() Python é não-determinístico entre sessões (PYTHONHASHSEED).
+    # Isso invalidava TODO o cache SQLite a cada restart. Corrigido com hashlib.md5.
+    import hashlib
+    dom_hash  = hashlib.md5(dom_context.encode("utf-8", errors="replace")).hexdigest()[:12]
     cache_key = f"{tenant_id}_{url}_{prompt_usuario}_{dom_hash}"
 
     cached = _cache_get(cache_key)

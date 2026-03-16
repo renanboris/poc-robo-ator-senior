@@ -1,10 +1,29 @@
+# Senior Training OS — Dependências Completas
+# Gerado pelo Audit de Código — Correção de Bug #REQ-01
+# Execute: pip install -r requirements.txt
+
+# === API & WEB ===
 fastapi>=0.100.0
 uvicorn>=0.23.0
 pydantic>=2.0.0
-pinecone>=3.0.0
-openai>=1.10.0
-google-genai>=0.8.0
 python-dotenv>=1.0.0
-reportlab>=4.0.0
-pillow>=10.0.0
 jinja2>=3.1.2
+
+# === IA & EMBEDDINGS ===
+google-genai>=0.8.0
+openai>=1.10.0
+pinecone>=3.0.0
+
+# === AUTOMAÇÃO / BROWSER ===
+playwright>=1.40.0
+# Execute após instalar: playwright install chromium
+
+# === GERAÇÃO DE MÍDIA ===
+edge-tts>=6.1.9          # FIX: estava ausente — usado em main.py para TTS
+moviepy>=1.0.3           # FIX: estava ausente — usado em main.py para renderização
+proglog>=0.1.10          # FIX: estava ausente — usado em main.py (CustomRenderLogger)
+pygame>=2.5.0            # FIX: estava ausente — usado em main.py para playback de áudio
+
+# === PROCESSAMENTO DE IMAGEM ===
+pillow>=10.0.0
+reportlab>=4.0.0

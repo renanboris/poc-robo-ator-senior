@@ -53,14 +53,21 @@ async def dry_run_validador(caminho_json: str):
                         locator = page.locator(seletor).first
                         if acao == "upload":
                             print(f"   [Passo {id_p}] 📁 Mock de Upload em: {seletor}")
-                            continue # Ignora upload real no dry-run
-                            
-                        await locator.click(timeout=3000, force=True)
-                        print(f"   [Passo {id_p}] ✅ Clique validado: {seletor}")
+                            continue  # Ignora upload real no dry-run
+
+                        # FIX Bug #VAL-01: force=True foi removido.
+                        # Com force=True, o Playwright bypassa verificações de visibilidade,
+                        # habilitação e cobertura do elemento — um botão desabilitado ou
+                        # escondido atrás de um modal passaria como "válido".
+                        # Sem force=True, o dry-run valida o estado REAL do elemento.
+                        await locator.wait_for(state="visible", timeout=3000)
+                        await locator.wait_for(state="enabled", timeout=1000)
+                        print(f"   [Passo {id_p}] ✅ Seletor válido e elemento visível: {seletor}")
                     except Exception as e:
                         print(f"\n❌ ERRO CRÍTICO NO PASSO {id_p}!")
-                        print(f"   O botão '{alvo.get('label_curto', seletor)}' não foi encontrado ou mudou.")
+                        print(f"   O botão '{alvo.get('label_curto', seletor)}' não foi encontrado, mudou ou está desabilitado.")
                         print(f"   Seletor: {seletor}")
+                        print(f"   Detalhe: {e}")
                         await browser.close()
                         return
 
