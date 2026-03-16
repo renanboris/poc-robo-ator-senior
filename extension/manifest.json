@@ -33,7 +33,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["aura.lottie"],
+      "resources": ["aura.json"],
       "matches": ["https://*.senior.com.br/*"]
     }
   ]

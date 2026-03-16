@@ -1,159 +1,438 @@
-/* style.css - Aura Senior Success Hub */
+/* ==========================================================================
+   AURA DAP — Production CSS
+   Glassmorphism Enterprise Edition · 2026
+   
+   REGRA DE OURO: Todo seletor usa !important.
+   Motivo: Este CSS é injetado via <style> dentro do Senior X (ERP corporativo
+   com ~2000 regras próprias). Sem !important, o ERP sobrescreve tudo.
+   ========================================================================== */
 
-/* ─── Container principal ─── */
+/* ─── 1. CONTAINER PRINCIPAL ─────────────────────────────────────────────── */
+/*
+   position: fixed  → ancora na viewport
+   position: fixed É um "positioned element", portanto cria containing block
+   para filhos com position: absolute. A bubble usa isso para flutuar acima
+   do player sem nenhum JS de posicionamento — segue o drag automaticamente.
+*/
 #aura-floating-container {
     position: fixed !important;
-    bottom: 50px !important;
-    right: 50px !important;
-    width: 200px !important;
-    height: 200px !important;
+    bottom: 30px !important;
+    right: 30px !important;
     z-index: 2147483647 !important;
-    cursor: grab !important;
     display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border: none !important;
+    pointer-events: none !important;
     user-select: none !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif !important;
 }
 
-#aura-floating-container:active {
-    cursor: grabbing !important;
+/* Todos os filhos diretos recebem pointer-events de volta */
+#aura-floating-container > * {
+    pointer-events: auto !important;
 }
 
-/* ─── Player Lottie ─── */
+/* ─── 2. MASCOTE LOTTIE ───────────────────────────────────────────────────── */
+/*
+   TAMANHO DO DAP: ajuste width e height abaixo.
+   Valores recomendados: 100px (compacto) · 130px (padrão) · 160px (grande)
+*/
 #aura-lottie-player {
-    width: 100% !important;
-    height: 100% !important;
+    width: 170px !important;
+    height: 170px !important;
+    cursor: pointer !important;
     display: block !important;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.18)) !important;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    will-change: transform !important;
 }
 
-/* ─── Balão de fala ─── */
+/* Hover: scale suave para indicar que é clicável — SEM disparar animação Lottie */
+#aura-lottie-player:hover {
+    transform: scale(1.07) !important;
+}
+
+#aura-lottie-player:active {
+    cursor: grabbing !important;
+    transform: scale(0.93) !important;
+}
+
+/* ─── 3. BALÃO DE CONVERSA ────────────────────────────────────────────────── */
+/*
+   position: absolute dentro de position: fixed.
+   O container fixed é o containing block → a bubble posiciona-se em relação
+   a ele, não ao viewport. Quando o container é arrastado, a bubble segue
+   automaticamente sem nenhum JS de reposicionamento.
+
+   ► PARA AJUSTAR A DISTÂNCIA ENTRE O BALÃO E O ÍCONE: mude o valor em bottom.
+     Exemplos:  calc(100% + 4px)  → colado
+                calc(100% + 8px)  → padrão atual
+                calc(100% + 16px) → afastado
+*/
 #aura-speech-bubble {
     display: none !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+
     position: absolute !important;
-    bottom: 80% !important;
-    right: 15px !important;
-    width: 280px !important;
-    background-color: #ffffff !important;
-    border: 2px solid #00ddb3 !important;
-    border-radius: 16px !important;
-    padding: 16px !important;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-    color: #1f2937 !important;
-    cursor: default !important;
+    bottom: calc(100% + 8px) !important;  /* ← ajuste a distância aqui */
+    right: 0 !important;                  /* alinha a borda direita com o player */
+
+    width: 320px !important;
+    max-width: calc(100vw - 70px) !important;
+
+    background: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    border-radius: 20px 20px 4px 20px !important;
+    padding: 20px !important;
+
+    box-shadow:
+        0 20px 40px rgba(0, 0, 0, 0.10),
+        0 4px 12px rgba(0, 0, 0, 0.06),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.45) !important;
+
+    transform-origin: bottom right !important;
+    z-index: 1 !important;
 }
 
 #aura-speech-bubble.active {
     display: flex !important;
-    flex-direction: column !important;
-    gap: 12px !important;
-    animation: aura-pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+    animation: aura-pop-in 0.38s cubic-bezier(0.16, 1, 0.3, 1) both !important;
 }
 
 @keyframes aura-pop-in {
-    0%   { opacity: 0; transform: scale(0.9) translateY(10px); }
-    100% { opacity: 1; transform: scale(1) translateY(0); }
+    from {
+        opacity: 0;
+        transform: scale(0.88) translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
 }
 
-/* Seta do balão */
+/* 
+   Seta do balão (o "rabinho")
+   
+   BUG CORRIGIDO #5: removemos backdrop-filter do ::after.
+   backdrop-filter em pseudo-elementos é comportamento não-especificado pelo W3C
+   e visualmente bugado na maioria dos browsers — aparece como um retângulo
+   desfocado independente ao invés de integrado ao balão.
+   Solução: cor sólida que imita o fundo do balão.
+*/
 #aura-speech-bubble::after {
     content: '' !important;
     position: absolute !important;
-    bottom: -10px !important;
-    right: 35px !important;
-    border-width: 10px 10px 0 !important;
-    border-style: solid !important;
-    border-color: #00ddb3 transparent transparent transparent !important;
-    display: block !important;
-    width: 0 !important;
+    bottom: -9px !important;
+    right: 18px !important;
+    width: 18px !important;
+    height: 18px !important;
+    /* Cor sólida compatível com o fundo rgba(255,255,255,0.96) */
+    background: #f9fafb !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.55) !important;
+    border-bottom: 1px solid rgba(220, 220, 220, 0.4) !important;
+    clip-path: polygon(100% 0, 0 0, 100% 100%) !important;
 }
 
-/* ─── Input e Textos ─── */
+/* ─── 4. TEXTO DO BALÃO ───────────────────────────────────────────────────── */
 .aura-text {
     font-size: 14px !important;
-    line-height: 1.5 !important;
+    line-height: 1.6 !important;
+    color: #1e293b !important;
+    font-weight: 400 !important;
     margin: 0 !important;
-    font-weight: 500 !important;
+    min-height: 20px !important;
+    /* Limita a altura para respostas longas — cria scroll interno suave */
+    max-height: 220px !important;
+    overflow-y: auto !important;
+    padding-right: 6px !important;
+    /* Suaviza a troca de texto quando a IA responde */
+    transition: opacity 0.2s ease !important;
 }
 
+/* Scrollbar fina e discreta — não compete visualmente com o conteúdo */
+.aura-text::-webkit-scrollbar        { width: 3px !important; }
+.aura-text::-webkit-scrollbar-track  { background: transparent !important; }
+.aura-text::-webkit-scrollbar-thumb  { background: #cbd5e1 !important; border-radius: 4px !important; }
+.aura-text::-webkit-scrollbar-thumb:hover { background: #94a3b8 !important; }
+
+/* ─── 4b. BOTÃO FECHAR ────────────────────────────────────────────────────── */
+/*
+   Posicionado no canto superior direito da bubble, acima do texto.
+   Pequeno e discreto — visível apenas em hover, para não poluir o visual.
+*/
+.aura-btn-close {
+    position: absolute !important;
+    top: 10px !important;
+    right: 10px !important;
+    background: transparent !important;
+    border: none !important;
+    color: #cbd5e1 !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    padding: 4px 6px !important;
+    border-radius: 50% !important;
+    line-height: 1 !important;
+    transition: background 0.2s ease, color 0.2s ease !important;
+    pointer-events: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.aura-btn-close:hover {
+    background: #fee2e2 !important;
+    color: #ef4444 !important;
+}
+
+/* Ajuste no padding do bubble para acomodar o botão fechar */
+#aura-speech-bubble {
+    padding: 20px 20px 20px 20px !important;
+}
+
+/* ─── 5. INPUT AREA ───────────────────────────────────────────────────────── */
 .aura-input-wrapper {
     display: flex !important;
-    gap: 8px !important;
-    margin-top: 4px !important;
+    align-items: center !important;
+    background: #f1f5f9 !important;
+    border-radius: 100px !important;
+    padding: 4px 4px 4px 14px !important;
+    border: 1.5px solid transparent !important;
+    /*
+       BUG CORRIGIDO #6: listamos apenas as propriedades que queremos animar.
+       "transition: all" animaria width, height, border-radius, etc. causando
+       micro-jank no ERP durante qualquer reflow de layout próximo.
+    */
+    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease !important;
+}
+
+/* :focus-within: o wrapper "acende" quando o input filho está em foco */
+.aura-input-wrapper:focus-within {
+    background: #ffffff !important;
+    border-color: #00ddb3 !important;
+    box-shadow: 0 0 0 3px rgba(0, 221, 179, 0.18) !important;
 }
 
 #aura-prompt-input {
     flex: 1 !important;
-    padding: 8px 12px !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 20px !important;
-    font-size: 12px !important;
-    font-family: inherit !important;
+    border: none !important;
+    background: transparent !important;
+    font-size: 13px !important;
+    color: #334155 !important;
     outline: none !important;
-    transition: all 0.2s !important;
-    background: #ffffff !important;
-    color: #1f2937 !important;
+    font-family: inherit !important;
+    min-width: 0 !important;                /* Evita overflow do flex em textos longos */
 }
 
-#aura-prompt-input:focus {
-    border-color: #00ddb3 !important;
-    box-shadow: 0 0 0 3px rgba(0,221,179,0.12) !important;
+#aura-prompt-input::placeholder {
+    color: #94a3b8 !important;
 }
 
+/* ─── 6. BOTÃO DE ENVIO ───────────────────────────────────────────────────── */
+/*
+   BUG CORRIGIDO #7: cor unificada para #00ddb3 (teal).
+   O CSS submetido usava #00E676 (verde Material Design) que conflita com a
+   identidade visual estabelecida no projeto (style.css usa #00ddb3 / #00e5e5).
+*/
 .aura-btn-send {
-    width: 32px !important;
-    height: 32px !important;
-    padding: 0 !important;
-    border-radius: 50% !important;
-    background-color: #00ddb3 !important;
+    background: #00ddb3 !important;
     color: #ffffff !important;
     border: none !important;
-    cursor: pointer !important;
+    border-radius: 50% !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;             /* Garante que flex não comprima o botão */
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(0, 221, 179, 0.35) !important;
     flex-shrink: 0 !important;
-    transition: transform 0.1s ease !important;
 }
-.aura-btn-send:hover { transform: scale(1.05) !important; }
 
-/* ─── Sugestões Rápidas (Chips) ─── */
-#aura-speech-bubble .aura-options {
+.aura-btn-send:hover {
+    background: #00c49f !important;
+    transform: scale(1.08) !important;
+    box-shadow: 0 4px 14px rgba(0, 221, 179, 0.45) !important;
+}
+
+.aura-btn-send:active {
+    transform: scale(0.92) !important;
+    box-shadow: none !important;
+}
+
+/* ─── 7. CHIPS DE SUGESTÃO ────────────────────────────────────────────────── */
+/*
+   BUG CORRIGIDO #4: havia duas definições de .aura-btn com estilos
+   contraditórios (chips brancas vs chips verdes). Unificado em uma única
+   regra canônica com a identidade visual do projeto.
+*/
+.aura-options {
     display: flex !important;
     flex-wrap: wrap !important;
-    gap: 8px !important;
-    margin-top: 12px !important;
+    gap: 6px !important;
+    margin-top: 2px !important;
     padding-top: 10px !important;
-    border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
-    justify-content: flex-start !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
 }
 
 .aura-btn {
-    background: rgba(0, 230, 118, 0.1) !important;
-    border: 1px solid #00E676 !important;
-    color: #00E676 !important;
-    padding: 5px 14px !important;
-    border-radius: 20px !important;
-    font-size: 13px !important;
+    background: rgba(0, 221, 179, 0.08) !important;
+    border: 1px solid rgba(0, 221, 179, 0.4) !important;
+    color: #007a6b !important;
+    padding: 5px 13px !important;
+    border-radius: 100px !important;
+    font-size: 12px !important;
     font-weight: 500 !important;
     cursor: pointer !important;
-    transition: all 0.2s ease !important;
+    font-family: inherit !important;
     white-space: nowrap !important;
     pointer-events: auto !important;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease !important;
+    outline: none !important;
 }
 
 .aura-btn:hover {
-    background: #00E676 !important;
-    color: #000 !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 10px rgba(0, 230, 118, 0.3) !important;
+    background: #00ddb3 !important;
+    border-color: #00ddb3 !important;
+    color: #ffffff !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 10px rgba(0, 221, 179, 0.3) !important;
 }
 
-/* Animação do Holofote (Spotlight) */
-@keyframes aura-pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.04); opacity: 0.8; }
-    100% { transform: scale(1); opacity: 1; }
+.aura-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: none !important;
+}
+
+/* Focus acessível para navegação por teclado */
+.aura-btn:focus-visible {
+    outline: 2px solid #00ddb3 !important;
+    outline-offset: 2px !important;
+}
+
+/* ─── 7b. ESTADOS DESABILITADOS (durante processamento da IA) ─────────────── */
+/*
+   Ativados via JS (.disabled = true) enquanto a IA está processando.
+   Dão feedback visual imediato ao usuário de que o envio foi registrado.
+*/
+#aura-prompt-input:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+.aura-btn-send:disabled {
+    background: #cbd5e1 !important;
+    cursor: wait !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* ─── 8. SONAR NEON (Holofote de Elemento) ────────────────────────────────── */
+/*
+   BUG CORRIGIDO #3: esta seção estava completamente ausente no CSS submetido.
+   Sem ela, o highlight que localiza elementos na tela não seria renderizado,
+   quebrando o feature central de orientação visual da Aura.
+*/
+#aura-sonar-highlight {
+    position: fixed !important;
+    width: 52px !important;
+    height: 52px !important;
+    border: 2px solid #00e5e5 !important;
+    border-radius: 50% !important;
+    z-index: 2147483647 !important;
+    pointer-events: none !important;
+    transform: translate(-50%, -50%) !important;
+    box-shadow:
+        0 0 16px rgba(0, 229, 229, 0.6),
+        inset 0 0 12px rgba(0, 229, 229, 0.4) !important;
+    animation: aura-sonar-pulse 1.5s infinite cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Ponto central branco */
+#aura-sonar-highlight::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 7px !important;
+    height: 7px !important;
+    background: #ffffff !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 8px #ffffff, 0 0 16px #00e5e5 !important;
+}
+
+@keyframes aura-sonar-pulse {
+    0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.7); opacity: 0; }
+}
+
+/* ─── 9. ESTADO DE LOADING (Digitando...) ─────────────────────────────────── */
+/*
+   Indicador visual enquanto a IA processa a resposta.
+   Ativado adicionando a classe .loading ao #aura-speech-bubble via JS.
+*/
+#aura-speech-bubble.loading .aura-text::after {
+    content: '' !important;
+    display: inline-flex !important;
+    gap: 3px !important;
+    margin-left: 4px !important;
+    vertical-align: middle !important;
+}
+
+.aura-typing-dots {
+    display: inline-flex !important;
+    gap: 4px !important;
+    align-items: center !important;
+    height: 16px !important;
+}
+
+.aura-typing-dots span {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #00ddb3 !important;
+    display: block !important;
+    animation: aura-dot-bounce 1.2s ease infinite !important;
+}
+
+.aura-typing-dots span:nth-child(2) { animation-delay: 0.2s !important; }
+.aura-typing-dots span:nth-child(3) { animation-delay: 0.4s !important; }
+
+@keyframes aura-dot-bounce {
+    0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
+    30%            { transform: translateY(-5px); opacity: 1;   }
+}
+
+/* ─── 10. ACESSIBILIDADE ───────────────────────────────────────────────────── */
+/*
+   Respeita a preferência do sistema operacional por movimento reduzido.
+   Usuários com sensibilidade vestibular ou epilepsia fotossensível não
+   verão animações — mas a interface continua 100% funcional.
+*/
+@media (prefers-reduced-motion: reduce) {
+    #aura-lottie-player,
+    #aura-speech-bubble,
+    .aura-btn,
+    .aura-btn-send,
+    .aura-input-wrapper {
+        transition: none !important;
+        animation: none !important;
+    }
+
+    #aura-speech-bubble.active {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+
+    #aura-sonar-highlight {
+        animation: none !important;
+        opacity: 0.8 !important;
+        transform: translate(-50%, -50%) scale(1) !important;
+    }
 }
