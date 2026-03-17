@@ -1678,6 +1678,9 @@ html.light .theme-opt.active {
             <span class="btn-ai-icon">✨</span>
             Gerar com Aura IA
           </button>
+          <button class="btn btn-primary" onclick="abrirModalFila()" style="margin-left: 8px;">
+            📚 Importar Cronograma (Texto Livre)
+          </button>
           <button class="btn-rebuild" id="btn-rebuild-lib" onclick="reconstruirBiblioteca()" title="Reconstrói o dicionário de peças a partir de todos os roteiros salvos">
             <span id="rebuild-icon">🧩</span>
             <span id="rebuild-label">Atualizar Biblioteca</span>
@@ -1954,6 +1957,28 @@ html.light .theme-opt.active {
   </div>
 </div>
 <div id="toast-container"></div>
+
+<div class="modal" id="modalFilaAulas">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="background: var(--bg-2); border: 1px solid var(--border);">
+      <div class="modal-header">
+        <h5 class="modal-title" style="color: var(--text);">📚 Importar Cronograma (Texto Livre)</h5>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-2); font-size: 13px;">Cole abaixo o texto do cronograma exatamente como o Gem gerou (Aula X.X: Título: Objetivo).</p>
+        
+        <textarea id="textoFilaInput" class="field-textarea" rows="10" placeholder="🏗️ Módulo 01: Setup...&#10;Aula 1.1: Papéis e Permissões: A diferença entre..."></textarea>
+        
+        <div id="statusFila" style="margin-top: 15px; max-height: 250px; overflow-y: auto; display: none; padding: 10px; background: var(--bg-1); border-radius: 6px;">
+           </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="fecharModalFila()">Fechar</button>
+        <button class="btn btn-primary" id="btnIniciarFila" onclick="iniciarFilaGeracaoTexto()">🚀 Iniciar Automação das Aulas</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 // ════════════════════════════════════════
@@ -2750,6 +2775,7 @@ function mudarVozIA(valor) {
   }
 }
 
+
 function renderizarPassos() {
   const container = document.getElementById('passos-container');
   if (!container || !roteiroAtual?.passos) return;
@@ -3371,6 +3397,101 @@ async function gerarRoteiroIA() {
 
   document.addEventListener('DOMContentLoaded', conectarWS);
 })();
+
+let modalFila = null;
+
+function abrirModalFila() {
+    if(!modalFila) modalFila = new bootstrap.Modal(document.getElementById('modalFilaAulas'));
+    document.getElementById('textoFilaInput').value = '';
+    document.getElementById('statusFila').style.display = 'none';
+    document.getElementById('statusFila').innerHTML = '';
+    document.getElementById('btnIniciarFila').disabled = false;
+    modalFila.show();
+}
+
+function fecharModalFila() {
+    if(modalFila) modalFila.hide();
+    if(typeof carregarRoteiros === 'function') carregarRoteiros(); 
+}
+
+async function iniciarFilaGeracaoTexto() {
+    const textoRaw = document.getElementById('textoFilaInput').value;
+    const linhas = textoRaw.split('\n');
+    let listaAulas = [];
+    
+    // O Parser: Lê o texto humano e acha onde estão as aulas
+    for (let linha of linhas) {
+        linha = linha.trim();
+        if (!linha || !linha.toLowerCase().startsWith("aula")) continue;
+
+        // Esperamos o formato: "Aula 1.1: Titulo da Aula: Objetivo da aula"
+        let partes = linha.split(':');
+        if (partes.length >= 3) {
+            let idAula = partes[0].trim(); // ex: "Aula 1.1"
+            let titulo = partes[1].trim(); // ex: "Papéis e Permissões"
+            let objetivo = partes.slice(2).join(':').trim(); // Junta o resto pro caso de ter ":" no objetivo
+
+            listaAulas.push({
+                nome_aula: `${idAula} - ${titulo}`,
+                objetivo: objetivo
+            });
+        }
+    }
+
+    if (listaAulas.length === 0) {
+        alert("❌ Nenhuma aula encontrada! Certifique-se de colar o texto no formato 'Aula X.X: Título: Objetivo'.");
+        return;
+    }
+
+    // Inicia a UI da Fila
+    document.getElementById('btnIniciarFila').disabled = true;
+    const statusDiv = document.getElementById('statusFila');
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = `<strong style="color: var(--cyan);">Lendo ementa... ${listaAulas.length} aulas identificadas!</strong><br><br>`;
+
+    // Executa a fila, um por um
+    for (let i = 0; i < listaAulas.length; i++) {
+        const aula = listaAulas[i];
+        const linhaStatus = document.createElement('div');
+        linhaStatus.style.marginBottom = "6px";
+        linhaStatus.innerHTML = `⏳ [${i+1}/${listaAulas.length}] Extraindo robô para: <b>${aula.nome_aula}</b>...`;
+        statusDiv.appendChild(linhaStatus);
+        statusDiv.scrollTop = statusDiv.scrollHeight;
+
+        try {
+            // Envia para a Aura gerar o JSON profundo nos bastidores
+            const response = await fetch('/api/gerar-ia', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nome_aula: aula.nome_aula,
+                    objetivo: aula.objetivo
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'sucesso') {
+                linhaStatus.innerHTML = `✅ [${i+1}/${listaAulas.length}] <b>${aula.nome_aula}</b> -> Roteiro criado com sucesso!`;
+                linhaStatus.style.color = '#10b981'; // Verde sucesso
+            } else {
+                linhaStatus.innerHTML = `❌ [${i+1}/${listaAulas.length}] <b>${aula.nome_aula}</b> -> Falha: ${data.erro || 'Erro'}`;
+                linhaStatus.style.color = 'var(--amber)';
+            }
+        } catch (error) {
+            linhaStatus.innerHTML = `❌ [${i+1}/${listaAulas.length}] <b>${aula.nome_aula}</b> -> Erro de rede.`;
+            linhaStatus.style.color = '#ef4444';
+        }
+        
+        // Pausa de 3 segundos para respirar
+        await new Promise(r => setTimeout(r, 3000));
+    }
+
+    const fimMsg = document.createElement('div');
+    fimMsg.innerHTML = `<br>🎉 <strong>Automação Concluída!</strong> Suas aulas estão prontas no painel.`;
+    statusDiv.appendChild(fimMsg);
+    statusDiv.scrollTop = statusDiv.scrollHeight;
+}
 </script>
 </body>
 </html>

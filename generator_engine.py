@@ -42,21 +42,17 @@ def gerar_roteiro_ia_sync(nome_aula: str, objetivo: str, tenant_id: str = "senio
     if contexto_rag and contexto_rag.get("texto_rag"):
         texto_manual = contexto_rag["texto_rag"]
     else:
-        texto_manual = "Nenhum manual específico encontrado. Baseie-se no objetivo fornecido."
-        logger.warning("RAG não retornou contexto. Procedendo sem manual.")
+        texto_manual = "Nenhum manual específico encontrado. Baseie-se no objetivo fornecido para deduzir o fluxo padrão de ERP."
+        logger.warning("RAG não retornou contexto. Procedendo de forma autônoma.")
 
     # ── 2. Biblioteca de ações (Lego) ───────────────────────────────────────
     caminho_biblioteca = "biblioteca_acoes.json"
-    if not os.path.exists(caminho_biblioteca):
-        return {"status": "erro", "mensagem": "Biblioteca de peças não encontrada. Execute lego_builder.py primeiro."}
+    biblioteca = {}
+    if os.path.exists(caminho_biblioteca):
+        with open(caminho_biblioteca, "r", encoding="utf-8") as f:
+            biblioteca = json.load(f)
 
-    with open(caminho_biblioteca, "r", encoding="utf-8") as f:
-        biblioteca = json.load(f)
-
-    if not biblioteca:
-        return {"status": "erro", "mensagem": "Biblioteca de ações está vazia."}
-
-    logger.info(f"Injetando {len(biblioteca)} peças na IA...")
+    logger.info(f"Injetando {len(biblioteca)} peças mapeadas na IA...")
 
     # Trunca biblioteca se for gigantesca
     biblioteca_json = json.dumps(biblioteca, ensure_ascii=False)
@@ -65,15 +61,7 @@ def gerar_roteiro_ia_sync(nome_aula: str, objetivo: str, tenant_id: str = "senio
         peças_limitadas = dict(list(biblioteca.items())[:200])
         biblioteca_json = json.dumps(peças_limitadas, ensure_ascii=False)
 
-    # ── 3. Prompt do sistema (externo) ──────────────────────────────────────
-    caminho_prompt = "generator_prompt.txt"
-    try:
-        with open(caminho_prompt, "r", encoding="utf-8") as f:
-            prompt_sistema = f.read()
-    except FileNotFoundError:
-        return {"status": "erro", "mensagem": f"Arquivo '{caminho_prompt}' não encontrado."}
-
-    # 🟢 O PROMPT DE USUÁRIO: Estrutura Perfeita s/ Comentários (BugFix #4 aplicado)
+# 🟢 O PROMPT DE UTILIZADOR: Estrutura Profunda e Atómica (Sem invenção de seletores)
     prompt_usuario = f"""
 NOME DA AULA: {nome_aula}
 OBJETIVO: {objetivo}
@@ -88,57 +76,49 @@ BIBLIOTECA DE AÇÕES DISPONÍVEIS (peças técnicas validadas):
 
 =======================================
 INSTRUÇÕES DE MONTAGEM (CRÍTICO):
-- Use as peças da biblioteca acima como base.
+- Use as peças da biblioteca acima como base. NUNCA invente seletores.
 - Altere o campo "valor_input" se o objetivo exigir digitar algo específico.
-- NÃO invente seletores. Copie-os exatamente.
+- Se o manual exigir um clique num botão que NÃO existe na biblioteca, crie a ação técnica com o "elemento_alvo" VAZIO ({{}}) para que o instrutor mapeie posteriormente.
 - Agrupe navegações e crie o passo final de conclusão exatamente como no modelo.
 
 Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON):
 
 {{
-  "metadata": {{"nome_aula": "{nome_aula}", "id_treinamento": "{limpar_nome(nome_aula)}"}},
-  "configuracao_gravacao": {{"gravar_video": true, "pasta_destino": "videos_gerados", "voz_ia": "pt-BR-FranciscaNeural"}},
+  "metadata": {{
+    "nome_aula": "{nome_aula}", 
+    "id_treinamento": "{limpar_nome(nome_aula)}",
+    "gerado_por_ia": true,
+    "validado_hitl": false
+  }},
+  "configuracao_gravacao": {{
+    "gravar_video": true, 
+    "pasta_destino": "videos_gerados", 
+    "voz_ia": "pt-BR-FranciscaNeural"
+  }},
   "passos": [
     {{
       "id_passo": 1,
       "tipo_passo": "navigation",
       "peso_narrativo": 2,
       "pause_sugerida": 2.5,
-      "pedagogia": {{"ancora": "Introdução professoral aqui. Vamos acessar os menus...", "tooltip_dap": "Navegue pelo menu"}},
+      "pedagogia": {{"ancora": "Introdução professoral explicando o POR QUÊ desta etapa...", "tooltip_dap": "Navegue pelo menu"}},
       "is_conclusao": false,
       "acoes_tecnicas": [
         {{
           "acao": "clique",
-          "micro_narracao": "...acessando o primeiro menu...",
-          "elemento_alvo": {{}}
-        }},
-        {{
-          "acao": "clique",
-          "micro_narracao": "...e clicando no submenu...",
-          "elemento_alvo": {{}}
+          "micro_narracao": "Explicação do COMO (ex: Clique no menu X...)",
+          "elemento_alvo": {{
+             "label_curto": "COPIADO DA BIBLIOTECA",
+             "seletor_hint": "COPIADO DA BIBLIOTECA",
+             "iframe_hint": "COPIADO DA BIBLIOTECA"
+          }}
         }}
       ]
     }},
     {{
       "id_passo": 2,
-      "tipo_passo": "operacao",
-      "peso_narrativo": 2,
-      "pause_sugerida": 2.5,
-      "pedagogia": {{"ancora": "Agora preencha e confirme a ação.", "tooltip_dap": "Preencha o campo"}},
-      "is_conclusao": false,
-      "acoes_tecnicas": [
-        {{
-          "acao": "digitar_e_enter",
-          "valor_input": "VALOR_DO_OBJETIVO_AQUI",
-          "micro_narracao": "",
-          "elemento_alvo": {{}}
-        }}
-      ]
-    }},
-    {{
-      "id_passo": 3,
       "tipo_passo": "confirmation",
-      "peso_narrativo": 2,
+      "peso_narrativo": 3,
       "pause_sugerida": 3.0,
       "pedagogia": {{"ancora": "Parabéns! A tarefa foi concluída com sucesso.", "tooltip_dap": "Concluído!"}},
       "is_conclusao": true,
@@ -154,23 +134,23 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
   ]
 }}
 """
-
-    # ── 4. Chamada Gemini com retry em falhas transitórias ───────────────────
+    # ── 4. Chamada Gemini ───────────────────
     ultimo_erro = None
     for tentativa in range(1, _MAX_TENTATIVAS + 1):
         try:
+            # Não dependemos mais do arquivo .txt externo para o System Prompt, 
+            # a instrução completa e atômica já está no prompt_usuario, garantindo força total.
             resposta = dap_engine.gemini_client.models.generate_content(
                 model=dap_engine.GEMINI_LLM_MODEL,
                 contents=prompt_usuario,
                 config=types.GenerateContentConfig(
-                    system_instruction=prompt_sistema,
                     response_mime_type="application/json",
                     temperature=0.1,
                 ),
             )
 
             if not resposta.text:
-                raise ValueError("Gemini retornou resposta vazia ou bloqueada pelo safety filter.")
+                raise ValueError("Gemini retornou resposta vazia.")
 
             roteiro_final = json.loads(resposta.text)
 
@@ -178,7 +158,7 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
             if erro_estrutura:
                 raise ValueError(f"Estrutura do JSON inválida: {erro_estrutura}")
 
-            break  # Sucesso!
+            break
 
         except Exception as e:
             ultimo_erro = e
@@ -191,20 +171,31 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
 
     # ── 5. Pós-processamento e persistência ─────────────────────────────────
     nome_arquivo_base = limpar_nome(nome_aula)
-    if "metadata" in roteiro_final:
-        roteiro_final["metadata"]["id_treinamento"] = nome_arquivo_base
-        roteiro_final["metadata"]["nome_aula"] = nome_aula
+    
+    # Previne quebra se a IA esquecer campos críticos da raiz
+    roteiro_final.setdefault("metadata", {})
+    roteiro_final["metadata"]["id_treinamento"] = nome_arquivo_base
+    roteiro_final["metadata"]["nome_aula"] = nome_aula
+    roteiro_final["metadata"]["gerado_por_ia"] = True
+    roteiro_final["metadata"]["validado_hitl"] = False
 
-    roteiro_final["configuracao_gravacao"] = {
-        "gravar_video": True,
-        "pasta_destino": "videos_gerados",
-        "voz_ia": "pt-BR-FranciscaNeural",
-    }
+    roteiro_final.setdefault("configuracao_gravacao", {})
+    roteiro_final["configuracao_gravacao"]["gravar_video"] = True
+    roteiro_final["configuracao_gravacao"]["pasta_destino"] = "videos_gerados"
+    roteiro_final["configuracao_gravacao"]["voz_ia"] = "pt-BR-FranciscaNeural"
 
-    # Evita colisão de nomes
+    # Força a criação da conclusão no último passo se a IA não tiver feito
+    if roteiro_final["passos"] and not roteiro_final["passos"][-1].get("is_conclusao", False):
+         roteiro_final["passos"][-1]["is_conclusao"] = True
+         roteiro_final["passos"][-1]["acoes_tecnicas"].append({
+             "acao": "concluir_video",
+             "micro_narracao": ""
+         })
+
     os.makedirs("roteiros_salvos", exist_ok=True)
     nome_arquivo = f"{nome_arquivo_base}.json"
     caminho = os.path.join("roteiros_salvos", nome_arquivo)
+    
     contador = 1
     while os.path.exists(caminho):
         nome_arquivo = f"{nome_arquivo_base}_{contador}.json"
