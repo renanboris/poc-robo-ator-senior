@@ -452,7 +452,7 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
     except Exception:
         pass
 
-    # 1. O Mouse viaja suavemente até ao centro exato
+# 1. O Mouse viaja suavemente até ao centro exato
     try:
         box = await locator.bounding_box(timeout=1000)
         if box:
@@ -463,7 +463,10 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
             await mover_cursor_humanizado(page, cx, cy)
             
             # 🟢 A PEÇA QUE FALTAVA: O Hover estabilizador
-            await locator.hover(timeout=2000)
+            # Protege contra o bug de "Abre e logo Fecha" do Angular,
+            # mas evita checkboxes para não abrir tooltips indesejados.
+            if "checkbox" not in acao and "p-checkbox" not in str(locator):
+                await locator.hover(timeout=2000)
     except Exception:
         pass
 

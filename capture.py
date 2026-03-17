@@ -2,8 +2,12 @@
 capture.py — Senior Training OS · Motor de Captura
 ====================================================
 Correcoes aplicadas:
-  - Removida a importação cruzada de app.py (Isolamento total do script operário).
-  - Try/Except global com flush=True para garantir que o painel leia erros reais.
+  - Isolamento total do script operário.
+  - Hack Supremo para Checkboxes Angular/PrimeNG (textContent + :has-text).
+  - Captura Zero-Latency (Fim dos cliques perdidos).
+  - Deteccao automatica de PrimeNG v14+ vs v12 (.p-checkbox-box).
+  - [NOVO] Fix Coordenadas SCORM: Calculo Absoluto para iframes.
+  - [NOVO] Fix Print Limpo: Atraso de 400ms no highlight vermelho para nao sujar a foto.
 """
 
 import asyncio
@@ -15,7 +19,8 @@ import logging
 import re
 import traceback
 from dotenv import load_dotenv
-from playwright.async_api import async_playwright
+
+from playwright.async_api import async_playwright, Error as PlaywrightError
 from google import genai
 from google.genai import types
 from openai import OpenAI
@@ -42,7 +47,6 @@ cliques_capturados: list = []
 _id_acao_global: int    = 0
 _lock_id: asyncio.Lock  = None
 
-# Isolamento: Função limpa e local, sem importar app.py
 def limpar_nome(nome: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
 
@@ -139,6 +143,19 @@ async def _injetar_em_contexto(contexto):
         }
 
         const getElementName = (el) => {
+            const isCheckbox = el.closest('p-checkbox, mat-checkbox, [type="checkbox"], .ui-chkbox');
+            if (isCheckbox) {
+                const parentRow = el.closest('tr, item, li, .ui-g, .list-item, .row');
+                if (parentRow) {
+                    let text = parentRow.textContent || '';
+                    text = text.replace(/\\s+/g, ' ').trim();
+                    if (text.length > 2) {
+                        return `Checkbox de: ${text.substring(0, 40)}`;
+                    }
+                }
+                return 'Caixa de selecao Angular';
+            }
+
             const tag = el.tagName.toLowerCase();
             const isEditable = tag === 'input' || tag === 'textarea' || el.getAttribute('contenteditable') === 'true';
             if (isEditable) return el.placeholder || el.name || el.title || 'Campo de entrada';
@@ -155,6 +172,43 @@ async def _injetar_em_contexto(contexto):
         };
 
         const getBestSelector = (el) => {
+            const customCheckbox = el.closest('p-checkbox, mat-checkbox, [role="checkbox"], .ui-chkbox');
+            if (customCheckbox) {
+                let tagCheck = customCheckbox.tagName.toLowerCase();
+                
+                const isV14 = customCheckbox.querySelector('.p-checkbox-box');
+                const boxSelector = isV14 ? '.p-checkbox-box' : '.ui-chkbox-box';
+                
+                let cliqueInterno = tagCheck;
+                if (tagCheck === 'p-checkbox') {
+                    cliqueInterno = `p-checkbox ${boxSelector}`;
+                } else if (tagCheck === 'div' && customCheckbox.classList.contains('ui-chkbox')) {
+                    cliqueInterno = `.ui-chkbox ${boxSelector}`;
+                }
+
+                const parentRow = customCheckbox.closest('tr, item, li, .ui-g, .list-item, .row');
+                if (parentRow) {
+                    let text = parentRow.textContent || '';
+                    text = text.replace(/\\s+/g, ' ').trim();
+                    if (text.length > 2) {
+                        let cleanText = text.substring(0, 50).replace(/['"\\\\/]/g, '');
+                        if (text.length > 50) {
+                            const lastSpace = cleanText.lastIndexOf(' ');
+                            if (lastSpace > 10) cleanText = cleanText.substring(0, lastSpace);
+                        }
+                        
+                        let pTag = parentRow.tagName.toLowerCase();
+                        if (pTag === 'div' && parentRow.classList.contains('ui-g')) pTag = '.ui-g';
+                        return `${pTag}:has-text("${cleanText}") ${cliqueInterno}`;
+                    }
+                }
+
+                const parentComId = customCheckbox.closest('[id]:not([id*="ng-"]):not([id*="mat-"])');
+                if (parentComId && parentComId.id) {
+                    return `${parentComId.tagName.toLowerCase()}#${parentComId.id} ${cliqueInterno}`;
+                }
+            }
+
             let cur = el;
             for (let i = 0; i < 5; i++) {
                 if (!cur) break;
@@ -191,33 +245,64 @@ async def _injetar_em_contexto(contexto):
             return 'Pagina Principal';
         };
 
+        // 🟢 FIX: O SCORM Desorientado (Calculo Absoluto de Coordenadas para Iframes)
+        const getAbsoluteRect = (el) => {
+            let rect = el.getBoundingClientRect();
+            let x = rect.left, y = rect.top;
+            let win = window;
+            try {
+                while (win !== window.top) {
+                    let frames = win.parent.document.querySelectorAll('iframe, frame');
+                    for (let frame of frames) {
+                        if (frame.contentWindow === win) {
+                            let fRect = frame.getBoundingClientRect();
+                            x += fRect.left;
+                            y += fRect.top;
+                            break;
+                        }
+                    }
+                    win = win.parent;
+                }
+            } catch(e) {}
+            return { x: x, y: y, width: rect.width, height: rect.height };
+        };
+
         const processarEvento = (target, acao, valor = '') => {
-            const rect = target.getBoundingClientRect();
+            const absRect = getAbsoluteRect(target);
+            
             window.capturarElemento(JSON.stringify({
                 tag: target.tagName.toLowerCase(),
                 texto_encontrado: valor || getElementName(target),
                 seletor: getBestSelector(target),
                 iframe: getFrameId(), acao,
-                posicao_visual: `x:${Math.round(rect.x)},y:${Math.round(rect.y)},w:${Math.round(rect.width)},h:${Math.round(rect.height)}`,
+                posicao_visual: `x:${Math.round(absRect.x)},y:${Math.round(absRect.y)},w:${Math.round(absRect.width)},h:${Math.round(absRect.height)}`,
                 html_snapshot: target.outerHTML.substring(0, 300)
             }));
-            const orig = target.style.outline;
-            target.style.outline = '2px solid red';
-            setTimeout(() => target.style.outline = orig, 200);
+            
+            // 🟢 FIX: A Foto "Suja" (Atrasa o piscar vermelho para o Python tirar a foto limpa primeiro)
+            setTimeout(() => {
+                const orig = target.style.outline;
+                target.style.outline = '2px solid red';
+                target.style.outlineOffset = '-2px'; // Mantém para dentro para não empurrar layout
+                setTimeout(() => target.style.outline = orig, 300);
+            }, 400);
         };
 
-        let clickTimeout = null;
+        let lastClickTime = 0;
         document.addEventListener('mousedown', (e) => {
+            if (Date.now() - lastClickTime < 300) return; 
+            lastClickTime = Date.now();
+            
             if (e.button === 2) { processarEvento(e.target, 'clique_direito'); return; }
             if (e.button === 0) {
-                if (clickTimeout !== null) { clearTimeout(clickTimeout); clickTimeout = null; return; }
-                clickTimeout = setTimeout(() => { processarEvento(e.target, 'clique'); clickTimeout = null; }, 250);
+                processarEvento(e.target, 'clique');
             }
         }, true);
+
         document.addEventListener('dblclick', (e) => {
-            clearTimeout(clickTimeout); clickTimeout = null;
             processarEvento(e.target, 'duplo_clique');
         }, true);
+
         let ultimoEnterTarget = null, ultimoEnterTime = 0;
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -225,16 +310,28 @@ async def _injetar_em_contexto(contexto):
                 processarEvento(e.target, 'digitar_e_enter', e.target.value || e.target.innerText || '');
             }
         }, true);
+
         document.addEventListener('blur', (e) => {
             const tag = e.target.tagName.toLowerCase();
             if (e.target === ultimoEnterTarget && Date.now() - ultimoEnterTime < 500) return;
-            if ((tag === 'input' || tag === 'textarea' || e.target.isContentEditable) && e.target.value) {
+            
+            // 🟢 FIX SCORM: Ignora inputs de sistema (checkbox, radio, hidden)
+            // Impede que o Angular crie uma ação fantasma de 'preencher_campo' com coordenadas 0x0
+            const tipo = e.target.type ? e.target.type.toLowerCase() : '';
+            const isCampoTexto = tag === 'textarea' || 
+                               (tag === 'input' && !['checkbox', 'radio', 'hidden', 'submit', 'button', 'file'].includes(tipo)) || 
+                               e.target.isContentEditable;
+
+            if (isCampoTexto && e.target.value) {
                 processarEvento(e.target, 'preencher_campo', e.target.value);
             }
         }, true);
     }"""
     try:
         await contexto.evaluate(script_radar)
+    except PlaywrightError as e:
+        if "Target closed" not in str(e) and "browser has been closed" not in str(e):
+            pass
     except Exception:
         pass
 
@@ -273,6 +370,10 @@ async def on_capturar_elemento(source, args):
                 screenshot_b64   = base64.b64encode(screenshot_bytes).decode("utf-8")
                 vp               = await page_ref.evaluate("() => ({w: window.innerWidth, h: window.innerHeight})")
                 vp_w, vp_h       = vp["w"], vp["h"]
+        except PlaywrightError as e:
+            if "Target closed" in str(e) or "browser has been closed" in str(e):
+                return
+            logger.warning(f"Falha ao tirar print: {e}")
         except Exception as e:
             logger.warning(f"Falha ao tirar print: {e}")
 
@@ -335,26 +436,22 @@ async def capturar_cliques_na_tela():
             await asyncio.sleep(2.0)
             await page.keyboard.press("Escape")
             
-            # 1. Tenta preencher o usuário de forma flexível
             campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
             await campo_usr.wait_for(state="visible", timeout=10000)
             await campo_usr.fill(usuario)
             await asyncio.sleep(0.5)
 
-            # 2. Tenta clicar no botão Próximo/Continuar, se não achar, aperta Enter
             try:
                 await page.locator("button:has-text('Próximo'), button:has-text('Proximo'), button:has-text('Continuar')").first.click(timeout=3000)
             except Exception:
                 await page.keyboard.press("Enter")
             
-            # 3. Aguarda pacificamente o campo de senha aparecer (até 10 segundos)
             campo_senha = page.locator("input[type='password']").first
             await campo_senha.wait_for(state="visible", timeout=10000)
             await campo_senha.fill(senha)
             await asyncio.sleep(0.5)
             await page.keyboard.press("Enter")
             
-            # 4. Aguarda a tela inicial da Senior carregar
             print("Login efetuado. A aguardar carregamento do painel...", flush=True)
             await page.wait_for_load_state("load", timeout=30_000)
             await asyncio.sleep(2.0)
@@ -363,17 +460,13 @@ async def capturar_cliques_na_tela():
             logger.warning(f"O auto-login falhou/travou: {e}")
             print("AVISO: O robô não conseguiu fazer o login automático. Por favor, conclua o login manualmente na janela do Chrome!", flush=True)
             try:
-                # O robô senta e espera pacientemente até 60 segundos para você fazer o login na mão
                 await page.wait_for_load_state("networkidle", timeout=60000)
-                await asyncio.sleep(3.0) # Dá um respiro após você logar
+                await asyncio.sleep(3.0) 
             except Exception as ex:
                 print("ERRO FATAL: Tempo esgotado para login manual.", flush=True)
                 await browser.close()
                 return
 
-        # =========================================================
-        # INJEÇÃO DO RADAR DE EVENTOS (Onde a mágica de fato começa)
-        # =========================================================
         await injetar_radar_event_driven(page)
 
         try:
@@ -395,12 +488,59 @@ async def capturar_cliques_na_tela():
             while not page.is_closed():
                 await asyncio.sleep(2)
                 try:
+                    if page.is_closed():
+                        break
                     if not await page.evaluate("() => !!window.__radarInjetado"):
                         await _injetar_em_contexto(page)
+                except PlaywrightError as e:
+                    if "Target closed" in str(e) or "browser has been closed" in str(e):
+                        break 
                 except Exception:
                     break
         except Exception:
             pass
+
+def _validar_roteiro(roteiro: dict) -> tuple[bool, str]:
+    passos = roteiro.get("passos", [])
+    if len(passos) < 2:
+        return False, f"Apenas {len(passos)} passo(s) gerado(s) — mapeamento insuficiente."
+
+    total_acoes = 0
+    acoes_com_seletor = 0
+    acoes_baixa_confianca = 0
+
+    for passo in passos:
+        for acao in passo.get("acoes_tecnicas", []):
+            if acao.get("acao") == "concluir_video":
+                continue
+            total_acoes += 1
+            alvo = acao.get("elemento_alvo", {})
+            if alvo.get("seletor_hint", "").strip():
+                acoes_com_seletor += 1
+            if alvo.get("confianca_captura") == "baixa":
+                acoes_baixa_confianca += 1
+
+    if total_acoes == 0:
+        return False, "Nenhuma acao tecnica valida encontrada no roteiro."
+
+    pct_seletor       = acoes_com_seletor / total_acoes
+    pct_baixa_conf    = acoes_baixa_confianca / total_acoes
+
+    if pct_seletor < 0.50:
+        return False, (
+            f"Apenas {pct_seletor:.0%} das acoes tem seletor — "
+            "roteiro pode nao reproduzir corretamente."
+        )
+    if pct_baixa_conf > 0.70:
+        return False, (
+            f"{pct_baixa_conf:.0%} das acoes tem confianca baixa — "
+            "qualidade do mapeamento insuficiente para indexar."
+        )
+
+    return True, (
+        f"OK — {len(passos)} passos, {total_acoes} acoes, "
+        f"{pct_seletor:.0%} com seletor, {pct_baixa_conf:.0%} baixa confianca."
+    )
 
 def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, contexto_rag: str):
     if not gemini_client:
@@ -476,6 +616,42 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
         with open(caminho_roteiro, "w", encoding="utf-8") as f:
             json.dump(roteiro_final, f, indent=2, ensure_ascii=False)
         logger.info(f"Roteiro salvo em: {caminho_roteiro}")
+
+        aprovado, motivo_validacao = _validar_roteiro(roteiro_final)
+
+        if aprovado:
+            logger.info(f"Portão de qualidade: APROVADO — {motivo_validacao}")
+            try:
+                import lego_builder as _lb
+                
+                # 🟢 FIX: Removido o uso de Threading (daemon=True) que estava a assassinar 
+                # o processo a meio. Agora o robô extrai as peças de forma síncrona e segura
+                # antes de fechar o programa.
+                resultado = _lb.construir_biblioteca()
+                
+                if resultado.get("status") == "sucesso":
+                    novas = resultado.get("total_acoes_novas", 0)
+                    total = resultado.get("total_acoes_lidas", 0)
+                    print(
+                        f"AUTO-REBUILD: biblioteca atualizada — "
+                        f"{total} peças lidas, {novas} novas adicionadas.",
+                        flush=True,
+                    )
+                else:
+                    print(f"AUTO-REBUILD: aviso — {resultado.get('mensagem')}", flush=True)
+
+            except Exception as e:
+                logger.warning(f"Não foi possível atualizar a biblioteca: {e}")
+        else:
+            print(
+                f"\n⚠️  AUTO-REBUILD BLOQUEADO — roteiro salvo mas não indexado.\n"
+                f"   Motivo: {motivo_validacao}\n"
+                f"   → Revise o roteiro em: {caminho_roteiro}\n"
+                f"   → Se ok, clique em 'Atualizar Biblioteca' no Dashboard.",
+                flush=True,
+            )
+            logger.warning(f"Portão de qualidade: REPROVADO — {motivo_validacao}")
+
         return caminho_roteiro
 
     except Exception as e:

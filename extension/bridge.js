@@ -1,5 +1,5 @@
-// bridge.js - A Ponte Veloz (Mundo ISOLATED)
-// ✅ CORRIGIDO: Handler de AURA_PRE_CAPTURE adicionado — agora o pre-capture funciona de verdade
+// bridge.js - A Ponte Veloz (Mundo MAIN)
+// ✅ CORRIGIDO: Handler de AURA_PRE_CAPTURE e repasse do "historico" para a IA
 
 (function() {
     document.documentElement.setAttribute('data-aura-id', chrome.runtime.id);
@@ -9,18 +9,17 @@
         if (event.origin !== window.location.origin) return;
         if (!event.data) return;
 
-        // 🟢 PREVENÇÃO DE CRASH: Verifica se a extensão ainda está viva
         if (!chrome?.runtime?.id) {
             console.warn("Aura Bridge: A extensão foi recarregada. Por favor, dê um F5 na página.");
             return;
         }
 
-        // ✅ FIX: Handler do Pre-Capture — antes esta mensagem era ignorada silenciosamente
-        // content.js envia AURA_PRE_CAPTURE ao focar no input, mas o bridge não escutava.
-        // Resultado: o cache de screenshot nunca era preenchido, perdendo os 500ms de ganho.
         if (event.data.type === "AURA_PRE_CAPTURE") {
             try {
-                chrome.runtime.sendMessage({ action: "pre_capture" });
+                // 🟢 FIX: Opcional, mas boa prática passar um callback vazio se a action retorna "true"
+                chrome.runtime.sendMessage({ action: "pre_capture" }, () => {
+                    const err = chrome.runtime.lastError; // Consome o erro silenciosamente se houver
+                });
                 console.log("Aura Bridge: Pre-capture solicitado ao background.");
             } catch (err) {
                 console.warn("Aura Bridge: Falha ao solicitar pre-capture:", err.message);
@@ -28,7 +27,6 @@
             return;
         }
 
-        // Handler principal da análise completa
         if (event.data.type !== "AURA_CAPTURE") return;
 
         try {
@@ -38,7 +36,9 @@
                 prompt:      event.data.prompt      || "O que devo fazer nesta tela?",
                 dom_context: event.data.dom_context || "",
                 user_name:   event.data.user_name   || "Utilizador",
-                tenant_id:   event.data.tenant_id   || "senior_default"
+                tenant_id:   event.data.tenant_id   || "senior_default",
+                // 🟢 FIX: Agora a IA vai lembrar do que foi falado antes!
+                historico:   event.data.historico   || [] 
             }, (response) => {
 
                 if (chrome.runtime.lastError) {

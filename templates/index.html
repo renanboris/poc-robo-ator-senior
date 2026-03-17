@@ -102,7 +102,10 @@ html.light #sidebar::before {
   transition-timing-function: ease;
 }
 /* Exclude animation-driven elements */
-.loader-ring, .live-dot, .rec-dot, .bar-fill, .roadmap-progress-fill,
+/* FIX BUG-HTML-3: .bar-fill REMOVIDO desta lista. transition:none cancelava
+   o transform:scaleX 1.2s das barras de velocidade, fazendo-as saltar.
+   Apenas elementos genuinamente animados ficam aqui. */
+.loader-ring, .live-dot, .rec-dot, .roadmap-progress-fill,
 .toast, [class*="pulse"], canvas { transition: none !important; }
 
 html, body {
@@ -534,7 +537,9 @@ body::after {
   background: var(--bg-3); cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
-.drop-zone:hover { border-color: var(--blue); background: var(--blue-dim); }
+/* FIX BUG-HTML-4: adicionado .drop-zone.hover — o JS adiciona classe 'hover',
+   não pseudo-classe. Ambos mantidos para cobrir hover real e drag. */
+.drop-zone:hover, .drop-zone.hover { border-color: var(--blue); background: var(--blue-dim); }
 .drop-zone-icon { font-size: 26px; margin-bottom: 10px; }
 .drop-zone-label { font-size: 13px; font-weight: 600; color: var(--text); }
 .drop-zone-sub { font-size: 11px; color: var(--text-3); margin-top: 5px; }
@@ -667,6 +672,23 @@ body::after {
   transition: all 0.2s;
 }
 .btn-ai:hover { background: rgba(0,229,229,0.15); box-shadow: 0 0 20px rgba(0,229,229,0.12); }
+
+.btn-rebuild {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 7px 10px; margin-top: 6px;
+  background: transparent;
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-3);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 600;
+  cursor: pointer; letter-spacing: 0.3px;
+  transition: all 0.2s;
+}
+.btn-rebuild:hover  { border-color: var(--violet); color: var(--violet); background: var(--violet-dim); border-style: solid; }
+.btn-rebuild:disabled { opacity: 0.5; cursor: not-allowed; }
+@keyframes spin-icon { to { transform: rotate(360deg); } }
+.btn-rebuild.loading span:first-child { display: inline-block; animation: spin-icon 0.9s linear infinite; }
 
 /* AI modal progress bar */
 .ai-progress-bar {
@@ -1270,11 +1292,11 @@ html.light .theme-opt.active {
   <div class="loader-ring"></div>
   
   <div class="loader-title" style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
-    <span>Processando</span>
+    <span id="loader-title-txt">Processando...</span>
     <span id="loader-pct" style="color: var(--cyan); font-family: var(--font-mono); font-size: 28px; min-height: 28px;"></span>
   </div>
   
-  <div class="loader-msg" id="loading-msg">Aguarde enquanto o sistema executa a operação.</div>
+  <div class="loader-msg" id="loading-msg">Aguarde enquanto o robô trabalha nos bastidores. 🎬</div>
   <div class="loader-progress"><div class="loader-progress-fill"></div></div>
   
   <button class="btn btn-ghost" onclick="cancelarProcesso()" style="pointer-events:auto">
@@ -1591,7 +1613,7 @@ html.light .theme-opt.active {
                ondrop="handleRagDrop(event)">
             <div class="drop-zone-icon">☁️</div>
             <div class="drop-zone-label">Arraste manuais em PDF aqui</div>
-            <div class="drop-zone-sub">Sincronização direta com Vector DB (Pinecone)</div>
+            <div class="drop-zone-sub">Indexação direta no banco vetorial (Pinecone)</div>
           </div>
           <input type="file" id="rag-file-input" accept=".pdf" multiple style="display:none"
                  onchange="uploadRagFiles(this.files)">
@@ -1599,9 +1621,10 @@ html.light .theme-opt.active {
           <div class="rag-footer">
             <span class="rag-status">
               <span class="rag-status-dot"></span>
-              Motor Pinecone: Online
+              Motor de IA: Online ⚡
             </span>
-            <span class="rag-count" id="rag-count">14 Manuais Indexados</span>
+            <!-- FIX BUG-HTML-6: valor dinâmico — preenchido via carregarMetricas() -->
+          <span class="rag-count" id="rag-count">Carregando...</span>
           </div>
         </div>
 
@@ -1654,11 +1677,15 @@ html.light .theme-opt.active {
             <span class="btn-ai-icon">✨</span>
             Gerar com Aura IA
           </button>
+          <button class="btn-rebuild" id="btn-rebuild-lib" onclick="reconstruirBiblioteca()" title="Reconstrói o dicionário de peças a partir de todos os roteiros salvos">
+            <span id="rebuild-icon">🧩</span>
+            <span id="rebuild-label">Atualizar Biblioteca</span>
+          </button>
         </div>
         <div class="studio-list-label" style="padding-bottom: 4px;">Treinamentos Salvos</div>
         
         <div class="search-box-container">
-          <input type="text" id="busca-treinamentos" class="search-box" oninput="filtrarRoteiros()" placeholder="Procurar treinamento...">
+          <input type="text" id="busca-treinamentos" class="search-box" oninput="filtrarRoteiros()" placeholder="Buscar treinamento...">
         </div>
 
         <div id="lista-roteiros"></div>
@@ -1719,7 +1746,8 @@ html.light .theme-opt.active {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               Assistir
             </button>
-            <a id="btn-baixar-scorm" class="btn-consume" href="#" download>
+            <!-- FIX BUG-HTML-10: href="" em vez de "#" — evita navegação acidental antes de arquivo disponível -->
+            <a id="btn-baixar-scorm" class="btn-consume" href="" download>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               SCORM
             </a>
@@ -1755,7 +1783,7 @@ html.light .theme-opt.active {
     <div class="modal-body">
       <div class="modal-field">
         <label>Nome do Treinamento</label>
-        <input type="text" id="input-nome-aula" placeholder="Ex: Criar Pasta no Géd">
+        <input type="text" id="input-nome-aula" placeholder="Ex: Criar Pasta no GED">
       </div>
       <div class="modal-field">
         <label>Objetivo (Contexto para Aura IA)</label>
@@ -1871,6 +1899,22 @@ html.light .theme-opt.active {
 <div id="toast-container"></div>
 
 <script>
+// ════════════════════════════════════════
+// FIX BUG-HTML-5: CTRL+S — Salvar com teclado
+// ════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (typeof arquivoAtual !== 'undefined' && arquivoAtual) salvarRoteiro(true);
+  }
+  // FIX BUG-HTML-9: Escape fecha modais
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
+    const mv = document.getElementById('modal-video');
+    if (mv && mv.classList.contains('open')) fecharVideo();
+  }
+});
+
 // ════════════════════════════════════════
 // THEME
 // ════════════════════════════════════════
@@ -2284,26 +2328,55 @@ function renderizarListaRoteiros() {
     return;
   }
 
-  container.innerHTML = cacheRoteiros.map(r => {
+  // FIX BUG-HTML-8: substituído innerHTML com template strings por criação segura de DOM
+  // Previne XSS via nomes de treinamento com HTML/JS injetado.
+  container.innerHTML = '';
+  cacheRoteiros.forEach(r => {
     const sel = arquivoAtual === r.arquivo;
     let icon = '📄';
-    let badges = '';
-    if (r.tem_video)  { icon = '🎬'; badges += `<span class="media-badge mb-video">Vídeo</span>`; }
-    if (r.tem_scorm)  { badges += `<span class="media-badge mb-scorm">SCORM</span>`; }
-    if (r.tem_pdf)    { badges += `<span class="media-badge mb-pdf">PDF</span>`; }
+    if (r.tem_video) icon = '🎬';
 
-    return `
-      <div class="roteiro-item ${sel ? 'selected' : ''}" onclick="carregarRoteiro('${r.arquivo}')">
-        <div class="roteiro-icon">${icon}</div>
-        <div class="roteiro-info">
-          <div class="roteiro-name">${r.nome}</div>
-          <div class="roteiro-meta">
-            <span>${r.qtd_passos || 0} passos</span>
-            ${badges}
-          </div>
-        </div>
-      </div>`;
-  }).join('');
+    const item = document.createElement('div');
+    item.className = 'roteiro-item' + (sel ? ' selected' : '');
+    item.addEventListener('click', () => carregarRoteiro(r.arquivo));  // sem onclick string
+
+    const iconEl = document.createElement('div');
+    iconEl.className = 'roteiro-icon';
+    iconEl.textContent = icon;  // textContent previne XSS
+
+    // Badge de qualidade — só exibe se aprovado ou reprovado (não em "sem_acoes")
+    if (r.qualidade === 'aprovado' || r.qualidade === 'reprovado') {
+      const badge = document.createElement('span');
+      badge.className = `qualidade-badge ${r.qualidade}`;
+      badge.textContent = r.qualidade === 'aprovado' ? '✓' : '✕';
+      badge.title = r.qualidade_motivo || '';  // tooltip com o motivo completo
+      iconEl.appendChild(badge);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'roteiro-info';
+
+    const name = document.createElement('div');
+    name.className = 'roteiro-name';
+    name.textContent = r.nome;  // textContent previne XSS
+
+    const meta = document.createElement('div');
+    meta.className = 'roteiro-meta';
+
+    const passos = document.createElement('span');
+    passos.textContent = `${r.qtd_passos || 0} passos`;
+    meta.appendChild(passos);
+
+    if (r.tem_video)  { const b = document.createElement('span'); b.className='media-badge mb-video'; b.textContent='Vídeo'; meta.appendChild(b); }
+    if (r.tem_scorm)  { const b = document.createElement('span'); b.className='media-badge mb-scorm'; b.textContent='SCORM'; meta.appendChild(b); }
+    if (r.tem_pdf)    { const b = document.createElement('span'); b.className='media-badge mb-pdf'; b.textContent='PDF'; meta.appendChild(b); }
+
+    info.appendChild(name);
+    info.appendChild(meta);
+    item.appendChild(iconEl);
+    item.appendChild(info);
+    container.appendChild(item);
+  });
   
   filtrarRoteiros(); 
 }
@@ -2383,7 +2456,7 @@ function confirmarExcluir() {
         document.getElementById('editor-title').style.color  = 'var(--text-3)';
         document.getElementById('editor-title').style.fontStyle = 'italic';
         carregarRoteiros();
-        toast('Treinamento excluído.', 'info');
+        toast('🗑️ Treinamento removido do catálogo.', 'info');
       } catch (e) {
         toast(e.message, 'error');
       }
@@ -2424,7 +2497,7 @@ async function gerarPDF() {
         await salvarRoteiro(false);
         const r = await fetch(`/api/gerar-pdf/${arquivoAtual}`, { method: 'POST' });
         if (!r.ok) throw new Error();
-        toast('Geração do PDF Playbook iniciada...', 'info');
+        toast('📜 Forjando os pergaminhos sagrados (PDF)...', 'info');
     } catch (e) {
         toast('Erro ao iniciar gerador de PDF', 'error');
     }
@@ -2433,10 +2506,10 @@ async function gerarPDF() {
 async function ingestarCoachIA() {
     if (!arquivoAtual) return;
     try {
-        toast('Alimentando a Aura IA...', 'info');
+        toast('🔄 Farmando XP para a Aura...', 'info');
         const r = await fetch(`/api/ingest/${arquivoAtual}`, { method: 'POST' });
         if (!r.ok) throw new Error('Falha ao indexar conhecimento no Coach IA.');
-        toast('Conhecimento indexado com sucesso no Coach IA!', 'success');
+        toast('⚡ Level Up! Aura dominou este fluxo.', 'success');
         carregarRoteiros(); // 👈 Isso garante que o botão atualize na mesma hora
     } catch (e) {
         toast(e.message, 'error');
@@ -2829,6 +2902,40 @@ function exportarKPIs() {
 }
 
 // ════════════════════════════════════════
+// BIBLIOTECA DE LEGO — REBUILD MANUAL
+// ════════════════════════════════════════
+async function reconstruirBiblioteca() {
+  const btn   = document.getElementById('btn-rebuild-lib');
+  const icon  = document.getElementById('rebuild-icon');
+  const label = document.getElementById('rebuild-label');
+  if (!btn || btn.disabled) return;
+
+  btn.disabled    = true;
+  btn.classList.add('loading');
+  icon.textContent  = '⚙️';
+  label.textContent = 'Reconstruindo...';
+
+  try {
+    const r = await fetch('/api/rebuild-library', { method: 'POST' });
+    const d = await r.json();
+    if (r.ok && d.status === 'sucesso') {
+      const novas = d.total_acoes_novas ?? '?';
+      const total = d.total_acoes_lidas ?? '?';
+      toast(`🧩 Biblioteca atualizada! ${total} peças (${novas} novas).`, 'success');
+    } else {
+      toast('⚠️ Rebuild com aviso: ' + (d.mensagem || d.erro || 'Verifique os roteiros salvos.'), 'info');
+    }
+  } catch (e) {
+    toast('Erro ao reconstruir biblioteca: ' + e.message, 'error');
+  } finally {
+    btn.disabled    = false;
+    btn.classList.remove('loading');
+    icon.textContent  = '🧩';
+    label.textContent = 'Atualizar Biblioteca';
+  }
+}
+
+// ════════════════════════════════════════
 // RAG — UPLOAD DE MANUAIS PDF
 // ════════════════════════════════════════
 function handleRagDrop(event) {
@@ -2876,13 +2983,28 @@ document.querySelectorAll('.modal-backdrop').forEach(el => {
 let _aiCycleTimer = null;
 
 const _aiMensagens = [
-  { icon: '📚', label: 'Memória',    text: 'Lendo os manuais da Senior e buscando contexto relevante…' },
-  { icon: '🧩', label: 'Montagem',  text: 'Selecionando peças de Lego do repositório de ações validadas…' },
-  { icon: '🧠', label: 'Síntese',   text: 'A Aura está estruturando a sequência pedagógica do roteiro…' },
-  { icon: '✍️', label: 'Escrita',   text: 'Gerando narrações e tooltips para cada passo do treinamento…' },
-  { icon: '🔗', label: 'Linkagem',  text: 'Vinculando ações técnicas ao roteiro final com micro-narrações…' },
-  { icon: '💾', label: 'Salvando',  text: 'Persistindo o roteiro em disco e indexando na base de dados…' },
+  { icon: '🔄', label: 'Memória',       text: 'Farmando XP para a Aura — buscando contexto nos manuais...' },
+  { icon: '🧩', label: 'Lego Factory',  text: 'Selecionando peças do repositório de ações validadas...' },
+  { icon: '🧠', label: 'Síntese',       text: 'Injetando sinapses na base de dados da Aura...' },
+  { icon: '✍️', label: 'Escrita',       text: 'Gerando narrações e tooltips para cada passo do treinamento...' },
+  { icon: '🔗', label: 'Linkagem',      text: 'Vinculando ações técnicas ao roteiro com micro-narrações...' },
+  { icon: '💾', label: 'Commit',        text: 'Salvando o roteiro em disco — quase lá, aguenta...' },
 ];
+
+// Mensagens gamificadas por tipo de operação (usadas pelo overlay via WS)
+const _loadingMsgsPorOperacao = {
+  robo:   ['🤖 Traduzindo botões para a Matrix...', '🔍 Hackeando o DOM (com autorização)...', '🎯 Memorizando cada clique com precisão cirúrgica...'],
+  video:  ['🎬 Contratando o locutor da IA...', '🎞️ Equipe de produção na ilha de edição...', '🏆 Renderizando frames... quase no Oscar!'],
+  scorm:  ['📦 Empacotando o conhecimento (Padrão SCORM)...', '🎮 Montando o simulador interativo...', '🚀 Deployando módulo no padrão LMS...'],
+  pdf:    ['📜 Forjando os pergaminhos sagrados...', '📖 Diagramando o Playbook premium...', '🖨️ Compilando o e-book final...'],
+  coach:  ['🔄 Farmando XP para a Aura...', '🧬 Injetando sinapses na base de dados...', '⚡ Indexando vetores no Pinecone...'],
+};
+
+function _getMsgCiclo(tipo) {
+  const msgs = _loadingMsgsPorOperacao[tipo] || ['⚙️ Processando nos bastidores...'];
+  let idx = 0;
+  return () => msgs[idx++ % msgs.length];
+}
 
 function _setAiStatus(tipo, icon, label, msg, mostrarBarra = false) {
   const box    = document.getElementById('ai-status-box');
@@ -2969,8 +3091,8 @@ async function gerarRoteiroIA() {
 
     if (resposta.ok && dados.status === 'sucesso') {
       _setAiStatus(
-        'success', '✅', 'Concluído',
-        `Roteiro "${dados.arquivo || nomeAula}" gerado! Clique em "Abrir Roteiro" para editá-lo.`
+        'success', '🏆', 'Level Up!',
+        `Aura dominou este fluxo! Roteiro "${dados.arquivo || nomeAula}" gerado. Clique em "Abrir Roteiro" para conferir.`
       );
 
       // Troca botões para abrir o roteiro gerado
@@ -2991,7 +3113,7 @@ async function gerarRoteiroIA() {
       toast(`✨ Roteiro "${nomeAula}" gerado com sucesso!`, 'success');
 
     } else {
-      _setAiStatus('error', '❌', 'Erro ao gerar', dados.erro || 'Falha desconhecida. Tente novamente.');
+      _setAiStatus('error', '⚠️', 'Erro ao gerar', dados.erro || 'Algo deu errado nos bastidores. Tente novamente.');
       btnLabel.textContent = 'Tentar novamente';
       btn.disabled         = false;
       btn.onclick          = () => gerarRoteiroIA();
@@ -2999,7 +3121,7 @@ async function gerarRoteiroIA() {
 
   } catch (erro) {
     _pararCicloMensagens();
-    _setAiStatus('error', '❌', 'Sem conexão', 'Não foi possível comunicar com o servidor. Verifique se o backend está rodando.');
+    _setAiStatus('error', '📡', 'Servidor offline', 'Não foi possível falar com o servidor. Verifique se o backend está rodando (python app.py).');
     btnLabel.textContent = 'Tentar novamente';
     btn.disabled         = false;
     btn.onclick          = () => gerarRoteiroIA();
@@ -3007,45 +3129,88 @@ async function gerarRoteiroIA() {
 }
 </script>
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("A iniciar conexão com o motor da Aura...");
+// FIX BUG-HTML-1: WebSocket agora controla a UI real (loading overlay, progress, toasts)
+// FIX BUG-HTML-7: Reconexão automática com exponential backoff
+(function() {
+  const protocolo = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocolo}//${window.location.host}/api/ws/status`;
+  let _ws = null;
+  let _reconectarDelay = 1000;
+  let _ocupadoAnterior = false;
 
-    // Descobre automaticamente se está em http ou https para o WebSocket
-    const protocolo = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocolo}//${window.location.host}/api/ws/status`;
-    
-    // Liga o tubo invisível ao Python
-    const ws = new WebSocket(wsUrl);
+  function conectarWS() {
+    _ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => {
-        console.log("🟢 Conectado ao servidor via WebSocket com sucesso!");
+    _ws.onopen = () => {
+      console.log('🟢 WebSocket conectado.');
+      _reconectarDelay = 1000; // reset backoff
     };
 
-    ws.onmessage = (event) => {
+    _ws.onmessage = (event) => {
+      try {
         const estado = JSON.parse(event.data);
-        
-        // ---------------------------------------------------------
-        // AQUI VOCÊ LIGA COM A SUA INTERFACE VISUAL (HTML)
-        // ---------------------------------------------------------
+        const overlay   = document.getElementById('loading-overlay');
+        const loaderMsg = document.getElementById('loading-msg');
+        const loaderPct = document.getElementById('loader-pct');
+
         if (estado.ocupado) {
-            console.log(`⏳ A trabalhar: ${estado.mensagem} | Progresso: ${estado.progresso || 0}%`);
-            
-            // Exemplo de como você ligaria a uma barra do seu HTML:
-            // document.getElementById('texto-status').innerText = estado.mensagem;
-            // document.getElementById('barra-progresso').style.width = estado.progresso + '%';
-            
-        } else if (estado.sucesso) {
-            console.log(`✅ Concluído: ${estado.sucesso}`);
-            
-        } else if (estado.erro) {
-            console.error(`❌ Erro: ${estado.erro}`);
+          // Mostra overlay de loading com mensagem gamificada
+          if (overlay) overlay.classList.add('visible');
+          // Detecta tipo de operação pela mensagem do backend p/ exibir copy certo
+          const msg = estado.mensagem || '';
+          let tipoOp = 'robo';
+          if (msg.includes('vídeo') || msg.includes('frame') || msg.includes('ilha'))     tipoOp = 'video';
+          else if (msg.includes('SCORM') || msg.includes('simulador'))                    tipoOp = 'scorm';
+          else if (msg.includes('PDF') || msg.includes('pergaminho') || msg.includes('E-book')) tipoOp = 'pdf';
+          else if (msg.includes('Aura') || msg.includes('Pinecone') || msg.includes('IA'))tipoOp = 'coach';
+          const titulos = { robo: '🤖 Robô em ação', video: '🎬 Renderizando', scorm: '📦 Gerando SCORM', pdf: '📜 Gerando PDF', coach: '🧠 Treinando a Aura' };
+          const titleEl = document.getElementById('loader-title-txt');
+          if (titleEl) titleEl.textContent = titulos[tipoOp] || '⚙️ Processando...';
+          if (loaderMsg) loaderMsg.textContent = msg || 'Trabalhando nos bastidores... 🎬';
+          if (loaderPct) {
+            loaderPct.textContent = estado.progresso != null ? estado.progresso + '%' : '';
+          }
+          _ocupadoAnterior = true;
+
+        } else {
+          // Esconde overlay
+          if (overlay) overlay.classList.remove('visible');
+          if (loaderPct) loaderPct.textContent = '';
+
+          if (_ocupadoAnterior) {
+            // Veio de um estado ocupado — recarrega dados
+            if (typeof carregarRoteiros   === 'function') carregarRoteiros();
+            if (typeof carregarMetricas   === 'function') carregarMetricas();
+          }
+          _ocupadoAnterior = false;
+
+          if (estado.sucesso) {
+            if (typeof toast === 'function') toast('✅ ' + estado.sucesso, 'success');
+            if (typeof limparStatus === 'function') limparStatus();
+          }
+          if (estado.erro) {
+            if (typeof toast === 'function') toast('❌ ' + estado.erro, 'error');
+            if (typeof limparStatus === 'function') limparStatus();
+          }
         }
+      } catch (e) {
+        console.warn('WS parse error:', e);
+      }
     };
 
-    ws.onclose = () => {
-        console.log("🔴 Conexão WebSocket encerrada. Atualize a página se precisar reconectar.");
+    _ws.onclose = () => {
+      console.warn(`🔴 WS desconectado. Reconectando em ${_reconectarDelay}ms…`);
+      setTimeout(() => {
+        _reconectarDelay = Math.min(_reconectarDelay * 2, 30000); // max 30s
+        conectarWS();
+      }, _reconectarDelay);
     };
-});
+
+    _ws.onerror = () => _ws.close();
+  }
+
+  document.addEventListener('DOMContentLoaded', conectarWS);
+})();
 </script>
 </body>
 </html>

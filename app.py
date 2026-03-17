@@ -201,6 +201,48 @@ def _set_estado(**kwargs):
         except Exception as e:
             logging.error(f"Erro ao disparar broadcast via WebSocket: {e}")
 
+
+def _validar_roteiro_app(roteiro: dict) -> tuple[bool, str]:
+    """
+    Portão de qualidade idêntico ao _validar_roteiro do capture.py.
+    Duplicado aqui para que app.py não importe capture.py
+    (evita efeitos colaterais da inicialização do motor de captura).
+
+    Critérios mínimos para liberar auto-rebuild:
+      · Pelo menos 2 passos (1 real + 1 conclusão)
+      · >= 50% das ações com seletor_hint preenchido
+      · <= 70% das ações com confianca_captura = 'baixa'
+    """
+    passos = roteiro.get("passos", [])
+    if len(passos) < 2:
+        return False, f"Apenas {len(passos)} passo(s) — mapeamento insuficiente."
+
+    total_acoes = acoes_com_seletor = acoes_baixa_conf = 0
+
+    for passo in passos:
+        for acao in passo.get("acoes_tecnicas", []):
+            if acao.get("acao") == "concluir_video":
+                continue
+            total_acoes += 1
+            alvo = acao.get("elemento_alvo", {})
+            if alvo.get("seletor_hint", "").strip():
+                acoes_com_seletor += 1
+            if alvo.get("confianca_captura") == "baixa":
+                acoes_baixa_conf += 1
+
+    if total_acoes == 0:
+        return False, "Nenhuma ação técnica válida encontrada."
+
+    pct_seletor   = acoes_com_seletor / total_acoes
+    pct_baixa     = acoes_baixa_conf  / total_acoes
+
+    if pct_seletor < 0.50:
+        return False, f"Apenas {pct_seletor:.0%} das ações tem seletor CSS válido."
+    if pct_baixa > 0.70:
+        return False, f"{pct_baixa:.0%} das ações com confiança baixa."
+
+    return True, f"{len(passos)} passos, {total_acoes} ações, {pct_seletor:.0%} com seletor."
+
 def executar_processo_bg(comando, msg_executando, msg_sucesso):
     global processo_atual
     _set_estado(ocupado=True, mensagem=msg_executando, progresso=None, erro="", sucesso="")
@@ -223,6 +265,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
         for linha in iter(proc.stdout.readline, ""):
             linha_limpa = linha.strip()
             if linha_limpa:
+                print(f"[ROBÔ BASTIDORES]: {linha_limpa}")
                 linhas_log.append(linha_limpa)
                 if "PROGRESSO:" in linha_limpa:
                     try:
@@ -245,6 +288,62 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
                 _set_estado(erro=f"Falha: {erro_real}")
         else:
             _set_estado(sucesso=msg_sucesso)
+
+            # AUTO-REBUILD: se o processo concluído era um mapeamento (capture.py),
+            # reconstrói a biblioteca de peças automaticamente.
+            # Usa daemon thread para não travar o broadcast do WebSocket.
+            if "capture.py" in " ".join(comando):
+                def _auto_rebuild():
+                    """
+                    Portão de qualidade para o caminho Dashboard.
+                    Como capture.py rodou em subprocess, não temos o roteiro_final
+                    em memória — lemos o JSON mais recente de roteiros_salvos/
+                    e validamos antes de reconstruir a biblioteca.
+                    """
+                    try:
+                        # Encontra o roteiro mais recente gerado por este mapeamento
+                        import glob
+                        arquivos = glob.glob(os.path.join(ROTEIROS_DIR, "*.json"))
+                        if not arquivos:
+                            logging.warning("Auto-rebuild: nenhum roteiro encontrado.")
+                            return
+
+                        roteiro_recente = max(arquivos, key=os.path.getmtime)
+
+                        # Portão de qualidade — mesmos critérios do capture.py
+                        try:
+                            with open(roteiro_recente, "r", encoding="utf-8") as f_r:
+                                roteiro_dados = json.load(f_r)
+                        except Exception as e_read:
+                            logging.warning(f"Auto-rebuild: erro ao ler roteiro: {e_read}")
+                            return
+
+                        aprovado, motivo = _validar_roteiro_app(roteiro_dados)
+                        if not aprovado:
+                            msg_rb = f"⚠️ Rebuild bloqueado: {motivo}"
+                            _set_estado(sucesso=msg_rb)
+                            logging.warning(f"Auto-rebuild Dashboard: {msg_rb}")
+                            return
+
+                        resultado = lego_builder.construir_biblioteca()
+                        if resultado.get("status") == "sucesso":
+                            novas = resultado.get("total_acoes_novas", 0)
+                            total = resultado.get("total_acoes_lidas", 0)
+                            msg_rb = (
+                                f"🧩 Biblioteca atualizada! "
+                                f"{total} peças ({novas} novas)."
+                            )
+                        else:
+                            msg_rb = f"⚠️ Rebuild parcial: {resultado.get('mensagem', '')}"
+
+                        _set_estado(sucesso=msg_rb)
+                        logging.info(f"Auto-rebuild Dashboard: {msg_rb}")
+
+                    except Exception as e_rb:
+                        logging.warning(f"Auto-rebuild falhou (não crítico): {e_rb}")
+
+                import threading
+                threading.Thread(target=_auto_rebuild, daemon=True, name="lego-rebuild-bg").start()
 
     except Exception as e:
         _set_estado(erro=str(e))
@@ -411,6 +510,13 @@ async def listar_roteiros():
             tem_video = os.path.exists(os.path.join(VIDEOS_DIR, f"{base}.mp4"))
             tem_scorm = os.path.exists(os.path.join(SCORM_DIR,  f"{base}_SCORM.zip"))
             tem_pdf   = os.path.exists(os.path.join(PDF_DIR,    f"{base}_Playbook.pdf"))
+            # Avalia qualidade do roteiro para exibir badge no card do Studio
+            _q_aprovado, _q_motivo = _validar_roteiro_app(dados)
+            _q_status = "aprovado" if _q_aprovado else (
+                "sem_acoes" if "Nenhuma ação" in _q_motivo or "passo(s)" in _q_motivo
+                else "reprovado"
+            )
+
             roteiros.append({
                 "arquivo":   arquivo, "nome": nome_raw,
                 "qtd_passos": len(dados.get("passos", [])),
@@ -421,6 +527,8 @@ async def listar_roteiros():
                 "video_url": f"/videos/{base}.mp4"           if tem_video else None,
                 "scorm_url": f"/api/download-scorm/{base}"   if tem_scorm else None,
                 "pdf_url":   f"/api/download-pdf/{base}"     if tem_pdf   else None,
+                "qualidade":        _q_status,   # "aprovado" | "reprovado" | "sem_acoes"
+                "qualidade_motivo": _q_motivo,   # texto explicativo para tooltip
             })
         except Exception:
             pass
@@ -462,7 +570,7 @@ def _iniciar_bg(comando, msg_exec, msg_ok):
 @app.post("/api/gravar")
 async def gravar_aula(req: NovaAulaReq):
     ok = _iniciar_bg([sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"],
-                     "A mapear o ecrã no Senior X...", "Mapeamento guardado com sucesso.")
+                     "🔍 Hackeando o DOM (com autorização)...", "🎯 Tela capturada. A IA já pode enxergar.")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
 # FIX Bug #APP-01: Rota /api/gerar-ia duplicada removida aqui.
@@ -472,28 +580,28 @@ async def gravar_aula(req: NovaAulaReq):
 async def executar_robo(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
     ok = _iniciar_bg([sys.executable, "main.py", caminho, "--record"],
-                     "Robô a atuar e a gravar áudios...", "Atuação e gravação de áudios concluídas.")
+                     "🎬 Contratando o locutor da IA...", "🎞️ Cenas gravadas. Ilha de edição, é com vocês!")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
 @app.post("/api/renderizar/{arquivo}")
 async def renderizar_video(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
     ok = _iniciar_bg([sys.executable, "main.py", caminho, "--render"],
-                     "A montar o vídeo final...", "Vídeo pronto e disponível!")
+                     "🎬 Equipe de produção na ilha de edição...", "🏆 Vídeo pronto para o Oscar.")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
 @app.post("/api/gerar-scorm/{arquivo}")
 async def gerar_scorm(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
     ok = _iniciar_bg([sys.executable, "scorm_builder.py", caminho],
-                     "A montar Simulador Interativo...", "Pacote SCORM gerado com sucesso!")
+                     "📦 Empacotando o conhecimento (Padrão SCORM)...", "✅ Módulo SCORM deployado. Pode subir para o LMS.")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
 @app.post("/api/gerar-pdf/{arquivo}")
 async def gerar_pdf(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
     ok = _iniciar_bg([sys.executable, "pdf_builder.py", caminho],
-                     "A montar E-book Playbook...", "Digital Playbook gerado com sucesso!")
+                     "📜 Forjando os pergaminhos sagrados (PDF)...", "📖 Playbook gerado. Conhecimento imortalizado.")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
 @app.get("/api/download-scorm/{nome_base}")
@@ -596,11 +704,40 @@ async def ingestar_no_dap(arquivo: str):
     
     if res.get("status") == "sucesso":
         dados.setdefault("metadata", {})
-        # Marca no JSON que este arquivo já ensinou a Aura
         dados["metadata"]["ingestado_dap"] = True
         with open(caminho, "w", encoding="utf-8") as f:
             json.dump(dados, f, indent=2, ensure_ascii=False)
-            
+
+        # AUTO-REBUILD: roteiro validado e ingestado = momento ideal para atualizar
+        # a biblioteca de peças. Background thread para não travar a resposta HTTP.
+        def _rebuild_apos_ingest():
+            """
+            No caminho de ingest o roteiro já está salvo e foi explicitamente
+            aprovado pelo instrutor (ele clicou em 'Coach IA'). Ainda assim
+            validamos para garantir consistência — se a qualidade for baixa,
+            logamos mas não bloqueamos o ingest em si (só o rebuild).
+            """
+            try:
+                aprovado, motivo = _validar_roteiro_app(dados)
+                if not aprovado:
+                    logging.warning(
+                        f"Auto-rebuild pós-ingest bloqueado: {motivo}. "
+                        "Use o botão 'Atualizar Biblioteca' após corrigir o roteiro."
+                    )
+                    return
+
+                r = lego_builder.construir_biblioteca()
+                if r.get("status") == "sucesso":
+                    logging.info(
+                        f"Auto-rebuild pós-ingest: {r.get('total_acoes_lidas', 0)} peças, "
+                        f"{r.get('total_acoes_novas', 0)} novas."
+                    )
+            except Exception as e_rb:
+                logging.warning(f"Auto-rebuild pós-ingest falhou: {e_rb}")
+
+        import threading
+        threading.Thread(target=_rebuild_apos_ingest, daemon=True, name="lego-rebuild-ingest").start()
+
     return res
 
 class GerarIAPayload(BaseModel):
@@ -662,6 +799,103 @@ def carregarMetricas_bg():
     # A rota /api/metricas já lê do disco — não há estado a sincronizar.
     # Esta função existe para garantir que logs/cache interno sejam atualizados.
     pass  # extensível futuramente com invalidação de cache Redis, etc.
+
+
+
+# ══════════════════════════════════════════════════════════════════
+# ENDPOINT GPS — Retorna passos de roteiro para o motor GPS da Aura
+# ══════════════════════════════════════════════════════════════════
+@app.get("/api/gps-roteiro")
+async def get_gps_roteiro(
+    objetivo: str = "",
+    tenant_id: str = "senior_default",
+    token: str = Depends(verificar_token),
+):
+    """
+    Busca o roteiro mais relevante para um objetivo via RAG (Pinecone).
+    Retorna os passos formatados para o Motor GPS da extensão Aura.
+    
+    Formato de cada passo GPS:
+      { id_passo, tooltip, seletor, label, acao, ancora }
+    """
+    if not objetivo.strip():
+        return JSONResponse(status_code=422, content={"erro": "objetivo é obrigatório"})
+
+    # 1. Busca no Pinecone pelo roteiro mais relevante
+    busca = dap_engine.buscar_contexto(objetivo.strip(), tenant_id)
+    if not busca or busca.get("score", 0) < 0.45:
+        return {"status": "nao_encontrado", "passos": []}
+
+    nome_aula_alvo = busca.get("melhor_aula", "")
+    if not nome_aula_alvo:
+        return {"status": "nao_encontrado", "passos": []}
+
+    # 2. Localiza o arquivo JSON do roteiro em roteiros_salvos/
+    passos_gps = []
+    arquivo_encontrado = None
+
+    try:
+        for arquivo in sorted(os.listdir(ROTEIROS_DIR)):
+            if not arquivo.endswith(".json"):
+                continue
+            caminho = os.path.join(ROTEIROS_DIR, arquivo)
+            try:
+                with open(caminho, "r", encoding="utf-8") as f:
+                    roteiro = json.load(f)
+                nome_roteiro = roteiro.get("metadata", {}).get("nome_aula", "")
+                # Match pelo nome_aula ou pelo id_treinamento
+                if nome_roteiro == nome_aula_alvo or                    roteiro.get("metadata", {}).get("id_treinamento") == limpar_nome(nome_aula_alvo):
+                    arquivo_encontrado = arquivo
+
+                    for passo in roteiro.get("passos", []):
+                        if passo.get("is_conclusao"):
+                            continue
+                        acoes = passo.get("acoes_tecnicas", [])
+                        if not acoes:
+                            continue
+
+                        # Primeiro seletor válido do passo
+                        seletor_passo = ""
+                        label_passo = ""
+                        acao_tipo = "clique"
+                        for ac in acoes:
+                            if ac.get("acao") == "concluir_video":
+                                continue
+                            alvo = ac.get("elemento_alvo", {})
+                            s = alvo.get("seletor_hint", "") or alvo.get("seletor_css", "")
+                            if s:
+                                seletor_passo = s
+                                label_passo   = alvo.get("label_curto", "")
+                                acao_tipo     = ac.get("acao", "clique")
+                                break
+
+                        passos_gps.append({
+                            "id_passo": passo.get("id_passo", len(passos_gps) + 1),
+                            "tooltip":  passo.get("pedagogia", {}).get("tooltip_dap", ""),
+                            "ancora":   passo.get("pedagogia", {}).get("ancora", "")[:120],
+                            "seletor":  seletor_passo,
+                            "label":    label_passo,
+                            "acao":     acao_tipo,
+                        })
+                    break
+            except Exception:
+                continue
+
+    except Exception as e:
+        logging.error(f"GPS: Erro ao varrer roteiros: {e}")
+        return {"status": "erro", "mensagem": str(e)}
+
+    if not passos_gps:
+        return {"status": "nao_encontrado", "passos": []}
+
+    logging.info(f"GPS: Roteiro '{nome_aula_alvo}' — {len(passos_gps)} passos retornados.")
+    return {
+        "status":    "sucesso",
+        "nome_aula": nome_aula_alvo,
+        "arquivo":   arquivo_encontrado,
+        "score":     round(busca.get("score", 0), 3),
+        "passos":    passos_gps,
+    }
 
 if __name__ == "__main__":
     print("\n" + "=" * 50)
