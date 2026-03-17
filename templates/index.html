@@ -856,6 +856,7 @@ body::after {
 .pipe-btn.video { --clr: var(--cyan); }
 .pipe-btn.scorm { --clr: var(--violet); }
 .pipe-btn.pdf   { --clr: var(--green); }
+.pipe-btn.hitl  { --c: var(--amber); }
 .pipe-btn.coach { --clr: var(--amber); }
 
 .pipe-btn.pulse {
@@ -1716,6 +1717,11 @@ html.light .theme-opt.active {
             </button>
             <div class="pipeline-sep"></div>
 
+            <button id="btn-gen-hitl" class="pipe-btn hitl" onclick="validarHitl()" data-tip="Validar com co-piloto humano">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10z"/><path d="M12 8v4l3 3"/></svg>
+              <span class="lbl">HITL</span>
+              <div class="notif"></div>
+            </button>
             <button id="btn-gen-robo" class="pipe-btn robo" onclick="executarRobo()">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="15" x2="8" y2="15"/><line x1="12" y1="15" x2="12" y2="15"/><line x1="16" y1="15" x2="16" y2="15"/></svg>
               <span class="lbl">1. Robô</span>
@@ -1896,6 +1902,57 @@ html.light .theme-opt.active {
   </div>
 </div>
 
+
+<!-- ═══════════ MODAL: PRÓXIMO PASSO APÓS GERAÇÃO IA ═══════════ -->
+<div class="modal-backdrop" id="modal-proximo-passo">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header" style="background:linear-gradient(135deg,var(--surface),var(--surface-2))">
+      <div class="modal-icon" style="background:var(--amber-dim);color:var(--amber);font-size:20px">🏆</div>
+      <div>
+        <div class="modal-title" id="mpp-titulo">Roteiro gerado!</div>
+        <div class="modal-subtitle">Escolha o próximo passo</div>
+      </div>
+      <button class="modal-close" onclick="fecharModal('modal-proximo-passo')">✕</button>
+    </div>
+    <div class="modal-body" style="gap:12px">
+      <div style="background:var(--amber-dim);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-xs);padding:12px 14px;font-size:12px;color:var(--amber);line-height:1.5">
+        ⚠️ Este roteiro foi gerado por IA e <strong>ainda não foi testado no sistema real</strong>.
+        A validação HITL garante que os cliques estão corretos antes de gravar o vídeo.
+      </div>
+      <div onclick="_mppExecutarHitl()"
+           style="background:var(--surface-2);border:1.5px solid var(--amber);border-radius:var(--radius-sm);padding:16px;cursor:pointer;transition:all 0.2s"
+           onmouseover="this.style.background='var(--amber-dim)'"
+           onmouseout="this.style.background='var(--surface-2)'">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <span style="font-size:20px">🟡</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text)">Validar com HITL</span>
+          <span style="font-size:9px;font-weight:800;background:var(--amber);color:#000;padding:2px 7px;border-radius:99px;margin-left:auto">RECOMENDADO</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);line-height:1.5;padding-left:30px">
+          Abre o sistema com co-piloto humano. A IA executa e para quando precisar da sua ajuda. Cada correção é salva no Brain.
+        </div>
+      </div>
+      <div onclick="_mppExecutarRobo()"
+           style="background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--radius-sm);padding:14px;cursor:pointer;transition:all 0.2s"
+           onmouseover="this.style.borderColor='var(--cyan)'"
+           onmouseout="this.style.borderColor='var(--border-2)'">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <span style="font-size:18px">🤖</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text)">Gravar direto</span>
+          <span style="font-size:9px;font-weight:700;background:var(--surface-3);color:var(--text-3);padding:2px 7px;border-radius:99px;margin-left:auto">SEM VALIDAÇÃO</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);line-height:1.5;padding-left:28px">
+          Executa imediatamente. Pode gravar cliques errados se algum seletor mudou.
+        </div>
+      </div>
+      <div style="text-align:center">
+        <button class="btn btn-ghost" style="font-size:11px" onclick="_mppAbrirRoteiro()">
+          Só abrir o roteiro para editar →
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="toast-container"></div>
 
 <script>
@@ -2370,6 +2427,19 @@ function renderizarListaRoteiros() {
     if (r.tem_video)  { const b = document.createElement('span'); b.className='media-badge mb-video'; b.textContent='Vídeo'; meta.appendChild(b); }
     if (r.tem_scorm)  { const b = document.createElement('span'); b.className='media-badge mb-scorm'; b.textContent='SCORM'; meta.appendChild(b); }
     if (r.tem_pdf)    { const b = document.createElement('span'); b.className='media-badge mb-pdf'; b.textContent='PDF'; meta.appendChild(b); }
+    if (r.origem === 'ia') {
+      const bIA = document.createElement('span');
+      if (r.hitl_validado) {
+        bIA.className = 'media-badge mb-ia-ok';
+        bIA.textContent = '✓ IA';
+        bIA.title = 'Gerado por IA e validado com HITL';
+      } else {
+        bIA.className = 'media-badge mb-ia-warn';
+        bIA.textContent = '⚠ IA';
+        bIA.title = 'Gerado por IA — não validado com HITL. Execute a validação antes de gravar.';
+      }
+      meta.appendChild(bIA);
+    }
 
     info.appendChild(name);
     info.appendChild(meta);
@@ -2662,11 +2732,56 @@ function adicionarAcao(pi) {
     renderizarPassos();
 }
 
+function mudarVozIA(valor) {
+  if (!roteiroAtual.configuracao_gravacao) {
+    roteiroAtual.configuracao_gravacao = {
+      gravar_video: true,
+      pasta_destino: "videos_gerados",
+      voz_ia: "pt-BR-FranciscaNeural"
+    };
+  }
+  roteiroAtual.configuracao_gravacao.voz_ia = valor;
+  salvarRoteiro(false);
+  
+  if (valor === 'elevenlabs') {
+    toast('🎙️ Voz Premium ativada! (Pode consumir créditos da API)', 'success');
+  } else {
+    toast('🎙️ Voz de Rascunho ativada! (Modo Gratuito)', 'info');
+  }
+}
+
 function renderizarPassos() {
   const container = document.getElementById('passos-container');
   if (!container || !roteiroAtual?.passos) return;
   container.innerHTML = '';
 
+  // 🟢 NOVO: Card de Configuração de Locução no topo do Editor
+  const configVoz = roteiroAtual.configuracao_gravacao?.voz_ia || 'pt-BR-FranciscaNeural';
+  const cfgDiv = document.createElement('div');
+  cfgDiv.className = 'step-card';
+  cfgDiv.style.marginBottom = '16px';
+  cfgDiv.style.borderColor = 'rgba(0, 229, 229, 0.3)'; // Borda ciano sutil
+  cfgDiv.innerHTML = `
+    <div class="step-header" style="background: var(--bg-3);">
+      <div style="font-size:16px; margin-right:4px;">🎙️</div>
+      <div class="step-title">Estúdio de Locução</div>
+      <span class="step-type-badge" style="background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(0,229,229,0.3)">AUDIO</span>
+    </div>
+    <div class="step-body" style="padding: 14px 16px;">
+       <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
+         <select class="field-select" style="max-width: 280px; font-weight: 600; cursor: pointer; color: ${configVoz === 'elevenlabs' ? 'var(--amber)' : 'var(--text)'};" onchange="mudarVozIA(this.value); this.style.color = this.value === 'elevenlabs' ? 'var(--amber)' : 'var(--text)';">
+            <option value="pt-BR-FranciscaNeural" ${configVoz !== 'elevenlabs' ? 'selected' : ''}>Rascunho (Edge TTS - Grátis)</option>
+            <option value="elevenlabs" ${configVoz === 'elevenlabs' ? 'selected' : ''}>Premium (ElevenLabs - Realista)</option>
+         </select>
+         <span style="font-size: 11px; color: var(--text-3); line-height: 1.4;">
+           <strong>Dica:</strong> Use o <i>Rascunho</i> para validar a gravação e mude para <i>Premium</i> apenas antes de gerar o Vídeo Final.
+         </span>
+       </div>
+    </div>
+  `;
+  container.appendChild(cfgDiv);
+
+  // Renderiza os passos normais
   roteiroAtual.passos.forEach((passo, pi) => {
     const tipo = passo.tipo_passo || 'operacao';
     const cor  = tipoColor[tipo] || 'var(--text-3)';
@@ -2935,6 +3050,57 @@ async function reconstruirBiblioteca() {
   }
 }
 
+
+
+// ════════════════════════════════════════
+// MODAL PRÓXIMO PASSO (pós geração IA)
+// ════════════════════════════════════════
+let _mppArquivo = '';
+let _mppNome    = '';
+
+function _abrirModalProximoPasso(arquivo, nome) {
+  _mppArquivo = arquivo || '';
+  _mppNome    = nome    || 'Roteiro';
+  document.getElementById('mpp-titulo').textContent = `"${_mppNome}" está pronto!`;
+  abrirModal('modal-proximo-passo');
+}
+
+async function _mppExecutarHitl() {
+  fecharModal('modal-proximo-passo');
+  if (!_mppArquivo) return;
+  showTab('studio');
+  await carregarRoteiro(_mppArquivo);
+  setTimeout(() => validarHitl(), 400);
+}
+
+async function _mppExecutarRobo() {
+  fecharModal('modal-proximo-passo');
+  if (!_mppArquivo) return;
+  showTab('studio');
+  await carregarRoteiro(_mppArquivo);
+  setTimeout(() => executarRobo(), 400);
+}
+
+function _mppAbrirRoteiro() {
+  fecharModal('modal-proximo-passo');
+  if (!_mppArquivo) return;
+  showTab('studio');
+  carregarRoteiro(_mppArquivo);
+  carregarRoteiros();
+}
+
+// ════════════════════════════════════════
+// HITL VALIDATOR
+// ════════════════════════════════════════
+async function validarHitl() {
+  if (!arquivoAtual) return;
+  try {
+    await salvarRoteiro(false);
+    const r = await fetch(`/api/validar-hitl/${arquivoAtual}`, { method: 'POST' });
+    if (!r.ok) throw new Error('Falha ao iniciar validação HITL');
+    toast('🟡 Validação HITL iniciada — observe a janela do Chrome!', 'info');
+  } catch (e) { toast(e.message, 'error'); }
+}
 // ════════════════════════════════════════
 // RAG — UPLOAD DE MANUAIS PDF
 // ════════════════════════════════════════
@@ -3095,22 +3261,16 @@ async function gerarRoteiroIA() {
         `Aura dominou este fluxo! Roteiro "${dados.arquivo || nomeAula}" gerado. Clique em "Abrir Roteiro" para conferir.`
       );
 
-      // Troca botões para abrir o roteiro gerado
-      btnLabel.textContent  = 'Abrir Roteiro';
-      btn.disabled          = false;
-      btn.onclick           = () => {
+      btnLabel.textContent = 'Ver próximo passo';
+      btn.disabled         = false;
+      btn.onclick          = () => {
         fecharModalGerarIA();
-        showTab('studio');
-        if (dados.arquivo) carregarRoteiro(dados.arquivo);
-        carregarRoteiros();
-        // Restaura o onclick original para próxima vez
+        _abrirModalProximoPasso(dados.arquivo, nomeAula);
         btn.onclick = () => gerarRoteiroIA();
       };
-
-      // Atualiza a lista de roteiros em background
       carregarRoteiros();
       carregarMetricas();
-      toast(`✨ Roteiro "${nomeAula}" gerado com sucesso!`, 'success');
+      toast(`✨ Roteiro "${nomeAula}" gerado! Valide com HITL antes de gravar.`, 'info');
 
     } else {
       _setAiStatus('error', '⚠️', 'Erro ao gerar', dados.erro || 'Algo deu errado nos bastidores. Tente novamente.');

@@ -527,8 +527,10 @@ async def listar_roteiros():
                 "video_url": f"/videos/{base}.mp4"           if tem_video else None,
                 "scorm_url": f"/api/download-scorm/{base}"   if tem_scorm else None,
                 "pdf_url":   f"/api/download-pdf/{base}"     if tem_pdf   else None,
-                "qualidade":        _q_status,   # "aprovado" | "reprovado" | "sem_acoes"
-                "qualidade_motivo": _q_motivo,   # texto explicativo para tooltip
+                "qualidade":        _q_status,
+                "qualidade_motivo": _q_motivo,
+                "origem":          dados.get("metadata", {}).get("origem", "manual"),
+                "hitl_validado":   dados.get("metadata", {}).get("hitl_validado", False),
             })
         except Exception:
             pass
@@ -570,7 +572,7 @@ def _iniciar_bg(comando, msg_exec, msg_ok):
 @app.post("/api/gravar")
 async def gravar_aula(req: NovaAulaReq):
     ok = _iniciar_bg([sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"],
-                     "🔍 Hackeando o DOM (com autorização)...", "🎯 Tela capturada. A IA já pode enxergar.")
+                     "🔍 Vasculhando o DOM (com autorização)...", "🎯 Tela capturada. A IA já pode enxergar.")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
 # FIX Bug #APP-01: Rota /api/gerar-ia duplicada removida aqui.
@@ -768,7 +770,17 @@ async def gerar_aula_com_ia(payload: GerarIAPayload):
     )
 
     if resultado.get("status") == "sucesso":
-        # Atualiza métricas para o Overview refletir a nova aula gerada
+        # Marca origem="ia" e hitl_validado=False no metadata do roteiro
+        _arq = os.path.join(ROTEIROS_DIR, resultado.get("arquivo", ""))
+        if os.path.exists(_arq):
+            try:
+                with open(_arq, "r", encoding="utf-8") as _f: _rd = json.load(_f)
+                _rd.setdefault("metadata", {})
+                _rd["metadata"]["origem"] = "ia"
+                _rd["metadata"]["hitl_validado"] = False
+                with open(_arq, "w", encoding="utf-8") as _f:
+                    json.dump(_rd, _f, indent=2, ensure_ascii=False)
+            except Exception: pass
         carregarMetricas_bg()
         return JSONResponse(status_code=200, content=resultado)
     else:
@@ -805,6 +817,41 @@ def carregarMetricas_bg():
 # ══════════════════════════════════════════════════════════════════
 # ENDPOINT GPS — Retorna passos de roteiro para o motor GPS da Aura
 # ══════════════════════════════════════════════════════════════════
+
+
+@app.post("/api/marcar-hitl-validado/{arquivo}")
+async def marcar_hitl_validado(arquivo: str):
+    """Chamado pelo validator_hitl após concluir — marca o roteiro como validado."""
+    caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
+    if not os.path.exists(caminho):
+        return JSONResponse(status_code=404, content={"erro": "Arquivo não encontrado"})
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+        dados.setdefault("metadata", {})
+        dados["metadata"]["hitl_validado"] = True
+        with open(caminho, "w", encoding="utf-8") as f:
+            json.dump(dados, f, indent=2, ensure_ascii=False)
+        return {"status": "sucesso"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"erro": str(e)})
+
+@app.post("/api/validar-hitl/{arquivo}")
+async def validar_hitl(arquivo: str):
+    """
+    Abre o browser em modo HITL — o analista co-pilota a validação.
+    O processo roda em janela própria do Chrome.
+    """
+    caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
+    ok = _iniciar_bg(
+        [sys.executable, "validator_hitl.py", caminho],
+        "🟡 Validação HITL iniciada — aguarde a janela do Chrome abrir...",
+        "✅ Validação HITL concluída. Brain atualizado com as correções.",
+    )
+    return {"status": "iniciado"} if ok else JSONResponse(
+        status_code=400, content={"erro": "Sistema ocupado"}
+    )
+
 @app.get("/api/gps-roteiro")
 async def get_gps_roteiro(
     objetivo: str = "",
@@ -822,7 +869,7 @@ async def get_gps_roteiro(
         return JSONResponse(status_code=422, content={"erro": "objetivo é obrigatório"})
 
     # 1. Busca no Pinecone pelo roteiro mais relevante
-    busca = dap_engine.buscar_contexto(objetivo.strip(), tenant_id)
+    busca = await asyncio.to_thread(dap_engine.buscar_contexto, objetivo.strip(), tenant_id)
     if not busca or busca.get("score", 0) < 0.45:
         return {"status": "nao_encontrado", "passos": []}
 
@@ -843,8 +890,22 @@ async def get_gps_roteiro(
                 with open(caminho, "r", encoding="utf-8") as f:
                     roteiro = json.load(f)
                 nome_roteiro = roteiro.get("metadata", {}).get("nome_aula", "")
-                # Match pelo nome_aula ou pelo id_treinamento
-                if nome_roteiro == nome_aula_alvo or                    roteiro.get("metadata", {}).get("id_treinamento") == limpar_nome(nome_aula_alvo):
+                id_trein     = roteiro.get("metadata", {}).get("id_treinamento", "")
+
+                # Match robusto: normaliza acentos e caixa antes de comparar.
+                # O Pinecone pode retornar o nome com variação de capitalização
+                # ou acento diferente do que está salvo no JSON.
+                import unicodedata
+                def _norm(s):
+                    return unicodedata.normalize("NFD", s).encode("ascii","ignore").decode().lower().strip()
+
+                alvo_norm = _norm(nome_aula_alvo)
+                if (_norm(nome_roteiro) == alvo_norm or
+                        _norm(id_trein) == alvo_norm or
+                        _norm(id_trein) == _norm(limpar_nome(nome_aula_alvo)) or
+                        # Fallback: nome do arquivo contém o alvo (match parcial)
+                        alvo_norm in _norm(nome_roteiro) or
+                        _norm(nome_roteiro) in alvo_norm):
                     arquivo_encontrado = arquivo
 
                     for passo in roteiro.get("passos", []):
@@ -854,29 +915,43 @@ async def get_gps_roteiro(
                         if not acoes:
                             continue
 
-                        # Primeiro seletor válido do passo
-                        seletor_passo = ""
-                        label_passo = ""
-                        acao_tipo = "clique"
-                        for ac in acoes:
-                            if ac.get("acao") == "concluir_video":
-                                continue
-                            alvo = ac.get("elemento_alvo", {})
-                            s = alvo.get("seletor_hint", "") or alvo.get("seletor_css", "")
-                            if s:
-                                seletor_passo = s
-                                label_passo   = alvo.get("label_curto", "")
-                                acao_tipo     = ac.get("acao", "clique")
-                                break
+                        # Expõe CADA ação técnica como um step GPS separado.
+                        # Isso resolve o caso onde um passo pedagógico tem múltiplos
+                        # cliques (ex: Senior Flow → GED → Documentos).
+                        ancora_passo  = passo.get("pedagogia", {}).get("ancora", "")[:120]
+                        tooltip_passo = passo.get("pedagogia", {}).get("tooltip_dap", "")
+                        id_passo      = passo.get("id_passo", len(passos_gps) + 1)
 
-                        passos_gps.append({
-                            "id_passo": passo.get("id_passo", len(passos_gps) + 1),
-                            "tooltip":  passo.get("pedagogia", {}).get("tooltip_dap", ""),
-                            "ancora":   passo.get("pedagogia", {}).get("ancora", "")[:120],
-                            "seletor":  seletor_passo,
-                            "label":    label_passo,
-                            "acao":     acao_tipo,
-                        })
+                        acoes_validas = [
+                            ac for ac in acoes
+                            if ac.get("acao") not in ("concluir_video",)
+                            and (ac.get("elemento_alvo", {}).get("seletor_hint", "")
+                                 or ac.get("elemento_alvo", {}).get("seletor_css", ""))
+                        ]
+
+                        if not acoes_validas:
+                            continue
+
+                        for i, ac in enumerate(acoes_validas):
+                            alvo = ac.get("elemento_alvo", {})
+                            s    = alvo.get("seletor_hint", "") or alvo.get("seletor_css", "")
+                            micro = ac.get("micro_narracao", "").strip()
+
+                            # Primeira ação do passo: usa a âncora pedagógica completa
+                            # Ações seguintes: usa a micro-narração ou o label
+                            if i == 0:
+                                tooltip_step = ancora_passo or tooltip_passo
+                            else:
+                                tooltip_step = micro or alvo.get("label_curto", "") or tooltip_passo
+
+                            passos_gps.append({
+                                "id_passo":    f"{id_passo}.{i+1}",
+                                "tooltip":     tooltip_step,
+                                "ancora":      ancora_passo if i == 0 else micro,
+                                "seletor":     s,
+                                "label":       alvo.get("label_curto", ""),
+                                "acao":        ac.get("acao", "clique"),
+                            })
                     break
             except Exception:
                 continue

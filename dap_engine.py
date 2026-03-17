@@ -241,6 +241,7 @@ def buscar_contexto(prompt_usuario: str, tenant_id: str = "senior_default") -> d
         contextos      = []
         melhor_seletor = None
         melhor_score   = 0.0
+        melhor_aula    = None  # GPS: rastreia o nome da aula com maior score
 
         for match in resultados.matches:
             if match.score < SCORE_THRESHOLD:
@@ -256,6 +257,7 @@ def buscar_contexto(prompt_usuario: str, tenant_id: str = "senior_default") -> d
                 if match.score > melhor_score:
                     melhor_score   = match.score
                     melhor_seletor = md.get("seletor")
+                    melhor_aula    = md.get("aula")
             contextos.append(contexto)
 
         if not contextos:
@@ -265,6 +267,7 @@ def buscar_contexto(prompt_usuario: str, tenant_id: str = "senior_default") -> d
             "texto_rag":      "\n\n---\n\n".join(contextos),
             "seletor_direto": melhor_seletor,
             "score":          melhor_score,
+            "melhor_aula":    melhor_aula,  # GPS: nome da aula com maior score
         }
 
     except Exception as e:

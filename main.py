@@ -9,6 +9,7 @@ Correcoes aplicadas:
   - Threads de audio protegidas com try/except individual
   - wait_for_load_state com timeout explicito
   - LOGIN HÍBRIDO (Resiliente e com Fallback Humano)
+  - [NOVO] Chaveador de Vozes (Edge TTS vs ElevenLabs)
 """
 
 import sys
@@ -17,8 +18,9 @@ import os
 import json
 import time
 import re
-import shutil  # FIX: import no topo, nao dentro da funcao
+import shutil  
 import logging
+import requests # NOVO: Para fazer as requisições pro ElevenLabs
 
 import edge_tts
 import pygame
@@ -42,8 +44,6 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 import moviepy.audio.fx.all as afx
 
-# FIX: importa limpar_nome de app.py — fonte de verdade unica (DRY)
-# Se app.py nao estiver no path, define localmente como fallback
 try:
     from app import limpar_nome
 except ImportError:
@@ -58,7 +58,6 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 pygame.mixer.init()
 pygame.mixer.set_num_channels(2)
-
 
 # ==============================================================
 # CUSTOM LOGGER PARA ENVIAR PORCENTAGEM AO PAINEL
@@ -79,14 +78,10 @@ class CustomRenderLogger(ProgressBarLogger):
                 print(f"PROGRESSO:{pct}", flush=True)
                 self.last_pct = pct
 
-
 # ==============================================================
 # UTILITARIOS GERAIS
 # ==============================================================
-
-# Manifesto global de audios
 _audio_manifest: dict[str, str] = {}
-
 
 def salvar_manifesto_audio(id_treinamento: str) -> None:
     nome_pasta    = limpar_nome(id_treinamento)
@@ -97,9 +92,8 @@ def salvar_manifesto_audio(id_treinamento: str) -> None:
         json.dump(_audio_manifest, f, indent=2, ensure_ascii=False)
     logging.info(f"Manifesto de audio salvo: {caminho} ({len(_audio_manifest)} entradas)")
 
-
 # ==============================================================
-# AUDIO (TTS)
+# AUDIO (TTS e ELEVENLABS)
 # ==============================================================
 async def gerar_audio(
     texto: str, id_unico: str, id_treinamento: str, voz: str = "pt-BR-FranciscaNeural"
@@ -107,6 +101,7 @@ async def gerar_audio(
     if not texto or not texto.strip():
         return None
 
+    # Correções de pronúncia
     texto_falado = re.sub(r"(?i)\becm_ged\b", "E C M gédi", texto)
     texto_falado = re.sub(r"\bGED\b", "gédi", texto_falado)
     texto_falado = re.sub(r"\bged\b", "gédi", texto_falado)
@@ -119,11 +114,53 @@ async def gerar_audio(
     arquivo_mp3 = os.path.join(pasta_audio, f"audio_{id_unico}.mp3")
 
     if not os.path.exists(arquivo_mp3):
-        await edge_tts.Communicate(texto_falado, voz, rate="-12%").save(arquivo_mp3)
+        # 🟢 A Trava Inteligente: Decide quem vai narrar
+        if voz == "elevenlabs":
+            api_key = os.getenv("ELEVENLABS_API_KEY")
+            if not api_key:
+                print("⚠️  Chave ELEVENLABS_API_KEY não encontrada no .env! Fazendo fallback para a voz gratuita...", flush=True)
+                await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
+            else:
+                try:
+                    # ID do Antoni (Voz Masculina PT-BR boa para tutoriais)
+                    # Você pode trocar esse ID por qualquer outro do ElevenLabs
+                    voice_id = "cjVigY5qzO86Huf0OWal" 
+                    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+                    
+                    headers = {
+                        "Accept": "audio/mpeg",
+                        "Content-Type": "application/json",
+                        "xi-api-key": api_key
+                    }
+                    
+                    data = {
+                        "text": texto_falado,
+                        "model_id": "eleven_multilingual_v2",
+                        "voice_settings": {
+                            "stability": 0.5,
+                            "similarity_boost": 0.75
+                        }
+                    }
+                    
+                    # Roda de forma síncrona (requests bloqueia a thread, mas ok pra MVP)
+                    response = requests.post(url, json=data, headers=headers)
+                    if response.status_code == 200:
+                        with open(arquivo_mp3, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=1024):
+                                if chunk:
+                                    f.write(chunk)
+                    else:
+                        print(f"⚠️  Erro no ElevenLabs ({response.status_code}): {response.text}. Fallback gratuito ativado.", flush=True)
+                        await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
+                except Exception as e:
+                    print(f"⚠️  Falha ao conectar no ElevenLabs: {e}. Fallback gratuito ativado.", flush=True)
+                    await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
+        else:
+            # Modo Rascunho / Gratuito
+            await edge_tts.Communicate(texto_falado, voz, rate="-12%").save(arquivo_mp3)
 
     _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"
     return arquivo_mp3
-
 
 def iniciar_reproducao_audio(arquivo_mp3: str) -> None:
     if arquivo_mp3 and os.path.exists(arquivo_mp3):
@@ -132,11 +169,9 @@ def iniciar_reproducao_audio(arquivo_mp3: str) -> None:
         except Exception as e:
             logging.warning(f"Falha ao reproduzir audio: {e}")
 
-
 async def aguardar_audio_terminar() -> None:
     while pygame.mixer.Channel(1).get_busy():
         await asyncio.sleep(0.1)
-
 
 # ==============================================================
 # ELEMENTOS VISUAIS E CINEMATOGRAFICOS
@@ -148,7 +183,6 @@ async def safe_evaluate(target, script: str, arg=None, timeout: float = 3.0) -> 
         return True
     except Exception:
         return False
-
 
 async def atualizar_progress_bar(page, passo_atual: int, total_passos: int, nome_aula: str) -> None:
     porcentagem = int((passo_atual / total_passos) * 100)
@@ -192,7 +226,6 @@ async def atualizar_progress_bar(page, passo_atual: int, total_passos: int, nome
     }}"""
     await safe_evaluate(page, script)
 
-
 async def exibir_legenda_cinema(page, texto: str) -> None:
     if not texto or not texto.strip():
         return
@@ -215,10 +248,8 @@ async def exibir_legenda_cinema(page, texto: str) -> None:
     }"""
     await safe_evaluate(page, script, arg=texto)
 
-
 async def remover_legenda(page) -> None:
     await safe_evaluate(page, "() => { const e = document.getElementById('senior-video-subtitle'); if(e) e.remove(); }")
-
 
 async def exibir_encerramento_cinema(page) -> None:
     script = """() => new Promise((resolve) => {
@@ -252,7 +283,6 @@ async def exibir_encerramento_cinema(page) -> None:
     })"""
     await safe_evaluate(page, script, timeout=5.0)
 
-
 # ==============================================================
 # GERACAO DE LEGENDAS (SRT) E VIDEO FINAL
 # ==============================================================
@@ -263,14 +293,12 @@ def formatar_tempo_srt(segundos: float) -> str:
     ms = int(round((segundos - int(segundos)) * 1000))
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
-
 def gerar_arquivo_srt(timeline: list, caminho_srt: str) -> None:
     with open(caminho_srt, "w", encoding="utf-8") as f:
         for idx, item in enumerate(timeline):
             f.write(f"{idx + 1}\n")
             f.write(f"{formatar_tempo_srt(item['inicio'])} --> {formatar_tempo_srt(item['fim'])}\n")
             f.write(f"{item['texto']}\n\n")
-
 
 def renderizar_video_final(
     caminho_webm: str, timeline: list, nome_arquivo_base: str, tempo_corte: float
@@ -308,14 +336,10 @@ def renderizar_video_final(
             gerar_arquivo_srt(timeline, srt_path)
             print(f"SUCESSO! Video: {mp4_path}")
         finally:
-            # FIX Bug #MAIN-01: VideoFileClip.close() agora está em finally — garante
-            # que o handle do arquivo .webm seja sempre liberado, mesmo se
-            # write_videofile falhar. Sem isso, o .webm fica bloqueado no Windows.
             video.close()
 
     except Exception as e:
         print(f"Erro na Pos-Producao: {e}")
-
 
 # ==============================================================
 # WRAPPER DE CLIQUE E VALIDACAO
@@ -333,13 +357,8 @@ def _validar_roteiro_gravacao(roteiro: dict) -> list[str]:
             erros.append(f"Passo {pid}: ancora (narracao principal) vazia.")
     return erros
 
-
 async def clicar_com_animacao(page, acao_tec: dict) -> None:
     await garantir_cursor_visivel(page)
-
-    # 🟢 O Mouse não "some" mais!
-    # E a viagem (Curva Bézier) foi movida para dentro do vision_engine.py,
-    # para garantir sincronia milimétrica com o elemento real e evitar pulos.
     await encontrar_e_clicar(page, acao_tec)
 
 # ==============================================================
@@ -373,7 +392,6 @@ async def executar_roteiro(caminho_json: str) -> None:
     global _audio_manifest
     _audio_manifest.clear()
 
-    # Limpa cache de audios antigos
     pasta_audio_cache = os.path.join("audios_gerados", nome_arquivo_base)
     if os.path.exists(pasta_audio_cache):
         try:
@@ -389,8 +407,6 @@ async def executar_roteiro(caminho_json: str) -> None:
 
     timeline_audios: list = []
     caminho_video_webm    = None
-
-    # FIX: usa None como sentinel (nao -1) — mais legivel e semanticamente correto
     tempo_corte_segundos: float | None = None
 
     passos_lista = roteiro.get("passos", [])
@@ -408,28 +424,22 @@ async def executar_roteiro(caminho_json: str) -> None:
         page = await context.new_page()
         await instalar_cursor(page)
 
-        # ---------------------------------------------------------
-        # 🟢 NOVO MOTOR DE LOGIN HÍBRIDO (Resiliente)
-        # ---------------------------------------------------------
         print("A iniciar o robô e a tentar login no Senior X...", flush=True)
         try:
             await page.goto(SENIOR_URL)
             await asyncio.sleep(2.0)
             await page.keyboard.press("Escape")
 
-            # 1. Tenta preencher o usuário
             campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
             await campo_usr.wait_for(state="visible", timeout=10000)
             await campo_usr.fill(usuario)
             await asyncio.sleep(0.5)
 
-            # 2. Tenta clicar em Próximo ou aperta Enter
             try:
                 await page.locator("button:has-text('Próximo'), button:has-text('Proximo'), button:has-text('Continuar')").first.click(timeout=3000)
             except Exception:
                 await page.keyboard.press("Enter")
 
-            # 3. Aguarda a senha
             campo_senha = page.locator("input[type='password']").first
             await campo_senha.wait_for(state="visible", timeout=10000)
             await campo_senha.fill(senha)
@@ -450,12 +460,8 @@ async def executar_roteiro(caminho_json: str) -> None:
                 print("ERRO FATAL: Tempo esgotado para login manual.", flush=True)
                 await browser.close()
                 return
-        # ---------------------------------------------------------
-        # FIM DO BLOCO DE LOGIN
-        # ---------------------------------------------------------
 
         try:
-            # Pula os modais caso ainda existam após o carregamento
             await page.keyboard.press("Escape")
             await asyncio.sleep(0.3)
             await page.keyboard.press("Escape")
@@ -486,7 +492,7 @@ async def executar_roteiro(caminho_json: str) -> None:
                         try:
                             duracao = pygame.mixer.Sound(mp3).get_length()
                         except Exception:
-                            duracao = 3.0  # fallback se o arquivo estiver corrompido
+                            duracao = 3.0
                         iniciar_reproducao_audio(mp3)
                         timeline_audios.append({
                             "arquivo": mp3,
@@ -532,7 +538,6 @@ async def executar_roteiro(caminho_json: str) -> None:
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
                     
-                    # 🟢 REDUTOR DE TEMPO MORTO (Deixa o robô ágil e natural)
                     pausa_real = min(pausa_inteligente * 0.3, 0.8)
                     await asyncio.sleep(pausa_real)
 
@@ -540,7 +545,7 @@ async def executar_roteiro(caminho_json: str) -> None:
             pygame.mixer.stop()
             pygame.mixer.music.stop()
             logging.error(f"Gravacao interrompida: {e}")
-            tempo_corte_segundos = None  # FIX: None indica falha
+            tempo_corte_segundos = None
 
         finally:
             pygame.mixer.stop()
@@ -548,7 +553,6 @@ async def executar_roteiro(caminho_json: str) -> None:
             salvar_manifesto_audio(id_treinamento)
 
             try:
-                # FIX: verifica se o video existe antes de chamar .path()
                 if not page.is_closed() and page.video:
                     caminho_video_webm = await page.video.path()
                 await asyncio.sleep(1.0)
@@ -559,7 +563,6 @@ async def executar_roteiro(caminho_json: str) -> None:
             except Exception:
                 pass
 
-            # FIX: usa None como sentinel — sem ambiguidade com valores negativos
             if tempo_corte_segundos is None and caminho_video_webm and os.path.exists(caminho_video_webm):
                 try:
                     os.remove(caminho_video_webm)
@@ -579,7 +582,6 @@ async def executar_roteiro(caminho_json: str) -> None:
     else:
         print("Operacao abortada.", flush=True)
         sys.exit(1)
-
 
 # ==============================================================
 # PONTO DE ENTRADA (CLI)

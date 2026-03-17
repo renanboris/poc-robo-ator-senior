@@ -555,37 +555,62 @@ function injetarEstilosAura() {
                 }));
             }
 
-            exibirBalaoAura(textoResposta, sugestoes, true); // true = show feedback
+            // ── GPS disponível: oferece escolha, NÃO auto-inicia ─────────────
+            const temGPS = payload.gps_passos && Array.isArray(payload.gps_passos)
+                           && payload.gps_passos.length > 0;
 
-            // GPS: Se o payload contém passos, entra em modo GPS automaticamente
-            if (payload.gps_passos && Array.isArray(payload.gps_passos) && payload.gps_passos.length > 0) {
-                setTimeout(() => iniciarGPS(payload.gps_passos, payload.gps_nome_aula || ''), 800);
-            }
+            if (temGPS) {
+                // Adiciona "Me guie" e "Faça por mim" ANTES dos chips da IA
+                const gpsOpcoes = [
+                    {
+                        label: '🧭 Me guie passo a passo',
+                        action: () => {
+                            document.getElementById('aura-sonar-highlight')?.remove();
+                            document.getElementById('aura-backdrop')?.remove();
+                            iniciarGPS(payload.gps_passos, payload.gps_nome_aula || '');
+                        }
+                    },
+                    {
+                        label: '🤖 Faça por mim',
+                        action: () => {
+                            exibirBalaoAura(
+                                '⚙️ Modo Agente em desenvolvimento! Por enquanto, o GPS te guia.',
+                                [{ label: '🧭 Ok, me guie', action: () => iniciarGPS(payload.gps_passos, payload.gps_nome_aula || '') }]
+                            );
+                        }
+                    },
+                    ...sugestoes.slice(0, 1)  // máximo 1 chip da IA para não poluir
+                ];
+                // GPS disponível: NÃO roda spotlight normal — evita conflito de elementos
+                exibirBalaoAura(textoResposta, gpsOpcoes, true);
 
-            // Lógica híbrida: Brain (seletor CSS gravado) → Fallback visual (DOM ID)
-            if (payload.seletor_css) {
-                console.log("Aura: Usando memória muscular (Brain):", payload.seletor_css);
-                document.getElementById('aura-sonar-highlight')?.remove();
-                let matchAlvo = null;
-                try { matchAlvo = encontrarElementoNaTela(payload.seletor_css); }
-                catch(e) { console.warn("Aura: Seletor CSS inválido:", payload.seletor_css); }
-
-                if (matchAlvo?.elemento) {
-                    console.log("Aura: Elemento encontrado pelo CSS (inclui iframes).");
-                    aplicarHolofoteDom(payload.seletor_css, true);
-                } else {
-                    console.warn("Aura: Seletor não encontrado. Acionando Plano B (DOM visual)...");
-                    if (payload.elemento_id != null) {
-                        aplicarHolofoteDom(payload.elemento_id, false);
-                    } else {
-                        console.warn("Aura: Plano B também falhou. Nenhum elemento identificado.");
-                    }
-                }
-            } else if (payload.elemento_id != null) {
-                console.log("Aura: Usando DOM visual, ID:", payload.elemento_id);
-                aplicarHolofoteDom(payload.elemento_id, false);
             } else {
-                document.getElementById('aura-sonar-highlight')?.remove();
+                // Sem GPS: comportamento normal da Aura pontual
+                exibirBalaoAura(textoResposta, sugestoes, true);
+
+                if (payload.seletor_css) {
+                    console.log('Aura: Usando memória muscular (Brain):', payload.seletor_css);
+                    document.getElementById('aura-sonar-highlight')?.remove();
+                    let matchAlvo = null;
+                    try { matchAlvo = encontrarElementoNaTela(payload.seletor_css); }
+                    catch(e) { console.warn('Aura: Seletor CSS inválido:', payload.seletor_css); }
+
+                    if (matchAlvo?.elemento) {
+                        console.log('Aura: Elemento encontrado pelo CSS (inclui iframes).');
+                        aplicarHolofoteDom(payload.seletor_css, true);
+                    } else {
+                        console.warn('Aura: Seletor não encontrado. Plano B...');
+                        if (payload.elemento_id != null) {
+                            aplicarHolofoteDom(payload.elemento_id, false);
+                        } else {
+                            document.getElementById('aura-sonar-highlight')?.remove();
+                        }
+                    }
+                } else if (payload.elemento_id != null) {
+                    aplicarHolofoteDom(payload.elemento_id, false);
+                } else {
+                    document.getElementById('aura-sonar-highlight')?.remove();
+                }
             }
         }
 
@@ -654,9 +679,11 @@ const _gps = {
     ativo: false,
     passos: [],
     idx: 0,
-    _listenerEl: null,   // listener de clique no elemento alvo atual
-    _pollingTimer: null, // timer de retry para encontrar o elemento
-    _urlWatcher: null,   // MutationObserver dedicado ao GPS
+    _listenerEl: null,    // listener de clique no elemento alvo atual
+    _pollingTimer: null,  // timer de retry para encontrar o elemento
+    _urlWatcher: null,    // MutationObserver de URL (Angular hash routing)
+    _domExitWatcher: null,// MutationObserver: detecta elemento saindo do DOM
+    _bcWatcher: null,     // MutationObserver: detecta mudança de breadcrumb
 };
 
 // ─── HUD ──────────────────────────────────────────────────────────
@@ -772,12 +799,40 @@ function _tentarSpotlightComRetry(seletor, tentativas = 0) {
 
     const el = _spotlightGPS(seletor);
     if (el) {
-        // Elemento encontrado — registra listener de clique
-        _gps._listenerEl?.call && el.removeEventListener('click', _gps._listenerEl);
-        _gps._listenerEl = () => {
-            setTimeout(() => _avancarGPS(), 200); // pequeno delay para Angular processar
-        };
+        // Sinal 1: clique direto (menus estáticos)
+        _gps._listenerEl = () => setTimeout(_avancarGPS, 150);
         el.addEventListener('click', _gps._listenerEl, { once: true });
+
+        // Sinal 2: elemento SAI do DOM (Angular SPA — mais confiável que click)
+        _gps._domExitWatcher?.disconnect();
+        let _exitThrottle = null;
+        _gps._domExitWatcher = new MutationObserver(() => {
+            if (!_gps.ativo || _exitThrottle) return;
+            if (!document.body.contains(el)) {
+                _gps._domExitWatcher.disconnect();
+                _gps._domExitWatcher = null;
+                _exitThrottle = setTimeout(() => setTimeout(_avancarGPS, 250), 50);
+            }
+        });
+        _gps._domExitWatcher.observe(document.body, { childList: true, subtree: true });
+
+        // Sinal 3: breadcrumb muda (toda navegação do Senior X atualiza ele)
+        const _bc = document.querySelector('p-breadcrumb, [class*="breadcrumb"]');
+        if (_bc) {
+            let _bcSnap = _bc.textContent || '';
+            _gps._bcWatcher?.disconnect();
+            _gps._bcWatcher = new MutationObserver(() => {
+                if (!_gps.ativo) { _gps._bcWatcher.disconnect(); return; }
+                const curr = _bc.textContent || '';
+                if (curr !== _bcSnap && curr.length > 0) {
+                    _gps._bcWatcher.disconnect();     _gps._bcWatcher      = null;
+                    _gps._domExitWatcher?.disconnect(); _gps._domExitWatcher = null;
+                    setTimeout(_avancarGPS, 300);
+                }
+            });
+            _gps._bcWatcher.observe(_bc, { childList: true, subtree: true, characterData: true });
+        }
+
     } else if (tentativas < 6) {
         _gps._pollingTimer = setTimeout(() =>
             _tentarSpotlightComRetry(seletor, tentativas + 1), 400
@@ -793,6 +848,8 @@ function _avancarGPS() {
     document.getElementById('aura-sonar-highlight')?.remove();
     document.getElementById('aura-backdrop')?.remove();
     clearTimeout(_gps._pollingTimer);
+    _gps._domExitWatcher?.disconnect(); _gps._domExitWatcher = null;
+    _gps._bcWatcher?.disconnect();      _gps._bcWatcher      = null;
 
     _gps.idx++;
 
@@ -855,8 +912,9 @@ function pararGPS(concluido = false) {
     _gps.ativo = false;
 
     clearTimeout(_gps._pollingTimer);
-    _gps._urlWatcher?.disconnect();
-    _gps._urlWatcher = null;
+    _gps._urlWatcher?.disconnect();     _gps._urlWatcher     = null;
+    _gps._domExitWatcher?.disconnect(); _gps._domExitWatcher = null;
+    _gps._bcWatcher?.disconnect();      _gps._bcWatcher      = null;
 
     document.getElementById('aura-sonar-highlight')?.remove();
     document.getElementById('aura-backdrop')?.remove();
@@ -954,30 +1012,41 @@ function _criarBarraFeedback(prompt, resposta) {
     let _auraInicializada = false;
 
     function _estaLogado() {
-        // Sinal negativo: campo de senha visível = ainda na tela de login
+        // ── Sinal negativo 1: URL de login ────────────────────────────────
+        if (/\/login|\/auth|\/signin|\/sso/i.test(window.location.href)) return false;
+
+        // ── Sinal negativo 2: campo de senha visível ──────────────────────
         const campoSenha = document.querySelector('input[type="password"]');
-        if (campoSenha && campoSenha.offsetParent !== null) {
-            return false;  // offsetParent !== null = visível na tela
-        }
+        if (campoSenha && campoSenha.offsetParent !== null) return false;
 
-        // Sinal positivo: elementos que só existem no app autenticado
-        const sinaisLogado = [
-            'p-breadcrumb',                // breadcrumb de navegação do Angular
-            '[class*="user-name"]',        // nome do usuário no header
-            '[class*="profile-name"]',     // variante de perfil
-            'senior-menu',                 // componente de menu proprietário Senior
-            '[data-testid="user-name"]',   // atributo de teste do header
-            '.senior-header',              // header da aplicação
-            'p-menubar',                   // menu principal PrimeNG
-            '[aria-label*="Grupo de menus"]', // menus de navegação do ERP
-        ];
+        // ── Sinal positivo 1: token no storage (aparece logo após login) ──
+        // Chega muito antes de qualquer componente Angular renderizar
+        try {
+            for (const st of [sessionStorage, localStorage]) {
+                for (let i = 0; i < st.length; i++) {
+                    if (/token|auth|session|jwt|bearer|access/i.test(st.key(i) || ''))
+                        return true;
+                }
+            }
+        } catch(e) {}
 
-        return sinaisLogado.some(sel => document.querySelector(sel) !== null);
+        // ── Sinal positivo 2: router-outlet com filhos (~2-3s após boot) ──
+        // Muito mais rápido que p-breadcrumb que precisa de API calls
+        const outlet = document.querySelector('router-outlet');
+        if (outlet && outlet.nextElementSibling) return true;
+
+        // ── Sinal positivo 3: componente raiz com conteúdo ────────────────
+        const appRoot = document.querySelector('app-root, platform-root, senior-root');
+        if (appRoot && appRoot.children.length > 1) return true;
+
+        // ── Sinal positivo 4 (tardio): nav autenticada — fallback garantido
+        return ['p-breadcrumb', 'p-menubar', '[aria-label*="Grupo de menus"]',
+                '[class*="user-name"]', '.senior-header']
+               .some(sel => document.querySelector(sel) !== null);
     }
 
     function _tentarIniciarAura() {
         if (_auraInicializada) return;
-
         if (_estaLogado()) {
             _auraInicializada = true;
             console.log("Aura: Login detectado. Inicializando assistente...");
@@ -986,40 +1055,45 @@ function _criarBarraFeedback(prompt, resposta) {
     }
 
     function _aguardarLogin() {
-        // Verificação imediata (SPA pode já estar logada ao abrir extensão)
+        // Verificação imediata — se já está logado, sobe na hora
         _tentarIniciarAura();
         if (_auraInicializada) return;
 
-        // MutationObserver: detecta mudanças no DOM causadas pelo Angular
-        // ao navegar da tela de login para o app principal.
-        // Throttle de 200ms para não sobrecarregar em SPAs com muitas mutações.
+        // ── Poll a cada 500ms — independente de mutações pararem ─────────
+        // Garante resposta mesmo com pausa no render Angular
+        const _pollTimer = setInterval(() => {
+            if (_auraInicializada) { clearInterval(_pollTimer); return; }
+            _tentarIniciarAura();
+        }, 500);
+
+        // ── MutationObserver — reage em tempo real, throttle reduzido ─────
         let _throttle = null;
         const observer = new MutationObserver(() => {
-            if (_throttle || _auraInicializada) return;
+            if (_auraInicializada) { observer.disconnect(); return; }
+            if (_throttle) return;
             _throttle = setTimeout(() => {
                 _throttle = null;
                 _tentarIniciarAura();
-                if (_auraInicializada) observer.disconnect();
-            }, 200);
+                if (_auraInicializada) {
+                    observer.disconnect();
+                    clearInterval(_pollTimer);
+                }
+            }, 100);
         });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
 
-        observer.observe(document.documentElement, {
-            childList: true,
-            subtree: true,
-        });
-
-        // Camada 3: timeout de segurança (SSO externo, etc.)
+        // ── Timeout de segurança: 30s (SSO, ambientes lentos) ────────────
         setTimeout(() => {
-            if (!_auraInicializada) {
-                console.log("Aura: Timeout de segurança atingido. Inicializando por precaução.");
-                observer.disconnect();
-                _auraInicializada = true;
-                iniciarAura();
-            }
+            if (_auraInicializada) return;
+            console.log("Aura: Timeout atingido — inicializando por precaução.");
+            observer.disconnect();
+            clearInterval(_pollTimer);
+            _auraInicializada = true;
+            iniciarAura();
         }, 30_000);
     }
 
-    // Ponto de entrada — aguarda DOM estar pronto, depois aguarda login
+    // Ponto de entrada
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', _aguardarLogin);
     } else {
