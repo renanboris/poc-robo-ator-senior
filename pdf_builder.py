@@ -126,29 +126,25 @@ def processar_imagem_com_zoom(b64_str: str, coords: dict) -> PILImage.Image | No
         return None
     try:
         img = PILImage.open(BytesIO(base64.b64decode(b64_str))).convert("RGB")
-        img_w, img_h = img.size
+img_w, img_h = img.size
+    draw = ImageDraw.Draw(img)
+    pad = 8
+    
+    # Para o "pan da câmera", focamos no PRIMEIRO clique da lista
+    primeira_coord = lista_coords[0]
+    cx_cam = primeira_coord.get("x_pct", 0.5) * img_w
+    cy_cam = primeira_coord.get("y_pct", 0.5) * img_h
 
-        # Busca as coordenadas gravadas pelo radar do capture.py
-        x_pct = coords.get("x_pct", 0.5)
-        y_pct = coords.get("y_pct", 0.5)
-        w_pct = coords.get("w_pct", 0.05)
-        h_pct = coords.get("h_pct", 0.05)
-
-        cx = x_pct * img_w
-        cy = y_pct * img_h
-        tw = w_pct * img_w
-        th = h_pct * img_h
-
-        # 1. Desenha o Destaque Visual Vermelho
-        draw = ImageDraw.Draw(img)
-        pad = 8 # Margem ao redor do elemento
-        box_left = max(0, cx - tw/2 - pad)
-        box_top = max(0, cy - th/2 - pad)
-        box_right = min(img_w, cx + tw/2 + pad)
-        box_bottom = min(img_h, cy + th/2 + pad)
+    # Desenha as caixas vermelhas para TODAS as ações do passo
+    for coords in lista_coords:
+        cx = coords.get("x_pct", 0.5) * img_w
+        cy = coords.get("y_pct", 0.5) * img_h
+        tw = coords.get("w_pct", 0.05) * img_w
+        th = coords.get("h_pct", 0.05) * img_h
         
-        # Borda grossa vermelha altamente contrastante
-        draw.rectangle([box_left, box_top, box_right, box_bottom], outline="#EF4444", width=6)
+        box = [max(0, cx - tw/2 - pad), max(0, cy - th/2 - pad),
+               min(img_w, cx + tw/2 + pad), min(img_h, cy + th/2 + pad)]
+        draw.rectangle(box, outline="#EF4444", width=6)
 
         # 2. Define a janela de Zoom (Proporção ajustada para o painel lateral do PDF)
         # O painel tem aspecto mais vertical (Retrato), então cortamos 800x1050

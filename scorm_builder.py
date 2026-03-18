@@ -201,6 +201,20 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
         }}
         .error-flash {{ box-shadow: inset 0 0 100px 20px rgba(220, 38, 38, 0.5) !important; }}
 
+        /* Feedback de Erro Elegante */
+        #wrong-feedback {{
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
+            background: rgba(220, 38, 38, 0.95); color: white;
+            padding: 10px 24px; border-radius: 50px; font-size: 13px; font-weight: 600;
+            box-shadow: 0 10px 25px rgba(220, 38, 38, 0.4);
+            opacity: 0; pointer-events: none; z-index: 100;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;
+        }}
+        #wrong-feedback.show {{
+            opacity: 1; transform: translateX(-50%) translateY(0);
+        }}
+
         /* Barra de Instruções Moderna com Navegação */
         #instruction-bar {{
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -245,6 +259,9 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
         <input type="text" id="hotspot-input" class="interactive-zone" style="display:none;" autocomplete="off">
         
         <div id="error-mask"></div>
+        <div id="wrong-feedback">
+            <span style="font-size: 16px;">❌</span> Clique no local incorreto. Tente novamente.
+        </div>
         
         <div id="instruction-bar" style="display:none;">
             <button class="nav-btn" id="btn-prev" onclick="slideAnterior()">
@@ -435,19 +452,17 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
             if(slide.tipo !== "interacao") return; 
             
             const mask = document.getElementById('error-mask');
-            mask.classList.add('error-flash');
+            const feedback = document.getElementById('wrong-feedback');
             
-            try {{
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioCtx.createOscillator();
-                oscillator.type = 'square';
-                oscillator.frequency.setValueAtTime(120, audioCtx.currentTime); 
-                oscillator.connect(audioCtx.destination);
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.15);
-            }} catch(e) {{}}
-
+            // Ativa o flash e a pílula
+            mask.classList.add('error-flash');
+            feedback.classList.add('show');
+            
+            // Remove o flash rápido (300ms)
             setTimeout(() => {{ mask.classList.remove('error-flash'); }}, 300);
+            
+            // Esconde a pílula suavemente após 2 segundos
+            setTimeout(() => {{ feedback.classList.remove('show'); }}, 2000);
         }}
 
         function forcarDica() {{

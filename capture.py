@@ -598,15 +598,24 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
                 "alerta_instrutor": passo_ia.get("alerta_instrutor"),
                 "is_conclusao": passo_ia.get("is_conclusao", False), "acoes_tecnicas": [],
             }
+            
+            # 🟢 FIX: Busca os dois arrays paralelos gerados pela IA
             micro_narracoes = passo_ia.get("micro_narracoes", [])
+            validacoes = passo_ia.get("validacoes_esperadas", [])
+            
             for i, id_tec in enumerate(passo_ia.get("ids_acoes_tecnicas", [])):
                 acao_bruta = next((item for item in log_mapeador if item["id_acao"] == id_tec), None)
                 if acao_bruta:
                     passo_mesclado["acoes_tecnicas"].append({
-                        "acao": acao_bruta["acao"], "intencao_semantica": acao_bruta["intencao_semantica"],
-                        "elemento_alvo": acao_bruta["elemento_alvo"], "valor_input": acao_bruta["valor_input"],
+                        "acao": acao_bruta["acao"], 
+                        "intencao_semantica": acao_bruta["intencao_semantica"],
+                        "elemento_alvo": acao_bruta["elemento_alvo"], 
+                        "valor_input": acao_bruta["valor_input"],
                         "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
+                        # 🟢 AQUI: Costura a validação da IA junto com o print pesado do Python
+                        "validacao_esperada": validacoes[i] if i < len(validacoes) else None 
                     })
+                    
             if passo_mesclado["is_conclusao"]:
                 passo_mesclado["acoes_tecnicas"].append({"acao": "concluir_video"})
             roteiro_final["passos"].append(passo_mesclado)

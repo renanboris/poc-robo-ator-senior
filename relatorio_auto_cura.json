@@ -1,0 +1,38 @@
+[
+  {
+    "timestamp": "2026-03-18 09:47:37",
+    "intencao_original": "O usuário quis alterar a forma de visualização ou atribuição de permissões, de 'Papel' (Role) para 'Usuário' (User), dentro do modal de gerenciamento de permissões.",
+    "label_procurado": "Usuário",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-18 09:52:16",
+    "intencao_original": "Habilitar a permissão de download para o usuário 'Maria Eduarda' na pasta 'Financeiro'.",
+    "label_procurado": "span",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-18 14:18:36",
+    "intencao_original": "O usuário quis conceder a permissão de 'Download' para o usuário 'Adriana Conceição' na pasta 'Logistica'.",
+    "label_procurado": "span",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-18 14:46:43",
+    "intencao_original": "Ativar a permissão de Download para a Adriana Conceição na pasta Logística.",
+    "label_procurado": "span",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-18 17:20:09",
+    "intencao_original": "Abrir o menu Senior Flow",
+    "label_procurado": "ícone de menu",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-18 17:20:55",
+    "intencao_original": "Abrir o menu GED",
+    "label_procurado": "GED",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  }
+]

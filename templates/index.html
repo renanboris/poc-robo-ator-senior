@@ -1137,8 +1137,8 @@ body::after {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.loader-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.loader-msg { font-size: 12px; color: var(--text-3); margin-bottom: 24px; text-align: center; max-width: 280px; }
+.loader-title { font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 4px; }
+.loader-msg { font-size: 12px; color: #cbd5e1; margin-bottom: 24px; text-align: center; max-width: 280px; }
 
 .loader-progress {
   width: 200px; height: 2px;
@@ -2885,11 +2885,25 @@ function renderizarPassos() {
               type="text" placeholder="Texto a digitar…" value="${acao.valor_input || ''}"
               oninput="roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].valor_input=this.value">
           </div>
+          
+          <div class="action-row">
+             <input class="field-input" style="flex:1; border-color: var(--violet); color: var(--text);" 
+               type="text" placeholder="Intenção (O que a ação faz)..." value="${acao.intencao_semantica || ''}"
+               oninput="roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].intencao_semantica=this.value">
+          </div>
+
           <div class="action-row">
              <input class="field-input" style="flex:1; font-family:var(--font-mono); font-size:10px; color:var(--text-2);" 
-               type="text" placeholder="Seletor CSS ou Texto do Botão..." value="${acao.seletor_css || ''}"
-               oninput="roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].seletor_css=this.value">
+               type="text" placeholder="Seletor CSS (Apague se estiver errado)..." value="${acao.elemento_alvo?.seletor_hint || ''}"
+               oninput="if(!roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].elemento_alvo) roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].elemento_alvo = {}; roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].elemento_alvo.seletor_hint=this.value">
           </div>
+          
+          <div class="action-row">
+             <input class="field-input" style="flex:1; font-family:var(--font-mono); font-size:10px; color:var(--amber);" 
+               type="text" placeholder="Validação Agentic UI (Ex: O checkbox fica marcado)..." value="${acao.validacao_esperada?.alvo || ''}"
+               oninput="if(!roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].validacao_esperada) roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].validacao_esperada = {tipo: 'estado_visual'}; roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].validacao_esperada.alvo=this.value">
+          </div>
+
           <textarea class="field-textarea" rows="1" placeholder="Micro-narração…"
             oninput="roteiroAtual.passos[${pi}].acoes_tecnicas[${ai}].micro_narracao=this.value"
           >${acao.micro_narracao || ''}</textarea>

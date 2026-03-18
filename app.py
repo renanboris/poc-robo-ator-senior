@@ -368,6 +368,10 @@ class ElementoAlvo(BaseModel):
     html_hint:             Optional[str]            = ""
     screenshot_referencia: Optional[str]            = None
 
+class ValidacaoEsperada(BaseModel):
+    tipo: Optional[str] = "estado_visual"
+    alvo: Optional[str] = ""
+
 class AcaoTecnica(BaseModel):
     acao:               str
     intencao_semantica: Optional[str]           = ""
@@ -375,6 +379,7 @@ class AcaoTecnica(BaseModel):
     valor_input:        Optional[str]           = ""
     micro_narracao:     Optional[str]           = ""
     seletor_css:        Optional[str]           = ""
+    validacao_esperada: Optional[ValidacaoEsperada] = None
 
 class Pedagogia(BaseModel):
     ancora:      Optional[str] = ""

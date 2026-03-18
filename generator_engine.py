@@ -61,7 +61,7 @@ def gerar_roteiro_ia_sync(nome_aula: str, objetivo: str, tenant_id: str = "senio
         peças_limitadas = dict(list(biblioteca.items())[:200])
         biblioteca_json = json.dumps(peças_limitadas, ensure_ascii=False)
 
-# 🟢 O PROMPT DE UTILIZADOR: Estrutura Profunda e Atómica (Sem invenção de seletores)
+# 🟢 O PROMPT DE USUÁRIO: Estrutura Profunda com Validação de Estado (Agentic UI)
     prompt_usuario = f"""
 NOME DA AULA: {nome_aula}
 OBJETIVO: {objetivo}
@@ -76,10 +76,10 @@ BIBLIOTECA DE AÇÕES DISPONÍVEIS (peças técnicas validadas):
 
 =======================================
 INSTRUÇÕES DE MONTAGEM (CRÍTICO):
-- Use as peças da biblioteca acima como base. NUNCA invente seletores.
+- Use as peças da biblioteca acima como base. NUNCA invente seletores HTML no "elemento_alvo".
 - Altere o campo "valor_input" se o objetivo exigir digitar algo específico.
-- Se o manual exigir um clique num botão que NÃO existe na biblioteca, crie a ação técnica com o "elemento_alvo" VAZIO ({{}}) para que o instrutor mapeie posteriormente.
-- Agrupe navegações e crie o passo final de conclusão exatamente como no modelo.
+- Se a ação não existir na biblioteca, crie com o "elemento_alvo" VAZIO ({{}}).
+- OBRIGATÓRIO: Crie o bloco "validacao_esperada" para cada ação técnica, prevendo o resultado visual na tela.
 
 Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON):
 
@@ -101,7 +101,7 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
       "tipo_passo": "navigation",
       "peso_narrativo": 2,
       "pause_sugerida": 2.5,
-      "pedagogia": {{"ancora": "Introdução professoral explicando o POR QUÊ desta etapa...", "tooltip_dap": "Navegue pelo menu"}},
+      "pedagogia": {{"ancora": "Introdução professoral explicando o POR QUÊ...", "tooltip_dap": "Navegue pelo menu"}},
       "is_conclusao": false,
       "acoes_tecnicas": [
         {{
@@ -111,6 +111,10 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
              "label_curto": "COPIADO DA BIBLIOTECA",
              "seletor_hint": "COPIADO DA BIBLIOTECA",
              "iframe_hint": "COPIADO DA BIBLIOTECA"
+          }},
+          "validacao_esperada": {{
+             "tipo": "elemento_visivel",
+             "alvo": "text='Título da Próxima Tela' ou '.toast-success'"
           }}
         }}
       ]
@@ -120,14 +124,17 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
       "tipo_passo": "confirmation",
       "peso_narrativo": 3,
       "pause_sugerida": 3.0,
-      "pedagogia": {{"ancora": "Parabéns! A tarefa foi concluída com sucesso.", "tooltip_dap": "Concluído!"}},
+      "pedagogia": {{"ancora": "Parabéns! A tarefa foi concluída.", "tooltip_dap": "Concluído!"}},
       "is_conclusao": true,
-      "acoes_tecnicas": [
+    "acoes_tecnicas": [
         {{
-          "acao": "concluir_video",
-          "micro_narracao": "",
-          "valor_input": "",
-          "elemento_alvo": {{}}
+          "acao": "clique",
+          "micro_narracao": "...acessando o primeiro menu...",
+          "elemento_alvo": {{}},
+          "validacao_esperada": {{
+            "tipo": "estado_visual",
+            "alvo": "O que deve acontecer na tela"
+          }}
         }}
       ]
     }}

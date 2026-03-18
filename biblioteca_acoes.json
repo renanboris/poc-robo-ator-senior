@@ -379,7 +379,7 @@
       "html_hint": "<h1 _ngcontent-jpr-c34=\"\" class=\"file-name\" contenteditable=\"true\"><span _ngcontent-jpr-c34=\"\" id=\"itemTitle\">UCS</span><!----><!----><!----><!----></h1>"
     },
     "valor_input": "UCS",
-    "micro_narracao": "...nomeando a pasta como 'UCS' e confirmando...",
+    "micro_narracao": "...nomeando a pasta como 'UCS 2026' e confirmando...",
     "seletor_css": "",
     "_source": "Criar_uma_Pasta_no_GED.json"
   },
@@ -4097,11 +4097,11 @@
     "seletor_css": "",
     "_source": "GED_-_M01.A03_-_Permissões_Locais_Restri.json"
   },
-  "habilitar a permissão de visualização para o usuário 'renan.kirsch@senior.com.br' na pasta 'financeiro'.": {
+  "habilitar a permissão de download para o usuário 'maria eduarda' na pasta 'financeiro'.": {
     "acao": "clique",
-    "intencao_semantica": "Habilitar a permissão de visualização para o usuário 'renan.kirsch@senior.com.br' na pasta 'Financeiro'.",
+    "intencao_semantica": "Habilitar a permissão de download para o usuário 'Maria Eduarda' na pasta 'Financeiro'.",
     "elemento_alvo": {
-      "descricao_visual": "Um checkbox vazio (não selecionado) ao lado do texto 'Visualizar' na seção de permissões do usuário.",
+      "descricao_visual": "Um checkbox vazio (não selecionado) ao lado do texto 'Download' na seção de permissões do usuário.",
       "contexto_tela": "O usuário está em um modal de gerenciamento de permissões para a pasta 'Financeiro', onde pode configurar permissões para papéis e usuários.",
       "tipo_elemento": "checkbox",
       "confianca_captura": "alta",
@@ -4112,13 +4112,13 @@
         "w_pct": 0.0073,
         "h_pct": 0.0148
       },
-      "seletor_hint": "[aria-label='Tabela de permissões'] span",
+      "seletor_hint": "[#meu-botao-quebrado-123]",
       "iframe_hint": "ci",
       "html_hint": "<span class=\"ui-radiobutton-icon ui-clickable\"></span>"
     },
     "valor_input": "",
     "micro_narracao": "...habilitando a permissão de 'Download' para Maria Eduarda...",
-    "seletor_css": "",
+    "seletor_css": "#meu-botao-quebrado-123",
     "_source": "GED_-_M01.A03_-_Permissões_Locais_Restri.json"
   },
   "salvar as configurações de permissões para os papéis e usuários listados na janela modal.": {
@@ -4358,6 +4358,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...acessando o módulo Senior Flow no menu lateral...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "navegar para a seção ou módulo de ged (gerenciamento eletrônico de documentos) do sistema.": {
@@ -4381,6 +4382,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...navegando para o Gerenciamento Eletrônico de Documentos...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "o usuário deseja navegar para a seção de documentos ou acessar funcionalidades relacionadas a documentos dentro do sistema.": {
@@ -4404,6 +4406,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...entrando na seção de Documentos, onde tudo é gerenciado...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "acessar um menu de contexto para realizar ações específicas no documento 'folha demonstrativo de pagamento.pdf'.": {
@@ -4427,6 +4430,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...clicando com o botão direito do mouse no documento...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "o usuário quis visualizar ou editar as propriedades do documento ou pasta selecionado.": {
@@ -4450,6 +4454,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...selecionando 'Propriedades' para abrir os detalhes...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "selecionar uma data de expiração para o documento.": {
@@ -4473,6 +4478,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...ativando o calendário para a data de expiração...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "navegar para o próximo mês no seletor de data.": {
@@ -4496,6 +4502,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...avançando para o mês de abril de 2026...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "preencher a data de expiração do documento.": {
@@ -4519,6 +4526,7 @@
     },
     "valor_input": "__/__/____",
     "micro_narracao": "...confirmando a seleção da data no campo...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "selecionar o dia 30 de abril de 2026 como uma data, provavelmente para o campo 'data de expiração' ou 'data de obsolescência' do documento.": {
@@ -4542,6 +4550,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...escolhendo o dia 30 de abril de 2026...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "selecionar uma data para a propriedade 'obsolescência' do documento.": {
@@ -4565,6 +4574,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...ativando o calendário de obsolescência...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "definir a data de obsolescência do documento": {
@@ -4588,6 +4598,7 @@
     },
     "valor_input": "__/__/____",
     "micro_narracao": "...confirmando a data no campo...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "o usuário quis selecionar o dia 30 no calendário para definir uma data, provavelmente a data de expiração ou a data de obsolescência do documento.": {
@@ -4611,6 +4622,7 @@
     },
     "valor_input": "",
     "micro_narracao": "...escolhendo o dia 30...",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "salvar as alterações nas propriedades do documento.": {
@@ -4634,6 +4646,7 @@
     },
     "valor_input": "",
     "micro_narracao": "",
+    "seletor_css": "",
     "_source": "GED_-_M01.A06_-_Gestão_de_Expiração_e_Ob.json"
   },
   "navegar para a funcionalidade ou módulo 'senior flow' dentro do sistema.": {
@@ -5331,5 +5344,1192 @@
     "micro_narracao": "...retornando à tela inicial do GED...",
     "seletor_css": "",
     "_source": "M02.A01_-_Upload_e_Publicação_de_Documen.json"
+  },
+  "o usuário quis navegar para a seção ou funcionalidade 'senior flow' do sistema, utilizando o menu lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou funcionalidade 'Senior Flow' do sistema, utilizando o menu lateral.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra de navegação lateral esquerda, exibindo o texto 'Senior Flow' ao lado de um ícone (não visível no crop, mas presente na barra de navegação). Ele está dentro de uma estrutura que se comporta como um botão.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que parece ser um dashboard ou página de relatórios, e está interagindo com o menu de navegação principal do sistema, localizado na lateral esquerda.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0172,
+        "y_pct": 0.7593,
+        "w_pct": 0.0333,
+        "h_pct": 0.0497
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-nrg-c117=\"\" tabindex=\"-1\" class=\"menu-item btn\"><span _ngcontent-nrg-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-nrg-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu principal Senior Flow </span><i _ngcon"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o menu principal do Senior Flow...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário clicou no item de menu 'ged' para navegar para a seção ou módulo de gerenciamento eletrônico de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no item de menu 'GED' para navegar para a seção ou módulo de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de texto em um menu de navegação vertical no lado esquerdo da tela. Ele possui um ícone de seta apontando para a direita, indicando que pode expandir ou levar a uma nova página. O item está realçado, sugerindo que foi selecionado ou está em foco.",
+      "contexto_tela": "O usuário está na interface principal do sistema Senior X, interagindo com o menu de navegação lateral que lista os diferentes módulos e funcionalidades do sistema. A área de conteúdo principal exibe 'Indicadores de Incorporação' com abas de dados.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.1125,
+        "y_pct": 0.4249,
+        "w_pct": 0.1417,
+        "h_pct": 0.0476
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-nrg-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\"><span _ngcontent-nrg-c143=\"\"><em _ngcontent-nrg-c143=\"\" class=\"fa fa-lg pull-right fa-an"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando o módulo de Gestão Eletrônica de Documentos...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis navegar para a seção de documentos dentro do sistema senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção de documentos dentro do sistema Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, com o texto 'Documentos' e um ícone de estrela à direita, indicando que pode ser favoritado.",
+      "contexto_tela": "O usuário está na aplicação 'Senior Flow', visualizando a tela 'Indicadores de Incorporação', e interagindo com o menu de navegação lateral esquerdo, especificamente na seção 'GED'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.1125,
+        "y_pct": 0.2344,
+        "w_pct": 0.1417,
+        "h_pct": 0.0476
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-nrg-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...entrando na seção Documentos, onde as pastas vivem...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis acessar um menu de contexto para realizar ações relacionadas à pasta 'ucs'.": {
+    "acao": "clique_direito",
+    "intencao_semantica": "O usuário quis acessar um menu de contexto para realizar ações relacionadas à pasta 'UCS'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de pasta amarela com o texto 'UCS' ao lado, dentro de uma lista de documentos e pastas.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos, visualizando uma lista de arquivos e pastas.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "UCS",
+      "coordenadas_relativas": {
+        "x_pct": 0.1391,
+        "y_pct": 0.7407,
+        "w_pct": 0.0156,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-mmn-c34=\"\" id=\"itemTitle\">UCS</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...clicando com o botão direito do mouse na pasta 'UCS'...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "gerenciar as permissões de acesso para a pasta ou documento selecionado.": {
+    "acao": "clique",
+    "intencao_semantica": "Gerenciar as permissões de acesso para a pasta ou documento selecionado.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu de texto dentro de um menu suspenso, com um ícone de duas pessoas à esquerda e o texto 'Permissões'. Está realçado em cinza, indicando que foi clicado ou está sob o cursor.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos, visualizando uma lista de pastas e arquivos. Um menu de contexto foi aberto para uma das pastas, e o usuário interagiu com uma das opções desse menu.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Permissões",
+      "coordenadas_relativas": {
+        "x_pct": 0.1867,
+        "y_pct": 0.5519,
+        "w_pct": 0.038,
+        "h_pct": 0.0222
+      },
+      "seletor_hint": "text=\"Permissões\"",
+      "iframe_hint": "ci",
+      "html_hint": "<div _ngcontent-mmn-c33=\"\">Permissões</div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...escolhendo 'Permissões' para configurar o acesso...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "abrir o menu suspenso para selecionar um papel ou tipo de documento.": {
+    "acao": "clique",
+    "intencao_semantica": "Abrir o menu suspenso para selecionar um papel ou tipo de documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão com uma seta para baixo, localizado à direita de um campo de busca de papel, dentro de um modal de permissões. O botão tem um fundo cinza claro e uma borda arredondada à direita.",
+      "contexto_tela": "O usuário está em um modal de gerenciamento de permissões para a pasta 'UCS', onde pode configurar usuários e seus respectivos papéis e permissões (Visualizar, Download, Editar).",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "div",
+      "coordenadas_relativas": {
+        "x_pct": 0.6323,
+        "y_pct": 0.2741,
+        "w_pct": 0.0177,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[id='selectPermissionType']",
+      "iframe_hint": "ci",
+      "html_hint": "<div class=\"ui-dropdown-trigger ui-state-default ui-corner-right\"><span class=\"ui-dropdown-trigger-icon ui-clickable pi pi-chevron-down\"></span></div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o seletor de tipo de permissão...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário clicou em 'usuário' para mudar a forma de gerenciar as permissões, provavelmente para atribuir ou visualizar permissões por usuário em vez de por papel (role).": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou em 'Usuário' para mudar a forma de gerenciar as permissões, provavelmente para atribuir ou visualizar permissões por usuário em vez de por papel (role).",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Usuário' é um item de menu em um dropdown, atualmente selecionado e destacado em azul. Ele está localizado abaixo do item 'Papel' dentro de uma caixa de diálogo de permissões.",
+      "contexto_tela": "O usuário está em uma caixa de diálogo (modal) para gerenciar as permissões da pasta 'UCS', que está sobreposta à tela principal de gerenciamento de documentos.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Usuário",
+      "coordenadas_relativas": {
+        "x_pct": 0.5729,
+        "y_pct": 0.363,
+        "w_pct": 0.025,
+        "h_pct": 0.019
+      },
+      "seletor_hint": "[aria-label='Usuário']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ng-star-inserted\">Usuário</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...escolhendo a opção 'Usuário' para continuar...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário deseja buscar por um usuário específico para gerenciar suas permissões na pasta 'ucs'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário deseja buscar por um usuário específico para gerenciar suas permissões na pasta 'UCS'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com um ícone de lupa à esquerda e o texto 'Buscar usuário...' como placeholder. Está localizado no topo de um modal de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está em um modal de gerenciamento de permissões para a pasta 'UCS', dentro da seção 'Usuários', que faz parte do módulo de documentos do sistema GED.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Buscar usuário...",
+      "coordenadas_relativas": {
+        "x_pct": 0.4422,
+        "y_pct": 0.2757,
+        "w_pct": 0.2156,
+        "h_pct": 0.0392
+      },
+      "seletor_hint": "[aria-label='Botão de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-mmn-c16=\"\" aria-label=\"Botão de busca\" class=\"search ng-pristine ng-valid ng-touched\" id=\"searchPermission\" pinputtext=\"\" size=\"100\" type=\"text\" title=\"Pesquise um novo usuário\" placeholder=\"Buscar usuário...\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "...ativando o campo de busca de usuário...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário está buscando por um usuário específico, 'adriana', para gerenciar permissões dentro do sistema.": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "O usuário está buscando por um usuário específico, 'Adriana', para gerenciar permissões dentro do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um campo de entrada de texto com um ícone de lupa à esquerda e o texto 'Adriana' digitado. Ele está localizado no topo de uma janela modal de gerenciamento de permissões, ao lado de um dropdown 'Usuário'.",
+      "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões, que está sobreposta à tela principal de documentos do sistema GED.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Adriana",
+      "coordenadas_relativas": {
+        "x_pct": 0.4422,
+        "y_pct": 0.2757,
+        "w_pct": 0.2156,
+        "h_pct": 0.0392
+      },
+      "seletor_hint": "[aria-label='Botão de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-mmn-c16=\"\" aria-label=\"Botão de busca\" class=\"search ng-valid ng-touched ng-dirty\" id=\"searchPermission\" pinputtext=\"\" size=\"100\" type=\"text\" title=\"Pesquise um novo usuário\" placeholder=\"Buscar usuário...\" style=\"outline-offset: -2px;\">"
+    },
+    "valor_input": "Adriana",
+    "micro_narracao": "...informando 'Adriana' e confirmando a busca...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis selecionar ou interagir com o perfil de 'adriana conceição' para gerenciar suas permissões, possivelmente para aplicar ou modificar as permissões para ela.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis selecionar ou interagir com o perfil de 'Adriana Conceição' para gerenciar suas permissões, possivelmente para aplicar ou modificar as permissões para ela.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Adriana Conceição' aparece como um nome em destaque, acompanhado de um ícone de usuário e um endereço de e-mail ('sem.email.g5@trn47827227.com.br'), dentro de um card ou item de lista em um diálogo de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está em um diálogo modal de gerenciamento de permissões, que está sobreposto à tela principal de documentos. Este diálogo permite buscar e selecionar usuários para aplicar permissões a subpastas e arquivos.",
+      "tipo_elemento": "list_item",
+      "confianca_captura": "alta",
+      "label_curto": "Adriana Conceição",
+      "coordenadas_relativas": {
+        "x_pct": 0.5268,
+        "y_pct": 0.4677,
+        "w_pct": 0.3484,
+        "h_pct": 0.0296
+      },
+      "seletor_hint": "text=\"Adriana Conceição\"",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-mmn-c57=\"\"> Adriana Conceição <!----></h1>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando 'Adriana Conceição' na lista de resultados...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis alterar a permissão de download para o usuário 'você' (renan.kirsch@senior.com.br) na pasta 'ucs'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis alterar a permissão de download para o usuário 'Você' (renan.kirsch@senior.com.br) na pasta 'UCS'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um rótulo 'Download' ao lado de uma caixa de seleção (checkbox) que está desmarcada, dentro de uma seção de permissões para o usuário 'Você'.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de permissões de uma pasta chamada 'UCS', acessada através de um modal de configuração de permissões.",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "Download",
+      "coordenadas_relativas": {
+        "x_pct": 0.5901,
+        "y_pct": 0.6175,
+        "w_pct": 0.0323,
+        "h_pct": 0.0222
+      },
+      "seletor_hint": "[aria-label='Tabela de permissões']",
+      "iframe_hint": "ci",
+      "html_hint": "<label class=\"ui-radiobutton-label ng-star-inserted\">Download</label>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...ativando a permissão de 'Download' para a usuária...",
+    "seletor_css": "",
+    "_source": "Teste2_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário provavelmente deseja navegar para a funcionalidade ou módulo 'senior flow' dentro do sistema, acessando-o através do menu lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário provavelmente deseja navegar para a funcionalidade ou módulo 'Senior Flow' dentro do sistema, acessando-o através do menu lateral.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra de navegação lateral esquerda, com o texto 'Senior Flow' e um ícone associado (não visível na imagem, mas implícito por ser um item de menu). Ele está destacado, indicando que o mouse está sobre ele ou que foi clicado.",
+      "contexto_tela": "O usuário está em uma tela de dashboard ou relatório intitulada 'Indicadores de Incorporação'. A tela exibe várias áreas de conteúdo vazias e uma seção de 'FILTRO GLOBAL'. O clique ocorreu no menu de navegação principal, localizado na lateral esquerda da interface.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0172,
+        "y_pct": 0.772,
+        "w_pct": 0.0333,
+        "h_pct": 0.0497
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-dbp-c117=\"\" tabindex=\"-1\" class=\"menu-item btn\"><span _ngcontent-dbp-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-dbp-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu principal Senior Flow </span><i _ngcon"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o módulo Senior Flow no menu lateral...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "navegar para a seção 'ged' do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção 'GED' do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, com o texto 'GED' e um ícone de seta apontando para a direita, indicando que pode expandir ou levar a uma nova página.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que exibe vários painéis de dados e um filtro global, com um menu de navegação lateral visível.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0568,
+        "y_pct": 0.4249,
+        "w_pct": 0.0146,
+        "h_pct": 0.0222
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-dbp-c143=\"\" class=\"pull left menu-label\">GED</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando a área de Gestão Eletrônica de Documentos...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis acessar a seção de documentos dentro do sistema senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a seção de documentos dentro do sistema Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra lateral esquerda, com o texto 'Documentos' em branco sobre um fundo cinza escuro. À direita do texto, há um ícone de estrela (favoritar) e à esquerda, um ícone que representa documentos. O item está selecionado ou destacado como um link clicável.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação' e interagindo com o menu de navegação lateral da aplicação 'Senior Flow'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.1125,
+        "y_pct": 0.2344,
+        "w_pct": 0.1417,
+        "h_pct": 0.0476
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-dbp-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...entrando na seção de Documentos, onde tudo é organizado...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "acessar o menu de contexto para a pasta 'ucs' e realizar uma ação específica, como mover, copiar, renomear ou excluir.": {
+    "acao": "clique_direito",
+    "intencao_semantica": "Acessar o menu de contexto para a pasta 'UCS' e realizar uma ação específica, como mover, copiar, renomear ou excluir.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de pasta amarela seguido pelo texto 'UCS', localizado em uma linha de uma tabela de documentos. A linha está levemente destacada, indicando que o elemento está selecionado ou sob o cursor.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos, visualizando uma lista de pastas e arquivos com opções de filtro e ações em lote.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "UCS",
+      "coordenadas_relativas": {
+        "x_pct": 0.1391,
+        "y_pct": 0.7407,
+        "w_pct": 0.0156,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-ppk-c34=\"\" id=\"itemTitle\">UCS</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...clicando com o botão direito do mouse na pasta 'UCS'...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "gerenciar as permissões de acesso para a pasta selecionada.": {
+    "acao": "clique",
+    "intencao_semantica": "Gerenciar as permissões de acesso para a pasta selecionada.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu de contexto com o texto 'Permissões' e um ícone de duas pessoas, realçado em cinza claro, indicando que está selecionado ou sob o cursor.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos, visualizando uma lista de pastas e arquivos. Um menu de contexto foi aberto para uma pasta, e o item 'Permissões' foi clicado.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Permissões",
+      "coordenadas_relativas": {
+        "x_pct": 0.1867,
+        "y_pct": 0.554,
+        "w_pct": 0.038,
+        "h_pct": 0.0222
+      },
+      "seletor_hint": "text=\"Permissões\"",
+      "iframe_hint": "ci",
+      "html_hint": "<div _ngcontent-ppk-c33=\"\">Permissões</div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando a opção 'Permissões' para configurar o acesso...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis abrir um menu suspenso para selecionar um tipo de 'papel' ou 'role' para as permissões.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis abrir um menu suspenso para selecionar um tipo de 'Papel' ou 'Role' para as permissões.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de seta para baixo (chevron-down) que faz parte de um componente de dropdown, localizado ao lado do texto 'Papel' dentro de uma janela modal de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões para a pasta 'UCS', onde pode configurar usuários e seus respectivos papéis e permissões (Visualizar, Download, Editar).",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.6326,
+        "y_pct": 0.2741,
+        "w_pct": 0.0047,
+        "h_pct": 0.0148
+      },
+      "seletor_hint": "[id='selectPermissionType']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-dropdown-trigger-icon ui-clickable pi pi-chevron-down\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o seletor de tipo de permissão...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário clicou em 'usuário' para alternar a forma de atribuição de permissões, de 'papel' (role) para 'usuário' individual, dentro do diálogo de gerenciamento de permissões da pasta ucs.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou em 'Usuário' para alternar a forma de atribuição de permissões, de 'Papel' (role) para 'Usuário' individual, dentro do diálogo de gerenciamento de permissões da pasta UCS.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Usuário' é um item de menu dentro de um dropdown, exibido em um fundo azul claro, indicando que está selecionado ou prestes a ser selecionado. Ele está abaixo do item 'Papel'.",
+      "contexto_tela": "O usuário está em um diálogo modal de gerenciamento de permissões para a pasta 'UCS'. Este diálogo permite buscar e atribuir permissões (Visualizar, Download, Editar) para usuários ou papéis. A tela de fundo mostra uma lista de pastas e documentos.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Usuário",
+      "coordenadas_relativas": {
+        "x_pct": 0.5729,
+        "y_pct": 0.363,
+        "w_pct": 0.025,
+        "h_pct": 0.019
+      },
+      "seletor_hint": "[aria-label='Usuário']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ng-star-inserted\">Usuário</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...escolhendo 'Usuário' para permissões individuais...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis buscar por um usuário específico para gerenciar suas permissões na pasta 'ucs'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis buscar por um usuário específico para gerenciar suas permissões na pasta 'UCS'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com o placeholder 'Buscar usuário...' e um ícone de lupa à esquerda. Está localizado no topo de uma janela modal de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de permissões para a pasta 'UCS', dentro de um sistema de gestão de documentos (GED).",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Buscar usuário...",
+      "coordenadas_relativas": {
+        "x_pct": 0.4422,
+        "y_pct": 0.2757,
+        "w_pct": 0.2156,
+        "h_pct": 0.0392
+      },
+      "seletor_hint": "[aria-label='Botão de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-ppk-c16=\"\" aria-label=\"Botão de busca\" class=\"search ng-pristine ng-valid ng-touched\" id=\"searchPermission\" pinputtext=\"\" size=\"100\" type=\"text\" title=\"Pesquise um novo usuário\" placeholder=\"Buscar usuário...\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "...ativando o campo para buscar o usuário...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis interagir com o perfil ou as permissões da usuária 'adriana conceição', possivelmente para selecioná-la ou visualizar seus detalhes dentro do contexto de gerenciamento de permissões.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis interagir com o perfil ou as permissões da usuária 'Adriana Conceição', possivelmente para selecioná-la ou visualizar seus detalhes dentro do contexto de gerenciamento de permissões.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é o nome 'Adriana Conceição', exibido em um cabeçalho (h1) dentro de um card que também mostra um ícone de usuário e um endereço de e-mail. Ele está localizado em uma janela modal de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões, que está sobreposta à tela principal de documentos do sistema GED (Gerenciamento Eletrônico de Documentos).",
+      "tipo_elemento": "selectable_item",
+      "confianca_captura": "alta",
+      "label_curto": "Adriana Conceição",
+      "coordenadas_relativas": {
+        "x_pct": 0.5268,
+        "y_pct": 0.4677,
+        "w_pct": 0.3484,
+        "h_pct": 0.0296
+      },
+      "seletor_hint": "text=\"Adriana Conceição\"",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-ppk-c57=\"\"> Adriana Conceição <!----></h1>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando 'Adriana Conceição' na lista...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "desmarcar a permissão de 'visualizar' para a usuária adriana conceição na pasta ucs.": {
+    "acao": "clique",
+    "intencao_semantica": "Desmarcar a permissão de 'Visualizar' para a usuária Adriana Conceição na pasta UCS.",
+    "elemento_alvo": {
+      "descricao_visual": "Um checkbox marcado com o rótulo 'Visualizar', localizado ao lado do nome 'Adriana Conceição' e seu e-mail, dentro da seção de usuários para permissões da pasta.",
+      "contexto_tela": "O usuário está em uma janela modal de 'Permissões da pasta: UCS', onde pode gerenciar as permissões de visualização, download e edição para diferentes usuários em uma pasta específica.",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.563,
+        "y_pct": 0.618,
+        "w_pct": 0.0073,
+        "h_pct": 0.0148
+      },
+      "seletor_hint": "[aria-label='Tabela de permissões'] span",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-radiobutton-icon ui-clickable\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...desmarcando a permissão de 'Visualizar' para a usuária...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "salvar as permissões configuradas para a pasta 'ucs'.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar as permissões configuradas para a pasta 'UCS'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão azul com o texto 'Salvar permissões' em branco, localizado na parte inferior direita de um modal de configuração de permissões.",
+      "contexto_tela": "Em um modal de configuração de permissões para a pasta 'UCS', dentro de um sistema de gerenciamento de documentos.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar permissões",
+      "coordenadas_relativas": {
+        "x_pct": 0.6737,
+        "y_pct": 0.7175,
+        "w_pct": 0.0599,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='s-button-7']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-ppk-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar permissões</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...confirmando as alterações ao salvar as permissões...",
+    "_source": "Teste3_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis navegar para a seção ou funcionalidade 'senior flow' do sistema, provavelmente para acessar informações ou ferramentas relacionadas a esse fluxo de trabalho.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou funcionalidade 'Senior Flow' do sistema, provavelmente para acessar informações ou ferramentas relacionadas a esse fluxo de trabalho.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra de navegação lateral esquerda, identificado pelo texto 'Senior Flow' e um ícone de compartilhamento ou conexão. Ele está posicionado abaixo de outros ícones de menu e parece estar ativo ou selecionado, com um fundo escuro e texto claro.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que exibe um dashboard com abas para diferentes índices ('Distratos', 'M²', 'VGV', 'Vendas') e uma seção de 'FILTRO GLOBAL'. Há uma barra de navegação lateral esquerda com vários ícones de módulos e múltiplas mensagens de erro são exibidas no lado direito da tela.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0172,
+        "y_pct": 0.7593,
+        "w_pct": 0.0333,
+        "h_pct": 0.0497
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-kea-c117=\"\" tabindex=\"-1\" class=\"menu-item btn\"><span _ngcontent-kea-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-kea-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu principal Senior Flow </span><i _ngcon"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando o menu principal do Senior Flow...",
+    "_source": "Teste4_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "acessar o menu de contexto para realizar ações relacionadas à pasta 'logistica'.": {
+    "acao": "clique_direito",
+    "intencao_semantica": "Acessar o menu de contexto para realizar ações relacionadas à pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de lista que representa uma pasta, com um ícone de pasta amarela à esquerda e o texto 'Logistica' à direita. A linha inteira do item está destacada em cinza claro, indicando que está selecionada ou sob o cursor.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos, visualizando uma lista de pastas e arquivos. Acima da lista, há opções para filtrar dados e botões de ação em lote.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Logistica",
+      "coordenadas_relativas": {
+        "x_pct": 0.1456,
+        "y_pct": 0.5217,
+        "w_pct": 0.0286,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-ami-c34=\"\" id=\"itemTitle\">Logistica</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...clicando com o botão direito do mouse na pasta 'Logistica'...",
+    "_source": "Teste4_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuario quis abrir o menu suspenso para selecionar um papel (role) e gerenciar suas permissoes na pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuario quis abrir o menu suspenso para selecionar um papel (role) e gerenciar suas permissoes na pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um icone de seta para baixo, parte de um componente de dropdown, localizado a direita de um campo de texto que exibe 'Papel'.",
+      "contexto_tela": "O usuario esta em uma janela modal de configuracao de permissoes para a pasta 'Logistica', onde pode adicionar ou modificar permissoes de usuarios e papeis.",
+      "tipo_elemento": "dropdown",
+      "confianca_captura": "alta",
+      "label_curto": "div",
+      "coordenadas_relativas": {
+        "x_pct": 0.6323,
+        "y_pct": 0.2741,
+        "w_pct": 0.0177,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[id='selectPermissionType']",
+      "iframe_hint": "ci",
+      "html_hint": "<div class=\"ui-dropdown-trigger ui-state-default ui-corner-right\"><span class=\"ui-dropdown-trigger-icon ui-clickable pi pi-chevron-down\"></span></div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o dropdown de tipo de permissão...",
+    "_source": "Teste4_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis alterar o tipo de entidade para a qual as permissões estão sendo configuradas, de 'papel' (role) para 'usuário' (user), dentro da tela de gerenciamento de permissões da pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis alterar o tipo de entidade para a qual as permissões estão sendo configuradas, de 'Papel' (Role) para 'Usuário' (User), dentro da tela de gerenciamento de permissões da pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu de um dropdown, exibindo o texto 'Usuário' em destaque azul, indicando que foi selecionado ou está prestes a ser selecionado. Ele está localizado abaixo do item 'Papel' no mesmo dropdown.",
+      "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões, que permite configurar acessos para a pasta 'Logistica'. Dentro desta modal, há um campo de busca e um dropdown para selecionar se as permissões serão atribuídas a 'Papel' ou 'Usuário'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Usuário",
+      "coordenadas_relativas": {
+        "x_pct": 0.5729,
+        "y_pct": 0.363,
+        "w_pct": 0.025,
+        "h_pct": 0.019
+      },
+      "seletor_hint": "[aria-label='Usuário']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ng-star-inserted\">Usuário</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...escolhendo 'Usuário' para permissões individuais...",
+    "_source": "Teste4_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário clicou no campo de busca para procurar por um usuário específico, provavelmente para adicionar ou gerenciar suas permissões na pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no campo de busca para procurar por um usuário específico, provavelmente para adicionar ou gerenciar suas permissões na pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto com um ícone de lupa à esquerda e o placeholder 'Buscar usuário...'. Está localizado na parte superior de uma janela modal de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões para a pasta 'Logistica', que está sobreposta à tela principal de gerenciamento de documentos.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Buscar usuário...",
+      "coordenadas_relativas": {
+        "x_pct": 0.4422,
+        "y_pct": 0.2757,
+        "w_pct": 0.2156,
+        "h_pct": 0.0392
+      },
+      "seletor_hint": "[aria-label='Botão de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-ami-c16=\"\" aria-label=\"Botão de busca\" class=\"search ng-pristine ng-valid ng-touched\" id=\"searchPermission\" pinputtext=\"\" size=\"100\" type=\"text\" title=\"Pesquise um novo usuário\" placeholder=\"Buscar usuário...\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "...ativando o campo de busca de usuário...",
+    "_source": "Teste4_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis buscar um usuário ou papel (role) para gerenciar as permissões da pasta 'logistica'.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "O usuário quis buscar um usuário ou papel (role) para gerenciar as permissões da pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto (input) com um ícone de lupa à esquerda e o texto de placeholder 'Buscar papel...' (Search role...) à direita, localizado na parte superior de uma janela modal. O HTML indica que o placeholder é 'Buscar usuário...'.",
+      "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões para a pasta 'Logistica', dentro da seção de usuários/papéis.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Adriana",
+      "coordenadas_relativas": {
+        "x_pct": 0.4422,
+        "y_pct": 0.2757,
+        "w_pct": 0.2156,
+        "h_pct": 0.0392
+      },
+      "seletor_hint": "[aria-label='Botão de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-ami-c16=\"\" aria-label=\"Botão de busca\" class=\"search ng-valid ng-touched ng-dirty\" id=\"searchPermission\" pinputtext=\"\" size=\"100\" type=\"text\" title=\"Pesquise um novo usuário\" placeholder=\"Buscar usuário...\" style=\"outline-offset: -2px;\">"
+    },
+    "valor_input": "Adriana",
+    "micro_narracao": "...informando o nome 'Adriana' para localizar...",
+    "_source": "Teste4_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis conceder a permissão de 'visualizar' para o papel 'admin senior flow' na pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis conceder a permissão de 'Visualizar' para o papel 'ADMIN SENIOR FLOW' na pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de checkbox quadrado, atualmente desmarcado, localizado ao lado do texto 'Visualizar' na linha do usuário 'ADMIN SENIOR FLOW'.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de permissões de pasta, especificamente para a pasta 'Logistica', dentro de um modal de configurações de permissões.",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.563,
+        "y_pct": 0.5513,
+        "w_pct": 0.0073,
+        "h_pct": 0.0148
+      },
+      "seletor_hint": "[aria-label='Tabela de permissões'] span",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-radiobutton-icon ui-clickable\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...marcando a caixa para permitir a visualização...",
+    "_source": "Teste4_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "salvar as permissões configuradas para a pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar as permissões configuradas para a pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Botão azul com o texto 'Salvar permissões' em branco, localizado na parte inferior direita de um pop-up de configuração de permissões.",
+      "contexto_tela": "O usuário está em um pop-up de gerenciamento de permissões de pasta, especificamente para a pasta 'Logistica', onde pode configurar permissões de visualização, download e edição para diferentes usuários.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar permissões",
+      "coordenadas_relativas": {
+        "x_pct": 0.6737,
+        "y_pct": 0.7175,
+        "w_pct": 0.0599,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='s-button-7']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-ami-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar permissões</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "_source": "Teste4_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis acessar a funcionalidade ou página relacionada ao 'senior flow' através do menu lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade ou página relacionada ao 'Senior Flow' através do menu lateral.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra de navegação lateral esquerda, identificado pelo texto 'Senior Flow' e um ícone que se assemelha a um símbolo de compartilhamento ou duas caixas sobrepostas.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que exibe um dashboard com abas de índices ('Índice Distratos', 'Índice M²', 'Índice VGV', 'Índice Vendas'), uma seção de 'FILTRO GLOBAL' e uma barra de navegação lateral esquerda. Há também várias mensagens de erro no lado direito da tela.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0172,
+        "y_pct": 0.7593,
+        "w_pct": 0.0333,
+        "h_pct": 0.0497
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-xaw-c117=\"\" tabindex=\"-1\" class=\"menu-item btn\"><span _ngcontent-xaw-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-xaw-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu principal Senior Flow </span><i _ngcon"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o menu principal do Senior Flow...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O menu lateral se expande mostrando as opções do Senior Flow."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "navegar para a seção de documentos do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção de documentos do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, com o texto 'Documentos' e um ícone de estrela à direita, indicando que pode ser favoritado.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', dentro do módulo 'Senior Flow', e interagindo com o menu de navegação principal do sistema.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0711,
+        "y_pct": 0.2344,
+        "w_pct": 0.0432,
+        "h_pct": 0.0222
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-xaw-c143=\"\" class=\"pull left menu-label\">Documentos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e acessando a seção de Documentos...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela de Documentos do GED é carregada, exibindo a lista de pastas."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "acessar o menu de contexto para a pasta 'logistica' e realizar uma ação específica, como mover, copiar, excluir ou visualizar propriedades.": {
+    "acao": "clique_direito",
+    "intencao_semantica": "Acessar o menu de contexto para a pasta 'Logistica' e realizar uma ação específica, como mover, copiar, excluir ou visualizar propriedades.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de lista que representa uma pasta, identificado pelo ícone de pasta amarela e o texto 'Logistica'. A linha inteira está destacada, indicando que foi selecionada ou está sob o cursor.",
+      "contexto_tela": "O usuário está na seção 'Documentos' de um sistema de gerenciamento de documentos, visualizando uma lista de pastas e arquivos.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Logistica",
+      "coordenadas_relativas": {
+        "x_pct": 0.1456,
+        "y_pct": 0.5217,
+        "w_pct": 0.0286,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-xtr-c34=\"\" id=\"itemTitle\">Logistica</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...clicando com o botão direito do mouse na pasta 'Logistica'...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "Um menu de contexto aparece sobre a pasta 'Logistica'."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "gerenciar ou visualizar as permissões da pasta selecionada.": {
+    "acao": "clique",
+    "intencao_semantica": "Gerenciar ou visualizar as permissões da pasta selecionada.",
+    "elemento_alvo": {
+      "descricao_visual": "Item de menu em um menu de contexto, com o ícone de duas pessoas e o texto 'Permissões'.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos, visualizando uma lista de pastas e arquivos, e interagiu com uma pasta para abrir um menu de contexto.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Permissões",
+      "coordenadas_relativas": {
+        "x_pct": 0.1909,
+        "y_pct": 0.6725,
+        "w_pct": 0.038,
+        "h_pct": 0.0222
+      },
+      "seletor_hint": "text=\"Permissões\"",
+      "iframe_hint": "ci",
+      "html_hint": "<div _ngcontent-xtr-c33=\"\">Permissões</div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e selecionando a opção 'Permissões' no menu...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O modal de 'Permissões da pasta: Logistica' é exibido na tela."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "abrir o menu suspenso para selecionar um papel (role) para atribuir permissões.": {
+    "acao": "clique",
+    "intencao_semantica": "Abrir o menu suspenso para selecionar um papel (role) para atribuir permissões.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de seta para baixo, indicando um menu suspenso, localizado ao lado do texto 'Papel' dentro de um campo de seleção.",
+      "contexto_tela": "O usuário está em um modal de gerenciamento de permissões para a pasta 'Logistica', na seção de usuários e papéis, prestes a selecionar um papel para configurar suas permissões.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.6326,
+        "y_pct": 0.2741,
+        "w_pct": 0.0047,
+        "h_pct": 0.0148
+      },
+      "seletor_hint": "[id='selectPermissionType']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-dropdown-trigger-icon ui-clickable pi pi-chevron-down\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o seletor de tipo de permissão...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O dropdown de seleção de tipo de permissão se expande."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "alterar o tipo de busca ou filtro de permissões de 'papel' para 'usuário' dentro do modal de gerenciamento de permissões.": {
+    "acao": "clique",
+    "intencao_semantica": "Alterar o tipo de busca ou filtro de permissões de 'Papel' para 'Usuário' dentro do modal de gerenciamento de permissões.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu em uma lista suspensa (dropdown), destacado em azul, com o texto 'Usuário'.",
+      "contexto_tela": "O usuário está em um modal de gerenciamento de permissões para a pasta 'Logistica', onde pode adicionar permissões para papéis ou usuários.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Usuário",
+      "coordenadas_relativas": {
+        "x_pct": 0.5729,
+        "y_pct": 0.363,
+        "w_pct": 0.025,
+        "h_pct": 0.019
+      },
+      "seletor_hint": "[aria-label='Usuário']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ng-star-inserted\">Usuário</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e escolhendo a opção 'Usuário'...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O campo de busca e a lista de permissões são atualizados para buscar e exibir usuários."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis buscar por um usuário específico para gerenciar suas permissões na pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis buscar por um usuário específico para gerenciar suas permissões na pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com o placeholder 'Buscar usuário...' e um ícone de lupa à esquerda, localizado no topo de uma janela modal de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de permissões de uma pasta (Logistica) dentro da seção de Documentos do sistema GED.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Buscar usuário...",
+      "coordenadas_relativas": {
+        "x_pct": 0.4422,
+        "y_pct": 0.2757,
+        "w_pct": 0.2156,
+        "h_pct": 0.0392
+      },
+      "seletor_hint": "[aria-label='Botão de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-xtr-c16=\"\" aria-label=\"Botão de busca\" class=\"search ng-pristine ng-valid ng-touched\" id=\"searchPermission\" pinputtext=\"\" size=\"100\" type=\"text\" title=\"Pesquise um novo usuário\" placeholder=\"Buscar usuário...\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "...ativando o campo de busca...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O campo de busca de usuário fica ativo para digitação."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "selecionar o usuário 'adriana conceição' para gerenciar suas permissões ou interagir com suas configurações dentro do modal de permissões.": {
+    "acao": "clique",
+    "intencao_semantica": "Selecionar o usuário 'Adriana Conceição' para gerenciar suas permissões ou interagir com suas configurações dentro do modal de permissões.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é o nome 'Adriana Conceição' exibido em texto grande e negrito, com o e-mail 'sem.email.g5@trn47827227.com.br' abaixo, e um ícone de usuário genérico à esquerda. Está contido em um cartão branco dentro de um modal maior.",
+      "contexto_tela": "O usuário está em um modal de gerenciamento de permissões, que está sobreposto à tela principal de documentos. O modal é intitulado 'Adriana' e contém opções para aplicar permissões a subpastas e arquivos.",
+      "tipo_elemento": "list_item",
+      "confianca_captura": "alta",
+      "label_curto": "Adriana Conceição",
+      "coordenadas_relativas": {
+        "x_pct": 0.5268,
+        "y_pct": 0.4677,
+        "w_pct": 0.3484,
+        "h_pct": 0.0296
+      },
+      "seletor_hint": "text=\"Adriana Conceição\"",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-xtr-c57=\"\"> Adriana Conceição <!----></h1>"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O usuário 'Adriana Conceição' é adicionado à lista de permissões ou suas permissões são exibidas."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis conceder a permissão de 'editar' para o usuário 'admin senior flow' na pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis conceder a permissão de 'Editar' para o usuário 'ADMIN SENIOR FLOW' na pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um ícone de checkbox, que estava desmarcado e se tornou marcado após o clique. Ele faz parte de um conjunto de opções de permissão (Visualizar, Download, Editar) para um usuário específico dentro de uma lista.",
+      "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões, intitulada 'Permissões da pasta: Logistica', que permite configurar quais usuários têm acesso e quais ações podem realizar em uma pasta específica do sistema de documentos.",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.563,
+        "y_pct": 0.5513,
+        "w_pct": 0.0073,
+        "h_pct": 0.0148
+      },
+      "seletor_hint": "[aria-label='Tabela de permissões'] span",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-radiobutton-icon ui-clickable\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...ativando a permissão de 'Editar'...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O checkbox 'Editar' para 'Adriana Conceição' é marcado."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "salvar as alterações de permissões feitas para a pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar as alterações de permissões feitas para a pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão retangular azul com o texto 'Salvar permissões' em branco, localizado no canto inferior direito de uma janela modal.",
+      "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões de pasta, especificamente para a pasta 'Logistica', dentro de um sistema de gestão de documentos (GED).",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar permissões",
+      "coordenadas_relativas": {
+        "x_pct": 0.6737,
+        "y_pct": 0.7175,
+        "w_pct": 0.0599,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='s-button-7']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-xtr-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar permissões</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O modal de permissões se fecha ou uma mensagem de sucesso é exibida."
+    },
+    "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis acessar as funcionalidades ou a página relacionada ao 'senior flow' através do menu lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar as funcionalidades ou a página relacionada ao 'Senior Flow' através do menu lateral.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra de navegação lateral esquerda, identificado pelo texto 'Senior Flow' e um ícone de compartilhamento. Ele está realçado, indicando que foi clicado ou está ativo.",
+      "contexto_tela": "O usuário está em uma tela de dashboard intitulada 'Indicadores de Incorporação', com um menu de navegação vertical à esquerda e uma área de conteúdo principal com abas ('Índice Distratos', 'Índice M²', 'Índice VGV', 'Índice Vendas') e uma seção de 'FILTRO GLOBAL' abaixo.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0172,
+        "y_pct": 0.7593,
+        "w_pct": 0.0333,
+        "h_pct": 0.0497
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-vpq-c117=\"\" tabindex=\"-1\" class=\"menu-item btn\"><span _ngcontent-vpq-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-vpq-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu principal Senior Flow </span><i _ngcon"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o menu principal do Senior Flow...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "acessar a funcionalidade ou módulo de gerenciamento eletrônico de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a funcionalidade ou módulo de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, com um ícone que se assemelha a um documento e o texto 'GED'. Possui uma seta à direita, indicando que pode expandir ou levar a uma nova página. O item está realçado, sugerindo que foi clicado ou está ativo.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação' da plataforma Senior X, com um menu de navegação lateral visível. A área principal da tela exibe abas de indicadores e um filtro global.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.1125,
+        "y_pct": 0.4249,
+        "w_pct": 0.1417,
+        "h_pct": 0.0476
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-vpq-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\"><span _ngcontent-vpq-c143=\"\"><em _ngcontent-vpq-c143=\"\" class=\"fa fa-lg pull-right fa-an"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando o módulo de Gestão Eletrônica de Documentos...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis acessar as opções de gerenciamento ou ações contextuais para a pasta 'logistica'.": {
+    "acao": "clique_direito",
+    "intencao_semantica": "O usuário quis acessar as opções de gerenciamento ou ações contextuais para a pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é uma pasta com o nome 'Logistica', exibida em uma lista de documentos e pastas. A linha correspondente à pasta 'Logistica' está destacada, indicando que foi selecionada ou está sob foco.",
+      "contexto_tela": "O usuário está na tela de 'Documentos' de um sistema de gerenciamento de arquivos ou documentos, onde pode visualizar, filtrar e gerenciar pastas e arquivos.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Logistica",
+      "coordenadas_relativas": {
+        "x_pct": 0.1456,
+        "y_pct": 0.5217,
+        "w_pct": 0.0286,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-wrk-c34=\"\" id=\"itemTitle\">Logistica</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...clicando com o botão direito do mouse na pasta 'Logistica'...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis acessar ou gerenciar as permissões de uma pasta específica na lista de documentos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou gerenciar as permissões de uma pasta específica na lista de documentos.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Permissões' é um item de menu dentro de um menu de contexto que apareceu ao interagir com uma pasta. Ele possui um ícone de duas pessoas ao lado do texto e está visualmente destacado, indicando que foi selecionado ou está sob o cursor.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos, visualizando uma lista de pastas e arquivos. Um menu de contexto foi aberto para uma das pastas, e o item 'Permissões' foi clicado dentro desse menu.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Permissões",
+      "coordenadas_relativas": {
+        "x_pct": 0.1935,
+        "y_pct": 0.6757,
+        "w_pct": 0.038,
+        "h_pct": 0.0222
+      },
+      "seletor_hint": "text=\"Permissões\"",
+      "iframe_hint": "ci",
+      "html_hint": "<div _ngcontent-wrk-c33=\"\">Permissões</div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando 'Permissões' para configurar o acesso...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário quis abrir o menu suspenso para selecionar um papel (role) para gerenciar suas permissões.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis abrir o menu suspenso para selecionar um papel (role) para gerenciar suas permissões.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de seta para baixo, indicando um menu suspenso, localizado ao lado do texto 'Papel' dentro de um campo de seleção.",
+      "contexto_tela": "O usuário está em uma janela modal de 'Permissões da pasta: Logistica', que permite buscar e gerenciar permissões de papéis para a pasta 'Logistica'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.6326,
+        "y_pct": 0.2741,
+        "w_pct": 0.0047,
+        "h_pct": 0.0148
+      },
+      "seletor_hint": "[id='selectPermissionType']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-dropdown-trigger-icon ui-clickable pi pi-chevron-down\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o seletor de tipo de permissão...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário deseja alterar o tipo de entidade para a qual as permissões estão sendo configuradas, de 'papel' (role) para 'usuário' (user).": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário deseja alterar o tipo de entidade para a qual as permissões estão sendo configuradas, de 'Papel' (Role) para 'Usuário' (User).",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Usuário' é um item de menu dentro de um dropdown, que aparece em destaque azul, indicando que foi selecionado. O dropdown está localizado ao lado de um campo de busca dentro de um modal de configuração de permissões.",
+      "contexto_tela": "O usuário está em um modal de configuração de permissões para a pasta 'Logistica', onde pode definir permissões para 'Papéis' ou 'Usuários'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Usuário",
+      "coordenadas_relativas": {
+        "x_pct": 0.5729,
+        "y_pct": 0.363,
+        "w_pct": 0.025,
+        "h_pct": 0.019
+      },
+      "seletor_hint": "[aria-label='Usuário']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ng-star-inserted\">Usuário</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...escolhendo 'Usuário' para permissões individuais...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "o usuário pretende buscar um usuário específico para gerenciar suas permissões na pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende buscar um usuário específico para gerenciar suas permissões na pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto com um ícone de lupa à esquerda e o placeholder 'Buscar usuário...'. Está localizado na parte superior de uma janela modal de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de permissões de uma pasta (especificamente 'Logistica'), dentro de uma janela modal que permite adicionar e configurar permissões para usuários.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Buscar usuário...",
+      "coordenadas_relativas": {
+        "x_pct": 0.4422,
+        "y_pct": 0.2757,
+        "w_pct": 0.2156,
+        "h_pct": 0.0392
+      },
+      "seletor_hint": "[aria-label='Botão de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-wrk-c16=\"\" aria-label=\"Botão de busca\" class=\"search ng-pristine ng-valid ng-touched\" id=\"searchPermission\" pinputtext=\"\" size=\"100\" type=\"text\" title=\"Pesquise um novo usuário\" placeholder=\"Buscar usuário...\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "...ativando o campo de busca de usuário...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "selecionar ou interagir com o perfil da usuária adriana conceição para gerenciar suas permissões dentro do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Selecionar ou interagir com o perfil da usuária Adriana Conceição para gerenciar suas permissões dentro do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento exibe o nome 'Adriana Conceição' em destaque, com um endereço de e-mail 'sem.email.g5@trn47827227.com.br' abaixo, e um ícone de avatar à esquerda. Está contido em um card branco dentro de um modal de gerenciamento de permissões.",
+      "contexto_tela": "O usuário está em um modal de gerenciamento de permissões, que está sobreposto à tela principal de documentos. Este modal permite aplicar permissões a subpastas e arquivos, e exibe informações sobre a usuária 'Adriana'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Adriana Conceição",
+      "coordenadas_relativas": {
+        "x_pct": 0.5268,
+        "y_pct": 0.4677,
+        "w_pct": 0.3484,
+        "h_pct": 0.0296
+      },
+      "seletor_hint": "text=\"Adriana Conceição\"",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-wrk-c57=\"\"> Adriana Conceição <!----></h1>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando 'Adriana Conceição' na lista de resultados...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "salvar as permissões configuradas para a pasta 'logistica' e seus usuários associados.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar as permissões configuradas para a pasta 'Logistica' e seus usuários associados.",
+    "elemento_alvo": {
+      "descricao_visual": "Botão retangular azul com o texto 'Salvar permissões' em branco, localizado no canto inferior direito de um modal de configuração de permissões.",
+      "contexto_tela": "O usuário está em um modal de gerenciamento de permissões para a pasta 'Logistica', dentro da seção de documentos do sistema GED.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar permissões",
+      "coordenadas_relativas": {
+        "x_pct": 0.6737,
+        "y_pct": 0.7175,
+        "w_pct": 0.0599,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='s-button-7']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-wrk-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar permissões</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
   }
 }
