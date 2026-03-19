@@ -5345,6 +5345,690 @@
     "seletor_css": "",
     "_source": "M02.A01_-_Upload_e_Publicação_de_Documen.json"
   },
+  "abrir a pasta financeiro": {
+    "id_acao": 2,
+    "acao": "clique",
+    "intencao_semantica": "Abrir a pasta Financeiro",
+    "valor_input": "",
+    "micro_narracao": "...abrir a pasta financeiro...",
+    "pattern_detectado": "table_selection",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "linha Financeiro",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "linha",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.15930438284146584,
+        "y_pct": 0.4905475781430605,
+        "w_pct": 0.05540254237288136,
+        "h_pct": 0.02326757810184554
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve carregar e exibir o conteúdo da pasta 'Financeiro', mostrando os documentos e/ou subpastas que ela contém."
+    },
+    "_source": "Teste03_-_GED.json"
+  },
+  "ativar a busca": {
+    "id_acao": 3,
+    "acao": "clique",
+    "intencao_semantica": "Ativar a busca",
+    "valor_input": "",
+    "micro_narracao": "...ativar a busca...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "icone Busca",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "icone",
+      "label_curto": "Busca",
+      "coordenadas_relativas": {
+        "x_pct": 0.044385593220338984,
+        "y_pct": 0.27837317413191154,
+        "w_pct": 0.013347457627118644,
+        "h_pct": 0.021244309559939303
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "Um campo de busca deve ser exibido na tela, ou a interface deve mudar para a tela de busca."
+    },
+    "_source": "Teste03_-_GED.json"
+  },
+  "prosseguir para a próxima etapa do login": {
+    "id_acao": 1,
+    "acao": "clique",
+    "intencao_semantica": "Prosseguir para a próxima etapa do login",
+    "valor_input": "",
+    "micro_narracao": "...prosseguir para a próxima etapa do login...",
+    "pattern_detectado": "button_click",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "botao Botão Próximo",
+      "contexto_tela": "Plataforma de Gestão | Senior Sistemas",
+      "tipo_elemento": "botao",
+      "label_curto": "Botão Próximo",
+      "coordenadas_relativas": {
+        "x_pct": 0.8046875,
+        "y_pct": 0.5829574240777725,
+        "w_pct": 0.23046875,
+        "h_pct": 0.05112781954887218
+      },
+      "iframe_hint": null
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve exibir o campo para inserção da senha ou uma nova etapa do processo de autenticação."
+    },
+    "_source": "Teste04_-_GED.json"
+  },
+  "navegar para a seção senior flow": {
+    "id_acao": 2,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção Senior Flow",
+    "valor_input": "",
+    "micro_narracao": "...navegar para a seção senior flow...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "menu Senior Flow",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "menu",
+      "label_curto": "Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.02578125074505806,
+        "y_pct": 0.6596491534010809,
+        "w_pct": 0.01666666716337204,
+        "h_pct": 0.02406015037593985
+      },
+      "iframe_hint": null
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve carregar e exibir o conteúdo ou dashboard relacionado a 'Senior Flow'."
+    },
+    "_source": "Teste04_-_GED.json"
+  },
+  "navegar para o módulo ged": {
+    "id_acao": 3,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para o módulo GED",
+    "valor_input": "",
+    "micro_narracao": "...navegar para o módulo ged...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "menu GED",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "menu",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.085205078125,
+        "y_pct": 0.6030075187969924,
+        "w_pct": 0.02197265625,
+        "h_pct": 0.031578947368421054
+      },
+      "iframe_hint": null
+    },
+    "validacao_esperada": {
+      "alvo": "A área de conteúdo principal da tela deve ser atualizada para exibir as informações ou funcionalidades relacionadas ao módulo GED. O item 'GED' no menu lateral deve permanecer selecionado/destacado."
+    },
+    "_source": "Teste04_-_GED.json"
+  },
+  "navegar para a seção documentos": {
+    "id_acao": 4,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção Documentos",
+    "valor_input": "",
+    "micro_narracao": "...navegar para a seção documentos...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "menu Documentos",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "menu",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.10678304135799407,
+        "y_pct": 0.3323308270676692,
+        "w_pct": 0.06512858271598816,
+        "h_pct": 0.031578947368421054
+      },
+      "iframe_hint": null
+    },
+    "validacao_esperada": {
+      "alvo": "O conteúdo principal da tela deve ser atualizado para exibir a interface ou os dados relacionados à seção 'Documentos'."
+    },
+    "_source": "Teste04_-_GED.json"
+  },
+  "abrir a pasta contas a pagar": {
+    "id_acao": 7,
+    "acao": "clique",
+    "intencao_semantica": "Abrir a pasta Contas a pagar",
+    "valor_input": "",
+    "micro_narracao": "...abrir a pasta contas a pagar...",
+    "pattern_detectado": "table_selection",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "pasta Contas a pagar",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "pasta",
+      "label_curto": "Contas a pagar",
+      "coordenadas_relativas": {
+        "x_pct": 0.17217073278912043,
+        "y_pct": 0.6807979575057312,
+        "w_pct": 0.08113524226819055,
+        "h_pct": 0.02326757810184554
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve exibir o conteúdo da pasta 'Contas a pagar', e o breadcrumb deve ser atualizado para 'Financeiro > Contas a pagar'."
+    },
+    "_source": "Teste04_-_GED.json"
+  },
+  "clicar em elemento": {
+    "id_acao": 9,
+    "acao": "clique",
+    "intencao_semantica": "Clicar em elemento",
+    "valor_input": "",
+    "micro_narracao": "...clicar em elemento...",
+    "pattern_detectado": "unknown",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "span",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "span",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.044385593220338984,
+        "y_pct": 0.3603155110059631,
+        "w_pct": 0.013347457627118644,
+        "h_pct": 0.021244309559939303
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "Teste04_-_GED.json"
+  },
+  "navegar para senior flow": {
+    "id_acao": 1,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para Senior Flow",
+    "valor_input": "",
+    "micro_narracao": "...navegar para senior flow...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "menu Senior Flow",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "menu",
+      "label_curto": "Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.02578125,
+        "y_pct": 0.6646303277266653,
+        "w_pct": 0.05,
+        "h_pct": 0.06835839981423285
+      },
+      "iframe_hint": null
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve exibir o conteúdo ou a página principal do 'Senior Flow', e o item 'Senior Flow' na barra lateral deve estar destacado como ativo."
+    },
+    "_source": "Teste05_-_GED.json"
+  },
+  "navegar para a seção ged": {
+    "id_acao": 2,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção GED",
+    "valor_input": "",
+    "micro_narracao": "...navegar para a seção ged...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "menu GED",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "menu",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.16861979961395263,
+        "y_pct": 0.6030075187969924,
+        "w_pct": 0.21223959922790528,
+        "h_pct": 0.06766917293233082
+      },
+      "iframe_hint": null
+    },
+    "validacao_esperada": {
+      "alvo": "A área de conteúdo principal da aplicação deve ser atualizada para exibir a página ou o dashboard relacionado ao GED."
+    },
+    "_source": "Teste05_-_GED.json"
+  },
+  "navegar para documentos": {
+    "id_acao": 3,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para Documentos",
+    "valor_input": "",
+    "micro_narracao": "...navegar para documentos...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "menu Documentos",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "menu",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.16861979961395263,
+        "y_pct": 0.3323308270676692,
+        "w_pct": 0.21223959922790528,
+        "h_pct": 0.06766917293233082
+      },
+      "iframe_hint": null
+    },
+    "validacao_esperada": {
+      "alvo": "O conteúdo principal da tela deve ser atualizado para exibir a seção de 'Documentos', e o item 'Documentos' na barra lateral deve ser destacado como ativo."
+    },
+    "_source": "Teste05_-_GED.json"
+  },
+  "clicar em financeiro": {
+    "id_acao": 5,
+    "acao": "clique",
+    "intencao_semantica": "Clicar em Financeiro",
+    "valor_input": "",
+    "micro_narracao": "...clicar em financeiro...",
+    "pattern_detectado": "unknown",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "span Financeiro",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "span",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.15930438284146584,
+        "y_pct": 0.6422926464283412,
+        "w_pct": 0.05540254237288136,
+        "h_pct": 0.02326757810184554
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "Teste05_-_GED.json"
+  },
+  "navegar para a pasta financeiro": {
+    "id_acao": 4,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a pasta Financeiro",
+    "valor_input": "",
+    "micro_narracao": "...navegar para a pasta financeiro...",
+    "pattern_detectado": "table_selection",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "pasta Financeiro",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "pasta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.15930438284146584,
+        "y_pct": 0.6422926464283412,
+        "w_pct": 0.05540254237288136,
+        "h_pct": 0.02326757810184554
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve exibir o conteúdo da pasta 'Financeiro', com o nome 'Financeiro' visível no cabeçalho ou breadcrumb da navegação."
+    },
+    "_source": "Teste05_-_GED.json"
+  },
+  "clicar em contas a pagar": {
+    "id_acao": 7,
+    "acao": "clique",
+    "intencao_semantica": "Clicar em Contas a pagar",
+    "valor_input": "",
+    "micro_narracao": "...clicar em contas a pagar...",
+    "pattern_detectado": "unknown",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "span Contas a pagar",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "span",
+      "label_curto": "Contas a pagar",
+      "coordenadas_relativas": {
+        "x_pct": 0.17217073278912043,
+        "y_pct": 0.6807979575057312,
+        "w_pct": 0.08113524226819055,
+        "h_pct": 0.02326757810184554
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "Teste05_-_GED.json"
+  },
+  "navegar para a pasta contas a pagar": {
+    "id_acao": 6,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a pasta Contas a pagar",
+    "valor_input": "",
+    "micro_narracao": "...navegar para a pasta contas a pagar...",
+    "pattern_detectado": "table_selection",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "pasta Contas a pagar",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "pasta",
+      "label_curto": "Contas a pagar",
+      "coordenadas_relativas": {
+        "x_pct": 0.17217073278912043,
+        "y_pct": 0.6807979575057312,
+        "w_pct": 0.08113524226819055,
+        "h_pct": 0.02326757810184554
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve exibir o conteúdo da pasta 'Contas a pagar', e o breadcrumb deve ser atualizado para 'Financeiro > Contas a pagar'."
+    },
+    "_source": "Teste05_-_GED.json"
+  },
+  "navegar para financeiro": {
+    "id_acao": 4,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para Financeiro",
+    "valor_input": "",
+    "micro_narracao": "...navegar para financeiro...",
+    "pattern_detectado": "table_selection",
+    "seletor_css": "#itemTitle",
+    "elemento_alvo": {
+      "descricao_visual": "pasta Financeiro",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "pasta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.15930438284146584,
+        "y_pct": 0.6422926464283412,
+        "w_pct": 0.05540254237288136,
+        "h_pct": 0.02326757810184554
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve exibir o conteúdo da pasta 'Financeiro', com o título ou breadcrumb da página atualizado para refletir a navegação para 'Financeiro'."
+    },
+    "_source": "Teste06_-_GED.json"
+  },
+  "navegar para contas a pagar": {
+    "id_acao": 6,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para Contas a pagar",
+    "valor_input": "",
+    "micro_narracao": "...navegar para contas a pagar...",
+    "pattern_detectado": "table_selection",
+    "seletor_css": "#itemTitle",
+    "elemento_alvo": {
+      "descricao_visual": "pasta Contas a pagar",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "pasta",
+      "label_curto": "Contas a pagar",
+      "coordenadas_relativas": {
+        "x_pct": 0.17217073278912043,
+        "y_pct": 0.6807979575057312,
+        "w_pct": 0.08113524226819055,
+        "h_pct": 0.02326757810184554
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve exibir o conteúdo da pasta 'Contas a pagar', e o breadcrumb deve ser atualizado para 'Financeiro > Contas a pagar'."
+    },
+    "_source": "Teste06_-_GED.json"
+  },
+  "navegar para a página inicial": {
+    "id_acao": 8,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a página inicial",
+    "valor_input": "",
+    "micro_narracao": "...navegar para a página inicial...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "div.ui-breadcrumb.ui-widget.ui-widget-header > ul > li:nth-child(1) > a",
+    "elemento_alvo": {
+      "descricao_visual": "icone Página Inicial",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "icone",
+      "label_curto": "Página Inicial",
+      "coordenadas_relativas": {
+        "x_pct": 0.044385593220338984,
+        "y_pct": 0.3603155110059631,
+        "w_pct": 0.013347457627118644,
+        "h_pct": 0.021244309559939303
+      },
+      "iframe_hint": "ci"
+    },
+    "validacao_esperada": {
+      "alvo": "A tela deve exibir o conteúdo da página inicial ou do diretório raiz do sistema."
+    },
+    "_source": "Teste06_-_GED.json"
+  },
+  "o usuário deseja navegar para a seção de documentos do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário deseja navegar para a seção de documentos do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, com o texto 'Documentos' e um ícone de estrela à direita, indicando que pode ser favoritado ou marcado.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação' dentro do módulo 'Senior Flow', com um menu de navegação lateral visível que inclui opções como 'Documentos', 'Gerenciar Assuntos', 'Lixeira' e 'Tour'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0711,
+        "y_pct": 0.2344,
+        "w_pct": 0.0432,
+        "h_pct": 0.0222
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-gkq-c143=\"\" class=\"pull left menu-label\">Documentos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...entrando na seção Documentos, onde as pastas vivem...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A página de documentos carrega mostrando a lista de pastas"
+    },
+    "_source": "Teste08_-_Navegar_no_GED.json"
+  },
+  "o usuário quis navegar para dentro da pasta 'financeiro' para visualizar seu conteúdo.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para dentro da pasta 'Financeiro' para visualizar seu conteúdo.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de pasta amarela seguido pelo texto 'Financeiro', listado em uma tabela de documentos.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos, visualizando uma lista de pastas e arquivos.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.1482,
+        "y_pct": 0.4487,
+        "w_pct": 0.0339,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-vua-c34=\"\" id=\"itemTitle\">Financeiro</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando a pasta 'Financeiro'...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O conteúdo da pasta 'Financeiro' é exibido na tela"
+    },
+    "_source": "Teste08_-_Navegar_no_GED.json"
+  },
+  "abrir a pasta 'contas a pagar' para visualizar seu conteúdo.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "Abrir a pasta 'Contas a pagar' para visualizar seu conteúdo.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de pasta amarela, localizado à esquerda do texto 'Contas a pagar'.",
+      "contexto_tela": "O usuário está na seção 'Financeiro' de um sistema de gestão de documentos, visualizando uma lista de pastas e arquivos.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "em",
+      "coordenadas_relativas": {
+        "x_pct": 0.1151,
+        "y_pct": 0.4772,
+        "w_pct": 0.0094,
+        "h_pct": 0.0254
+      },
+      "seletor_hint": "[id='file_0']",
+      "iframe_hint": "ci",
+      "html_hint": "<em _ngcontent-vua-c34=\"\" class=\"fad fa-folder folder-icon ng-star-inserted\"></em>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo a subpasta 'Contas a pagar'...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O conteúdo da pasta 'Contas a pagar' é exibido na tela"
+    },
+    "_source": "Teste08_-_Navegar_no_GED.json"
+  },
+  "o usuário quis navegar para a seção 'financeiro' do sistema, possivelmente para explorar outras subseções ou documentos relacionados a finanças.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção 'Financeiro' do sistema, possivelmente para explorar outras subseções ou documentos relacionados a finanças.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Financeiro' é um texto azul, sublinhado ao passar o mouse, que faz parte de um caminho de navegação (breadcrumb) 'Home > Financeiro > Contas a pagar'.",
+      "contexto_tela": "O usuário está na tela 'Contas a pagar', que é uma subseção de 'Financeiro'. A tela exibe uma mensagem de 'Pasta vazia!' no conteúdo principal.",
+      "tipo_elemento": "link",
+      "confianca_captura": "alta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.0943,
+        "y_pct": 0.2519,
+        "w_pct": 0.0292,
+        "h_pct": 0.0148
+      },
+      "seletor_hint": "text=\"Financeiro\"",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-menuitem-text\">Financeiro</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...retornando à pasta 'Financeiro'...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O conteúdo da pasta 'Financeiro' é exibido novamente"
+    },
+    "_source": "Teste08_-_Navegar_no_GED.json"
+  },
+  "abrir a pasta 'contas a receber' para visualizar seu conteúdo.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "Abrir a pasta 'Contas a receber' para visualizar seu conteúdo.",
+    "elemento_alvo": {
+      "descricao_visual": "Texto 'Contas a receber' ao lado de um ícone de pasta amarela, listado abaixo dos cabeçalhos 'Nome', 'Autor', 'Tamanho', 'Última modificação' e 'Status documento'.",
+      "contexto_tela": "O usuário está na seção 'Financeiro' do sistema, visualizando uma lista de pastas ou documentos.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Contas a receber",
+      "coordenadas_relativas": {
+        "x_pct": 0.1591,
+        "y_pct": 0.5481,
+        "w_pct": 0.0557,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-vua-c34=\"\" id=\"itemTitle\">Contas a receber</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo a subpasta 'Contas a receber'...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O conteúdo da pasta 'Contas a receber' é exibido na tela"
+    },
+    "_source": "Teste08_-_Navegar_no_GED.json"
+  },
+  "o usuário deseja acessar a funcionalidade de gestão de envelopes para visualizar, criar ou gerenciar envelopes no sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário deseja acessar a funcionalidade de gestão de envelopes para visualizar, criar ou gerenciar envelopes no sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão retangular com o texto 'Gestão de Envelopes' e um ícone de envelope à esquerda, localizado na barra superior do cabeçalho da aplicação, ao lado de outros botões de ação como 'Pendentes' e 'Favoritos'.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), onde pode filtrar e visualizar uma lista de documentos e pastas. A ação clicada está na barra de ferramentas superior, que contém opções de navegação e ações globais do sistema.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Gestão de Envelopes",
+      "coordenadas_relativas": {
+        "x_pct": 0.6349,
+        "y_pct": 0.0339,
+        "w_pct": 0.0698,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='s-button-28']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-vua-c5=\"\" class=\"s-button-text ng-star-inserted\">Gestão de Envelopes</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando a funcionalidade de Gestão de Envelopes...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela de 'Gestão de Envelopes' é carregada"
+    },
+    "_source": "Teste08_-_Navegar_no_GED.json"
+  },
+  "o usuário quis cancelar ou desistir do tour de apresentação do sistema senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis cancelar ou desistir do tour de apresentação do sistema Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um botão retangular com fundo cinza escuro e texto branco, localizado na parte inferior esquerda de um pop-up modal. Ele está ao lado de um botão azul com o texto 'Iniciar tour'.",
+      "contexto_tela": "O usuário está na tela de 'Gestão de Envelopes' e um pop-up modal 'CONHEÇA A SENIOR FLOW' apareceu, oferecendo um tour pelo sistema.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Desistir do tour",
+      "coordenadas_relativas": {
+        "x_pct": 0.6945,
+        "y_pct": 0.5614,
+        "w_pct": 0.0526,
+        "h_pct": 0.0201
+      },
+      "seletor_hint": "[id='s-button-9']",
+      "iframe_hint": "envelope-management",
+      "html_hint": "<span _ngcontent-knf-c98=\"\" class=\"s-button-text ng-star-inserted\" style=\"\"> Desistir do tour </span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...desistindo do tour de apresentação...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O modal 'CONHEÇA A SENIOR FLOW' é fechado"
+    },
+    "_source": "Teste08_-_Navegar_no_GED.json"
+  },
+  "o usuário quis fechar a tela ou o modal atual, optando por não continuar com o tour ou processo que estava sendo incentivado.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis fechar a tela ou o modal atual, optando por não continuar com o tour ou processo que estava sendo incentivado.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão retangular com fundo verde-azulado escuro e texto branco 'Fechar tela mesmo assim'. Ele está localizado na parte inferior direita de um modal, à esquerda do botão 'Ok, aceito continuar'.",
+      "contexto_tela": "O usuário está na tela de 'Gestão de Envelopes' e um modal de incentivo intitulado 'FIQUE COM A GENTE' está sobreposto ao conteúdo principal.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Fechar tela mesmo assim",
+      "coordenadas_relativas": {
+        "x_pct": 0.6893,
+        "y_pct": 0.5836,
+        "w_pct": 0.0859,
+        "h_pct": 0.0201
+      },
+      "seletor_hint": "[id='s-button-11']",
+      "iframe_hint": "envelope-management",
+      "html_hint": "<span _ngcontent-knf-c98=\"\" class=\"s-button-text ng-star-inserted\"> Fechar tela mesmo assim </span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...confirmando o fechamento da tela...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O modal 'FIQUE COM A GENTE' é fechado e a tela de Gestão de Envelopes fica visível"
+    },
+    "_source": "Teste08_-_Navegar_no_GED.json"
+  },
   "o usuário quis navegar para a seção ou funcionalidade 'senior flow' do sistema, utilizando o menu lateral.": {
     "acao": "clique",
     "intencao_semantica": "O usuário quis navegar para a seção ou funcionalidade 'Senior Flow' do sistema, utilizando o menu lateral.",
@@ -6067,10 +6751,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...abrindo o menu principal do Senior Flow...",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "O menu lateral se expande mostrando as opções do Senior Flow."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
   "navegar para a seção de documentos do sistema.": {
@@ -6094,10 +6776,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...e acessando a seção de Documentos...",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "A tela de Documentos do GED é carregada, exibindo a lista de pastas."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
   "acessar o menu de contexto para a pasta 'logistica' e realizar uma ação específica, como mover, copiar, excluir ou visualizar propriedades.": {
@@ -6121,10 +6801,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...clicando com o botão direito do mouse na pasta 'Logistica'...",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "Um menu de contexto aparece sobre a pasta 'Logistica'."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
   "gerenciar ou visualizar as permissões da pasta selecionada.": {
@@ -6148,10 +6826,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...e selecionando a opção 'Permissões' no menu...",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "O modal de 'Permissões da pasta: Logistica' é exibido na tela."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
   "abrir o menu suspenso para selecionar um papel (role) para atribuir permissões.": {
@@ -6175,10 +6851,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...abrindo o seletor de tipo de permissão...",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "O dropdown de seleção de tipo de permissão se expande."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
   "alterar o tipo de busca ou filtro de permissões de 'papel' para 'usuário' dentro do modal de gerenciamento de permissões.": {
@@ -6202,10 +6876,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...e escolhendo a opção 'Usuário'...",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "O campo de busca e a lista de permissões são atualizados para buscar e exibir usuários."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
   "o usuário quis buscar por um usuário específico para gerenciar suas permissões na pasta 'logistica'.": {
@@ -6229,10 +6901,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...ativando o campo de busca...",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "O campo de busca de usuário fica ativo para digitação."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
   "selecionar o usuário 'adriana conceição' para gerenciar suas permissões ou interagir com suas configurações dentro do modal de permissões.": {
@@ -6256,15 +6926,13 @@
     },
     "valor_input": "",
     "micro_narracao": "",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "O usuário 'Adriana Conceição' é adicionado à lista de permissões ou suas permissões são exibidas."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
-  "o usuário quis conceder a permissão de 'editar' para o usuário 'admin senior flow' na pasta 'logistica'.": {
+  "liberar a opção de download para a usuária adriana.": {
     "acao": "clique",
-    "intencao_semantica": "O usuário quis conceder a permissão de 'Editar' para o usuário 'ADMIN SENIOR FLOW' na pasta 'Logistica'.",
+    "intencao_semantica": "Liberar a opção de Download para a usuária Adriana.",
     "elemento_alvo": {
       "descricao_visual": "O elemento é um ícone de checkbox, que estava desmarcado e se tornou marcado após o clique. Ele faz parte de um conjunto de opções de permissão (Visualizar, Download, Editar) para um usuário específico dentro de uma lista.",
       "contexto_tela": "O usuário está em uma janela modal de gerenciamento de permissões, intitulada 'Permissões da pasta: Logistica', que permite configurar quais usuários têm acesso e quais ações podem realizar em uma pasta específica do sistema de documentos.",
@@ -6277,15 +6945,16 @@
         "w_pct": 0.0073,
         "h_pct": 0.0148
       },
-      "seletor_hint": "[aria-label='Tabela de permissões'] span",
+      "seletor_hint": "tr:has-text(\"Adriana Conceição\") >> p-radiobutton:has-text(\"Download\")",
       "iframe_hint": "ci",
       "html_hint": "<span class=\"ui-radiobutton-icon ui-clickable\"></span>"
     },
     "valor_input": "",
-    "micro_narracao": "...ativando a permissão de 'Editar'...",
+    "micro_narracao": "...ativando a permissão de 'Download'...",
+    "seletor_css": "",
     "validacao_esperada": {
       "tipo": "estado_visual",
-      "alvo": "O checkbox 'Editar' para 'Adriana Conceição' é marcado."
+      "alvo": "O checkbox de Download na linha da Adriana Conceição fica marcado (selecionado)"
     },
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
@@ -6310,10 +6979,8 @@
     },
     "valor_input": "",
     "micro_narracao": "",
-    "validacao_esperada": {
-      "tipo": "estado_visual",
-      "alvo": "O modal de permissões se fecha ou uma mensagem de sucesso é exibida."
-    },
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Teste6_-_Criar_permissões_para_uma_pasta.json"
   },
   "o usuário quis acessar as funcionalidades ou a página relacionada ao 'senior flow' através do menu lateral.": {
@@ -6508,6 +7175,30 @@
     "seletor_css": "",
     "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
   },
+  "o usuário quis conceder a permissão de 'editar' para o usuário 'admin senior flow' na pasta 'logistica'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis conceder a permissão de 'Editar' para o usuário 'ADMIN SENIOR FLOW' na pasta 'Logistica'.",
+    "elemento_alvo": {
+      "descricao_visual": "É um checkbox com o label 'Editar', localizado ao lado do nome do usuário 'ADMIN SENIOR FLOW' e seu e-mail. O checkbox está marcado.",
+      "contexto_tela": "O usuário está em um modal de gerenciamento de permissões para a pasta 'Logistica', dentro do sistema GED (Gerenciamento Eletrônico de Documentos).",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.563,
+        "y_pct": 0.5513,
+        "w_pct": 0.0073,
+        "h_pct": 0.0148
+      },
+      "seletor_hint": "[aria-label='Tabela de permissões'] span",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-radiobutton-icon ui-clickable\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...marcando a opção 'Editar' para a usuária...",
+    "seletor_css": "",
+    "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
   "salvar as permissões configuradas para a pasta 'logistica' e seus usuários associados.": {
     "acao": "clique",
     "intencao_semantica": "Salvar as permissões configuradas para a pasta 'Logistica' e seus usuários associados.",
@@ -6531,5 +7222,315 @@
     "micro_narracao": "",
     "seletor_css": "",
     "_source": "Teste_-_Criar_permissões_para_uma_pasta.json"
+  },
+  "navegar para a seção sign": {
+    "id_acao": 1,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção SIGN",
+    "valor_input": "",
+    "micro_narracao": "...navegar para a seção sign...",
+    "pattern_detectado": "menu_navigation",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "menu SIGN",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "menu",
+      "label_curto": "SIGN",
+      "coordenadas_relativas": {
+        "x_pct": 0.02578125074505806,
+        "y_pct": 0.6596491534010809,
+        "w_pct": 0.01666666716337204,
+        "h_pct": 0.02406015037593985
+      }
+    },
+    "validacao_esperada": {
+      "alvo": "A tela principal deve exibir o conteúdo ou a página correspondente à seção 'SIGN', ou um submenu de 'SIGN' deve ser expandido."
+    },
+    "_source": "Teste_GED_001.json"
+  },
+  "avançar para a próxima etapa do processo de login": {
+    "id_acao": 1,
+    "acao": "clique",
+    "intencao_semantica": "Avançar para a próxima etapa do processo de login",
+    "valor_input": "",
+    "micro_narracao": "...avançar para a próxima etapa do processo de login...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "botão de  na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "botão",
+      "confianca_captura": "IA",
+      "label_curto": "botão",
+      "coordenadas_relativas": {
+        "x_pct": 0.8046875,
+        "y_pct": 0.6365914939937735,
+        "w_pct": 0.23046875,
+        "h_pct": 0.05112781954887218
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela de login avança para a próxima etapa (ex: solicitação de senha ou login bem-sucedido)"
+    },
+    "_source": "Teste_Semantico_1.json"
+  },
+  "focar no campo de senha": {
+    "id_acao": 2,
+    "acao": "clique",
+    "intencao_semantica": "Focar no campo de senha",
+    "valor_input": "",
+    "micro_narracao": "...focar no campo de senha...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "input de Senha na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "input",
+      "confianca_captura": "IA",
+      "label_curto": "Senha",
+      "coordenadas_relativas": {
+        "x_pct": 0.8046875,
+        "y_pct": 0.5701754691905545,
+        "w_pct": 0.16953125,
+        "h_pct": 0.05112781954887218
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O campo de senha fica focado/ativo para digitação"
+    },
+    "_source": "Teste_Semantico_1.json"
+  },
+  "tentar autenticar o usuário": {
+    "id_acao": 4,
+    "acao": "clique",
+    "intencao_semantica": "Tentar autenticar o usuário",
+    "valor_input": "",
+    "micro_narracao": "...tentar autenticar o usuário...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "botão de  na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "botão",
+      "confianca_captura": "IA",
+      "label_curto": "botão",
+      "coordenadas_relativas": {
+        "x_pct": 0.8046875,
+        "y_pct": 0.5701754691905545,
+        "w_pct": 0.16953125,
+        "h_pct": 0.05112781954887218
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O sistema tenta autenticar o usuário e, se bem-sucedido, navega para a próxima tela."
+    },
+    "_source": "Teste_Semantico_1.json"
+  },
+  "digitar a senha": {
+    "id_acao": 5,
+    "acao": "clique",
+    "intencao_semantica": "Digitar a senha",
+    "valor_input": "",
+    "micro_narracao": "...digitar a senha...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "input de  na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "input",
+      "confianca_captura": "IA",
+      "label_curto": "input",
+      "coordenadas_relativas": {
+        "x_pct": 0.8046875,
+        "y_pct": 0.5701754691905545,
+        "w_pct": 0.16953125,
+        "h_pct": 0.05112781954887218
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O campo 'Senha' recebe o foco para digitação"
+    },
+    "_source": "Teste_Semantico_1.json"
+  },
+  "alternar a visibilidade da senha digitada": {
+    "id_acao": 3,
+    "acao": "clique",
+    "intencao_semantica": "Alternar a visibilidade da senha digitada",
+    "valor_input": "",
+    "micro_narracao": "...alternar a visibilidade da senha digitada...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "ícone de olho de  na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "ícone de olho",
+      "confianca_captura": "IA",
+      "label_curto": "ícone de olho",
+      "coordenadas_relativas": {
+        "x_pct": 0.9044271469116211,
+        "y_pct": 0.5681704413621945,
+        "w_pct": 0.0109375,
+        "h_pct": 0.021052631578947368
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O texto no campo 'Senha' é exibido ou ocultado, e o ícone de olho muda de estado (aberto/fechado)."
+    },
+    "_source": "Teste_Semantico_1.json"
+  },
+  "autenticar o usuário no sistema.": {
+    "id_acao": 6,
+    "acao": "clique",
+    "intencao_semantica": "Autenticar o usuário no sistema.",
+    "valor_input": "",
+    "micro_narracao": "...autenticar o usuário no sistema....",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "botão de  na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "botão",
+      "confianca_captura": "IA",
+      "label_curto": "botão",
+      "coordenadas_relativas": {
+        "x_pct": 0.8046875,
+        "y_pct": 0.5701754691905545,
+        "w_pct": 0.16953125,
+        "h_pct": 0.05112781954887218
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O sistema tenta autenticar o usuário com as credenciais fornecidas. Se bem-sucedido, o usuário é redirecionado para a página inicial; caso contrário, uma mensagem de erro é exibida."
+    },
+    "_source": "Teste_Semantico_1.json"
+  },
+  "autenticar o utilizador no sistema": {
+    "id_acao": 7,
+    "acao": "clique",
+    "intencao_semantica": "Autenticar o utilizador no sistema",
+    "valor_input": "",
+    "micro_narracao": "...autenticar o utilizador no sistema...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "botão de  na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "botão",
+      "confianca_captura": "IA",
+      "label_curto": "botão",
+      "coordenadas_relativas": {
+        "x_pct": 0.8046875,
+        "y_pct": 0.6438596797168703,
+        "w_pct": 0.23046875,
+        "h_pct": 0.05112781954887218
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O sistema tenta autenticar o utilizador e avança para a próxima tela ou exibe uma mensagem de sucesso/erro"
+    },
+    "_source": "Teste_Semantico_1.json"
+  },
+  "abrir o menu senior flow": {
+    "id_acao": 1,
+    "acao": "clique",
+    "intencao_semantica": "Abrir o menu Senior Flow",
+    "valor_input": "",
+    "micro_narracao": "...abrir o menu senior flow...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "ícone de menu de  na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "ícone de menu",
+      "confianca_captura": "IA",
+      "label_curto": "ícone de menu",
+      "coordenadas_relativas": {
+        "x_pct": 0.02578125,
+        "y_pct": 0.6646303277266653,
+        "w_pct": 0.05,
+        "h_pct": 0.06835839981423285
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A página ou submenu do Senior Flow é carregada/exibido"
+    },
+    "_source": "Teste_Semantico_2.json"
+  },
+  "abrir o menu ged": {
+    "id_acao": 2,
+    "acao": "clique",
+    "intencao_semantica": "Abrir o menu GED",
+    "valor_input": "",
+    "micro_narracao": "...abrir o menu ged...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "item de menu de GED na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "item de menu",
+      "confianca_captura": "IA",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.16861979961395263,
+        "y_pct": 0.6030075187969924,
+        "w_pct": 0.21223959922790528,
+        "h_pct": 0.06766917293233082
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A página do módulo GED é carregada no ecrã principal e o item 'GED' permanece selecionado no menu lateral."
+    },
+    "_source": "Teste_Semantico_2.json"
+  },
+  "navegar para a seção de documentos": {
+    "id_acao": 3,
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção de Documentos",
+    "valor_input": "",
+    "micro_narracao": "...navegar para a seção de documentos...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "item de menu de Documentos na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "item de menu",
+      "confianca_captura": "IA",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.16861979961395263,
+        "y_pct": 0.3323308270676692,
+        "w_pct": 0.21223959922790528,
+        "h_pct": 0.06766917293233082
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A página ou conteúdo relacionado a 'Documentos' é exibido no painel principal."
+    },
+    "_source": "Teste_Semantico_2.json"
+  },
+  "avançar para a próxima etapa do login": {
+    "acao": "clique",
+    "intencao_semantica": "Avançar para a próxima etapa do login",
+    "valor_input": "",
+    "micro_narracao": "...avançar para a próxima etapa do login...",
+    "seletor_css": "",
+    "elemento_alvo": {
+      "descricao_visual": "botão de  na coluna ",
+      "contexto_tela": "Mapeado via VLA",
+      "tipo_elemento": "botão",
+      "confianca_captura": "IA",
+      "label_curto": "botão",
+      "coordenadas_relativas": {
+        "x_pct": 0.819921875,
+        "y_pct": 0.5092732135514567,
+        "w_pct": 0.2,
+        "h_pct": 0.05112781954887218
+      }
+    },
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela de login avança para a etapa de inserção da senha ou exibe uma mensagem de erro/carregamento."
+    },
+    "_source": "Teste_da_Adriana.json"
   }
 }

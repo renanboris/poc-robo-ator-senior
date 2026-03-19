@@ -34,5 +34,185 @@
     "intencao_original": "Abrir o menu GED",
     "label_procurado": "GED",
     "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-18 17:36:34",
+    "intencao_original": "Abrir o menu Senior Flow",
+    "label_procurado": "ícone de menu",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 10:26:11",
+    "intencao_original": "Navegar para Senior Flow",
+    "label_procurado": "Senior Flow",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 10:29:27",
+    "intencao_original": "Navegar para a seção GED",
+    "label_procurado": "GED",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 11:51:35",
+    "intencao_original": "Navegar para a seção GED",
+    "label_procurado": "GED",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 13:55:11",
+    "intencao_original": "Navegar para Senior Flow (RESGATE)",
+    "label_procurado": "Senior Flow",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 14:43:35",
+    "intencao_original": "Navegar para Senior Flow",
+    "label_procurado": "Senior Flow",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 16:13:57",
+    "intencao_original": "O usuário deseja navegar para a seção de documentos do sistema. (RESGATE)",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 16:43:01",
+    "intencao_original": "Navegar para Documentos",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 17:28:11",
+    "intencao_original": "Abrir pasta Financeiro 2026 (IFRAME)",
+    "label_procurado": "Financeiro 2026",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 17:31:48",
+    "intencao_original": "Abrir pasta Financeiro 2026 (IFRAME)",
+    "label_procurado": "Financeiro 2026",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 17:31:59",
+    "intencao_original": "Navegar para a pasta 'Contas a pagar' (IFRAME)",
+    "label_procurado": "Contas a pagar",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 17:53:57",
+    "intencao_original": "Abrir pasta Financeiro 2026 (IFRAME)",
+    "label_procurado": "Financeiro 2026",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 17:54:21",
+    "intencao_original": "Gerenciar regras de ações em lote (IFRAME)",
+    "label_procurado": "Regras ações em lote",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 17:57:48",
+    "intencao_original": "Navegar para a seção GED",
+    "label_procurado": "GED",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 17:58:08",
+    "intencao_original": "Navegar para a seção Documentos",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 17:59:13",
+    "intencao_original": "Navegar para a seção Senior Flow",
+    "label_procurado": "Senior Flow",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:01:29",
+    "intencao_original": "Navegar para a seção Senior Flow",
+    "label_procurado": "Senior Flow",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:02:22",
+    "intencao_original": "Abrir pasta Financeiro 2026",
+    "label_procurado": "Financeiro 2026",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:02:28",
+    "intencao_original": "Navegar para a pasta 'Contas a pagar' (IFRAME)",
+    "label_procurado": "Contas a pagar",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:02:50",
+    "intencao_original": "Gerenciar regras de ações em lote (IFRAME)",
+    "label_procurado": "Regras ações em lote",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:06:30",
+    "intencao_original": "Navegar para Senior Flow",
+    "label_procurado": "Senior Flow",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:06:46",
+    "intencao_original": "Navegar para a seção GED",
+    "label_procurado": "GED",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:06:58",
+    "intencao_original": "Navegar para Documentos",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:09:34",
+    "intencao_original": "Navegar para Senior Flow",
+    "label_procurado": "Senior Flow",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:09:57",
+    "intencao_original": "Navegar para a seção GED",
+    "label_procurado": "GED",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:10:53",
+    "intencao_original": "Navegar para a seção GED",
+    "label_procurado": "GED",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:22:41",
+    "intencao_original": "Navegar para Documentos",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:24:04",
+    "intencao_original": "Navegar para Senior Flow",
+    "label_procurado": "Senior Flow",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:24:26",
+    "intencao_original": "Navegar para a seção GED",
+    "label_procurado": "GED",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-19 18:38:56",
+    "intencao_original": "Navegar para Documentos",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
   }
 ]

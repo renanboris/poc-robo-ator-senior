@@ -1,0 +1,17 @@
+{
+  "nome_aula": "Teste06 - GED",
+  "total_passos": 8,
+  "sucesso": 0,
+  "falha": 1,
+  "pulados": 0,
+  "detalhes": [
+    {
+      "passo": 1,
+      "intencao": "Navegar para Senior Flow",
+      "status": "falha",
+      "pattern": "menu_navigation",
+      "critico": true,
+      "screenshot": "diagnostico_falhas/falha_p01_Navegar_para_Senior_Flow_20260319_135200.png"
+    }
+  ]
+}

@@ -25,6 +25,7 @@ Correcoes aplicadas:
   [PERFORMANCE-3] — DB queries migradas para threads assíncronas (asyncio.to_thread).
   [FEATURE-1] — Delay de 1s injetado antes do Enter em todas as ações digitar_e_enter.
   [FEATURE-2] — Self-Healing Visual com registo de cura (relatorio_auto_cura.json).
+  [FIX] "Efeito Espelho" — _tirar_foto_limpa() oculta legendas do robô antes do screenshot da IA.
 """
 
 import asyncio
@@ -65,11 +66,8 @@ def _init_db():
     """Inicializa o banco de dados SQLite com otimizações de alta concorrência."""
     try:
         with sqlite3.connect(DB_PATH) as conn:
-            # [OTIMIZAÇÃO] Permite leituras e escritas simultâneas (Adeus Database Locked)
             conn.execute("PRAGMA journal_mode = WAL;")
-            # [OTIMIZAÇÃO] Reduz as esperas do disco (bom para ambientes efêmeros)
             conn.execute("PRAGMA synchronous = NORMAL;")
-            # [OTIMIZAÇÃO] Aumenta a memória em cache para buscas mais rápidas
             conn.execute("PRAGMA cache_size = -64000;") 
 
             conn.execute("""
@@ -141,7 +139,7 @@ def _registrar_sucesso_cache(
     chave      = _chave_cache(intencao)
     coords_str = json.dumps(coords) if coords else None
 
-    # Descarta seletores muito vagos (nao comecam com text=, [, #)
+    # Descarta seletores muito vagos
     if seletor and not seletor.startswith(("text=", "[", "#")):
         seletor = None
 
@@ -185,10 +183,6 @@ def _registrar_falha_cache(intencao: str):
 
 
 def _registrar_healing_necessario(intencao: str, acao_tec: dict):
-    """
-    SPRINT 3: Feedback Loop.
-    Registra que o CSS falhou miseravelmente, mas a IA Visual salvou a gravação.
-    """
     try:
         arquivo = "relatorio_auto_cura.json"
         registro = {
@@ -399,14 +393,42 @@ async def _scroll_para_area_esperada(page: Page, coords_relativas: Optional[dict
 
 
 # ──────────────────────────────────────────────────────────────
-# HIGHLIGHT VISUAL
+# HIGHLIGHT VISUAL E FOTO LIMPA
 # ──────────────────────────────────────────────────────────────
+async def _tirar_foto_limpa(page: Page) -> bytes:
+    """
+    Tira um screenshot garantindo que cursores, legendas e marcações do robô
+    fiquem ocultos milissegundos antes da foto, evitando o 'Efeito Espelho' na IA.
+    """
+    esconder_fantasmas = """() => {
+        const elementos = document.querySelectorAll('#robo-cursor, #robo-legenda, .robo-tooltip, #senior-rec-widget, div[style*="z-index: 999999"]');
+        elementos.forEach(el => {
+            el.setAttribute('data-old-opacity', el.style.opacity || '');
+            el.style.opacity = '0';
+        });
+    }"""
+    
+    mostrar_fantasmas = """() => {
+        const elementos = document.querySelectorAll('#robo-cursor, #robo-legenda, .robo-tooltip, #senior-rec-widget, div[style*="z-index: 999999"]');
+        elementos.forEach(el => {
+            el.style.opacity = el.getAttribute('data-old-opacity') || '1';
+        });
+    }"""
+    
+    try:
+        await page.evaluate(esconder_fantasmas)
+        await asyncio.sleep(0.1) # Aguarda o DOM redesenhar
+        foto = await page.screenshot(type="jpeg", quality=60, full_page=False)
+        await page.evaluate(mostrar_fantasmas)
+        return foto
+    except Exception as e:
+        logger.warning(f"Falha ao camuflar UI do robô antes da foto: {e}")
+        return await page.screenshot(type="jpeg", quality=60, full_page=False)
+
 async def _highlight_elemento(locator, page) -> None:
     try:
         await locator.evaluate("""el => {
-            // Focamos APENAS no elemento exato, sem invadir o CSS dos pais
             const alvoVisual = el;
-            
             const oldOutline = alvoVisual.style.outline;
             const oldBoxShadow = alvoVisual.style.boxShadow;
             const oldBorderRadius = alvoVisual.style.borderRadius;
@@ -538,9 +560,7 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
         await page.keyboard.press("Backspace")
         if valor:
             await page.keyboard.type(valor, delay=40)
-            
         await asyncio.sleep(1) 
-        
         await page.keyboard.press("Enter")
     elif acao == "preencher_campo":
         await locator.click(timeout=2000)
@@ -704,7 +724,6 @@ async def _gemini_localizar_elemento(
     contents.append("IMAGEM 2 - TELA ATUAL (onde o elemento deve ser clicado agora):")
     contents.append(types.Part.from_bytes(data=screenshot_atual, mime_type="image/jpeg"))
     
-    # 🟢 O NOVO PROMPT: Transformando a IA num Agente UI
     contents.append(
         f"Você é o 'Senior AI Operator', um agente autônomo de navegação visual.\n"
         f"A tela possui uma resolução de {viewport['width']}px de largura por {viewport['height']}px de altura.\n"
@@ -795,9 +814,6 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
 # ORQUESTRADOR PRINCIPAL (A MAQUINA DE DECISAO)
 # ──────────────────────────────────────────────────────────────
 async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
-    """
-    Roteia a tentativa pelas 7 camadas de fallback ate encontrar o elemento.
-    """
     alvo:     dict         = acao_tec.get("elemento_alvo", {})
     acao:     str          = acao_tec.get("acao", "clique")
     intencao: str          = acao_tec.get("intencao_semantica", "Acao na interface")
@@ -919,7 +935,8 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
     # ── 5. Gemini Vision (Self-Healing Supremo / Autonomous UI) ───────────────
     logger.info("   [Vision] DOM esgotado. Iniciando varredura visual...")
     try:
-        screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
+        # 🟢 FOTO LIMPA
+        screenshot_atual = await _tirar_foto_limpa(page)
     except Exception as exc:
         logger.warning(f"Screenshot falhou antes do Gemini: {exc}")
         screenshot_atual = None
@@ -938,12 +955,9 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
         if resultado:
             coords_ia = resultado.get("coordenadas")
             if coords_ia:
-                # Se o clique visual der certo, é aqui que a mágica se consolida
                 if await _clicar_por_coordenadas(page, coords_ia, acao, valor):
                     logger.info("   [Vision] ✅ Clique por Inteligência Visual bem-sucedido!")
-                    # 1. Ensina ao Brain a nova coordenada para o futuro
                     await asyncio.to_thread(_registrar_sucesso_cache, intencao, coords=coords_ia)
-                    # 2. Regista o relatório de "Cura" para a diretoria ver
                     await asyncio.to_thread(_registrar_healing_necessario, intencao, acao_tec)
                     return True
 
@@ -977,7 +991,8 @@ async def _validar_estado_visual(page: Page, validacao: dict) -> bool:
     await _aguardar_estabilidade(page, timeout_ms=3000)
     
     try:
-        screenshot_bytes = await page.screenshot(type="jpeg", quality=60, full_page=False)
+        # 🟢 FOTO LIMPA
+        screenshot_bytes = await _tirar_foto_limpa(page)
         contents = [
             "Você é o 'Senior AI Validator', um agente de garantia de qualidade (QA).",
             "Sua missão é olhar para o ecrã atual e confirmar se a ação anterior foi bem-sucedida.",
@@ -1005,32 +1020,27 @@ async def _validar_estado_visual(page: Page, validacao: dict) -> bool:
         
     except Exception as e:
         logger.warning(f"   [Validador] Erro ao consultar a IA: {e}")
-        return True # Em caso de erro da API, assume True para não travar o fluxo
+        return True
 
 async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     validacao = acao_tec.get("validacao_esperada")
     intencao = acao_tec.get("intencao_semantica", "Ação")
     
-    # 1. Executa a máquina de decisão clássica (Rápida)
     sucesso_core = await _encontrar_e_clicar_core(page, acao_tec)
     
     if not sucesso_core:
         return False
         
-    # 2. Se não tem validação (roteiro antigo), confia cegamente
     if not validacao or not validacao.get("alvo"):
         return True
         
-    # 3. A Pausa de Consciência
     is_valido = await _validar_estado_visual(page, validacao)
     
     if is_valido:
         return True
         
-    # 🟢 FIX: O Validador reprovou! A memória/seletor mentiu. Puna o cache!
     await asyncio.to_thread(_registrar_falha_cache, intencao)
         
-    # 4. O Resgate (Agentic Fallback)
     logger.error(f"   [Agentic UI] O CSS mentiu! A validação de '{intencao[:30]}...' falhou!")
     logger.info("   [Agentic UI] Ativando protocolo de resgate visual autônomo...")
     
@@ -1038,7 +1048,8 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     scroll_y = int(await page.evaluate("() => window.scrollY") or 0)
     
     try:
-        screenshot_resgate = await page.screenshot(type="jpeg", quality=60, full_page=False)
+        # 🟢 FOTO LIMPA
+        screenshot_resgate = await _tirar_foto_limpa(page)
         resultado_resgate = await _gemini_localizar_elemento(
             screenshot_atual=screenshot_resgate,
             screenshot_ref_b64=None,
@@ -1057,7 +1068,6 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if await _clicar_por_coordenadas(page, coords_ia, acao, valor):
                 logger.info("   [Agentic UI] 💊 Resgate Visual executado com sucesso!")
                 
-                # Valida novamente para garantir que o resgate funcionou!
                 if await _validar_estado_visual(page, validacao):
                     await asyncio.to_thread(_registrar_healing_necessario, intencao + " (RESGATE)", acao_tec)
                     return True
