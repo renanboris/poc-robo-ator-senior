@@ -13,6 +13,10 @@ __pycache__/
 # 🔴 DADOS SENSÍVEIS E MEMÓRIA DO ROBÔ (NÃO COMMITAR!)
 brain.db
 brain.db-journal
+brain.db-shm
+brain.db-wal
+aura_cache.db
+relatorio_auto_cura.json
 
 # 🔴 ARTEFATOS DE RUNTIME E PRODUÇÃO (O lixo gerado pelos testes)
 roteiros_salvos/
@@ -37,3 +41,6 @@ Thumbs.db
 
 # 🔴 PASTAS LEGADAS / BACKUPS
 old_but_gold/
+
+# Exceção (Asset do sistema):
+!trilha.mp3
