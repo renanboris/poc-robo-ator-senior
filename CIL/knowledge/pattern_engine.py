@@ -11,7 +11,7 @@ Responsabilidades:
   - Registrar outcomes para aprendizado contínuo
 
 Uso no vision_engine_cil.py:
-    from pattern_engine import PatternEngine
+    from knowledge.pattern_engine import PatternEngine
     engine = PatternEngine()
     pattern = engine.get("menu_navigation")
     steps   = engine.strategy_steps("menu_navigation")
@@ -27,8 +27,8 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-REGISTRY_PATH = os.path.join(os.path.dirname(__file__), "patterns_registry.json")
-DB_PATH       = "brain_v2.db"
+REGISTRY_PATH = os.path.join(os.path.dirname(__file__), "knowledge/patterns_registry.json")
+DB_PATH       = "data/brain_v2.db"
 
 
 @dataclass

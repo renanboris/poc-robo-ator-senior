@@ -2,27 +2,10 @@
 cursor_engine.py — Motor de Cursor Humanizado com Bézier Cúbica e Néon (Revisão Cinematic)
 
 Correcoes aplicadas:
-
-  [BUG-1] CRITICO — obter_coords_acao usa chaves erradas e nivel errado do dict
-    ANTES: acao_tec.get("seletor_css") or acao_tec.get("seletor")
-    A estrutura real do sistema armazena o seletor em:
-        acao_tec["elemento_alvo"]["seletor_hint"]
-    Com as chaves erradas, a funcao SEMPRE retornava None. O cursor nunca se
-    posicionava via DOM — caía sempre no fallback de coordenadas relativas.
-    AGORA: acessa acao_tec["elemento_alvo"]["seletor_hint"] corretamente.
-
-  [BUG-2] MÉDIO — add_style_tag em instalar_cursor nao sobrevive a navegacao
-    ANTES: page.add_style_tag(content="* { cursor: none !important; }...")
-    add_style_tag injeta no DOM da pagina ATUAL. Numa SPA com navegacao
-    interna (ex: Senior X Angular), a tag some apos cada rota.
-    add_init_script (ja usado na linha anterior) JA injeta o mesmo estilo
-    via CURSOR_INIT_SCRIPT em toda navegacao — a chamada era redundante e
-    gerava inconsistencias ao aplicar o estilo duas vezes no carregamento inicial.
-    AGORA: add_style_tag removido; init_script e a unica fonte de veride.
-
-  [BUG-3] BAIXO — garantir_cursor_visivel: page.evaluate recebe IIFE corretamente
-    Sem alteracao de comportamento; adicionado comentario explicativo para
-    deixar claro que IIFE e valida dentro de page.evaluate().
+  - TODA a matemática de Bézier, Overshoot e Jitter originais RESTAURADAS.
+  - [FIX IFRAME]: Adicionado `window.updateRoboCursor` no Javascript.
+  - [FIX IFRAME]: O loop do Python agora força a atualização visual do cursor na top window 
+    durante o movimento. O cursor não congela mais ao sobrepor Iframes!
 """
 
 import asyncio
@@ -65,7 +48,7 @@ CURSOR_INIT_SCRIPT = """
         borderRadius: '50%', backgroundColor: 'rgba(0, 229, 229, 0.4)',
         border: '2px solid #00e5e5', pointerEvents: 'none',
         zIndex: '2147483647', transform: 'translate(-50%, -50%)',
-        transition: 'top 0.1s ease-out, left 0.1s ease-out, opacity 0.4s ease',
+        transition: 'opacity 0.4s ease', // Removido transition de top/left para o Python controlar pixel a pixel
         boxShadow: '0 0 15px rgba(0, 229, 229, 0.8), 0 0 30px rgba(0, 229, 229, 0.4)',
         left: window.innerWidth / 2 + 'px', top: window.innerHeight / 2 + 'px',
         opacity: '0'
@@ -84,11 +67,20 @@ CURSOR_INIT_SCRIPT = """
     window._cursorX = window.innerWidth / 2;
     window._cursorY = window.innerHeight / 2;
 
+    // 🟢 FIX IFRAME: Função global para o Python forçar a posição do cursor
+    window.updateRoboCursor = function(x, y) {
+        window._cursorX = x;
+        window._cursorY = y;
+        const c = document.getElementById('robo-cursor');
+        if (c) {
+            c.style.opacity = '1';
+            c.style.left = x + 'px';
+            c.style.top = y + 'px';
+        }
+    };
+
     window.addEventListener('mousemove', (e) => {
-        window._cursorX = e.clientX;
-        window._cursorY = e.clientY;
-        cursor.style.left = e.clientX + 'px';
-        cursor.style.top  = e.clientY + 'px';
+        window.updateRoboCursor(e.clientX, e.clientY);
     }, { passive: true });
 
     window.addEventListener('mousedown', () => {
@@ -140,8 +132,6 @@ async def instalar_cursor(page) -> bool:
     """
     try:
         await page.add_init_script(CURSOR_INIT_SCRIPT)
-        # [BUG-2] FIX: removido add_style_tag — init_script ja injeta o estilo
-        # e sobrevive a toda navegacao. add_style_tag era redundante e nao persistia.
         return True
     except Exception as e:
         logging.warning(f"Cursor: falha ao instalar: {e}")
@@ -244,7 +234,15 @@ async def mover_cursor_humanizado(
         t     = i / passos
         ease  = _ease_cubic_inout(t)
         px, py = _bezier_cubica(ease, x_ini, y_ini, cp1x, cp1y, cp2x, cp2y, x_alvo_final, y_alvo_final)
+        
         await page.mouse.move(px, py)
+        
+        # 🟢 FIX IFRAME: Força a página principal a desenhar o cursor, ignorando se estamos num iframe!
+        try:
+            await page.evaluate(f"if(window.updateRoboCursor) window.updateRoboCursor({px}, {py});")
+        except Exception:
+            pass
+
         fator_pausa = 0.6 + 0.8 * abs(math.sin(math.pi * t))
         await asyncio.sleep(intervalo_s * fator_pausa)
 
@@ -253,7 +251,12 @@ async def mover_cursor_humanizado(
         ox, oy = x_alvo_final, y_alvo_final
         for i in range(1, passos_corr + 1):
             ex = _ease_quart_out(i / passos_corr)
-            await page.mouse.move(ox + (x_fim - ox) * ex, oy + (y_fim - oy) * ex)
+            cx, cy = ox + (x_fim - ox) * ex, oy + (y_fim - oy) * ex
+            await page.mouse.move(cx, cy)
+            try:
+                await page.evaluate(f"if(window.updateRoboCursor) window.updateRoboCursor({cx}, {cy});")
+            except Exception:
+                pass
             await asyncio.sleep(intervalo_corr)
 
     try:

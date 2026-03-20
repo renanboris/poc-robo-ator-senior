@@ -126,31 +126,24 @@ def processar_imagem_com_zoom(b64_str: str, coords: dict) -> PILImage.Image | No
         return None
     try:
         img = PILImage.open(BytesIO(base64.b64decode(b64_str))).convert("RGB")
-img_w, img_h = img.size
-    draw = ImageDraw.Draw(img)
-    pad = 8
-    
-    # Para o "pan da câmera", focamos no PRIMEIRO clique da lista
-    primeira_coord = lista_coords[0]
-    cx_cam = primeira_coord.get("x_pct", 0.5) * img_w
-    cy_cam = primeira_coord.get("y_pct", 0.5) * img_h
-
-    # Desenha as caixas vermelhas para TODAS as ações do passo
-    for coords in lista_coords:
+        img_w, img_h = img.size
+        draw = ImageDraw.Draw(img)
+        pad = 8
+        
+        # 1. Pega nas coordenadas do clique
         cx = coords.get("x_pct", 0.5) * img_w
         cy = coords.get("y_pct", 0.5) * img_h
         tw = coords.get("w_pct", 0.05) * img_w
         th = coords.get("h_pct", 0.05) * img_h
         
+        # Desenha a caixa vermelha de destaque
         box = [max(0, cx - tw/2 - pad), max(0, cy - th/2 - pad),
                min(img_w, cx + tw/2 + pad), min(img_h, cy + th/2 + pad)]
         draw.rectangle(box, outline="#EF4444", width=6)
 
         # 2. Define a janela de Zoom (Proporção ajustada para o painel lateral do PDF)
-        # O painel tem aspecto mais vertical (Retrato), então cortamos 800x1050
         crop_w, crop_h = 800, 1050 
         
-        # Se for um formulário muito comprido, expande o crop para não cortar o destaque
         crop_w = max(crop_w, tw * 2.5)
         crop_h = max(crop_h, th * 2.5)
 
@@ -159,7 +152,7 @@ img_w, img_h = img.size
         right = cx + crop_w / 2
         bottom = cy + crop_h / 2
 
-        # 3. Ajusta o "câmera pan" para não criar faixas pretas fora da imagem
+        # 3. Ajusta o "câmera pan" para não criar faixas pretas
         if left < 0:
             right += (0 - left)
             left = 0
@@ -173,7 +166,7 @@ img_w, img_h = img.size
             top -= (bottom - img_h)
             bottom = img_h
 
-        # Boundary check final de segurança
+        # Boundary check de segurança
         left = max(0, left)
         top = max(0, top)
         right = min(img_w, right)
@@ -182,8 +175,10 @@ img_w, img_h = img.size
         return img.crop((left, top, right, bottom))
     except Exception as e:
         print(f"Aviso: Não foi possível aplicar zoom na imagem: {e}")
-        # Retorna imagem original como fallback se algo falhar
-        return PILImage.open(BytesIO(base64.b64decode(b64_str))).convert("RGB")
+        try:
+            return PILImage.open(BytesIO(base64.b64decode(b64_str))).convert("RGB")
+        except:
+            return None
 
 
 def pil_to_rl(pil_img: PILImage.Image, max_w: float, max_h: float) -> RLImage | None:

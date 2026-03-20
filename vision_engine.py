@@ -39,6 +39,7 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from typing import Optional
+from cursor_engine import mover_cursor_humanizado
 
 from dotenv import load_dotenv
 from google import genai
@@ -781,28 +782,18 @@ def _parse_coords(coords):
 async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> bool:
     try:
         x, y = _parse_coords(coords)
-        if x <= 0 or y <= 0:
-            raise ValueError(f"Coordenadas invalidas: x={x}, y={y}")
+        if x <= 0 or y <= 0: raise ValueError(f"Coordenadas invalidas: x={x}, y={y}")
 
+        logger.info(f"   [Mouse] Disparando clique na coordenada da tela -> X:{x}, Y:{y}")
         await _highlight_coords(page, x, y)
-        await asyncio.sleep(0.3)
+        
+        # 🟢 MUDANÇA CRÍTICA: O rato deve navegar até a visão da IA antes de clicar!
+        await mover_cursor_humanizado(page, x, y)
 
-        if acao == "duplo_clique":
-            await page.mouse.dblclick(x, y)
-        elif acao == "clique_direito":
-            await page.mouse.click(x, y, button="right")
-        else:
-            await page.mouse.click(x, y)
-
-        if acao in ("digitar_e_enter", "preencher_campo") and valor:
-            await asyncio.sleep(0.3)
-            await page.keyboard.press("Control+A")
-            await page.keyboard.press("Backspace")
-            await page.keyboard.type(valor, delay=40)
-            if acao == "digitar_e_enter":
-                await asyncio.sleep(1) 
-                await page.keyboard.press("Enter")
-
+        if acao == "duplo_clique": await page.mouse.dblclick(x, y)
+        elif acao == "clique_direito": await page.mouse.click(x, y, button="right")
+        else: await page.mouse.click(x, y)
+        
         await _aguardar_estabilidade(page)
         return True
     except Exception as exc:

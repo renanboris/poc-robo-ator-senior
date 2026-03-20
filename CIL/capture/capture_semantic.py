@@ -689,25 +689,73 @@ async def worker_processamento(worker_id: int):
         finally:
             _processing_queue.task_done()
 
+async def _descrever_tela(b64_img: str, contexto: str = "") -> dict:
+    """
+    Pede ao Gemini uma descrição estruturada da tela.
+    Captura o ENTENDIMENTO, não só o clique.
+    """
+    prompt = f"""Analise esta tela de ERP e descreva em JSON:
+{{
+    "onde_estou": "onde o usuário está no sistema",
+    "tela_id": "identificador curto (ex: ged_documentos, painel_principal)",
+    "sidebar_estado": "colapsada|expandida|submenu_aberto",
+    "sidebar_item_ativo": "qual item está ativo (se houver)",
+    "iframe_presente": false,
+    "iframe_descricao": "",
+    "conteudo_central": "o que aparece na área central (resumo de 1 frase)"
+}}
+{f'Contexto adicional: {contexto}' if contexto else ''}"""
+    try:
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=[prompt, types.Part.from_bytes(
+                data=base64.b64decode(b64_img), mime_type="image/jpeg"
+            )],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json", temperature=0.0
+            ),
+        )
+        return json.loads(response.text)
+    except Exception:
+        return {"onde_estou": "", "tela_id": "", "sidebar_estado": "", "conteudo_central": ""}
+
+
 async def processar_click_semantico(item: dict):
     payload       = item["payload"]
-    b64_img       = item["screenshot_b64"]
+    b64_img_antes = item["screenshot_b64"]
     id_acao       = item["id_acao"]
+    page          = item.get("page")  # página Playwright, se disponível
 
     contexto_fluxo = montar_contexto_fluxo()
-    analise        = await analisar_semantica_gemini(b64_img, payload, contexto_fluxo)
+
+    # ── Captura o entendimento da tela ANTES do clique ──────────
+    descricao_antes = await _descrever_tela(b64_img_antes, "imediatamente antes do clique")
+
+    # ── Análise semântica do clique ──────────────────────────────
+    analise = await analisar_semantica_gemini(b64_img_antes, payload, contexto_fluxo)
+
+    # ── Screenshot DEPOIS do clique (se página disponível) ──────
+    b64_img_depois = ""
+    descricao_depois = {}
+    if page:
+        try:
+            await asyncio.sleep(1.2)  # aguarda animação/navegação
+            screenshot_depois = await page.screenshot(type="jpeg", quality=60, full_page=False)
+            b64_img_depois = base64.b64encode(screenshot_depois).decode("utf-8")
+            descricao_depois = await _descrever_tela(b64_img_depois, "após o clique")
+        except Exception:
+            pass
 
     pattern      = normalizar_pattern(analise.get("pattern_detectado"))
     acao_raw     = payload.get("acao", "clique")
 
-    # Mapeia todos os tipos de ação capturados pelo JS
     if acao_raw == "duplo_clique":
         acao_semantica = "duplo_clique"
     elif acao_raw == "clique_direito":
         acao_semantica = "clique_direito"
     elif acao_raw == "tecla":
         tecla = payload.get("tecla", "")
-        # Enter e Ctrl+S são confirmações → digitar_e_enter ou clique semântico
         acao_semantica = "digitar_e_enter" if tecla == "Enter" else "tecla"
     elif acao_raw == "selecionar_opcao":
         acao_semantica = "selecionar_opcao"
@@ -716,32 +764,38 @@ async def processar_click_semantico(item: dict):
     else:
         acao_semantica = "clique"
 
-    # valor_input: para tecla preserva a tecla, para select preserva o valor
     valor_input_base = analise.get("variaveis_pattern", {}).get("query", "")
     if acao_raw == "tecla":
         valor_input_base = payload.get("tecla", "")
     elif acao_raw == "selecionar_opcao":
         valor_input_base = payload.get("valor_selecionado", "") or payload.get("text_hint", "")
 
-    entidade   = analise.get("entidade", "")
+    entidade    = analise.get("entidade", "")
     label_curto = (
         entidade
         or payload.get("text_hint")
         or payload.get("aria_hint")
         or analise.get("tipo_alvo", "alvo")
     )
-
-    # FIX BUG A: seletor_css agora vem do payload JS, não é string vazia
     seletor_capturado = payload.get("seletor_css", "")
 
     acao = {
-        "id_acao":           id_acao,
-        "acao":              acao_semantica,
+        "id_acao":            id_acao,
+        "acao":               acao_semantica,
         "intencao_semantica": analise.get("intencao_desejada", f"Ação {id_acao}"),
-        "valor_input":       valor_input_base,
-        "micro_narracao":    f"...{analise.get('intencao_desejada', '').lower()}...",
-        "pattern_detectado": pattern,
-        "seletor_css":       seletor_capturado,   # FIX BUG A: preenchido!
+        "valor_input":        valor_input_base,
+        "micro_narracao":     f"...{analise.get('intencao_desejada', '').lower()}...",
+        "pattern_detectado":  pattern,
+        "seletor_css":        seletor_capturado,
+
+        # CONTEXTO SEMÂNTICO — o que diferencia v3 das versões anteriores
+        "contexto_semantico": {
+            "tela_antes": descricao_antes,
+            "tela_depois": descricao_depois,
+            "raciocinio": analise.get("raciocinio_captura", ""),
+            "o_que_mudou": _inferir_mudanca(descricao_antes, descricao_depois),
+        },
+
         "elemento_alvo": {
             "descricao_visual":    f"{analise.get('tipo_alvo', '')} {entidade}".strip(),
             "contexto_tela":       payload.get("page_title", ""),
@@ -753,17 +807,35 @@ async def processar_click_semantico(item: dict):
                 "w_pct": payload["w_pct"],
                 "h_pct": payload["h_pct"],
             },
-            "screenshot_referencia": b64_img,
-            "iframe_hint":          payload.get("iframe_hint"),
+            "screenshot_referencia": b64_img_antes,
+            "screenshot_depois":     b64_img_depois,
+            "iframe_hint":           payload.get("iframe_hint"),
         },
         "validacao_esperada": analise.get("validacao_esperada", {}),
     }
 
     cliques_capturados.append(acao)
     logger.info(
-        f"🧠 [IA {id_acao} Processado] {acao['intencao_semantica']} | "
-        f"Pattern: {pattern} | Seletor: {seletor_capturado[:50] or '(nenhum)'}"
+        f"🧠 [IA {id_acao}] {acao['intencao_semantica']} | "
+        f"Pattern: {pattern} | Seletor: {seletor_capturado[:40] or '(nenhum)'} | "
+        f"Tela: {descricao_antes.get('tela_id','')} → {descricao_depois.get('tela_id','')}"
     )
+
+
+def _inferir_mudanca(antes: dict, depois: dict) -> str:
+    """Descreve em linguagem natural o que mudou entre as duas telas."""
+    if not antes or not depois:
+        return ""
+    partes = []
+    if antes.get("tela_id") != depois.get("tela_id"):
+        partes.append(f"tela mudou de '{antes.get('tela_id','')}' para '{depois.get('tela_id','')}'")
+    if antes.get("sidebar_item_ativo") != depois.get("sidebar_item_ativo"):
+        partes.append(f"item ativo mudou para '{depois.get('sidebar_item_ativo','')}'")
+    if antes.get("sidebar_estado") != depois.get("sidebar_estado"):
+        partes.append(f"sidebar: {antes.get('sidebar_estado','')} → {depois.get('sidebar_estado','')}")
+    if antes.get("conteudo_central") != depois.get("conteudo_central"):
+        partes.append(f"conteúdo central atualizou")
+    return "; ".join(partes) if partes else "sem mudança detectada"
 
 # ──────────────────────────────────────────────────────────────
 # ORQUESTRADOR DE NAVEGAÇÃO E LOGIN

@@ -214,5 +214,29 @@
     "intencao_original": "Navegar para Documentos",
     "label_procurado": "Documentos",
     "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-20 11:15:12",
+    "intencao_original": "O usuário clicou em 'Documentos' para acessar a seção ou funcionalidade relacionada a documentos dentro do sistema GED. (RESGATE)",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-20 14:20:18",
+    "intencao_original": "O usuário clicou em 'Documentos' para acessar a seção de gerenciamento ou visualização de documentos dentro do módulo GED. (RESGATE)",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-20 14:55:02",
+    "intencao_original": "O usuário quis acessar a seção de documentos do sistema. (RESGATE)",
+    "label_procurado": "Documentos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
+  },
+  {
+    "timestamp": "2026-03-20 15:07:56",
+    "intencao_original": "Gerenciar os assuntos do sistema, como visualizar, adicionar ou editar categorias de assuntos. (RESGATE)",
+    "label_procurado": "Gerenciar Assuntos",
+    "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
   }
 ]

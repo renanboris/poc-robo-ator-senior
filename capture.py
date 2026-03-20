@@ -6,8 +6,9 @@ Correcoes aplicadas:
   - Hack Supremo para Checkboxes Angular/PrimeNG (textContent + :has-text).
   - Captura Zero-Latency (Fim dos cliques perdidos).
   - Deteccao automatica de PrimeNG v14+ vs v12 (.p-checkbox-box).
-  - [NOVO] Fix Coordenadas SCORM: Calculo Absoluto para iframes.
-  - [NOVO] Fix Print Limpo: Atraso de 400ms no highlight vermelho para nao sujar a foto.
+  - Fix Coordenadas SCORM: Calculo Absoluto para iframes.
+  - Fix Print Limpo: Atraso de 400ms no highlight vermelho.
+  - 🟢 FIX Concorrência: asyncio.Lock global para evitar crash em cliques muito rápidos.
 """
 
 import asyncio
@@ -245,7 +246,6 @@ async def _injetar_em_contexto(contexto):
             return 'Pagina Principal';
         };
 
-        // 🟢 FIX: O SCORM Desorientado (Calculo Absoluto de Coordenadas para Iframes)
         const getAbsoluteRect = (el) => {
             let rect = el.getBoundingClientRect();
             let x = rect.left, y = rect.top;
@@ -279,11 +279,10 @@ async def _injetar_em_contexto(contexto):
                 html_snapshot: target.outerHTML.substring(0, 300)
             }));
             
-            // 🟢 FIX: A Foto "Suja" (Atrasa o piscar vermelho para o Python tirar a foto limpa primeiro)
             setTimeout(() => {
                 const orig = target.style.outline;
                 target.style.outline = '2px solid red';
-                target.style.outlineOffset = '-2px'; // Mantém para dentro para não empurrar layout
+                target.style.outlineOffset = '-2px';
                 setTimeout(() => target.style.outline = orig, 300);
             }, 400);
         };
@@ -315,8 +314,6 @@ async def _injetar_em_contexto(contexto):
             const tag = e.target.tagName.toLowerCase();
             if (e.target === ultimoEnterTarget && Date.now() - ultimoEnterTime < 500) return;
             
-            // 🟢 FIX SCORM: Ignora inputs de sistema (checkbox, radio, hidden)
-            // Impede que o Angular crie uma ação fantasma de 'preencher_campo' com coordenadas 0x0
             const tipo = e.target.type ? e.target.type.toLowerCase() : '';
             const isCampoTexto = tag === 'textarea' || 
                                (tag === 'input' && !['checkbox', 'radio', 'hidden', 'submit', 'button', 'file'].includes(tipo)) || 
@@ -348,67 +345,70 @@ async def injetar_radar_event_driven(page):
 
 async def on_capturar_elemento(source, args):
     global _id_acao_global, _lock_id
+    
+    # 🟢 MUDANÇA CRÍTICA: O Lock agora abrange TODA a captura da imagem.
+    # Evita erros "Target Closed" se o utilizador clicar como um maluco no ecrã.
     async with _lock_id:
         _id_acao_global += 1
         meu_id_acao = _id_acao_global
 
-    try:
-        dados_json = await args.json_value()
-        dados      = json.loads(dados_json) if isinstance(dados_json, str) else dados_json
-        acao       = dados.get("acao", "clique")
-        label      = (dados["texto_encontrado"] or dados["tag"])[:40]
-        logger.info(f"[FOTO {meu_id_acao}] | {acao.upper()} | {label}")
-
-        screenshot_bytes = screenshot_b64 = None
-        vp_w, vp_h = 1920, 1080
-
         try:
-            frame = source.get("frame")
-            if frame:
-                page_ref         = frame.page
-                screenshot_bytes = await page_ref.screenshot(type="jpeg", quality=80, full_page=False)
-                screenshot_b64   = base64.b64encode(screenshot_bytes).decode("utf-8")
-                vp               = await page_ref.evaluate("() => ({w: window.innerWidth, h: window.innerHeight})")
-                vp_w, vp_h       = vp["w"], vp["h"]
-        except PlaywrightError as e:
-            if "Target closed" in str(e) or "browser has been closed" in str(e):
-                return
-            logger.warning(f"Falha ao tirar print: {e}")
+            dados_json = await args.json_value()
+            dados      = json.loads(dados_json) if isinstance(dados_json, str) else dados_json
+            acao       = dados.get("acao", "clique")
+            label      = (dados["texto_encontrado"] or dados["tag"])[:40]
+            logger.info(f"[FOTO {meu_id_acao}] | {acao.upper()} | {label}")
+
+            screenshot_bytes = screenshot_b64 = None
+            vp_w, vp_h = 1920, 1080
+
+            try:
+                frame = source.get("frame")
+                if frame:
+                    page_ref         = frame.page
+                    screenshot_bytes = await page_ref.screenshot(type="jpeg", quality=80, full_page=False)
+                    screenshot_b64   = base64.b64encode(screenshot_bytes).decode("utf-8")
+                    vp               = await page_ref.evaluate("() => ({w: window.innerWidth, h: window.innerHeight})")
+                    vp_w, vp_h       = vp["w"], vp["h"]
+            except PlaywrightError as e:
+                if "Target closed" in str(e) or "browser has been closed" in str(e):
+                    return
+                logger.warning(f"Falha ao tirar print: {e}")
+            except Exception as e:
+                logger.warning(f"Falha ao tirar print: {e}")
+
+            coords  = _extrair_coordenadas_relativas(dados.get("posicao_visual", ""), vp_w, vp_h)
+            analise = (
+                await _analisar_elemento_com_gemini(
+                    screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
+                ) if screenshot_bytes else {
+                    "intencao": f"{acao.capitalize()} em '{label}'",
+                    "descricao_visual": f"Elemento '{label}'",
+                    "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa",
+                }
+            )
+
+            iframe_id = dados.get("iframe", "Pagina Principal")
+            cliques_capturados.append({
+                "id_acao":            meu_id_acao,
+                "acao":               acao,
+                "intencao_semantica": analise["intencao"],
+                "elemento_alvo": {
+                    "descricao_visual":      analise["descricao_visual"],
+                    "contexto_tela":         analise["contexto_tela"],
+                    "tipo_elemento":         analise.get("tipo_elemento", "button"),
+                    "confianca_captura":     analise.get("confianca", "media"),
+                    "label_curto":           label,
+                    "coordenadas_relativas": coords,
+                    "seletor_hint":          dados["seletor"],
+                    "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
+                    "html_hint":             dados.get("html_snapshot", "")[:300],
+                    "screenshot_referencia": screenshot_b64,
+                },
+                "valor_input": dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else "",
+            })
         except Exception as e:
-            logger.warning(f"Falha ao tirar print: {e}")
-
-        coords  = _extrair_coordenadas_relativas(dados.get("posicao_visual", ""), vp_w, vp_h)
-        analise = (
-            await _analisar_elemento_com_gemini(
-                screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
-            ) if screenshot_bytes else {
-                "intencao": f"{acao.capitalize()} em '{label}'",
-                "descricao_visual": f"Elemento '{label}'",
-                "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa",
-            }
-        )
-
-        iframe_id = dados.get("iframe", "Pagina Principal")
-        cliques_capturados.append({
-            "id_acao":            meu_id_acao,
-            "acao":               acao,
-            "intencao_semantica": analise["intencao"],
-            "elemento_alvo": {
-                "descricao_visual":      analise["descricao_visual"],
-                "contexto_tela":         analise["contexto_tela"],
-                "tipo_elemento":         analise.get("tipo_elemento", "button"),
-                "confianca_captura":     analise.get("confianca", "media"),
-                "label_curto":           label,
-                "coordenadas_relativas": coords,
-                "seletor_hint":          dados["seletor"],
-                "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
-                "html_hint":             dados.get("html_snapshot", "")[:300],
-                "screenshot_referencia": screenshot_b64,
-            },
-            "valor_input": dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else "",
-        })
-    except Exception as e:
-        logger.error(f"Erro ao processar captura: {e}")
+            logger.error(f"Erro ao processar captura: {e}")
 
 async def capturar_cliques_na_tela():
     global _lock_id
@@ -599,7 +599,6 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
                 "is_conclusao": passo_ia.get("is_conclusao", False), "acoes_tecnicas": [],
             }
             
-            # 🟢 FIX: Busca os dois arrays paralelos gerados pela IA
             micro_narracoes = passo_ia.get("micro_narracoes", [])
             validacoes = passo_ia.get("validacoes_esperadas", [])
             
@@ -612,7 +611,6 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
                         "elemento_alvo": acao_bruta["elemento_alvo"], 
                         "valor_input": acao_bruta["valor_input"],
                         "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
-                        # 🟢 AQUI: Costura a validação da IA junto com o print pesado do Python
                         "validacao_esperada": validacoes[i] if i < len(validacoes) else None 
                     })
                     
@@ -632,12 +630,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
             logger.info(f"Portão de qualidade: APROVADO — {motivo_validacao}")
             try:
                 import lego_builder as _lb
-                
-                # 🟢 FIX: Removido o uso de Threading (daemon=True) que estava a assassinar 
-                # o processo a meio. Agora o robô extrai as peças de forma síncrona e segura
-                # antes de fechar o programa.
                 resultado = _lb.construir_biblioteca()
-                
                 if resultado.get("status") == "sucesso":
                     novas = resultado.get("total_acoes_novas", 0)
                     total = resultado.get("total_acoes_lidas", 0)

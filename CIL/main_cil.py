@@ -1,3 +1,5 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 """
 main_cil.py — Testador Isolado do CIL v2
 """
@@ -12,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-from vision_engine_cil import encontrar_e_clicar
+from core.vision_engine_cil import encontrar_e_clicar
 
 
 async def esperar_spa_pronta(page):

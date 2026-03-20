@@ -1,0 +1,203 @@
+{
+  "_comentario": "CIL v3 — Mapa de Conhecimento Semântico. Não é um script de cliques. É o que o agente aprendeu sobre o sistema.",
+  "metadata": {
+    "nome_aula": "GED — Gestão de Documentos",
+    "versao_schema": "CIL-v3-semantic",
+    "sistema": "Senior X",
+    "objetivo_geral": "Navegar pelo módulo GED, criar e gerenciar documentos",
+    "capturado_em": "2026-03-20",
+    "capturado_por": "capture_semantic_v3"
+  },
+
+  "conhecimento_do_sistema": {
+    "descricao": "Senior X é um ERP com sidebar colapsada de ícones na esquerda. Ao passar o mouse ou clicar num ícone, um submenu ou painel expandido aparece com as opções do módulo. A área central muda conforme a navegação.",
+    "telas_mapeadas": [
+      {
+        "id": "painel_principal",
+        "nome": "Painel Principal",
+        "como_identificar": "Logo Senior no topo, sidebar com ícones pequenos, área central com dashboard ou indicadores",
+        "sidebar_estado_tipico": "colapsada com ícones",
+        "acoes_disponiveis_aqui": ["expandir qualquer módulo pelo hover", "navegar para qualquer seção"],
+        "elementos_chave": [
+          {
+            "nome": "Sidebar de módulos",
+            "tipo": "sidebar",
+            "descricao": "Coluna de ícones na lateral esquerda. Hover expande labels.",
+            "seletor_css": "aside, [class*='sidebar']",
+            "iframe_hint": null
+          }
+        ]
+      },
+      {
+        "id": "senior_flow_submenu",
+        "nome": "Senior Flow — submenu expandido",
+        "como_identificar": "Painel lateral expandido com opções como GED, Gestão Logística, etc.",
+        "sidebar_estado_tipico": "submenu_aberto ao lado dos ícones",
+        "nota_importante": "Este painel NÃO é parte da sidebar principal. É um painel flutuante que aparece ao clicar no ícone Senior Flow.",
+        "acoes_disponiveis_aqui": ["clicar em GED", "clicar em Gestão Logística", "clicar em outros módulos"],
+        "elementos_chave": [
+          {
+            "nome": "Item GED",
+            "tipo": "menu_item",
+            "descricao": "Texto 'GED' no painel expandido do Senior Flow",
+            "seletor_css": "#apps-menu-item-4",
+            "iframe_hint": null,
+            "x_pct_aproximado": 0.169,
+            "nota": "x_pct > 0.08 indica submenu — NÃO resetar scroll da sidebar antes de clicar"
+          }
+        ]
+      },
+      {
+        "id": "ged_documentos",
+        "nome": "GED — Módulo Documentos",
+        "como_identificar": "Sidebar com itens Documentos, Pesquisa, Relatórios. Área central com iframe do GED.",
+        "sidebar_estado_tipico": "expandida com submenu do GED",
+        "iframe_presente": true,
+        "iframe_hint": "ci",
+        "nota_importante": "A lista de pastas e documentos fica DENTRO do iframe 'ci'. Botões de ação (Nova pasta, etc.) também ficam no iframe.",
+        "acoes_disponiveis_aqui": ["abrir pasta", "criar pasta", "pesquisar"],
+        "elementos_chave": [
+          {
+            "nome": "Item Documentos",
+            "tipo": "menu_item",
+            "seletor_css": "#apps-menu-item-0",
+            "iframe_hint": null
+          },
+          {
+            "nome": "Botão Nova pasta",
+            "tipo": "botao",
+            "descricao": "Botão no canto superior direito DENTRO do iframe GED",
+            "seletor_css": "#newFolderButton",
+            "iframe_hint": "ci",
+            "nota": "Está no iframe — Vision deve buscar dentro do iframe, não na página principal"
+          },
+          {
+            "nome": "Lista de pastas/documentos",
+            "tipo": "lista",
+            "descricao": "Grade de pastas e arquivos na área central do iframe",
+            "seletor_css": "#itemTitle",
+            "iframe_hint": "ci",
+            "interacao": "duplo_clique para abrir pasta"
+          }
+        ]
+      }
+    ]
+  },
+
+  "fluxos": [
+    {
+      "id": "navegar_para_ged",
+      "objetivo": "Abrir o módulo GED dentro do Senior Flow",
+      "descricao": "O GED não está diretamente na sidebar — está dentro do submenu do Senior Flow",
+      "passos": [
+        {
+          "id": "p1",
+          "tela_esperada": "painel_principal",
+          "entendimento": "Preciso clicar no ícone Senior Flow na sidebar para expandir o submenu",
+          "acao": {
+            "tipo": "clique",
+            "elemento": {
+              "label": "Senior Flow",
+              "descricao": "Ícone circular com 'S' na parte inferior da sidebar",
+              "seletor_css": "#menu-item-Senior\\ Flow",
+              "iframe_hint": null,
+              "pattern": "menu_navigation"
+            }
+          },
+          "resultado_esperado": "Submenu do Senior Flow expande mostrando GED e outros módulos",
+          "como_verificar": "Vejo texto 'GED' no painel expandido ao lado da sidebar",
+          "tela_resultante": "senior_flow_submenu"
+        },
+        {
+          "id": "p2",
+          "tela_esperada": "senior_flow_submenu",
+          "entendimento": "O submenu está aberto. GED está visível. Preciso clicar nele.",
+          "nota_critica": "NÃO resetar scroll da sidebar antes — isso colapsaria o submenu do pai",
+          "acao": {
+            "tipo": "clique",
+            "elemento": {
+              "label": "GED",
+              "descricao": "Texto 'GED' no painel expandido do Senior Flow",
+              "seletor_css": "#apps-menu-item-4",
+              "iframe_hint": null,
+              "pattern": "menu_navigation",
+              "x_pct": 0.169,
+              "nota": "x_pct > 0.08 = está no submenu, não no ícone da sidebar"
+            }
+          },
+          "resultado_esperado": "Área central carrega o módulo GED com sidebar mostrando Documentos, Pesquisa, etc.",
+          "como_verificar": "Sidebar mostra 'GED' ativo, área central mudou para interface do GED",
+          "tela_resultante": "ged_documentos"
+        }
+      ]
+    },
+    {
+      "id": "abrir_pasta_financeiro",
+      "objetivo": "Navegar até a pasta Financeiro dentro do GED",
+      "prerequisito": "navegar_para_ged",
+      "passos": [
+        {
+          "id": "p1",
+          "tela_esperada": "ged_documentos",
+          "entendimento": "Estou no GED. A lista de pastas está no iframe 'ci'. Preciso encontrar 'Financeiro'.",
+          "acao": {
+            "tipo": "duplo_clique",
+            "elemento": {
+              "label": "Financeiro",
+              "descricao": "Pasta chamada 'Financeiro' na lista de pastas dentro do iframe GED",
+              "seletor_css": "#itemTitle",
+              "iframe_hint": "ci",
+              "pattern": "table_selection",
+              "nota": "Duplo clique para abrir a pasta — clique simples só seleciona"
+            }
+          },
+          "resultado_esperado": "Conteúdo da pasta Financeiro exibido no iframe. Breadcrumb mostra 'Home > Financeiro'.",
+          "como_verificar": "Breadcrumb no iframe mostra 'Financeiro', conteúdo mostra arquivos/subpastas de Financeiro"
+        }
+      ]
+    },
+    {
+      "id": "criar_pasta",
+      "objetivo": "Criar uma nova pasta no GED",
+      "prerequisito": "navegar_para_ged",
+      "passos": [
+        {
+          "id": "p1",
+          "tela_esperada": "ged_documentos",
+          "entendimento": "O botão 'Nova pasta' está no iframe GED, no canto superior direito. NÃO está na página principal.",
+          "acao": {
+            "tipo": "clique",
+            "elemento": {
+              "label": "Nova pasta",
+              "descricao": "Botão 'Nova pasta' no canto superior direito DENTRO do iframe GED",
+              "seletor_css": "#newFolderButton",
+              "iframe_hint": "ci",
+              "pattern": "button_click"
+            }
+          },
+          "resultado_esperado": "Modal ou campo de texto aparece pedindo o nome da nova pasta",
+          "como_verificar": "Vejo input ou modal com campo de nome de pasta"
+        }
+      ]
+    }
+  ],
+
+  "padroes_aprendidos": {
+    "sidebar_senior_x": {
+      "comportamento": "Sidebar colapsada com ícones. Hover expande o label. Clique no ícone abre submenu ou navega.",
+      "armadilhas": [
+        "Resetar scroll da sidebar colapsa o submenu Angular do item pai",
+        "Itens de submenu ficam em x_pct > 0.08 — não são ícones da coluna principal",
+        "Ao passar para o próximo passo, o submenu ainda pode estar aberto — é bom sinal"
+      ]
+    },
+    "iframe_ged": {
+      "comportamento": "GED roda num iframe (nome: 'ci'). Botões, pastas e documentos ficam dentro do iframe.",
+      "armadilhas": [
+        "Vision que tira screenshot da página inteira NÃO vê os elementos dentro do iframe claramente",
+        "Usar screenshot focado no iframe para encontrar elementos",
+        "Pastas precisam de duplo clique para abrir — clique simples só seleciona"
+      ]
+    }
+  }
+}

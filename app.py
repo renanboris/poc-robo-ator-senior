@@ -352,6 +352,9 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
         with _estado_lock:
             processo_atual = None
 
+@app.get("/dashboard.html", response_class=HTMLResponse)
+async def dashboard_antigo(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 # ==============================================================
 # MODELOS DE DADOS (PYDANTIC)

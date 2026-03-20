@@ -304,10 +304,12 @@ def renderizar_video_final(
     caminho_webm: str, timeline: list, nome_arquivo_base: str, tempo_corte: float
 ) -> None:
     print("\nINICIANDO POS-PRODUCAO...")
+    video = None
+    clipes_audio = []
+    
     try:
         os.makedirs("videos_prontos", exist_ok=True)
-        video       = VideoFileClip(caminho_webm).subclip(tempo_corte)
-        clipes_audio = []
+        video = VideoFileClip(caminho_webm).subclip(tempo_corte)
 
         if os.path.exists("trilha.mp3"):
             bgm = AudioFileClip("trilha.mp3").volumex(0.08)
@@ -324,22 +326,29 @@ def renderizar_video_final(
         mp4_path = os.path.join("videos_prontos", f"{nome_arquivo_base}.mp4")
         srt_path = os.path.join("videos_prontos", f"{nome_arquivo_base}.srt")
 
-        try:
-            video.write_videofile(
-                mp4_path,
-                codec="libx264",
-                audio_codec="aac",
-                fps=24,
-                preset="ultrafast",
-                logger=CustomRenderLogger(),
-            )
-            gerar_arquivo_srt(timeline, srt_path)
-            print(f"SUCESSO! Video: {mp4_path}")
-        finally:
-            video.close()
+        video.write_videofile(
+            mp4_path,
+            codec="libx264",
+            audio_codec="aac",
+            fps=24,
+            preset="ultrafast",
+            logger=CustomRenderLogger(),
+        )
+        gerar_arquivo_srt(timeline, srt_path)
+        print(f"SUCESSO! Video: {mp4_path}")
 
     except Exception as e:
         print(f"Erro na Pos-Producao: {e}")
+    finally:
+        # 🟢 MUDANÇA CRÍTICA: Fechar rigorosamente todos os objetos da memória!
+        # Sem isto, o Windows impede o Python de apagar os áudios antigos (Memory Leak).
+        if video:
+            try: video.close() 
+            except: pass
+            
+        for clipe in clipes_audio:
+            try: clipe.close() 
+            except: pass
 
 # ==============================================================
 # WRAPPER DE CLIQUE E VALIDACAO
