@@ -34,3 +34,6 @@ documentacao_pdf/
 # Arquivos temporários do OS
 .DS_Store
 Thumbs.db
+
+# 🔴 PASTAS LEGADAS / BACKUPS
+old_but_gold/
