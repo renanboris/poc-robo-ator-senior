@@ -2,13 +2,10 @@
 capture.py — Senior Training OS · Motor de Captura
 ====================================================
 Correcoes aplicadas:
-  - Isolamento total do script operário.
-  - Hack Supremo para Checkboxes Angular/PrimeNG (textContent + :has-text).
-  - Captura Zero-Latency (Fim dos cliques perdidos).
-  - Deteccao automatica de PrimeNG v14+ vs v12 (.p-checkbox-box).
-  - Fix Coordenadas SCORM: Calculo Absoluto para iframes.
-  - Fix Print Limpo: Atraso de 400ms no highlight vermelho.
-  - 🟢 FIX Concorrência: asyncio.Lock global para evitar crash em cliques muito rápidos.
+  - Removida a importação cruzada de app.py (Isolamento total do script operário).
+  - Try/Except global com flush=True para garantir que o painel leia erros reais.
+  - Blindagem contra TargetClosedError (Falso Positivo ao fechar o navegador).
+  - [NOVO] Hack Supremo para Checkboxes Angular/PrimeNG (textContent + :has-text).
 """
 
 import asyncio
@@ -125,6 +122,7 @@ Analise o screenshot e responda com um JSON:
     except Exception:
         return fallback
 
+
 async def _injetar_em_contexto(contexto):
     script_radar = """() => {
         if (window.__radarInjetado) return;
@@ -144,6 +142,7 @@ async def _injetar_em_contexto(contexto):
         }
 
         const getElementName = (el) => {
+            // HACK: textContent no lugar de innerText para varrer o DOM invisivel do Angular
             const isCheckbox = el.closest('p-checkbox, mat-checkbox, [type="checkbox"], .ui-chkbox');
             if (isCheckbox) {
                 const parentRow = el.closest('tr, item, li, .ui-g, .list-item, .row');
@@ -177,27 +176,21 @@ async def _injetar_em_contexto(contexto):
             if (customCheckbox) {
                 let tagCheck = customCheckbox.tagName.toLowerCase();
                 
-                const isV14 = customCheckbox.querySelector('.p-checkbox-box');
-                const boxSelector = isV14 ? '.p-checkbox-box' : '.ui-chkbox-box';
-                
+                // HACK: Direciona o clique para a caixa visual interna do PrimeNG
                 let cliqueInterno = tagCheck;
                 if (tagCheck === 'p-checkbox') {
-                    cliqueInterno = `p-checkbox ${boxSelector}`;
+                    cliqueInterno = 'p-checkbox .ui-chkbox-box';
                 } else if (tagCheck === 'div' && customCheckbox.classList.contains('ui-chkbox')) {
-                    cliqueInterno = `.ui-chkbox ${boxSelector}`;
+                    cliqueInterno = '.ui-chkbox .ui-chkbox-box';
                 }
 
+                // SELETOR SUPREMO: "Linha que tem este texto" > Checkbox
                 const parentRow = customCheckbox.closest('tr, item, li, .ui-g, .list-item, .row');
                 if (parentRow) {
                     let text = parentRow.textContent || '';
                     text = text.replace(/\\s+/g, ' ').trim();
                     if (text.length > 2) {
-                        let cleanText = text.substring(0, 50).replace(/['"\\\\/]/g, '');
-                        if (text.length > 50) {
-                            const lastSpace = cleanText.lastIndexOf(' ');
-                            if (lastSpace > 10) cleanText = cleanText.substring(0, lastSpace);
-                        }
-                        
+                        const cleanText = text.substring(0, 40).replace(/['"\\\\/]/g, '');
                         let pTag = parentRow.tagName.toLowerCase();
                         if (pTag === 'div' && parentRow.classList.contains('ui-g')) pTag = '.ui-g';
                         return `${pTag}:has-text("${cleanText}") ${cliqueInterno}`;
@@ -246,62 +239,33 @@ async def _injetar_em_contexto(contexto):
             return 'Pagina Principal';
         };
 
-        const getAbsoluteRect = (el) => {
-            let rect = el.getBoundingClientRect();
-            let x = rect.left, y = rect.top;
-            let win = window;
-            try {
-                while (win !== window.top) {
-                    let frames = win.parent.document.querySelectorAll('iframe, frame');
-                    for (let frame of frames) {
-                        if (frame.contentWindow === win) {
-                            let fRect = frame.getBoundingClientRect();
-                            x += fRect.left;
-                            y += fRect.top;
-                            break;
-                        }
-                    }
-                    win = win.parent;
-                }
-            } catch(e) {}
-            return { x: x, y: y, width: rect.width, height: rect.height };
-        };
-
         const processarEvento = (target, acao, valor = '') => {
-            const absRect = getAbsoluteRect(target);
-            
+            const rect = target.getBoundingClientRect();
             window.capturarElemento(JSON.stringify({
                 tag: target.tagName.toLowerCase(),
                 texto_encontrado: valor || getElementName(target),
                 seletor: getBestSelector(target),
                 iframe: getFrameId(), acao,
-                posicao_visual: `x:${Math.round(absRect.x)},y:${Math.round(absRect.y)},w:${Math.round(absRect.width)},h:${Math.round(absRect.height)}`,
+                posicao_visual: `x:${Math.round(rect.x)},y:${Math.round(rect.y)},w:${Math.round(rect.width)},h:${Math.round(rect.height)}`,
                 html_snapshot: target.outerHTML.substring(0, 300)
             }));
-            
-            setTimeout(() => {
-                const orig = target.style.outline;
-                target.style.outline = '2px solid red';
-                target.style.outlineOffset = '-2px';
-                setTimeout(() => target.style.outline = orig, 300);
-            }, 400);
+            const orig = target.style.outline;
+            target.style.outline = '2px solid red';
+            setTimeout(() => target.style.outline = orig, 200);
         };
 
-        let lastClickTime = 0;
+        let clickTimeout = null;
         document.addEventListener('mousedown', (e) => {
-            if (Date.now() - lastClickTime < 300) return; 
-            lastClickTime = Date.now();
-            
             if (e.button === 2) { processarEvento(e.target, 'clique_direito'); return; }
             if (e.button === 0) {
-                processarEvento(e.target, 'clique');
+                if (clickTimeout !== null) { clearTimeout(clickTimeout); clickTimeout = null; return; }
+                clickTimeout = setTimeout(() => { processarEvento(e.target, 'clique'); clickTimeout = null; }, 250);
             }
         }, true);
-
         document.addEventListener('dblclick', (e) => {
+            clearTimeout(clickTimeout); clickTimeout = null;
             processarEvento(e.target, 'duplo_clique');
         }, true);
-
         let ultimoEnterTarget = null, ultimoEnterTime = 0;
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -309,17 +273,10 @@ async def _injetar_em_contexto(contexto):
                 processarEvento(e.target, 'digitar_e_enter', e.target.value || e.target.innerText || '');
             }
         }, true);
-
         document.addEventListener('blur', (e) => {
             const tag = e.target.tagName.toLowerCase();
             if (e.target === ultimoEnterTarget && Date.now() - ultimoEnterTime < 500) return;
-            
-            const tipo = e.target.type ? e.target.type.toLowerCase() : '';
-            const isCampoTexto = tag === 'textarea' || 
-                               (tag === 'input' && !['checkbox', 'radio', 'hidden', 'submit', 'button', 'file'].includes(tipo)) || 
-                               e.target.isContentEditable;
-
-            if (isCampoTexto && e.target.value) {
+            if ((tag === 'input' || tag === 'textarea' || e.target.isContentEditable) && e.target.value) {
                 processarEvento(e.target, 'preencher_campo', e.target.value);
             }
         }, true);
@@ -345,70 +302,70 @@ async def injetar_radar_event_driven(page):
 
 async def on_capturar_elemento(source, args):
     global _id_acao_global, _lock_id
-    
-    # 🟢 MUDANÇA CRÍTICA: O Lock agora abrange TODA a captura da imagem.
-    # Evita erros "Target Closed" se o utilizador clicar como um maluco no ecrã.
     async with _lock_id:
         _id_acao_global += 1
         meu_id_acao = _id_acao_global
 
+    try:
+        dados_json = await args.json_value()
+        dados      = json.loads(dados_json) if isinstance(dados_json, str) else dados_json
+        acao       = dados.get("acao", "clique")
+        label      = (dados["texto_encontrado"] or dados["tag"])[:40]
+        logger.info(f"[FOTO {meu_id_acao}] | {acao.upper()} | {label}")
+
+        screenshot_bytes = screenshot_b64 = None
+        vp_w, vp_h = 1920, 1080
+
         try:
-            dados_json = await args.json_value()
-            dados      = json.loads(dados_json) if isinstance(dados_json, str) else dados_json
-            acao       = dados.get("acao", "clique")
-            label      = (dados["texto_encontrado"] or dados["tag"])[:40]
-            logger.info(f"[FOTO {meu_id_acao}] | {acao.upper()} | {label}")
-
-            screenshot_bytes = screenshot_b64 = None
-            vp_w, vp_h = 1920, 1080
-
-            try:
-                frame = source.get("frame")
-                if frame:
-                    page_ref         = frame.page
-                    screenshot_bytes = await page_ref.screenshot(type="jpeg", quality=80, full_page=False)
-                    screenshot_b64   = base64.b64encode(screenshot_bytes).decode("utf-8")
-                    vp               = await page_ref.evaluate("() => ({w: window.innerWidth, h: window.innerHeight})")
-                    vp_w, vp_h       = vp["w"], vp["h"]
-            except PlaywrightError as e:
-                if "Target closed" in str(e) or "browser has been closed" in str(e):
-                    return
-                logger.warning(f"Falha ao tirar print: {e}")
-            except Exception as e:
-                logger.warning(f"Falha ao tirar print: {e}")
-
-            coords  = _extrair_coordenadas_relativas(dados.get("posicao_visual", ""), vp_w, vp_h)
-            analise = (
-                await _analisar_elemento_com_gemini(
-                    screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
-                ) if screenshot_bytes else {
-                    "intencao": f"{acao.capitalize()} em '{label}'",
-                    "descricao_visual": f"Elemento '{label}'",
-                    "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa",
-                }
-            )
-
-            iframe_id = dados.get("iframe", "Pagina Principal")
-            cliques_capturados.append({
-                "id_acao":            meu_id_acao,
-                "acao":               acao,
-                "intencao_semantica": analise["intencao"],
-                "elemento_alvo": {
-                    "descricao_visual":      analise["descricao_visual"],
-                    "contexto_tela":         analise["contexto_tela"],
-                    "tipo_elemento":         analise.get("tipo_elemento", "button"),
-                    "confianca_captura":     analise.get("confianca", "media"),
-                    "label_curto":           label,
-                    "coordenadas_relativas": coords,
-                    "seletor_hint":          dados["seletor"],
-                    "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
-                    "html_hint":             dados.get("html_snapshot", "")[:300],
-                    "screenshot_referencia": screenshot_b64,
-                },
-                "valor_input": dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else "",
-            })
+            frame = source.get("frame")
+            if frame:
+                page_ref         = frame.page
+                screenshot_bytes = await page_ref.screenshot(type="jpeg", quality=80, full_page=False)
+                screenshot_b64   = base64.b64encode(screenshot_bytes).decode("utf-8")
+                vp               = await page_ref.evaluate("() => ({w: window.innerWidth, h: window.innerHeight})")
+                vp_w, vp_h       = vp["w"], vp["h"]
+        except PlaywrightError as e:
+            if "Target closed" in str(e) or "browser has been closed" in str(e):
+                return
+            logger.warning(f"Falha ao tirar print: {e}")
         except Exception as e:
-            logger.error(f"Erro ao processar captura: {e}")
+            logger.warning(f"Falha ao tirar print: {e}")
+
+        coords  = _extrair_coordenadas_relativas(dados.get("posicao_visual", ""), vp_w, vp_h)
+        # Aviso quando coordenadas são zero — indica que getBoundingClientRect retornou vazio
+        if coords.get("x_pct", 0) == 0.5 and coords.get("y_pct", 0) == 0.5:
+            logger.warning(f"[FOTO {meu_id_acao}] Coordenadas padrão (0.5/0.5) — elemento pode ter sido capturado fora da viewport.")
+        analise = (
+            await _analisar_elemento_com_gemini(
+                screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
+            ) if screenshot_bytes else {
+                "intencao": f"{acao.capitalize()} em '{label}'",
+                "descricao_visual": f"Elemento '{label}'",
+                "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa",
+            }
+        )
+
+        iframe_id = dados.get("iframe", "Pagina Principal")
+        cliques_capturados.append({
+            "id_acao":            meu_id_acao,
+            "acao":               acao,
+            "intencao_semantica": analise["intencao"],
+            "elemento_alvo": {
+                "descricao_visual":      analise["descricao_visual"],
+                "contexto_tela":         analise["contexto_tela"],
+                "tipo_elemento":         analise.get("tipo_elemento", "button"),
+                "confianca_captura":     analise.get("confianca", "media"),
+                "label_curto":           label,
+                "coordenadas_relativas": coords,
+                "seletor_hint":          dados["seletor"],
+                "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
+                "html_hint":             dados.get("html_snapshot", "")[:300],
+                "screenshot_referencia": screenshot_b64,
+            },
+            "valor_input": dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else "",
+        })
+    except Exception as e:
+        logger.error(f"Erro ao processar captura: {e}")
 
 async def capturar_cliques_na_tela():
     global _lock_id
@@ -471,13 +428,41 @@ async def capturar_cliques_na_tela():
 
         try:
             await page.evaluate("""() => {
-                if (!document.body) return;
+                if (document.getElementById('aura-rec-toast')) return;
+                const style = document.createElement('style');
+                style.innerHTML = `
+                    @keyframes _aura_slide_in  { from { opacity:0; transform:translateX(-50%) translateY(-24px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+                    @keyframes _aura_slide_out { from { opacity:1; transform:translateX(-50%) translateY(0); } to { opacity:0; transform:translateX(-50%) translateY(-16px); } }
+                    @keyframes _aura_rec_pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.55;transform:scale(.88)} }
+                `;
+                document.head.appendChild(style);
+
                 const d = document.createElement('div');
-                d.innerHTML = 'GRAVACAO INICIADA!<br><span style="font-size:14px;font-weight:normal;">Clique de forma calma e firme.</span>';
-                d.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#e50914;color:white;padding:15px 30px;font-size:22px;font-weight:bold;font-family:sans-serif;z-index:999999;border-radius:8px;pointer-events:none;transition:opacity 1s ease;text-align:center;';
-                document.body.appendChild(d);
-                setTimeout(() => d.style.opacity='0', 4000);
-                setTimeout(() => d.remove(), 5000);
+                d.id = 'aura-rec-toast';
+                d.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="width:9px;height:9px;border-radius:50%;background:#ef4444;flex-shrink:0;animation:_aura_rec_pulse 1.4s ease infinite;box-shadow:0 0 0 3px rgba(239,68,68,.25);"></span>
+                        <div>
+                            <div style="font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#f1f5f9;">Mapeamento ativo</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Clique de forma calma e firme</div>
+                        </div>
+                    </div>`;
+                d.style.cssText = `
+                    position:fixed;top:20px;left:50%;transform:translateX(-50%);
+                    background:rgba(15,23,42,.92);
+                    backdrop-filter:blur(16px) saturate(180%);
+                    -webkit-backdrop-filter:blur(16px) saturate(180%);
+                    border:1px solid rgba(255,255,255,.1);
+                    border-radius:100px;
+                    padding:10px 20px;
+                    z-index:2147483647;
+                    pointer-events:none;
+                    box-shadow:0 8px 32px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.04);
+                    animation:_aura_slide_in .4s cubic-bezier(.16,1,.3,1) both;
+                    font-family:'Segoe UI',system-ui,sans-serif;
+                `;
+                document.documentElement.appendChild(d);
+                setTimeout(() => { d.style.animation='_aura_slide_out .4s ease forwards'; setTimeout(()=>d.remove(),400); }, 5000);
             }""")
         except Exception:
             pass
@@ -501,6 +486,16 @@ async def capturar_cliques_na_tela():
             pass
 
 def _validar_roteiro(roteiro: dict) -> tuple[bool, str]:
+    """
+    Portao de qualidade: verifica se o roteiro gerado tem estrutura minima valida
+    antes de permitir que o auto-rebuild aconteca.
+    
+    Retorna (aprovado: bool, motivo: str).
+    Criterios minimos:
+      - Tem campo 'passos' com pelo menos 2 passos (1 real + 1 conclusao)
+      - Pelo menos 50% dos passos tem acoes_tecnicas com seletor_hint preenchido
+      - Menos de 70% das acoes com confianca='baixa' (indicativo de captura ruim)
+    """
     passos = roteiro.get("passos", [])
     if len(passos) < 2:
         return False, f"Apenas {len(passos)} passo(s) gerado(s) — mapeamento insuficiente."
@@ -541,6 +536,7 @@ def _validar_roteiro(roteiro: dict) -> tuple[bool, str]:
         f"OK — {len(passos)} passos, {total_acoes} acoes, "
         f"{pct_seletor:.0%} com seletor, {pct_baixa_conf:.0%} baixa confianca."
     )
+
 
 def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, contexto_rag: str):
     if not gemini_client:
@@ -593,27 +589,24 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
         }
         for passo_ia in dados_da_ia.get("passos", []):
             passo_mesclado = {
-                "id_passo": passo_ia["id_passo"], "tipo_passo": passo_ia.get("tipo_passo", "operacao"),
-                "pedagogia": passo_ia.get("pedagogia", {"ancora": "", "tooltip_dap": ""}),
-                "alerta_instrutor": passo_ia.get("alerta_instrutor"),
-                "is_conclusao": passo_ia.get("is_conclusao", False), "acoes_tecnicas": [],
+                "id_passo":           passo_ia["id_passo"],
+                "tipo_passo":         passo_ia.get("tipo_passo", "operacao"),
+                "peso_narrativo":     passo_ia.get("peso_narrativo", 2),   # sistema de peso narrativo
+                "pause_sugerida":     passo_ia.get("pause_sugerida", 2.5), # pausa em segundos por peso
+                "pedagogia":          passo_ia.get("pedagogia", {"ancora": "", "tooltip_dap": ""}),
+                "alerta_instrutor":   passo_ia.get("alerta_instrutor"),
+                "is_conclusao":       passo_ia.get("is_conclusao", False),
+                "acoes_tecnicas":     [],
             }
-            
             micro_narracoes = passo_ia.get("micro_narracoes", [])
-            validacoes = passo_ia.get("validacoes_esperadas", [])
-            
             for i, id_tec in enumerate(passo_ia.get("ids_acoes_tecnicas", [])):
                 acao_bruta = next((item for item in log_mapeador if item["id_acao"] == id_tec), None)
                 if acao_bruta:
                     passo_mesclado["acoes_tecnicas"].append({
-                        "acao": acao_bruta["acao"], 
-                        "intencao_semantica": acao_bruta["intencao_semantica"],
-                        "elemento_alvo": acao_bruta["elemento_alvo"], 
-                        "valor_input": acao_bruta["valor_input"],
+                        "acao": acao_bruta["acao"], "intencao_semantica": acao_bruta["intencao_semantica"],
+                        "elemento_alvo": acao_bruta["elemento_alvo"], "valor_input": acao_bruta["valor_input"],
                         "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
-                        "validacao_esperada": validacoes[i] if i < len(validacoes) else None 
                     })
-                    
             if passo_mesclado["is_conclusao"]:
                 passo_mesclado["acoes_tecnicas"].append({"acao": "concluir_video"})
             roteiro_final["passos"].append(passo_mesclado)
@@ -624,27 +617,40 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
             json.dump(roteiro_final, f, indent=2, ensure_ascii=False)
         logger.info(f"Roteiro salvo em: {caminho_roteiro}")
 
+        # ── PORTÃO DE QUALIDADE + AUTO-REBUILD ───────────────────────────────
+        # O roteiro é SEMPRE salvo — o analista pode revisá-lo manualmente.
+        # O auto-rebuild só acontece se o roteiro passar no portão de qualidade,
+        # evitando que peças ruins contaminem o dicionário da IA.
         aprovado, motivo_validacao = _validar_roteiro(roteiro_final)
 
         if aprovado:
             logger.info(f"Portão de qualidade: APROVADO — {motivo_validacao}")
             try:
+                import threading
                 import lego_builder as _lb
-                resultado = _lb.construir_biblioteca()
-                if resultado.get("status") == "sucesso":
-                    novas = resultado.get("total_acoes_novas", 0)
-                    total = resultado.get("total_acoes_lidas", 0)
-                    print(
-                        f"AUTO-REBUILD: biblioteca atualizada — "
-                        f"{total} peças lidas, {novas} novas adicionadas.",
-                        flush=True,
-                    )
-                else:
-                    print(f"AUTO-REBUILD: aviso — {resultado.get('mensagem')}", flush=True)
 
+                def _rebuild_bg():
+                    try:
+                        resultado = _lb.construir_biblioteca()
+                        if resultado.get("status") == "sucesso":
+                            novas = resultado.get("total_acoes_novas", 0)
+                            total = resultado.get("total_acoes_lidas", 0)
+                            print(
+                                f"AUTO-REBUILD: biblioteca atualizada — "
+                                f"{total} peças lidas, {novas} novas adicionadas.",
+                                flush=True,
+                            )
+                        else:
+                            print(f"AUTO-REBUILD: aviso — {resultado.get('mensagem')}", flush=True)
+                    except Exception as e_rb:
+                        print(f"AUTO-REBUILD: erro (não crítico) — {e_rb}", flush=True)
+
+                threading.Thread(target=_rebuild_bg, daemon=True, name="lego-rebuild").start()
+                logger.info("Auto-rebuild da biblioteca iniciado em background.")
             except Exception as e:
-                logger.warning(f"Não foi possível atualizar a biblioteca: {e}")
+                logger.warning(f"Não foi possível iniciar auto-rebuild: {e}")
         else:
+            # Roteiro salvo mas não indexado automaticamente
             print(
                 f"\n⚠️  AUTO-REBUILD BLOQUEADO — roteiro salvo mas não indexado.\n"
                 f"   Motivo: {motivo_validacao}\n"
@@ -653,6 +659,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
                 flush=True,
             )
             logger.warning(f"Portão de qualidade: REPROVADO — {motivo_validacao}")
+        # ─────────────────────────────────────────────────────────────────────
 
         return caminho_roteiro
 

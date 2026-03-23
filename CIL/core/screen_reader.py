@@ -72,7 +72,7 @@ async def ler_tela(
         objetivo: O que o agente está tentando alcançar
         gemini_client: Cliente Gemini (None = só DOM)
     """
-    from screen_fingerprint import (
+    from core.screen_fingerprint import (
         identificar_tela, extrair_sinais, registrar_tela, listar_telas_conhecidas
     )
 

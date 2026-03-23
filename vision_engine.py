@@ -11,21 +11,34 @@ Camadas de Resiliência:
   2  Sniper semântico — 15+ seletores Playwright nativos (getByRole, getByLabel…)
   3  Seletor hint original (se não for frágil)
   4  Busca em todos os frames da página (sem depender do hint de iframe)
-  5  Gemini Vision — Agente Operacional Autônomo (Self-Healing Supremo)
+  5  Gemini Vision — screenshot atual + referência da gravação
   6  Coordenadas relativas da gravação (corrigidas por scroll)
 
 Correcoes aplicadas:
 
   [BUG-1] ALTO — gemini_client sem guard de chave ausente
+    ANTES: genai.Client(api_key=os.getenv("GOOGLE_API_KEY")) no nivel do modulo
+    → crash com AttributeError confuso se chave ausente.
+    AGORA: guard + warning; Vision retorna None graciosamente sem chave.
+
   [BUG-2] ALTO — Brain salva cand.descricao como seletor quando cand.seletor=""
+    ANTES: _registrar_sucesso_cache(intencao, seletor=cand.seletor or cand.descricao, ...)
+    Quando cand.seletor="" (candidatos get_by_role/label/placeholder/title), Python
+    avalia "" como falsy e passa cand.descricao — ex: "role=button name='Salvar'".
+    O filtro interno (_registrar_sucesso_cache) descarta por nao comecar com [/#/text=,
+    entao o Brain NUNCA aprende nada via Sniper para esses candidatos.
+    AGORA: passa seletor=cand.seletor or None (sem fallback pra descricao).
+
   [BUG-3] ALTO — Double _registrar_falha_cache quando Brain seletor falha
+    ANTES: quando cache.seletor existe e _tentar_candidato falha, a funcao chama
+    _registrar_falha_cache() no bloco do Brain (+1 imediato) E depois chama
+    novamente no final do orquestrador se TODAS as camadas falharam (+1 final).
+    Total: 2 falhas no mesmo ciclo → self-healing apaga memorias validas 2x mais rapido.
+    AGORA: flag brain_falhou controla o registro duplo; apenas uma falha e contada.
+
   [BUG-4] MÉDIO — _init_db() chamado no nivel do modulo sem try/except
-  [PERFORMANCE-1] — Adicionado slots=True em TentativaLocalizacao para economia de RAM.
-  [PERFORMANCE-2] — Ativado modo WAL no SQLite para alta concorrência sem bloqueio.
-  [PERFORMANCE-3] — DB queries migradas para threads assíncronas (asyncio.to_thread).
-  [FEATURE-1] — Delay de 1s injetado antes do Enter em todas as ações digitar_e_enter.
-  [FEATURE-2] — Self-Healing Visual com registo de cura (relatorio_auto_cura.json).
-  [FIX] "Efeito Espelho" — _tirar_foto_limpa() oculta legendas do robô antes do screenshot da IA.
+    ANTES: crash na importacao se o diretorio corrente nao tiver permissao de escrita.
+    AGORA: _init_db() com try/except; erro logado, modulo importa normalmente.
 """
 
 import asyncio
@@ -36,10 +49,8 @@ import logging
 import os
 import re
 import sqlite3
-import time
 from dataclasses import dataclass
 from typing import Optional
-from cursor_engine import mover_cursor_humanizado
 
 from dotenv import load_dotenv
 from google import genai
@@ -64,13 +75,10 @@ MAX_FALHAS_CACHE = 3
 
 
 def _init_db():
-    """Inicializa o banco de dados SQLite com otimizações de alta concorrência."""
+    """Inicializa o banco de dados SQLite. Erro de permissao e logado, nao propagado."""
+    # [BUG-4] FIX: try/except para nao crashar na importacao
     try:
         with sqlite3.connect(DB_PATH) as conn:
-            conn.execute("PRAGMA journal_mode = WAL;")
-            conn.execute("PRAGMA synchronous = NORMAL;")
-            conn.execute("PRAGMA cache_size = -64000;") 
-
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS memoria_semantica (
                     hash_intencao TEXT PRIMARY KEY,
@@ -140,7 +148,7 @@ def _registrar_sucesso_cache(
     chave      = _chave_cache(intencao)
     coords_str = json.dumps(coords) if coords else None
 
-    # Descarta seletores muito vagos
+    # Descarta seletores muito vagos (nao comecam com text=, [, #)
     if seletor and not seletor.startswith(("text=", "[", "#")):
         seletor = None
 
@@ -183,31 +191,10 @@ def _registrar_falha_cache(intencao: str):
         pass
 
 
-def _registrar_healing_necessario(intencao: str, acao_tec: dict):
-    try:
-        arquivo = "relatorio_auto_cura.json"
-        registro = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "intencao_original": intencao,
-            "label_procurado": acao_tec.get("elemento_alvo", {}).get("label_curto", "N/A"),
-            "status": "CURADO VIA IA VISUAL (SELF-HEALING)"
-        }
-        logs = []
-        if os.path.exists(arquivo):
-            with open(arquivo, "r", encoding="utf-8") as f:
-                logs = json.load(f)
-        logs.append(registro)
-        with open(arquivo, "w", encoding="utf-8") as f:
-            json.dump(logs, f, indent=2, ensure_ascii=False)
-        logger.warning(f"💊 OPERAÇÃO SALVA: A IA Visual encontrou e clicou no elemento '{intencao}'.")
-    except Exception as e:
-        pass
-
-
 # ──────────────────────────────────────────────────────────────
 # ESTRUTURAS DE CANDIDATOS (SNIPER)
 # ──────────────────────────────────────────────────────────────
-@dataclass(slots=True)
+@dataclass
 class TentativaLocalizacao:
     seletor: str
     iframe_hint: Optional[str] = None
@@ -240,6 +227,10 @@ def _e_seletor_fragil(seletor: str) -> bool:
 
 
 def _extrair_atributo(seletor: str, atributo: str) -> Optional[str]:
+    # FIX Bug #VIS-01: O primeiro regex tinha character class [\'\",]+
+    # que incluía vírgula e aspas como caracteres válidos DENTRO do valor —
+    # capturava lixo como 'aria-label="Salvar,"' com a vírgula incluída,
+    # gerando seletores quebrados. Mantido apenas o regex correto.
     match = re.search(rf"{atributo}=['\"]([^'\"]+)['\"]", seletor)
     return match.group(1) if match else None
 
@@ -394,42 +385,14 @@ async def _scroll_para_area_esperada(page: Page, coords_relativas: Optional[dict
 
 
 # ──────────────────────────────────────────────────────────────
-# HIGHLIGHT VISUAL E FOTO LIMPA
+# HIGHLIGHT VISUAL
 # ──────────────────────────────────────────────────────────────
-async def _tirar_foto_limpa(page: Page) -> bytes:
-    """
-    Tira um screenshot garantindo que cursores, legendas e marcações do robô
-    fiquem ocultos milissegundos antes da foto, evitando o 'Efeito Espelho' na IA.
-    """
-    esconder_fantasmas = """() => {
-        const elementos = document.querySelectorAll('#robo-cursor, #robo-legenda, .robo-tooltip, #senior-rec-widget, div[style*="z-index: 999999"]');
-        elementos.forEach(el => {
-            el.setAttribute('data-old-opacity', el.style.opacity || '');
-            el.style.opacity = '0';
-        });
-    }"""
-    
-    mostrar_fantasmas = """() => {
-        const elementos = document.querySelectorAll('#robo-cursor, #robo-legenda, .robo-tooltip, #senior-rec-widget, div[style*="z-index: 999999"]');
-        elementos.forEach(el => {
-            el.style.opacity = el.getAttribute('data-old-opacity') || '1';
-        });
-    }"""
-    
-    try:
-        await page.evaluate(esconder_fantasmas)
-        await asyncio.sleep(0.1) # Aguarda o DOM redesenhar
-        foto = await page.screenshot(type="jpeg", quality=60, full_page=False)
-        await page.evaluate(mostrar_fantasmas)
-        return foto
-    except Exception as e:
-        logger.warning(f"Falha ao camuflar UI do robô antes da foto: {e}")
-        return await page.screenshot(type="jpeg", quality=60, full_page=False)
-
 async def _highlight_elemento(locator, page) -> None:
     try:
         await locator.evaluate("""el => {
+            // Focamos APENAS no elemento exato, sem invadir o CSS dos pais
             const alvoVisual = el;
+            
             const oldOutline = alvoVisual.style.outline;
             const oldBoxShadow = alvoVisual.style.boxShadow;
             const oldBorderRadius = alvoVisual.style.borderRadius;
@@ -474,6 +437,7 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
     except Exception:
         pass
 
+    # 1. O Mouse viaja suavemente até ao centro exato
     try:
         box = await locator.bounding_box(timeout=1000)
         if box:
@@ -483,13 +447,16 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
             await page.evaluate("() => { const c = document.getElementById('robo-cursor'); if(c) c.style.opacity = '1'; }")
             await mover_cursor_humanizado(page, cx, cy)
             
-            if "checkbox" not in acao and "p-checkbox" not in str(locator):
-                await locator.hover(timeout=2000)
+            # 🟢 A PEÇA QUE FALTAVA: O Hover estabilizador
+            # Como o rato já está em (cx, cy), não há teleporte visual. 
+            # Ele apenas protege contra o bug de "Abre e logo Fecha" do Angular.
+            await locator.hover(timeout=2000)
     except Exception:
         pass
 
     await _highlight_elemento(locator, page)
 
+    # 2. AUTO-DETECT DE UPLOAD (A Mágica Cinematográfica)
     is_file = False
     try:
         html_do_botao = await locator.evaluate("el => el.outerHTML", timeout=1000)
@@ -550,6 +517,7 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
         await asyncio.sleep(0.5)
         return
 
+    # 3. CLIQUES PADRÃO E SEGUROS (Sem force=True)
     if acao == "duplo_clique":
         await locator.dblclick(timeout=3000)
     elif acao == "clique_direito":
@@ -561,7 +529,6 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
         await page.keyboard.press("Backspace")
         if valor:
             await page.keyboard.type(valor, delay=40)
-        await asyncio.sleep(1) 
         await page.keyboard.press("Enter")
     elif acao == "preencher_campo":
         await locator.click(timeout=2000)
@@ -639,7 +606,6 @@ async def _digitar_no_active_element(page: Page, acao: str, valor: str) -> bool:
         if valor:
             await page.keyboard.type(valor, delay=40)
         if acao == "digitar_e_enter":
-            await asyncio.sleep(1) 
             await page.keyboard.press("Enter")
         await asyncio.sleep(0.3)
         try:
@@ -701,17 +667,18 @@ async def _buscar_em_todos_os_frames(
 
 
 # ──────────────────────────────────────────────────────────────
-# GEMINI VISION (AGENTE OPERACIONAL) & COORDENADAS
+# GEMINI VISION & COORDENADAS
 # ──────────────────────────────────────────────────────────────
 async def _gemini_localizar_elemento(
     screenshot_atual: bytes, screenshot_ref_b64: Optional[str],
     descricao_visual: str, intencao: str, contexto_tela: str,
     viewport: dict, scroll_y: int,
 ) -> Optional[dict]:
+    # [BUG-1] FIX: retorna None graciosamente sem chave
     if not gemini_client:
         return None
 
-    logger.info("   [Vision] O DOM falhou. Acordando o Agente Operacional Visual...")
+    logger.info("   [Gemini Vision] Acionando a IA para reparar o script...")
     contents: list = []
 
     if screenshot_ref_b64:
@@ -724,25 +691,16 @@ async def _gemini_localizar_elemento(
 
     contents.append("IMAGEM 2 - TELA ATUAL (onde o elemento deve ser clicado agora):")
     contents.append(types.Part.from_bytes(data=screenshot_atual, mime_type="image/jpeg"))
-    
     contents.append(
-        f"Você é o 'Senior AI Operator', um agente autônomo de navegação visual.\n"
-        f"A tela possui uma resolução de {viewport['width']}px de largura por {viewport['height']}px de altura.\n"
-        f"O scroll vertical atual é {scroll_y}px.\n\n"
-        f"SUA MISSÃO:\n"
-        f"Localize as coordenadas exatas (centro do alvo) na IMAGEM 2 baseando-se nestes dados humanos:\n"
-        f"- O QUE o usuário quer fazer (Intenção): {intencao}\n"
-        f"- COMO era o botão (Descrição Visual): {descricao_visual}\n"
-        f"- ONDE ele deveria estar (Contexto): {contexto_tela}\n\n"
-        f"CUIDADO COM TABELAS E GRIDS: Se a intenção for 'habilitar algo para alguém' (ex: permissão), você DEVE cruzar a linha da pessoa com a coluna da permissão e retornar a coordenada EXATAMENTE em cima do Checkbox, e NÃO em cima do texto do nome.\n\n"
-        f"Responda ESTRITAMENTE em JSON com a seguinte estrutura. O campo 'raciocinio' é OBRIGATÓRIO para você explicar como encontrou o alvo antes de dar a coordenada.\n"
-        f"Exemplo Sucesso: {{\n"
-        f"  \"metodo\": \"coordenadas\",\n"
-        f"  \"raciocinio\": \"Encontrei a linha 'Adriana' e a coluna 'Download'. O checkbox na interseção está vazio. Coordenadas: X:845, Y:312\",\n"
-        f"  \"coordenadas\": {{\"x\": 845, \"y\": 312}},\n"
-        f"  \"confianca\": \"alta\"\n"
-        f"}}\n"
-        f"Exemplo Falha: {{\"metodo\": \"nao_encontrado\", \"raciocinio\": \"A Adriana não está visível\"}}"
+        f"Voce esta controlando um navegador com resolucao {viewport['width']}x{viewport['height']}px.\n"
+        f"O scroll vertical atual da pagina e {scroll_y}px.\n\n"
+        f"Localize este elemento na IMAGEM 2 (tela atual):\n"
+        f"- Intencao do usuario: {intencao}\n"
+        f"- Descricao visual: {descricao_visual}\n"
+        f"- Contexto da tela: {contexto_tela}\n\n"
+        f'Responda ESTRITAMENTE com JSON:\n'
+        f'{{"metodo": "coordenadas", "coordenadas": {{"x": 500, "y": 300}}, "confianca": "alta|media|baixa"}}\n'
+        f'ou {{"metodo": "nao_encontrado"}}'
     )
 
     try:
@@ -756,8 +714,7 @@ async def _gemini_localizar_elemento(
         if resultado.get("metodo") == "nao_encontrado":
             return None
         return resultado
-    except Exception as e:
-        logger.warning(f"   [Vision] Falha na analise visual: {e}")
+    except Exception:
         return None
 
 
@@ -782,18 +739,27 @@ def _parse_coords(coords):
 async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> bool:
     try:
         x, y = _parse_coords(coords)
-        if x <= 0 or y <= 0: raise ValueError(f"Coordenadas invalidas: x={x}, y={y}")
+        if x <= 0 or y <= 0:
+            raise ValueError(f"Coordenadas invalidas: x={x}, y={y}")
 
-        logger.info(f"   [Mouse] Disparando clique na coordenada da tela -> X:{x}, Y:{y}")
         await _highlight_coords(page, x, y)
-        
-        # 🟢 MUDANÇA CRÍTICA: O rato deve navegar até a visão da IA antes de clicar!
-        await mover_cursor_humanizado(page, x, y)
+        await asyncio.sleep(0.3)
 
-        if acao == "duplo_clique": await page.mouse.dblclick(x, y)
-        elif acao == "clique_direito": await page.mouse.click(x, y, button="right")
-        else: await page.mouse.click(x, y)
-        
+        if acao == "duplo_clique":
+            await page.mouse.dblclick(x, y)
+        elif acao == "clique_direito":
+            await page.mouse.click(x, y, button="right")
+        else:
+            await page.mouse.click(x, y)
+
+        if acao in ("digitar_e_enter", "preencher_campo") and valor:
+            await asyncio.sleep(0.3)
+            await page.keyboard.press("Control+A")
+            await page.keyboard.press("Backspace")
+            await page.keyboard.type(valor, delay=40)
+            if acao == "digitar_e_enter":
+                await page.keyboard.press("Enter")
+
         await _aguardar_estabilidade(page)
         return True
     except Exception as exc:
@@ -804,7 +770,10 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
 # ──────────────────────────────────────────────────────────────
 # ORQUESTRADOR PRINCIPAL (A MAQUINA DE DECISAO)
 # ──────────────────────────────────────────────────────────────
-async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
+async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
+    """
+    Roteia a tentativa pelas 7 camadas de fallback ate encontrar o elemento.
+    """
     alvo:     dict         = acao_tec.get("elemento_alvo", {})
     acao:     str          = acao_tec.get("acao", "clique")
     intencao: str          = acao_tec.get("intencao_semantica", "Acao na interface")
@@ -823,9 +792,9 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
     scroll_y = await _scroll_para_area_esperada(page, coords_relativas)
 
     # ── 0. BRAIN (Memoria SQLite de longo prazo) ──────────────────────────────
+    # [BUG-3] FIX: flag impede double-registration de falha
     brain_registrou_falha = False
-    cache = await asyncio.to_thread(_consultar_cache, intencao)
-    
+    cache = _consultar_cache(intencao)
     if cache:
         if cache.seletor:
             cand_cache = TentativaLocalizacao(
@@ -834,17 +803,17 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
                 descricao="brain knowledge",
             )
             if await _tentar_candidato(page, cand_cache, acao, valor):
-                await asyncio.to_thread(_registrar_sucesso_cache, intencao)
+                _registrar_sucesso_cache(intencao)
                 return True
             else:
-                await asyncio.to_thread(_registrar_falha_cache, intencao)
+                _registrar_falha_cache(intencao)
                 brain_registrou_falha = True
         elif cache.coords:
             if await _clicar_por_coordenadas(page, cache.coords, acao, valor):
-                await asyncio.to_thread(_registrar_sucesso_cache, intencao)
+                _registrar_sucesso_cache(intencao)
                 return True
             else:
-                await asyncio.to_thread(_registrar_falha_cache, intencao)
+                _registrar_falha_cache(intencao)
                 brain_registrou_falha = True
 
     # ── 1. Foco Nativo (exclusivo para inputs) ────────────────────────────────
@@ -874,7 +843,11 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
             logger.info("   [Senior X] Heuristica ativada para icone Home/Breadcrumb...")
             seletores_home = [
                 "li.ng-star-inserted:first-child", "p-breadcrumb li:first-child",
-                ".pi-home", ".fa-home", ".ph-house", "i[class*='home']", "span[class*='home']",
+                ".pi-home", ".fa-home", ".ph-house",
+                "i[class*='home']", "span[class*='home']",
+                # Variantes Senior X (fas fa-home, fas fa-house)
+                ".fas.fa-home", ".fas.fa-house", "span.fas.fa-home",
+                "[class*='fa-home']", "[class*='fa-house']",
             ]
             for sel in seletores_home:
                 try:
@@ -882,7 +855,7 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
                     if await loc.count() > 0 and await loc.is_visible():
                         await _executar_acao(loc, page, acao, valor)
                         logger.info("   [Heuristica] Icone Home atingido com sucesso.")
-                        await asyncio.to_thread(_registrar_sucesso_cache, intencao, seletor=sel, iframe=iframe_hint)
+                        _registrar_sucesso_cache(intencao, seletor=sel, iframe=iframe_hint)
                         return True
                 except Exception:
                     pass
@@ -896,8 +869,8 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
         for cand in candidatos:
             if await _tentar_candidato(page, cand, acao, valor):
                 logger.info(f"   [Sniper] Acerto: {cand.descricao}")
-                await asyncio.to_thread(
-                    _registrar_sucesso_cache,
+                # [BUG-2] FIX: passa apenas cand.seletor (None quando vazio, nao cand.descricao)
+                _registrar_sucesso_cache(
                     intencao,
                     seletor=cand.seletor if cand.seletor else None,
                     iframe=iframe_hint,
@@ -912,7 +885,7 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
         )
         if await _tentar_candidato(page, cand_hint, acao, valor):
             logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
-            await asyncio.to_thread(_registrar_sucesso_cache, intencao, seletor=seletor_hint, iframe=iframe_hint)
+            _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
             return True
 
     # ── 4. Busca Profunda em Todos os Frames ──────────────────────────────────
@@ -920,20 +893,19 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
         logger.info("   [Todos os Frames] Procurando o elemento em frames filhos...")
         frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
         if frame_url:
-            await asyncio.to_thread(_registrar_sucesso_cache, intencao, iframe=frame_url)
+            _registrar_sucesso_cache(intencao, iframe=frame_url)
             return True
 
-    # ── 5. Gemini Vision (Self-Healing Supremo / Autonomous UI) ───────────────
-    logger.info("   [Vision] DOM esgotado. Iniciando varredura visual...")
+    # ── 5. Gemini Vision (Self-Healing Supremo) ───────────────────────────────
+    logger.info("   [Vision] DOM esgotado. Acionando Gemini Visual...")
     try:
-        # 🟢 FOTO LIMPA
-        screenshot_atual = await _tirar_foto_limpa(page)
+        screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
     except Exception as exc:
         logger.warning(f"Screenshot falhou antes do Gemini: {exc}")
         screenshot_atual = None
 
     if screenshot_atual:
-        vp = page.viewport_size or {"width": 1920, "height": 1080}
+        vp       = page.viewport_size or {"width": 1920, "height": 1080}
         resultado = await _gemini_localizar_elemento(
             screenshot_atual=screenshot_atual,
             screenshot_ref_b64=alvo.get("screenshot_referencia"),
@@ -947,9 +919,8 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
             coords_ia = resultado.get("coordenadas")
             if coords_ia:
                 if await _clicar_por_coordenadas(page, coords_ia, acao, valor):
-                    logger.info("   [Vision] ✅ Clique por Inteligência Visual bem-sucedido!")
-                    await asyncio.to_thread(_registrar_sucesso_cache, intencao, coords=coords_ia)
-                    await asyncio.to_thread(_registrar_healing_necessario, intencao, acao_tec)
+                    logger.info("   [Vision] Clique por coordenadas da IA bem-sucedido.")
+                    _registrar_sucesso_cache(intencao, coords=coords_ia)
                     return True
 
     # ── 6. Fallback Cego (Coordenadas Relativas Originais) ───────────────────
@@ -966,103 +937,8 @@ async def _encontrar_e_clicar_core(page: Page, acao_tec: dict) -> bool:
             logger.warning(f"Fallback de coordenadas falhou: {exc}")
 
     # ── Falha Total ───────────────────────────────────────────────────────────
+    # [BUG-3] FIX: registra falha apenas se o Brain nao registrou uma neste ciclo
     if not brain_registrou_falha:
-        await asyncio.to_thread(_registrar_falha_cache, intencao)
+        _registrar_falha_cache(intencao)
     logger.error(f"   [FALHA TOTAL] Impossivel executar: '{intencao[:70]}'")
-    return False
-
-# ──────────────────────────────────────────────────────────────
-# AGENTIC UI - O VALIDADOR E RESGATE DE ESTADO
-# ──────────────────────────────────────────────────────────────
-async def _validar_estado_visual(page: Page, validacao: dict) -> bool:
-    if not gemini_client or not validacao or not validacao.get("alvo"):
-        return True
-        
-    logger.info(f"   [Validador] Conferindo o trabalho: '{validacao['alvo']}'")
-    await _aguardar_estabilidade(page, timeout_ms=3000)
-    
-    try:
-        # 🟢 FOTO LIMPA
-        screenshot_bytes = await _tirar_foto_limpa(page)
-        contents = [
-            "Você é o 'Senior AI Validator', um agente de garantia de qualidade (QA).",
-            "Sua missão é olhar para o ecrã atual e confirmar se a ação anterior foi bem-sucedida.",
-            f"A evidência visual esperada no ecrã é: {validacao['alvo']}",
-            "Responda ESTRITAMENTE em JSON com a seguinte estrutura:",
-            "{\"sucesso\": true ou false, \"motivo\": \"Explicação curta do que você viu\"}",
-            types.Part.from_bytes(data=screenshot_bytes, mime_type="image/jpeg")
-        ]
-        
-        resposta = await asyncio.to_thread(
-            gemini_client.models.generate_content,
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1),
-        )
-        resultado = json.loads(resposta.text)
-        
-        is_success = resultado.get("sucesso", True)
-        if is_success:
-            logger.info(f"   [Validador] ✅ SUCESSO CONFIRMADO: {resultado.get('motivo')}")
-        else:
-            logger.warning(f"   [Validador] ❌ FALHA DETECTADA: {resultado.get('motivo')}")
-            
-        return is_success
-        
-    except Exception as e:
-        logger.warning(f"   [Validador] Erro ao consultar a IA: {e}")
-        return True
-
-async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
-    validacao = acao_tec.get("validacao_esperada")
-    intencao = acao_tec.get("intencao_semantica", "Ação")
-    
-    sucesso_core = await _encontrar_e_clicar_core(page, acao_tec)
-    
-    if not sucesso_core:
-        return False
-        
-    if not validacao or not validacao.get("alvo"):
-        return True
-        
-    is_valido = await _validar_estado_visual(page, validacao)
-    
-    if is_valido:
-        return True
-        
-    await asyncio.to_thread(_registrar_falha_cache, intencao)
-        
-    logger.error(f"   [Agentic UI] O CSS mentiu! A validação de '{intencao[:30]}...' falhou!")
-    logger.info("   [Agentic UI] Ativando protocolo de resgate visual autônomo...")
-    
-    vp = page.viewport_size or {"width": 1920, "height": 1080}
-    scroll_y = int(await page.evaluate("() => window.scrollY") or 0)
-    
-    try:
-        # 🟢 FOTO LIMPA
-        screenshot_resgate = await _tirar_foto_limpa(page)
-        resultado_resgate = await _gemini_localizar_elemento(
-            screenshot_atual=screenshot_resgate,
-            screenshot_ref_b64=None,
-            descricao_visual=validacao["alvo"],
-            intencao=f"CORRIGIR FALHA: Tentar atingir o objetivo '{validacao['alvo']}'",
-            contexto_tela="Tentativa de resgate após o clique errado do DOM falhar a validação",
-            viewport=vp,
-            scroll_y=scroll_y
-        )
-        
-        if resultado_resgate and resultado_resgate.get("coordenadas"):
-            coords_ia = resultado_resgate["coordenadas"]
-            acao = acao_tec.get("acao", "clique")
-            valor = acao_tec.get("valor_input", "")
-            
-            if await _clicar_por_coordenadas(page, coords_ia, acao, valor):
-                logger.info("   [Agentic UI] 💊 Resgate Visual executado com sucesso!")
-                
-                if await _validar_estado_visual(page, validacao):
-                    await asyncio.to_thread(_registrar_healing_necessario, intencao + " (RESGATE)", acao_tec)
-                    return True
-    except Exception as e:
-        logger.warning(f"   [Agentic UI] Falha no resgate visual: {e}")
-        
     return False

@@ -950,6 +950,114 @@
     },
     "_source": "GED_-_Criar_nova_pasta.json"
   },
+  "o usuário quis acessar ou navegar para a funcionalidade ou módulo 'senior flow'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou navegar para a funcionalidade ou módulo 'Senior Flow'.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra lateral esquerda, exibido com um ícone de duas pessoas conectadas (ou compartilhamento) à esquerda e o texto 'Senior Flow' à direita, em um fundo escuro. Parece ser um item clicável que expande ou navega para uma seção específica.",
+      "contexto_tela": "O usuário está na tela principal do sistema 'Senior X Platform', que exibe 'Indicadores de Incorporação' no painel central e um menu de navegação vertical à esquerda.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0258,
+        "y_pct": 0.6639,
+        "w_pct": 0.05,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-oqv-c117=\"\" tabindex=\"-1\" class=\"menu-item btn\"><span _ngcontent-oqv-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-oqv-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu principal Senior Flow </span><i _ngcon"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o menu principal do Senior Flow...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O menu lateral se expande, mostrando as opções do Senior Flow"
+    },
+    "_source": "GED_-_Criação_de_pastas.json"
+  },
+  "acessar a funcionalidade de gerenciamento eletrônico de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a funcionalidade de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, representado por um ícone que se assemelha a documentos empilhados e o texto 'GED' ao lado.",
+      "contexto_tela": "O usuário está na tela principal do sistema Senior X, com uma barra de navegação vertical à esquerda que contém diversas opções de módulos ou funcionalidades.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0852,
+        "y_pct": 0.6038,
+        "w_pct": 0.0219,
+        "h_pct": 0.0316
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-oqv-c143=\"\" class=\"pull left menu-label\">GED</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando o módulo de Gestão Eletrônica de Documentos...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O submenu do GED é exibido, com opções como 'Documentos', 'Favoritos', etc."
+    },
+    "_source": "GED_-_Criação_de_pastas.json"
+  },
+  "acessar a seção de documentos do sistema para visualizar e gerenciar arquivos e pastas.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a seção de documentos do sistema para visualizar e gerenciar arquivos e pastas.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone na barra lateral esquerda que representa uma pilha de documentos, localizado abaixo do ícone de estrela (Favoritos) e acima do ícone de chapéu de formatura.",
+      "contexto_tela": "O usuário está na tela principal do sistema, que exibe uma lista de arquivos e pastas com detalhes como nome, autor, tamanho e data de modificação.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.1688,
+        "y_pct": 0.3331,
+        "w_pct": 0.2125,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-oqv-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e navegando para a seção de Documentos, onde tudo se organiza.",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela principal de documentos carrega, exibindo a lista de pastas e arquivos existentes"
+    },
+    "_source": "GED_-_Criação_de_pastas.json"
+  },
+  "o usuário quis criar uma nova pasta para organizar seus arquivos ou documentos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis criar uma nova pasta para organizar seus arquivos ou documentos.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um botão azul com um ícone de pasta e o texto 'Nova pasta' ao lado do botão 'Upload' na parte superior direita da tela.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos ou arquivos, onde pode visualizar uma lista de pastas e documentos, e realizar ações como buscar, gerenciar envelopes, ver pendências, favoritos, criar novas pastas e fazer upload.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Nova pasta",
+      "coordenadas_relativas": {
+        "x_pct": 0.8059,
+        "y_pct": 0.0481,
+        "w_pct": 0.0555,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='newFolderButton']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-xtd-c5=\"\" class=\"s-button-text ng-star-inserted\">Nova pasta</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...ativando a opção para criar uma nova pasta...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "Um modal ou formulário para 'Nova Pasta' é exibido na tela, solicitando o nome e outras informações"
+    },
+    "_source": "GED_-_Criação_de_pastas.json"
+  },
   "acessar ou navegar para a funcionalidade 'senior flow' dentro do sistema.": {
     "acao": "clique",
     "intencao_semantica": "Acessar ou navegar para a funcionalidade 'Senior Flow' dentro do sistema.",
@@ -5767,6 +5875,953 @@
     "micro_narracao": "...retornando à tela inicial do GED...",
     "seletor_css": "",
     "_source": "M02.A01_-_Upload_e_Publicação_de_Documen.json"
+  },
+  "o usuário quis acessar a funcionalidade 'senior flow' ou iniciar um fluxo de trabalho/compartilhamento relacionado a ela.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade 'Senior Flow' ou iniciar um fluxo de trabalho/compartilhamento relacionado a ela.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone cinza escuro na barra de navegação lateral esquerda, que se assemelha a dois círculos interligados por linhas. Ao lado dele, há um tooltip preto com o texto branco 'Senior Flow'.",
+      "contexto_tela": "O usuário está na tela de 'Indicadores de Incorporação', que exibe um dashboard com abas para diferentes índices (Distratos, M², VGV, Vendas). O ícone clicado faz parte do menu de navegação lateral esquerdo do sistema.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0254,
+        "y_pct": 0.6602,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-mpc-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o módulo principal do Senior Flow...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O menu lateral se expande, mostrando as opções do Senior Flow."
+    },
+    "_source": "Senior_Flow_-_GED_-_Abrindo_a_area_docum.json"
+  },
+  "o usuário quis acessar a funcionalidade ou o módulo de gerenciamento eletrônico de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade ou o módulo de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, representado por um ícone que se assemelha a uma pilha de documentos e o texto 'GED'.",
+      "contexto_tela": "O usuário está na tela principal ou em uma área de navegação geral do sistema Senior X, utilizando o menu lateral para acessar diferentes módulos ou aplicações.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.1688,
+        "y_pct": 0.6038,
+        "w_pct": 0.2125,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-mpc-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\"><span _ngcontent-mpc-c143=\"\"><em _ngcontent-mpc-c143=\"\" class=\"fa fa-lg pull-right fa-an"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando o módulo de Gerenciamento Eletrônico de Documentos...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A seção 'GED' é destacada no menu, e suas subopções são exibidas."
+    },
+    "_source": "Senior_Flow_-_GED_-_Abrindo_a_area_docum.json"
+  },
+  "o usuário clicou em 'documentos' para acessar a seção de documentos do sistema, provavelmente para visualizar, pesquisar ou gerenciar arquivos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou em 'Documentos' para acessar a seção de documentos do sistema, provavelmente para visualizar, pesquisar ou gerenciar arquivos.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Documentos' é um texto em cinza, parte de uma lista ou menu, localizado abaixo de 'Filtrar Dados' e parcialmente obscurecido por um modal de boas-vindas ('CONHEÇA A XPLATFORM').",
+      "contexto_tela": "O usuário está na tela principal do sistema GED (Gerenciamento Eletrônico de Documentos), que exibe uma lista de pastas (Financeiro, Logística, RH) e um cabeçalho com opções de navegação e upload. Um modal de tour de boas-vindas está sobreposto à tela.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.1688,
+        "y_pct": 0.3331,
+        "w_pct": 0.2125,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-mpc-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando a área de Documentos...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela de 'Documentos' é carregada, exibindo a lista de pastas e arquivos."
+    },
+    "_source": "Senior_Flow_-_GED_-_Abrindo_a_area_docum.json"
+  },
+  "desativar a exibição de um tour ou tutorial para futuras sessões.": {
+    "acao": "clique",
+    "intencao_semantica": "Desativar a exibição de um tour ou tutorial para futuras sessões.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "Um texto 'Não apresentar o tour novamente' que, ao ser clicado, provavelmente marca uma caixa de seleção associada.",
+      "contexto_tela": "O usuário está em uma tela de gerenciamento de documentos (GED), possivelmente após a conclusão de um tour inicial ou tutorial, e está optando por não vê-lo novamente.",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "Não apresentar o tour novamente",
+      "coordenadas_relativas": {
+        "x_pct": 0.2535,
+        "y_pct": 0.6188,
+        "w_pct": 0.1633,
+        "h_pct": 0.0316
+      },
+      "seletor_hint": "text=\"Não apresentar o tour novamente\"",
+      "iframe_hint": "ci",
+      "html_hint": "<label _ngcontent-vvv-c28=\"\" for=\"showTourCheckbox\"> Não apresentar o tour novamente </label>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...desativando o tour de boas-vindas...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O checkbox 'Não apresentar o tour novamente' é marcado."
+    },
+    "_source": "Senior_Flow_-_GED_-_Abrindo_a_area_docum.json"
+  },
+  "navegar para a funcionalidade ou módulo 'senior flow' dentro da plataforma.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a funcionalidade ou módulo 'Senior Flow' dentro da plataforma.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, destacado como ativo, com um ícone de fluxo ou compartilhamento e o texto 'Senior Flow'.",
+      "contexto_tela": "O usuário está na tela principal da plataforma Senior X, interagindo com o menu de navegação lateral.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0258,
+        "y_pct": 0.6639,
+        "w_pct": 0.05,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-pke-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-pke-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-pke-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o módulo principal do Senior Flow...",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Abrindo_pastas.json"
+  },
+  "o usuário quis navegar para a seção ou módulo 'ged' dentro do sistema, provavelmente para acessar funcionalidades relacionadas a gerenciamento eletrônico de documentos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou módulo 'GED' dentro do sistema, provavelmente para acessar funcionalidades relacionadas a gerenciamento eletrônico de documentos.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu de texto branco, localizado na barra lateral esquerda escura, abaixo de 'Senior Flow'. Ele possui um ícone de seta apontando para a esquerda ao seu lado, sugerindo que pode ser um item de menu expansível ou um link para uma subseção.",
+      "contexto_tela": "O usuário está na tela principal que exibe 'Indicadores de Incorporação' no cabeçalho. O clique ocorreu no menu de navegação lateral esquerdo do sistema Senior X Platform, que lista diferentes módulos e funcionalidades.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-pke-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-pke-c143=\"\"><em _ngcontent-pke-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando o módulo GED...",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Abrindo_pastas.json"
+  },
+  "acessar ou visualizar os documentos relacionados ao sistema senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar ou visualizar os documentos relacionados ao sistema Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone em uma barra de navegação vertical à esquerda da tela, que representa uma pilha de documentos ou papéis. Faz parte de uma lista de itens clicáveis que funcionam como atalhos para diferentes seções do sistema.",
+      "contexto_tela": "O usuário está na interface principal do sistema, que inclui uma barra de navegação lateral para acesso a diferentes módulos ou funcionalidades, e uma área de conteúdo principal vazia.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-pke-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...entrando na área de Documentos...",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Abrindo_pastas.json"
+  },
+  "o usuário quis acessar a seção ou módulo 'financeiro' do sistema, navegando para a tela correspondente.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "O usuário quis acessar a seção ou módulo 'Financeiro' do sistema, navegando para a tela correspondente.",
+    "elemento_alvo": {
+      "descricao_visual": "Um rótulo de texto 'Financeiro' que faz parte de um item de menu na barra lateral de navegação esquerda. Embora o texto não esteja visível no screenshot estático (devido à barra lateral estar recolhida), o elemento clicado possui este rótulo e está posicionado na parte inferior da barra lateral.",
+      "contexto_tela": "O usuário está na interface principal do sistema, que inclui uma barra lateral de navegação vertical à esquerda e uma área de conteúdo principal que exibe 'Filtrar Dados' e 'Documentos'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.1465,
+        "y_pct": 0.7391,
+        "w_pct": 0.0508,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-xpv-c34=\"\" id=\"itemTitle\">Financeiro</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo a pasta Financeiro...",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Abrindo_pastas.json"
+  },
+  "o usuário quis abrir a pasta 'contas a pagar' para visualizar seu conteúdo ou navegar para dentro dela.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "O usuário quis abrir a pasta 'Contas a pagar' para visualizar seu conteúdo ou navegar para dentro dela.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um texto 'Contas a pagar' precedido por um ícone de pasta amarela, listado em uma tabela de itens. O texto está sublinhado em vermelho na imagem, indicando a interação.",
+      "contexto_tela": "O usuário está na seção 'Financeiro' do sistema, visualizando uma lista de pastas e documentos. A navegação atual é 'Home > Financeiro'.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Contas a pagar",
+      "coordenadas_relativas": {
+        "x_pct": 0.1586,
+        "y_pct": 0.6744,
+        "w_pct": 0.075,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-xpv-c34=\"\" id=\"itemTitle\">Contas a pagar</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Abrindo_pastas.json"
+  },
+  "o usuário quis acessar ou iniciar um fluxo de trabalho ou funcionalidade relacionada a 'senior flow', possivelmente para compartilhar ou gerenciar os indicadores de incorporação.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou iniciar um fluxo de trabalho ou funcionalidade relacionada a 'Senior Flow', possivelmente para compartilhar ou gerenciar os indicadores de incorporação.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone cinza de compartilhamento (três círculos conectados por linhas) localizado na barra de navegação lateral esquerda. Ao lado dele, um tooltip preto com o texto 'Senior Flow' é exibido.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que exibe um dashboard com abas para diferentes índices ('Índice Distratos', 'Índice M²', 'Índice VGV', 'Índice Vendas') e uma barra de navegação lateral. Há também várias mensagens de erro na parte direita da tela.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0254,
+        "y_pct": 0.6602,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-tpa-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o menu principal do Senior Flow...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O menu lateral se expande mostrando as opções do Senior Flow."
+    },
+    "_source": "Senior_Flow_-_GED_-_Criando_pastas.json"
+  },
+  "o usuário quis acessar a seção de gerenciamento de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a seção de gerenciamento de documentos (GED) do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um ícone na barra de navegação lateral esquerda, que representa uma pilha de documentos ou um arquivo. Ele está posicionado abaixo de outros ícones de aplicativos e acima de um ícone de ferramentas.",
+      "contexto_tela": "O usuário está na tela principal do sistema, com uma barra de navegação lateral que exibe diversos ícones de aplicativos e funcionalidades.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.1688,
+        "y_pct": 0.6038,
+        "w_pct": 0.2125,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-tpa-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\"><span _ngcontent-tpa-c143=\"\"><em _ngcontent-tpa-c143=\"\" class=\"fa fa-lg pull-right fa-an"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando o módulo de Gestão Eletrônica de Documentos...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela do módulo GED é carregada, exibindo a área de documentos."
+    },
+    "_source": "Senior_Flow_-_GED_-_Criando_pastas.json"
+  },
+  "o usuário clicou no ícone para acessar ou iniciar o 'senior flow', que parece ser uma funcionalidade ou módulo do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no ícone para acessar ou iniciar o 'Senior Flow', que parece ser uma funcionalidade ou módulo do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "É um ícone branco estilizado de compartilhamento ou distribuição, localizado na barra de navegação vertical à esquerda. Ao lado do ícone, há um tooltip preto com o texto 'Senior Flow'.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que exibe um dashboard com diferentes abas de índices (Distratos, M², VGV, Vendas). O ícone clicado faz parte do menu de navegação principal do sistema, localizado na lateral esquerda.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0254,
+        "y_pct": 0.6602,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-pko-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o Senior Flow, a plataforma de gestão...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O menu lateral se expande mostrando as opções do Senior Flow"
+    },
+    "_source": "Senior_Flow_-_GED_-_Criando_uma_aula.json"
+  },
+  "acessar a funcionalidade de gerenciamento eletrônico de documentos (ged) para visualizar ou gerenciar documentos.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a funcionalidade de Gerenciamento Eletrônico de Documentos (GED) para visualizar ou gerenciar documentos.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, representado por um ícone de documentos empilhados e o texto 'GED' ao lado, que está parcialmente visível.",
+      "contexto_tela": "O usuário está na tela principal ou dashboard do sistema, com uma barra de navegação lateral esquerda visível e a área de conteúdo principal vazia, aguardando a seleção de uma funcionalidade.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0852,
+        "y_pct": 0.6038,
+        "w_pct": 0.0219,
+        "h_pct": 0.0316
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-pko-c143=\"\" class=\"pull left menu-label\">GED</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e agora, acessando o módulo GED, onde os documentos moram.",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela do módulo GED é carregada, exibindo a interface de gerenciamento de documentos"
+    },
+    "_source": "Senior_Flow_-_GED_-_Criando_uma_aula.json"
+  },
+  "o usuário quis acessar ou expandir as opções relacionadas a 'senior flow' dentro do menu de navegação lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou expandir as opções relacionadas a 'Senior Flow' dentro do menu de navegação lateral.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone que se assemelha a dois círculos conectados por linhas, posicionado à esquerda do texto 'Senior Flow' em um menu de navegação lateral escuro.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação' da plataforma Senior X, com o menu de navegação lateral expandido e visível.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0254,
+        "y_pct": 0.6602,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-gdm-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...expandindo as opções do Senior Flow no menu lateral...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O menu lateral se expande mostrando as opções do Senior Flow."
+    },
+    "_source": "Senior_Flow_-_GED_-_Navegando_nos_docume.json"
+  },
+  "navegar para a seção de gerenciamento eletrônico de documentos (ged) ou expandir suas opções no menu lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) ou expandir suas opções no menu lateral.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um texto em um menu lateral escuro, precedido por um ícone de seta para a esquerda, indicando que pode ser um item de menu pai ou uma opção de navegação. Ele não está destacado, mas as opções 'Documentos', 'Gerenciar Assuntos', 'Lixeira' e 'Tour' estão visíveis abaixo dele.",
+      "contexto_tela": "O usuário está na aplicação 'Senior Flow', visualizando o painel de 'Indicadores de Incorporação' e interagindo com o menu de navegação lateral esquerdo.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.1688,
+        "y_pct": 0.6038,
+        "w_pct": 0.2125,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-gdm-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\"><span _ngcontent-gdm-c143=\"\"><em _ngcontent-gdm-c143=\"\" class=\"fa fa-lg pull-right fa-an"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando o módulo de Gestão Eletrônica de Documentos...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela do módulo GED é carregada ou suas subopções são exibidas no menu."
+    },
+    "_source": "Senior_Flow_-_GED_-_Navegando_nos_docume.json"
+  },
+  "visualizar ou gerenciar os documentos listados na seção correspondente.": {
+    "acao": "clique",
+    "intencao_semantica": "Visualizar ou gerenciar os documentos listados na seção correspondente.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "Um rótulo de texto 'Documentos' em negrito, posicionado como um título para uma lista de arquivos e pastas, com um ícone de atualização ao lado.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos, que inclui funcionalidades para filtrar dados e interagir com uma lista de arquivos e pastas.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.1066,
+        "y_pct": 0.3331,
+        "w_pct": 0.0648,
+        "h_pct": 0.0316
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-gdm-c143=\"\" class=\"pull left menu-label\">Documentos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...entrando na seção Documentos, onde as pastas vivem...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A área de listagem de documentos e pastas é exibida na tela principal."
+    },
+    "_source": "Senior_Flow_-_GED_-_Navegando_nos_docume.json"
+  },
+  "o usuário quis navegar para a seção ou funcionalidade 'senior flow' dentro do sistema, utilizando o menu de navegação lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou funcionalidade 'Senior Flow' dentro do sistema, utilizando o menu de navegação lateral.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu em uma barra de navegação vertical à esquerda da tela. Ele exibe o texto 'Senior Flow' e possui um ícone de compartilhamento ou ramificação ao lado. O item parece estar ativo ou selecionado, indicado por um fundo escuro e texto claro.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que exibe um dashboard ou relatório. Há um menu de navegação lateral à esquerda, uma área de conteúdo principal com abas e um filtro global na parte inferior. Uma mensagem de erro também é visível no canto superior direito da tela.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0172,
+        "y_pct": 0.7593,
+        "w_pct": 0.0333,
+        "h_pct": 0.0497
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-vjh-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-vjh-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-vjh-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o Senior Flow...",
+    "_source": "Senior_Flow_-_GED_-_Pesquisando_um_arqui.json"
+  },
+  "navegar para a seção de gerenciamento de documentos do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção de gerenciamento de documentos do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, com o texto 'GED' e um ícone de pasta à esquerda. Parece ser um link clicável que leva a uma seção de documentos.",
+      "contexto_tela": "O usuário está na aplicação 'Senior Flow', visualizando 'Indicadores de Incorporação'. A navegação principal é feita através de um menu lateral esquerdo.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-vjh-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-vjh-c143=\"\"><em _ngcontent-vjh-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED...",
+    "_source": "Senior_Flow_-_GED_-_Pesquisando_um_arqui.json"
+  },
+  "o usuário quis acessar a seção ou funcionalidade de documentos do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a seção ou funcionalidade de documentos do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra lateral esquerda, representado por um ícone que se assemelha a uma pilha de documentos ou papéis, com um rótulo 'Documentos'.",
+      "contexto_tela": "O usuário está na tela principal do sistema Senior X, com um menu de navegação vertical à esquerda e uma área de conteúdo principal vazia.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-vjh-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...agora, a seção de Documentos.",
+    "_source": "Senior_Flow_-_GED_-_Pesquisando_um_arqui.json"
+  },
+  "o usuário deseja buscar por documentos específicos dentro do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário deseja buscar por documentos específicos dentro do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto com um ícone de lupa à esquerda e o placeholder 'Buscar documentos publicados...' dentro dele. Está localizado na parte superior central da tela, na barra de cabeçalho.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), onde pode visualizar e interagir com uma lista de documentos e pastas.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Buscar documentos publicados...",
+      "coordenadas_relativas": {
+        "x_pct": 0.2849,
+        "y_pct": 0.037,
+        "w_pct": 0.2656,
+        "h_pct": 0.0635
+      },
+      "seletor_hint": "[aria-label='Campo de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-loi-c11=\"\" aria-label=\"Campo de busca\" autocomplete=\"off\" formcontrolname=\"term\" id=\"search\" type=\"text\" placeholder=\"Buscar documentos publicados...\" class=\"ng-untouched ng-pristine ng-invalid\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "...no campo de busca...",
+    "_source": "Senior_Flow_-_GED_-_Pesquisando_um_arqui.json"
+  },
+  "buscar por documentos ou pastas relacionados a 'contas a pagar' dentro da lista de documentos.": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "Buscar por documentos ou pastas relacionados a 'Contas a pagar' dentro da lista de documentos.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto localizado na parte superior da área de conteúdo principal, com o rótulo 'Filtrar Dados' acima e o placeholder 'Buscar documentos publicados...' dentro do campo.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), visualizando uma lista de pastas e arquivos.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Contas a pagar",
+      "coordenadas_relativas": {
+        "x_pct": 0.2849,
+        "y_pct": 0.037,
+        "w_pct": 0.2656,
+        "h_pct": 0.0635
+      },
+      "seletor_hint": "[aria-label='Campo de busca']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-loi-c11=\"\" aria-label=\"Campo de busca\" autocomplete=\"off\" formcontrolname=\"term\" id=\"search\" type=\"text\" placeholder=\"Buscar documentos publicados...\" class=\"ng-untouched ng-dirty ng-valid\" style=\"\">"
+    },
+    "valor_input": "Contas a pagar",
+    "micro_narracao": "...e pronto, o resultado aparece.",
+    "_source": "Senior_Flow_-_GED_-_Pesquisando_um_arqui.json"
+  },
+  "abrir o item 'contas a pagar' para visualizar seu conteúdo ou navegar para dentro da pasta.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "Abrir o item 'Contas a pagar' para visualizar seu conteúdo ou navegar para dentro da pasta.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de lista com um ícone de pasta amarela à esquerda e o texto 'Contas a pagar' em preto. Abaixo dele, há um caminho 'Financeiro 2026 / Contas a pagar'. O item está realçado por uma borda vermelha.",
+      "contexto_tela": "O usuário está na tela de resultados de busca, especificamente para 'Contas a pagar'.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Contas a pagar",
+      "coordenadas_relativas": {
+        "x_pct": 0.2786,
+        "y_pct": 0.4529,
+        "w_pct": 0.399,
+        "h_pct": 0.0212
+      },
+      "seletor_hint": "text=\"Contas a pagar\"",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-loi-c34=\"\" class=\"file-name\" style=\"outline: red solid 2px;\"><span _ngcontent-loi-c34=\"\" id=\"itemTitle\" style=\"\">Contas a pagar</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, um duplo clique para abrir.",
+    "_source": "Senior_Flow_-_GED_-_Pesquisando_um_arqui.json"
+  },
+  "o usuário quis acessar a funcionalidade ou seção 'senior flow', que é um item do menu de navegação lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade ou seção 'Senior Flow', que é um item do menu de navegação lateral.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone branco estilizado que se assemelha a um símbolo de compartilhamento ou fluxo, localizado na barra de navegação lateral esquerda. Ao passar o mouse, exibe a tooltip 'Senior Flow'.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que apresenta abas para diferentes índices (Distratos, M², VGV, Vendas) e possui um menu de navegação lateral.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0254,
+        "y_pct": 0.6602,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-npn-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando o módulo principal do Senior Flow...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O menu lateral se expande, mostrando as opções do Senior Flow."
+    },
+    "_source": "Senior_Flow_-_GED_-_Renomeando_Pastas.json"
+  },
+  "o usuário quis acessar a funcionalidade de gestão eletrônica de documentos (ged) para visualizar ou gerenciar documentos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade de Gestão Eletrônica de Documentos (GED) para visualizar ou gerenciar documentos.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um ícone que representa uma pilha de documentos ou arquivos, localizado na barra de navegação vertical à esquerda da tela. Ele está posicionado abaixo de outros ícones como perfil, notificações, busca, favoritos, gráficos e capacete.",
+      "contexto_tela": "O usuário está na tela principal do sistema, com a barra de navegação lateral esquerda visível, que contém diversas opções de módulos ou funcionalidades.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.1688,
+        "y_pct": 0.6038,
+        "w_pct": 0.2125,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-npn-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\"><span _ngcontent-npn-c143=\"\"><em _ngcontent-npn-c143=\"\" class=\"fa fa-lg pull-right fa-an"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e agora, no coração da gestão de documentos, o GED...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela do módulo GED é carregada, exibindo as opções de documentos."
+    },
+    "_source": "Senior_Flow_-_GED_-_Renomeando_Pastas.json"
+  },
+  "acessar a funcionalidade ou módulo 'sign' do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a funcionalidade ou módulo 'SIGN' do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone branco estilizado, que se assemelha a um símbolo de compartilhamento ou um documento com uma seta, localizado na barra de navegação lateral esquerda, ao lado do texto 'SIGN'.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', visualizando um dashboard, e interagiu com o menu de navegação lateral esquerdo.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0223,
+        "y_pct": 0.6602,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-mlv-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o menu principal do Senior Flow...",
+    "_source": "Senior_Flow_-_GED_-_Teste20.json"
+  },
+  "o usuário clicou em 'ged' para navegar para a seção principal de gerenciamento eletrônico de documentos ou para expandir/recolher as opções relacionadas a ged no menu lateral.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou em 'GED' para navegar para a seção principal de Gerenciamento Eletrônico de Documentos ou para expandir/recolher as opções relacionadas a GED no menu lateral.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu de texto na barra lateral esquerda, com uma seta apontando para a esquerda ao lado do texto. Ele está localizado abaixo de 'Senior Flow' e acima de 'Documentos'.",
+      "contexto_tela": "O usuário está na plataforma Senior X, visualizando a tela de 'Indicadores de Incorporação', e interagindo com o menu de navegação lateral esquerdo.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-mlv-c143=\"\" class=\"pull left menu-label\">GED</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando o módulo GED...",
+    "_source": "Senior_Flow_-_GED_-_Teste20.json"
+  },
+  "o usuário quis acessar a seção ou funcionalidade relacionada a documentos no sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a seção ou funcionalidade relacionada a documentos no sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "É um item de menu na barra de navegação lateral esquerda, representado por um ícone de documentos empilhados ou um arquivo, com um rótulo de texto 'Documentos' ao lado. O ícone é branco sobre um fundo escuro da barra lateral.",
+      "contexto_tela": "O usuário está na tela principal ou em uma área de trabalho do sistema Senior X, com um menu de navegação vertical à esquerda.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-mlv-c143=\"\" class=\"pull left menu-label\">Documentos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...entrando na seção de Documentos...",
+    "_source": "Senior_Flow_-_GED_-_Teste20.json"
+  },
+  "o usuário quis navegar para a seção ou funcionalidade 'senior flow' dentro do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou funcionalidade 'Senior Flow' dentro do sistema.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, com o texto 'Senior Flow' em branco sobre um fundo escuro, e um ícone de seta apontando para a direita, indicando que pode ser um submenu ou uma navegação para uma nova página.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', que exibe diferentes abas de indicadores ('Índice Distratos', 'Índice M²', 'Índice VGV', 'Índice Vendas') e contém um menu de navegação lateral.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0258,
+        "y_pct": 0.6639,
+        "w_pct": 0.05,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-gal-c117=\"\" tabindex=\"-1\" class=\"menu-item btn\"><span _ngcontent-gal-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-gal-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu principal Senior Flow </span><i _ngcon"
+    },
+    "valor_input": "",
+    "micro_narracao": "...abrindo o menu principal do Senior Flow...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O menu lateral se expande, mostrando as opções do Senior Flow."
+    },
+    "_source": "Senior_Flow_-_GED_-_Teste_1.json"
+  },
+  "o usuário quis acessar a seção de gerenciamento eletrônico de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a seção de gerenciamento eletrônico de documentos (GED) do sistema.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu na barra lateral esquerda, posicionado abaixo de 'Senior Flow'. Ele possui um ícone de seta apontando para a esquerda ao lado do texto.",
+      "contexto_tela": "O usuário está na tela principal do sistema, que exibe 'Indicadores de Incorporação' no cabeçalho e uma barra de navegação lateral com diversas opções, incluindo 'Senior Flow' e 'GED'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.1688,
+        "y_pct": 0.6038,
+        "w_pct": 0.2125,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-gal-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\"><span _ngcontent-gal-c143=\"\"><em _ngcontent-gal-c143=\"\" class=\"fa fa-lg pull-right fa-an"
+    },
+    "valor_input": "",
+    "micro_narracao": "...acessando o módulo de Gestão Eletrônica de Documentos...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "As opções do GED são exibidas, com 'Documentos' visível."
+    },
+    "_source": "Senior_Flow_-_GED_-_Teste_1.json"
+  },
+  "o usuário quis visualizar ou atualizar a lista de documentos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis visualizar ou atualizar a lista de documentos.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Documentos' é um texto clicável com um ícone de atualização ao lado, funcionando como um cabeçalho de seção ou um item de menu dentro da área de conteúdo principal.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos (GED), que exibe uma lista de arquivos e pastas, com opções de filtragem e ações em lote.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.1688,
+        "y_pct": 0.3331,
+        "w_pct": 0.2125,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-gal-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e entrando na seção Documentos, onde as pastas vivem...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela de gerenciamento de documentos é carregada, exibindo pastas e arquivos."
+    },
+    "_source": "Senior_Flow_-_GED_-_Teste_1.json"
+  },
+  "o usuário clicou no elemento 'financeiro' para navegar para a pasta ou seção financeira, ou para visualizar o conteúdo relacionado a finanças.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no elemento 'Financeiro' para navegar para a pasta ou seção financeira, ou para visualizar o conteúdo relacionado a finanças.",
+    "pattern_detectado": "button_click",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Financeiro' é um texto em negrito, parte de um caminho de navegação (breadcrumb) 'Home > Financeiro', com um ícone de atualização ao lado. Ele está acima de uma lista de itens como 'Contas a pagar' e 'Contas a receber'.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), dentro da seção 'Financeiro', onde pode filtrar dados e visualizar uma lista de pastas ou documentos relacionados a finanças.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.1973,
+        "y_pct": 0.7391,
+        "w_pct": 0.0508,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-fbf-c34=\"\" id=\"itemTitle\">Financeiro</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionando a pasta 'Financeiro' para entrar...",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "O conteúdo da pasta 'Financeiro' é exibido na tela."
+    },
+    "_source": "Senior_Flow_-_GED_-_Teste_1.json"
+  },
+  "navegar para a funcionalidade 'sign' ou acessar suas opções, que parece estar relacionada a compartilhamento ou conexão.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a funcionalidade 'SIGN' ou acessar suas opções, que parece estar relacionada a compartilhamento ou conexão.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone branco em um fundo cinza escuro, localizado no menu de navegação lateral. O ícone representa dois retângulos sobrepostos conectados por linhas, similar a um símbolo de rede ou compartilhamento. Ele está associado ao texto 'SIGN' no menu.",
+      "contexto_tela": "O usuário está na tela principal do sistema 'Senior X Platform', visualizando o painel de 'Indicadores de Incorporação' e interagindo com o menu de navegação lateral esquerdo.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0223,
+        "y_pct": 0.6602,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-pvw-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o Senior Flow — nosso ponto de partida...",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste_Final.json"
+  },
+  "o usuário clicou no item 'ged' no menu lateral, indicando a intenção de navegar para a seção ou módulo de gestão eletrônica de documentos (ged) dentro do sistema senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no item 'GED' no menu lateral, indicando a intenção de navegar para a seção ou módulo de Gestão Eletrônica de Documentos (GED) dentro do sistema Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu de texto branco em um fundo cinza escuro, localizado na barra lateral esquerda. Ele possui um ícone de seta apontando para a esquerda ao seu lado esquerdo e está ligeiramente recuado em relação ao item 'Senior Flow' acima dele. Atualmente, ele está com um fundo cinza claro, indicando que é o item selecionado ou ativo, e abaixo dele há uma lista de subitens como 'Documentos', 'Gerenciar Assuntos', 'Lixeira' e 'Tour'.",
+      "contexto_tela": "O usuário está na tela principal intitulada 'Indicadores de Incorporação'. No lado esquerdo da tela, há um menu de navegação lateral. O clique ocorreu dentro deste menu, na seção 'Senior Flow', especificamente no item 'GED'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-pvw-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-pvw-c143=\"\"><em _ngcontent-pvw-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste_Final.json"
+  },
+  "acessar a seção de documentos do sistema para visualizar ou gerenciar arquivos.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a seção de documentos do sistema para visualizar ou gerenciar arquivos.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone que representa uma pilha de documentos, localizado na barra de navegação lateral esquerda. O ícone é branco sobre um fundo cinza escuro, posicionado entre o ícone de um trator e o ícone de ferramentas.",
+      "contexto_tela": "O usuário está na tela principal do sistema, com a barra de navegação lateral esquerda visível e o painel de conteúdo principal vazio, aguardando a seleção de uma funcionalidade. Há também um indicador 'MAPEAMENTO ATIVO' no canto inferior direito.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-pvw-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, a área de Documentos.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste_Final.json"
+  },
+  "confirmar ou definir o nome de uma pasta como 'aula 1'": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "Confirmar ou definir o nome de uma pasta como 'Aula 1'",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto editável exibindo 'Aula 1', localizado ao lado de um ícone de pasta amarela, na parte inferior de uma lista de documentos e pastas.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos, visualizando uma lista de arquivos e pastas.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Aula 1",
+      "coordenadas_relativas": {
+        "x_pct": 0.2398,
+        "y_pct": 0.8571,
+        "w_pct": 0.2375,
+        "h_pct": 0.0541
+      },
+      "seletor_hint": "[id='file_13']",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-roe-c34=\"\" class=\"file-name\" contenteditable=\"true\" style=\"\"><span _ngcontent-roe-c34=\"\" id=\"itemTitle\">Aula 1</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "Aula 1",
+    "micro_narracao": "",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste_Final.json"
+  },
+  "abrir o menu de contexto para interagir com a pasta 'aula 1'": {
+    "acao": "clique_direito",
+    "intencao_semantica": "Abrir o menu de contexto para interagir com a pasta 'Aula 1'",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de pasta amarela seguido pelo texto 'Aula 1', que está destacado, indicando que é o item selecionado ou o alvo da ação.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), que exibe uma lista de arquivos e pastas. A interface inclui opções como 'Gestão de Envelopes', 'Pendentes' e 'Upload'.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Aula 1",
+      "coordenadas_relativas": {
+        "x_pct": 0.1367,
+        "y_pct": 0.8504,
+        "w_pct": 0.0312,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-roe-c34=\"\" id=\"itemTitle\">Aula 1</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...na pasta 'Aula 1', um clique direito.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste_Final.json"
+  },
+  "clica no item excluir do menu de contexto que abriu": {
+    "acao": "clique",
+    "intencao_semantica": "Clica no item Excluir do menu de contexto que abriu",
+    "elemento_alvo": {
+      "descricao_visual": "",
+      "contexto_tela": "",
+      "tipo_elemento": "button",
+      "confianca_captura": "media",
+      "label_curto": "",
+      "coordenadas_relativas": {},
+      "seletor_hint": "",
+      "iframe_hint": null,
+      "html_hint": ""
+    },
+    "valor_input": "",
+    "micro_narracao": "Clicando em Excluir para deletar a pasta",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste_Final.json"
   },
   "acessar a funcionalidade 'senior flow'": {
     "acao": "clique",

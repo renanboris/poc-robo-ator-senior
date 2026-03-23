@@ -638,7 +638,7 @@ function injetarEstilosAura() {
         if (inputEl)  { inputEl.value = ''; inputEl.disabled = true; }
         if (btnEnviar) btnEnviar.disabled = true;
 
-        exibirBalaoAura("Estou a analisar a interface... Só um momento! 🔍", []);
+        exibirBalaoAura("Já estou analisando... Só um momento! 🔍", []);
 
         const extratoDOM = capturarDOMParaIA();
         const nomeReal   = descobrirNomeUsuario();
@@ -669,21 +669,22 @@ function injetarEstilosAura() {
 //
 // COMO FUNCIONA:
 //   1. AI responde com gps_passos[] no payload
-//   2. iniciarGPS(passos) cria o HUD e aponta para o Passo 1
-//   3. O HUD mostra tooltip_dap + spotlight no seletor do step
-//   4. Avanço por: clique no elemento alvo OU mudança de URL Angular
-//   5. Polling resiliente: tenta 6x a cada 400ms antes de desistir do spotlight
-//   6. "Pular" avança; "Sair" encerra o modo GPS
+//   2. iniciarGPS(passos) cria o HUD
+//   3. ATALHO INTELIGENTE: Verifica de trás para frente qual é o passo mais
+//      avançado que já está visível na tela e pula os anteriores (Resolve a "burrice").
+//   4. O HUD mostra tooltip_dap + spotlight no seletor do step
+//   5. Avanço por: clique do utilizador, mudança de URL ou Breadcrumb.
+//   6. Polling resiliente: 15 tentativas (6 segundos) para dar tempo aos menus do ERP.
 
 const _gps = {
     ativo: false,
     passos: [],
     idx: 0,
-    _listenerEl: null,    // listener de clique no elemento alvo atual
-    _pollingTimer: null,  // timer de retry para encontrar o elemento
-    _urlWatcher: null,    // MutationObserver de URL (Angular hash routing)
-    _domExitWatcher: null,// MutationObserver: detecta elemento saindo do DOM
-    _bcWatcher: null,     // MutationObserver: detecta mudança de breadcrumb
+    nomeAula: '', // 🟢 NOVO: Guarda o nome do guia para usar na comunicação
+    _listenerEl: null,
+    _pollingTimer: null,
+    _urlWatcher: null,
+    _bcWatcher: null,
 };
 
 // ─── HUD ──────────────────────────────────────────────────────────
@@ -734,11 +735,10 @@ function _atualizarHudGPS() {
     ).join('');
 }
 
-// ─── SPOTLIGHT GPS (persistente — não auto-remove) ─────────────────
-function _spotlightGPS(seletor, label) {
+// ─── SPOTLIGHT GPS (persistente) ──────────────────────────────────
+function _spotlightGPS(seletor) {
     document.getElementById('aura-sonar-highlight')?.remove();
     document.getElementById('aura-backdrop')?.remove();
-    document.getElementById('aura-gps-arrow')?.remove();
 
     if (!seletor) return null;
 
@@ -774,7 +774,7 @@ function _spotlightGPS(seletor, label) {
         // Borda neon verde GPS
         const hi = document.createElement('div');
         hi.id = 'aura-sonar-highlight';
-        hi.classList.add('gps-mode'); // classe para manter persistente
+        hi.classList.add('gps-mode');
         const top = rect.top + fTop + window.scrollY;
         const left = rect.left + fLeft + window.scrollX;
         hi.style.cssText = `
@@ -792,31 +792,19 @@ function _spotlightGPS(seletor, label) {
     return el;
 }
 
-// ─── POLLING: tenta encontrar elemento até 6x com 400ms entre tentativas ──
+// ─── POLLING RESILIENTE (15 tentativas = 6 segundos) ──────────────
 function _tentarSpotlightComRetry(seletor, tentativas = 0) {
     if (!_gps.ativo) return;
     clearTimeout(_gps._pollingTimer);
 
     const el = _spotlightGPS(seletor);
     if (el) {
-        // Sinal 1: clique direto (menus estáticos)
-        _gps._listenerEl = () => setTimeout(_avancarGPS, 150);
+        // Sinal 1: Clique do Usuário (Sinal mais seguro - resolve o Flash)
+        // Timeout de 800ms dá tempo para menus dropdown e modais do Angular abrirem
+        _gps._listenerEl = () => setTimeout(_avancarGPS, 800);
         el.addEventListener('click', _gps._listenerEl, { once: true });
 
-        // Sinal 2: elemento SAI do DOM (Angular SPA — mais confiável que click)
-        _gps._domExitWatcher?.disconnect();
-        let _exitThrottle = null;
-        _gps._domExitWatcher = new MutationObserver(() => {
-            if (!_gps.ativo || _exitThrottle) return;
-            if (!document.body.contains(el)) {
-                _gps._domExitWatcher.disconnect();
-                _gps._domExitWatcher = null;
-                _exitThrottle = setTimeout(() => setTimeout(_avancarGPS, 250), 50);
-            }
-        });
-        _gps._domExitWatcher.observe(document.body, { childList: true, subtree: true });
-
-        // Sinal 3: breadcrumb muda (toda navegação do Senior X atualiza ele)
+        // Sinal 2: Mudança de Breadcrumb (Toda navegação de módulo altera)
         const _bc = document.querySelector('p-breadcrumb, [class*="breadcrumb"]');
         if (_bc) {
             let _bcSnap = _bc.textContent || '';
@@ -824,21 +812,20 @@ function _tentarSpotlightComRetry(seletor, tentativas = 0) {
             _gps._bcWatcher = new MutationObserver(() => {
                 if (!_gps.ativo) { _gps._bcWatcher.disconnect(); return; }
                 const curr = _bc.textContent || '';
-                if (curr !== _bcSnap && curr.length > 0) {
-                    _gps._bcWatcher.disconnect();     _gps._bcWatcher      = null;
-                    _gps._domExitWatcher?.disconnect(); _gps._domExitWatcher = null;
-                    setTimeout(_avancarGPS, 300);
+                if (curr !== _bcSnap && curr.trim().length > 0) {
+                    _gps._bcWatcher.disconnect();
+                    _gps._bcWatcher = null;
+                    console.log("Aura GPS: Avanço via Breadcrumb");
+                    setTimeout(_avancarGPS, 1000); 
                 }
             });
             _gps._bcWatcher.observe(_bc, { childList: true, subtree: true, characterData: true });
         }
-
-    } else if (tentativas < 6) {
+    } else if (tentativas < 15) {
         _gps._pollingTimer = setTimeout(() =>
             _tentarSpotlightComRetry(seletor, tentativas + 1), 400
         );
     }
-    // Se não encontrar após 6 tentativas, exibe só o HUD sem spotlight (page changed or element hidden)
 }
 
 // ─── AVANÇAR PASSO ────────────────────────────────────────────────
@@ -848,13 +835,11 @@ function _avancarGPS() {
     document.getElementById('aura-sonar-highlight')?.remove();
     document.getElementById('aura-backdrop')?.remove();
     clearTimeout(_gps._pollingTimer);
-    _gps._domExitWatcher?.disconnect(); _gps._domExitWatcher = null;
-    _gps._bcWatcher?.disconnect();      _gps._bcWatcher      = null;
+    _gps._bcWatcher?.disconnect(); _gps._bcWatcher = null;
 
     _gps.idx++;
 
     if (_gps.idx >= _gps.passos.length) {
-        // Concluído!
         pararGPS(true);
         return;
     }
@@ -870,41 +855,65 @@ function _avancarGPS() {
 function iniciarGPS(passos, nomeAula) {
     if (!passos || passos.length === 0) return;
 
-    // Para qualquer GPS ativo antes de iniciar novo
     pararGPS();
-
     _gps.ativo  = true;
     _gps.passos = passos;
-    _gps.idx    = 0;
+    _gps.nomeAula = nomeAula || 'Guia Interativo'; // 🟢 Salva o contexto
+    
+    // 🟢 A MÁGICA: ATALHO INTELIGENTE (Busca Reversa)
+    let startingIndex = 0;
+    for (let i = passos.length - 1; i >= 0; i--) {
+        const passo = passos[i];
+        if (passo.seletor) {
+            try {
+                let match = encontrarElementoNaTela(passo.seletor);
+                if (match && match.elemento) {
+                    const rect = match.elemento.getBoundingClientRect();
+                    const style = window.getComputedStyle(match.elemento);
+                    if (rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                        startingIndex = i;
+                        console.log(`Aura GPS: Atalho Inteligente! O alvo do passo ${i+1} está visível. Pulando o resto.`);
+                        break;
+                    }
+                }
+            } catch(e) {}
+        }
+    }
+    
+    _gps.idx = startingIndex;
 
     _criarHudGPS();
     _atualizarHudGPS();
 
-    // Spotlight no primeiro elemento
-    const primeiro = passos[0];
-    if (primeiro.seletor) {
-        _tentarSpotlightComRetry(primeiro.seletor);
+    // 🟢 MUDANÇA: Comunicação Empática e Contextual!
+    if (startingIndex > 0) {
+        exibirBalaoAura(`Notei que você já começou o processo "${_gps.nomeAula}"! Para poupar o seu tempo, avancei o guia automaticamente para o Passo ${startingIndex + 1}. 🚀`, [
+            { label: '👍 Entendi', action: () => document.getElementById('aura-speech-bubble')?.classList.remove('active') }
+        ]);
+    } else {
+        document.getElementById('aura-speech-bubble')?.classList.remove('active');
     }
 
-    // Fecha a bubble da Aura para dar espaço ao GPS
-    document.getElementById('aura-speech-bubble')?.classList.remove('active');
+    const passoAtual = passos[_gps.idx];
+    if (passoAtual.seletor) {
+        _tentarSpotlightComRetry(passoAtual.seletor);
+    }
 
-    // ── Watcher de navegação Angular ──
-    // Observa mutações significativas no router-outlet (troca de view)
-    // E mudanças de URL via pushState/hashchange
+
+    // ── Watcher de URL (Avanço via Navegação SPA) ──
     let _lastUrl = window.location.href;
     _gps._urlWatcher = new MutationObserver(() => {
         if (!_gps.ativo) return;
         const current = window.location.href;
         if (current !== _lastUrl) {
             _lastUrl = current;
-            // URL mudou → aguarda Angular renderizar e avança
-            setTimeout(() => _avancarGPS(), 500);
+            console.log("Aura GPS: Avanço via URL alterada.");
+            setTimeout(() => _avancarGPS(), 1200); 
         }
     });
     _gps._urlWatcher.observe(document.body, { childList: true, subtree: true });
 
-    console.log(`Aura GPS: iniciado para "${nomeAula}" — ${passos.length} passos.`);
+    console.log(`Aura GPS: iniciado para "${nomeAula}" a partir do passo ${startingIndex + 1}.`);
 }
 
 // ─── PARAR GPS ────────────────────────────────────────────────────
@@ -912,9 +921,8 @@ function pararGPS(concluido = false) {
     _gps.ativo = false;
 
     clearTimeout(_gps._pollingTimer);
-    _gps._urlWatcher?.disconnect();     _gps._urlWatcher     = null;
-    _gps._domExitWatcher?.disconnect(); _gps._domExitWatcher = null;
-    _gps._bcWatcher?.disconnect();      _gps._bcWatcher      = null;
+    _gps._urlWatcher?.disconnect(); _gps._urlWatcher = null;
+    _gps._bcWatcher?.disconnect();  _gps._bcWatcher  = null;
 
     document.getElementById('aura-sonar-highlight')?.remove();
     document.getElementById('aura-backdrop')?.remove();
@@ -926,10 +934,11 @@ function pararGPS(concluido = false) {
     }
 
     if (concluido) {
-        // Mensagem de conclusão no bubble
         setTimeout(() => {
-            exibirBalaoAura('✅ Missão cumprida! Você completou todos os passos.', [
-                { label: '🔄 Repetir', action: () => iniciarGPS(_gps.passos, '') },
+            // 🟢 MUDANÇA: Celebração com o nome do guia
+            exibirBalaoAura(`✅ Missão cumprida! Você finalizou o guia "${_gps.nomeAula}" com sucesso.`, [
+                { label: '🔄 Repetir o Guia', action: () => iniciarGPS(_gps.passos, _gps.nomeAula) },
+                { label: '✕ Fechar', action: () => document.getElementById('aura-speech-bubble')?.classList.remove('active') }
             ]);
         }, 400);
     }

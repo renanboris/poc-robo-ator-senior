@@ -105,7 +105,8 @@ async def gerar_audio(
     texto_falado = re.sub(r"(?i)\becm_ged\b", "E C M gédi", texto)
     texto_falado = re.sub(r"\bGED\b", "gédi", texto_falado)
     texto_falado = re.sub(r"\bged\b", "gédi", texto_falado)
-    texto_falado = texto_falado.replace("Senior X", "Senior X")
+    texto_falado = re.sub(r"(?i)\bsenior\b", "Sênior", texto_falado)
+    texto_falado = texto_falado.replace("Sênior X", "Senior X")
 
     nome_pasta  = limpar_nome(id_treinamento)
     pasta_audio = os.path.join("audios_gerados", nome_pasta)
