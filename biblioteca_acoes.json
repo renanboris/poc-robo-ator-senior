@@ -6823,6 +6823,213 @@
     "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste_Final.json"
   },
+  "o usuário quis acessar uma funcionalidade relacionada a compartilhamento, conexão ou integração de dados/sistemas, possivelmente para gerenciar plugins ou conectores, dado o ícone e a proximidade com o item 'plugin (conector)' no menu.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar uma funcionalidade relacionada a compartilhamento, conexão ou integração de dados/sistemas, possivelmente para gerenciar plugins ou conectores, dado o ícone e a proximidade com o item 'Plugin (Conector)' no menu.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone estilizado de compartilhamento ou conexão, com dois quadrados sobrepostos e uma seta, exibido em vermelho sobre um fundo escuro na barra lateral de navegação, indicando que está ativo.",
+      "contexto_tela": "O usuário está na página 'Indicadores de Incorporação', e o clique ocorreu na barra lateral de navegação principal do sistema Senior X, que lista os módulos e funcionalidades disponíveis.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0148,
+        "y_pct": 0.7556,
+        "w_pct": 0.0109,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-cni-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "Primeiro, o Senior Flow...",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
+  "o usuário quis navegar para a seção ou módulo de gerenciamento eletrônico de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou módulo de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu de navegação lateral, exibido como um texto 'GED' com um ícone de seta para a esquerda ao lado, dentro de um painel escuro à esquerda da tela.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', com um menu de navegação lateral visível à esquerda.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-cni-c143=\"\" class=\"pull left menu-label\">GED</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o GED — Gestão Eletrônica de Documentos...",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
+  "acessar ou gerenciar documentos dentro do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar ou gerenciar documentos dentro do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, representado por um ícone que se assemelha a uma pilha de documentos ou um documento com linhas, e associado ao rótulo 'Documentos'.",
+      "contexto_tela": "O usuário está na tela principal do sistema Senior X, interagindo com a barra de navegação lateral.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-cni-c143=\"\" class=\"pull left menu-label\">Documentos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, a seção de Documentos.",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
+  "o usuário deseja criar uma nova pasta para organizar documentos ou arquivos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário deseja criar uma nova pasta para organizar documentos ou arquivos.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um botão azul claro com um ícone de pasta e o texto 'Nova pasta'. Ele está localizado na parte superior direita da tela, ao lado do botão 'Upload'.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), que exibe uma lista de pastas e arquivos, com opções para diversas ações como aprovar, enviar, revisar, mover, copiar, excluir e fazer upload.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Nova pasta",
+      "coordenadas_relativas": {
+        "x_pct": 0.8357,
+        "y_pct": 0.0339,
+        "w_pct": 0.037,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='newFolderButton']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-omp-c5=\"\" class=\"s-button-text ng-star-inserted\">Nova pasta</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "Nova Pasta — esse botão vai aparecer bastante...",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
+  "renomear um item (pasta ou arquivo) para 'a1' ou confirmar a criação de uma nova pasta com o nome 'a1'.": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "Renomear um item (pasta ou arquivo) para 'A1' ou confirmar a criação de uma nova pasta com o nome 'A1'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto editável com o valor 'A1', precedido por um ícone de pasta, e contornado por uma borda retangular vermelha, indicando que está em foco para edição.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), visualizando uma lista de pastas e arquivos.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "A1",
+      "coordenadas_relativas": {
+        "x_pct": 0.2349,
+        "y_pct": 0.8995,
+        "w_pct": 0.275,
+        "h_pct": 0.0381
+      },
+      "seletor_hint": "[id='file_9']",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-omp-c34=\"\" class=\"file-name\" contenteditable=\"true\" style=\"\">A1</h1>"
+    },
+    "valor_input": "A1",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
+  "renomear a pasta ou documento 'a2'.": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "Renomear a pasta ou documento 'A2'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto editável com o valor 'A2', precedido por um ícone de pasta amarela, e com uma borda vermelha indicando que está em modo de edição. Faz parte de uma lista de documentos.",
+      "contexto_tela": "O usuário está na tela principal de um sistema de gerenciamento de documentos (GED), visualizando uma lista de arquivos e pastas.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "A2",
+      "coordenadas_relativas": {
+        "x_pct": 0.2349,
+        "y_pct": 0.9661,
+        "w_pct": 0.275,
+        "h_pct": 0.0381
+      },
+      "seletor_hint": "[id='file_10']",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-omp-c34=\"\" class=\"file-name\" contenteditable=\"true\" style=\"\"><span _ngcontent-omp-c34=\"\" id=\"itemTitle\">A2</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "A2",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
+  "o usuário provavelmente quis abrir ou ativar o item de menu ou link identificado como 'a1'.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "O usuário provavelmente quis abrir ou ativar o item de menu ou link identificado como 'A1'.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento com o label 'A1' não é visível na captura de tela fornecida. Com base no HTML (<span id=\"itemTitle\">A1</span>), seria um rótulo de texto para um item, possivelmente dentro de uma lista ou menu.",
+      "contexto_tela": "O usuário está na tela 'Documentos'. A ação ocorreu na área da barra de navegação lateral esquerda, na parte inferior, onde geralmente se encontram links de navegação ou opções de sistema.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "baixa",
+      "label_curto": "A1",
+      "coordenadas_relativas": {
+        "x_pct": 0.1018,
+        "y_pct": 0.8878,
+        "w_pct": 0.0089,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-omp-c34=\"\" id=\"itemTitle\">A1</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "Entramos na pasta 'A1' com duplo toque...",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
+  "renomear a pasta ou documento 'a1.1'": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "Renomear a pasta ou documento 'A1.1'",
+    "elemento_alvo": {
+      "descricao_visual": "Um texto editável 'A1.1' que representa o nome de uma pasta, localizado em uma lista de arquivos e pastas.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de documentos (GED), visualizando o conteúdo da pasta 'A1'.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "A1.1",
+      "coordenadas_relativas": {
+        "x_pct": 0.2349,
+        "y_pct": 0.4243,
+        "w_pct": 0.275,
+        "h_pct": 0.0381
+      },
+      "seletor_hint": "[id='file_0']",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-omp-c34=\"\" class=\"file-name\" contenteditable=\"true\" style=\"\"><span _ngcontent-omp-c34=\"\" id=\"itemTitle\">A1.1</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "A1.1",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
+  "navegar para a tela inicial ou dashboard do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a tela inicial ou dashboard do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de casa (home) localizado no canto superior esquerdo da tela, ao lado do logo 'GED'.",
+      "contexto_tela": "O usuário está na tela de 'Documentos', que exibe uma lista de documentos e opções para gerenciamento, como 'Gestão de Envelopes', 'Pendentes', 'Favoritos', 'Nova pasta' e 'Upload'.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "span",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "span:nth-child(1)",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-menuitem-icon fas fa-home ng-star-inserted\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "O ícone de casa nos leva de volta.",
+    "_source": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta.json"
+  },
   "acessar a funcionalidade 'senior flow'": {
     "acao": "clique",
     "intencao_semantica": "Acessar a funcionalidade 'Senior Flow'",
