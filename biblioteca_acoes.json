@@ -6497,6 +6497,371 @@
     },
     "_source": "Senior_Flow_-_GED_-_Renomeando_Pastas.json"
   },
+  "acessar a funcionalidade ou módulo 'sign' da plataforma senior x.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a funcionalidade ou módulo 'SIGN' da plataforma Senior X.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone branco estilizado que representa compartilhamento ou conexão (duas esferas interligadas), localizado à esquerda do texto 'SIGN' em um menu de navegação vertical escuro.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação' e interagindo com o menu de navegação principal à esquerda da interface.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0223,
+        "y_pct": 0.6602,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-xli-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o Senior Flow...",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "o usuário quis navegar para a seção de gerenciamento eletrônico de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu de texto branco em um painel de navegação lateral escuro. Ele possui um ícone de seta apontando para a esquerda ao seu lado e está listado abaixo de 'Senior Flow', acima de 'Documentos'.",
+      "contexto_tela": "O usuário está na tela principal do sistema Senior X, visualizando o painel de navegação lateral esquerdo e a área de conteúdo principal que exibe 'Indicadores de Incorporação'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-xli-c143=\"\" class=\"pull left menu-label\">GED</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "o usuário quis acessar a funcionalidade para gerenciar assuntos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade para gerenciar assuntos.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento com o label 'Gerenciar Assuntos' não está visível no screenshot fornecido. O HTML indica que é um item de menu.",
+      "contexto_tela": "O usuário está na interface principal do sistema Senior X, que exibe uma barra de navegação vertical à esquerda com diversos ícones e um grande painel de conteúdo central que está vazio.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "media",
+      "label_curto": "Gerenciar Assuntos",
+      "coordenadas_relativas": {
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
+      },
+      "seletor_hint": "[aria-label='Gerenciar Assuntos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-xli-c143=\"\" class=\"pull left menu-label\">Gerenciar Assuntos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...agora, Gerenciar Assuntos.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "adicionar um novo assunto ao sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Adicionar um novo assunto ao sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão retangular azul com o texto branco 'Adicionar' no canto superior direito da área de conteúdo principal, acima da lista de assuntos.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de 'Assuntos', onde pode visualizar e adicionar novos assuntos. O clique no botão 'Adicionar' abriu um modal para 'NOVO ASSUNTO'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Adicionar",
+      "coordenadas_relativas": {
+        "x_pct": 0.8289,
+        "y_pct": 0.3699,
+        "w_pct": 0.0453,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='s-button-7']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-wds-c5=\"\" class=\"s-button-text ng-star-inserted\">Adicionar</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o botão Adicionar...",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "o usuário pretende inserir o nome de um novo assunto no campo de texto.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende inserir o nome de um novo assunto no campo de texto.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com borda vermelha, contendo o texto de exemplo 'Ex: Recursos Humanos', localizado dentro de um modal intitulado 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu um modal para criar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Ex: Recursos Humanos",
+      "coordenadas_relativas": {
+        "x_pct": 0.4609,
+        "y_pct": 0.4842,
+        "w_pct": 0.3172,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-wds-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ng-pristine ng-invalid ui-inputtext ui-corner-all ui-state-default ui-widget\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pattern=\"/^[\\"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "preencher o nome de um novo assunto para criação": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Preencher o nome de um novo assunto para criação",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto com o rótulo 'Nome *' e o valor 'Liderança' preenchido, destacado com uma borda vermelha, dentro de um pop-up intitulado 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu um modal para criar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Liderança",
+      "coordenadas_relativas": {
+        "x_pct": 0.4609,
+        "y_pct": 0.4842,
+        "w_pct": 0.3172,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-wds-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ng-valid ui-state-filled\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pa"
+    },
+    "valor_input": "Liderança",
+    "micro_narracao": "...e nomeamos o assunto como Liderança.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "salvar o novo assunto 'liderança' que foi inserido no campo de texto do formulário.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar o novo assunto 'Liderança' que foi inserido no campo de texto do formulário.",
+    "elemento_alvo": {
+      "descricao_visual": "Botão retangular azul com o texto 'Salvar' em branco, localizado no canto inferior direito do modal 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu um modal para criar um 'NOVO ASSUNTO'. Dentro deste modal, ele preencheu o nome do assunto como 'Liderança' e está prestes a salvá-lo.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar",
+      "coordenadas_relativas": {
+        "x_pct": 0.5992,
+        "y_pct": 0.6496,
+        "w_pct": 0.0312,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='s-button-5']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-wds-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...agora, é só Salvar.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "o usuário clicou no botão 'ações' para visualizar as opções disponíveis para o item 'financeiro', que incluem editar, gerenciar interessados ou excluir o item.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no botão 'Ações' para visualizar as opções disponíveis para o item 'Financeiro', que incluem editar, gerenciar interessados ou excluir o item.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um botão cinza claro com o texto 'Ações' e um ícone de seta para baixo. Ao ser clicado, ele exibe um menu suspenso branco com três opções: 'Editar' (com um ícone de lápis), 'Interessados' (com um ícone de pessoas) e 'Excluir' (com um ícone de lixeira).",
+      "contexto_tela": "O usuário está em uma tela de gerenciamento ou listagem de categorias/departamentos (como 'Contratos Jurídicos', 'Tecnologia', 'Financeiro'), onde cada item possui um botão de 'Ações' para operações específicas.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Ações",
+      "coordenadas_relativas": {
+        "x_pct": 0.8195,
+        "y_pct": 0.9218,
+        "w_pct": 0.0781,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[id='s-button-15']",
+      "iframe_hint": "ci",
+      "html_hint": "<button _ngcontent-wds-c5=\"\" showdelay=\"500\" tooltipposition=\"top\" class=\"s-button-auxiliary s-button-with-text s-button-size-default s-button-priority-default s-button-multiple s-button-active\" id=\"s-button-15\" type=\"button\"><!----><!----><span _ngcontent-wds-c5=\"\" class=\"s-button-text ng-star-inse"
+    },
+    "valor_input": "",
+    "micro_narracao": "...no botão Ações, para ver as opções...",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "o usuário clicou em 'interessados' para acessar a seção ou página dedicada a gerenciar os interessados relacionados ao assunto 'liderança'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou em 'Interessados' para acessar a seção ou página dedicada a gerenciar os interessados relacionados ao assunto 'Liderança'.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Interessados' é um texto azul, parte de um caminho de navegação (breadcrumb) que indica a localização atual do usuário no sistema. Ele é o último item do breadcrumb, seguindo 'Liderança'.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de interessados para o assunto 'Liderança'. A tela exibe um campo de busca para grupos e uma mensagem indicando que nenhum interessado foi adicionado ainda, com instruções para adicioná-los.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Interessados",
+      "coordenadas_relativas": {
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
+      },
+      "seletor_hint": "[id='interesteds']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-menuitem-text\">Interessados</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e acessamos os Interessados.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "salvar as alterações feitas na lista de interessados adicionados para a liderança.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar as alterações feitas na lista de interessados adicionados para a liderança.",
+    "elemento_alvo": {
+      "descricao_visual": "Botão azul com o texto 'Salvar' em branco, localizado na parte inferior direita da área de conteúdo principal.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de interessados para 'Liderança', acessada através do caminho 'Gerenciar assuntos > Liderança > Interessados'. A tela permite adicionar ou remover grupos de interessados.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar",
+      "coordenadas_relativas": {
+        "x_pct": 0.8324,
+        "y_pct": 0.9023,
+        "w_pct": 0.0633,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[id='s-button-16']",
+      "iframe_hint": "ci",
+      "html_hint": "<button _ngcontent-wds-c5=\"\" showdelay=\"500\" tooltipposition=\"top\" class=\"s-button-with-text s-button-size-default s-button-priority-primary\" id=\"s-button-16\" type=\"button\"><!----><!----><span _ngcontent-wds-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar</span><!----></button>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...depois de configurar, é só Salvar.",
+    "seletor_css": "",
+    "validacao_esperada": null,
+    "_source": "Senior_Flow_-_GED_-_Teste001.json"
+  },
+  "navegar para a seção ou módulo ged (gerenciamento eletrônico de documentos) dentro do sistema senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção ou módulo GED (Gerenciamento Eletrônico de Documentos) dentro do sistema Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, com o texto 'GED' em branco sobre um fundo cinza escuro, acompanhado de um ícone de seta para a esquerda e um ícone de estrela à direita. Está abaixo do título 'Senior Flow' e acima de 'Documentos'.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', com um menu de navegação lateral expandido para 'Senior Flow', onde 'GED' é uma das opções principais.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-mal-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-4\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-mal-c143=\"\"><em _ngcontent-mal-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED.",
+    "_source": "Senior_Flow_-_GED_-_Teste003.json"
+  },
+  "o usuário quis acessar a funcionalidade ou seção do sistema responsável por gerenciar assuntos ou tópicos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade ou seção do sistema responsável por gerenciar assuntos ou tópicos.",
+    "elemento_alvo": {
+      "descricao_visual": "Não visível na imagem. Com base no HTML fornecido, é um rótulo de texto ('Gerenciar Assuntos') que faz parte de um item de menu, provavelmente localizado na barra de navegação lateral esquerda.",
+      "contexto_tela": "O usuário está na interface principal do sistema Senior X, que apresenta uma barra de navegação lateral à esquerda e uma área de conteúdo central vazia. A ação indica uma tentativa de navegar para uma seção específica do sistema.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "media",
+      "label_curto": "Gerenciar Assuntos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Gerenciar Assuntos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-mal-c143=\"\" class=\"pull left menu-label\">Gerenciar Assuntos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, Gerenciar Assuntos.",
+    "_source": "Senior_Flow_-_GED_-_Teste003.json"
+  },
+  "o usuário está preenchendo o campo de nome para um novo assunto, provavelmente para criar um novo registro de assunto no sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário está preenchendo o campo de nome para um novo assunto, provavelmente para criar um novo registro de assunto no sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com borda vermelha, exibindo o placeholder 'Ex: Recursos Humanos' e rotulado como 'Nome *' acima dele. Este campo está dentro de um modal intitulado 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu um modal para adicionar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Ex: Recursos Humanos",
+      "coordenadas_relativas": {
+        "x_pct": 0.4734,
+        "y_pct": 0.4878,
+        "w_pct": 0.2115,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-dwy-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ng-pristine ng-invalid ui-inputtext ui-corner-all ui-state-default ui-widget\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pattern=\"/^[\\"
+    },
+    "valor_input": "",
+    "micro_narracao": "...no campo Nome...",
+    "_source": "Senior_Flow_-_GED_-_Teste003.json"
+  },
+  "preencher o nome para um novo assunto no formulário de criação.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Preencher o nome para um novo assunto no formulário de criação.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto com borda vermelha, indicando foco, contendo o texto 'UCS' e rotulado como 'Nome *'.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu um modal chamado 'NOVO ASSUNTO' para criar um novo item.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "UCS",
+      "coordenadas_relativas": {
+        "x_pct": 0.4734,
+        "y_pct": 0.4878,
+        "w_pct": 0.2115,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-dwy-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ng-valid ui-state-filled\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pa"
+    },
+    "valor_input": "UCS",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Teste003.json"
+  },
+  "salvar o novo assunto 'ucs' que foi inserido no campo de texto.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar o novo assunto 'UCS' que foi inserido no campo de texto.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão azul com o texto 'Salvar' em branco, localizado no canto inferior direito do modal 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu um modal para criar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar",
+      "coordenadas_relativas": {
+        "x_pct": 0.5656,
+        "y_pct": 0.6053,
+        "w_pct": 0.0208,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='s-button-5']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-dwy-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e pronto, é só Salvar.",
+    "_source": "Senior_Flow_-_GED_-_Teste003.json"
+  },
   "acessar a funcionalidade ou módulo 'sign' do sistema.": {
     "acao": "clique",
     "intencao_semantica": "Acessar a funcionalidade ou módulo 'SIGN' do sistema.",
@@ -6565,6 +6930,236 @@
     "valor_input": "",
     "micro_narracao": "...entrando na seção de Documentos...",
     "_source": "Senior_Flow_-_GED_-_Teste20.json"
+  },
+  "o usuário quis navegar para a seção ou módulo 'senior flow' do sistema, ou reconfirmar a seleção deste módulo, dado que ele já parece estar ativo.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou módulo 'Senior Flow' do sistema, ou reconfirmar a seleção deste módulo, dado que ele já parece estar ativo.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra de navegação lateral esquerda, com o texto 'Senior Flow' e um ícone associado. Ele está destacado, indicando que é o item de menu ativo ou selecionado no momento.",
+      "contexto_tela": "O usuário está na tela 'Indicadores de Incorporação', com um painel de navegação lateral visível que lista diferentes módulos ou funcionalidades do sistema Senior X, como 'Community', 'BPM', 'Bot Factory', entre outros.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0172,
+        "y_pct": 0.7593,
+        "w_pct": 0.0333,
+        "h_pct": 0.0497
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-yoq-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-yoq-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-yoq-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "...no menu lateral, o Senior Flow...",
+    "_source": "Senior_Flow_-_GED_-_Teste4.json"
+  },
+  "o usuário quis acessar a funcionalidade ou página para gerenciar assuntos dentro do sistema senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade ou página para gerenciar assuntos dentro do sistema Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item clicável localizado na barra de navegação lateral esquerda, provavelmente representado por um ícone, que ao ser clicado, direciona para a tela de gerenciamento de assuntos.",
+      "contexto_tela": "O usuário está na tela principal do sistema, interagindo com o menu de navegação lateral para acessar uma funcionalidade específica do módulo Senior Flow.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Gerenciar Assuntos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Gerenciar Assuntos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-yoq-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/subject?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Frecords%2Fsubject\" aria-"
+    },
+    "valor_input": "",
+    "micro_narracao": "...agora, Gerenciar Assuntos.",
+    "_source": "Senior_Flow_-_GED_-_Teste4.json"
+  },
+  "o usuário pretende inserir um novo nome de assunto no campo de texto.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende inserir um novo nome de assunto no campo de texto.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com o placeholder 'Ex: Recursos Humanos', realçado com uma borda vermelha, dentro de um pop-up intitulado 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de 'Assuntos' e abriu um diálogo para adicionar um novo assunto.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Ex: Recursos Humanos",
+      "coordenadas_relativas": {
+        "x_pct": 0.4734,
+        "y_pct": 0.4878,
+        "w_pct": 0.2115,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-htr-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ng-pristine ng-invalid ui-inputtext ui-corner-all ui-state-default ui-widget\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pattern=\"/^[\\"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o campo de nome...",
+    "_source": "Senior_Flow_-_GED_-_Teste4.json"
+  },
+  "preencher o nome do novo assunto com 'ucs' no campo de texto.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Preencher o nome do novo assunto com 'UCS' no campo de texto.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto dentro de um pop-up intitulado 'NOVO ASSUNTO', com o rótulo 'Nome *' e o valor 'UCS' preenchido, destacado por uma borda vermelha.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de 'Assuntos' e abriu um pop-up para criar um novo assunto.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "UCS",
+      "coordenadas_relativas": {
+        "x_pct": 0.4734,
+        "y_pct": 0.4878,
+        "w_pct": 0.2115,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-htr-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ng-valid ui-state-filled\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pa"
+    },
+    "valor_input": "UCS",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Teste4.json"
+  },
+  "salvar um novo assunto com o nome 'ucs'.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar um novo assunto com o nome 'UCS'.",
+    "elemento_alvo": {
+      "descricao_visual": "Botão azul com o texto 'Salvar' em branco, localizado no canto inferior direito de um modal de 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e interagindo com um modal para adicionar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar",
+      "coordenadas_relativas": {
+        "x_pct": 0.5656,
+        "y_pct": 0.6053,
+        "w_pct": 0.0208,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='s-button-5']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-htr-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e pronto, é só Salvar.",
+    "_source": "Senior_Flow_-_GED_-_Teste4.json"
+  },
+  "o usuário quis acessar ou ativar o menu principal 'senior flow' para navegar para a seção correspondente ou expandir suas opções.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou ativar o menu principal 'Senior Flow' para navegar para a seção correspondente ou expandir suas opções.",
+    "elemento_alvo": {
+      "descricao_visual": "É um item de menu na barra lateral de navegação esquerda, exibindo o texto 'Senior Flow' ao lado de um ícone que se assemelha a um símbolo de fluxo ou processo. O item está visualmente destacado, indicando que está ativo ou selecionado no momento.",
+      "contexto_tela": "O usuário está na tela principal do sistema Senior X, que exibe 'Indicadores de Incorporação' como título da página e possui uma barra de navegação lateral esquerda com diversas opções de módulos ou funcionalidades.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0172,
+        "y_pct": 0.7593,
+        "w_pct": 0.0333,
+        "h_pct": 0.0497
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-tcq-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-tcq-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-tcq-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "Primeiro, o menu Senior Flow...",
+    "_source": "Senior_Flow_-_GED_-_Teste_002.json"
+  },
+  "o usuário quis acessar a funcionalidade ou módulo de gerenciamento de assuntos dentro do sistema senior x, provavelmente para visualizar, criar ou editar assuntos.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar a funcionalidade ou módulo de gerenciamento de assuntos dentro do sistema Senior X, provavelmente para visualizar, criar ou editar assuntos.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu clicável com o texto 'Gerenciar Assuntos', localizado em uma barra de navegação vertical à esquerda da tela. O item é parte de uma lista de funcionalidades ou aplicações do sistema.",
+      "contexto_tela": "O usuário está na interface principal do sistema Senior X, navegando através de um menu lateral que oferece acesso a diferentes módulos e funcionalidades da plataforma.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Gerenciar Assuntos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Gerenciar Assuntos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-tcq-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/subject?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Frecords%2Fsubject\" aria-"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e aqui, Gerenciar Assuntos.",
+    "_source": "Senior_Flow_-_GED_-_Teste_002.json"
+  },
+  "o usuário clicou no campo de entrada para digitar o nome de um novo assunto.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no campo de entrada para digitar o nome de um novo assunto.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com uma borda vermelha, contendo o texto de exemplo 'Ex: Recursos Humanos', localizado dentro de uma janela modal intitulada 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de 'Assuntos' e abriu um modal para criar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Ex: Recursos Humanos",
+      "coordenadas_relativas": {
+        "x_pct": 0.4734,
+        "y_pct": 0.4878,
+        "w_pct": 0.2115,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-clp-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ng-pristine ng-invalid ui-inputtext ui-corner-all ui-state-default ui-widget\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pattern=\"/^[\\"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o campo de nome.",
+    "_source": "Senior_Flow_-_GED_-_Teste_002.json"
+  },
+  "preencher o campo de nome para criar um novo assunto com o valor 'treinamento ucs'.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Preencher o campo de nome para criar um novo assunto com o valor 'Treinamento UCS'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto dentro de um pop-up modal intitulado 'NOVO ASSUNTO', com o rótulo 'Nome *' acima dele. O campo está preenchido com o texto 'Treinamento UCS' e possui uma borda vermelha, indicando que está ativo ou é um campo obrigatório.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu um pop-up modal para adicionar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Treinamento UCS",
+      "coordenadas_relativas": {
+        "x_pct": 0.4734,
+        "y_pct": 0.4878,
+        "w_pct": 0.2115,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-clp-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled ng-valid\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pa"
+    },
+    "valor_input": "Treinamento UCS",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Teste_002.json"
+  },
+  "salvar o novo assunto 'treinamento ucs' que foi inserido no campo de texto.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar o novo assunto 'Treinamento UCS' que foi inserido no campo de texto.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão azul com o texto 'Salvar' em branco, localizado no canto inferior direito de uma janela modal intitulada 'NOVO ASSUNTO'.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu uma janela modal para adicionar um novo assunto.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar",
+      "coordenadas_relativas": {
+        "x_pct": 0.5656,
+        "y_pct": 0.6053,
+        "w_pct": 0.0208,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='s-button-5']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-clp-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e pronto, é só Salvar.",
+    "_source": "Senior_Flow_-_GED_-_Teste_002.json"
   },
   "o usuário quis navegar para a seção ou funcionalidade 'senior flow' dentro do sistema.": {
     "acao": "clique",
