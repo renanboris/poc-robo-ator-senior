@@ -1,0 +1,313 @@
+{
+  "mission_id": "GED_-_M01.A03_-_Permissoes_Locais_Restri",
+  "title": "GED - M01.A03 - Permissões Locais: Restringindo Acessos",
+  "module": "GED",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 375
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "O usuário quis navegar para a funcionalidade ou módulo 'Senior Flow' do sistema.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "Menu principal Senior Flow",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Senior Flow'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Navegar para a seção ou módulo 'GED' do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário quis acessar a seção de documentos do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "O usuario quis acessar um menu de contexto para realizar acoes relacionadas a pasta 'Financeiro', como renomear, mover, copiar ou excluir.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Financeiro",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "Gerenciar as permissões da pasta 'RH'.",
+      "validation": {
+        "target_selector": "text=\"Permissões\"",
+        "fallback_text": "Permissões",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Permissões'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "O usuário quis abrir o menu suspenso para selecionar um papel (role) ao qual atribuir permissões.",
+      "validation": {
+        "target_selector": "[id='selectPermissionType']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "O usuário clicou em 'Usuário' para selecionar o tipo de entidade para a qual deseja gerenciar permissões, indicando que ele quer atribuir permissões a usuários específicos em vez de papéis.",
+      "validation": {
+        "target_selector": "[aria-label='Usuário']",
+        "fallback_text": "Usuário",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Usuário'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "Buscar um usuário específico para gerenciar suas permissões na pasta 'Financeiro'.",
+      "validation": {
+        "target_selector": "[aria-label='Botão de busca']",
+        "fallback_text": "Buscar usuário...",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Buscar usuário...'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "Pesquisar por um usuário específico, provavelmente 'José', para gerenciar suas permissões na pasta 'Financeiro'.",
+      "validation": {
+        "target_selector": "[aria-label='Botão de busca']",
+        "fallback_text": "José",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'José'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "Selecionar o usuário 'José Carlos de Souza' para gerenciar suas permissões ou visualizar seu perfil dentro do contexto de aplicação de permissões.",
+      "validation": {
+        "target_selector": "text=\"José Carlos de Souza\"",
+        "fallback_text": "José Carlos de Souza",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'José Carlos de Souza'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 11,
+      "intent": "O usuário quis abrir o menu suspenso para selecionar um papel ou tipo de permissão.",
+      "validation": {
+        "target_selector": "[id='selectPermissionType']",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 12,
+      "intent": "O usuário quis alterar a forma de visualização ou atribuição de permissões, de 'Papel' (Role) para 'Usuário' (User), dentro do modal de gerenciamento de permissões.",
+      "validation": {
+        "target_selector": "[aria-label='Usuário']",
+        "fallback_text": "Usuário",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Usuário'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 13,
+      "intent": "Buscar por um usuário específico para gerenciar suas permissões na pasta.",
+      "validation": {
+        "target_selector": "[aria-label='Botão de busca']",
+        "fallback_text": "Buscar usuário...",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Buscar usuário...'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 14,
+      "intent": "O usuário está buscando por um usuário específico, 'Maria Eduarda', para gerenciar permissões ou realizar alguma ação relacionada a este usuário dentro do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Botão de busca']",
+        "fallback_text": "maria eduarda",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'maria eduarda'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 15,
+      "intent": "Selecionar a usuária 'Maria Eduarda Freitas' para aplicar permissões ou associá-la a alguma configuração.",
+      "validation": {
+        "target_selector": "text=\"Maria Eduarda Freitas\"",
+        "fallback_text": "Maria Eduarda Freitas",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Maria Eduarda Freitas'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 16,
+      "intent": "Habilitar a permissão de download para o usuário 'Maria Eduarda' na pasta 'Financeiro'.",
+      "validation": {
+        "target_selector": "[#meu-botao-quebrado-123]",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 17,
+      "intent": "Salvar as configurações de permissões para os papéis e usuários listados na janela modal.",
+      "validation": {
+        "target_selector": "[id='s-button-7']",
+        "fallback_text": "Salvar permissões",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar permissões'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 18,
+      "intent": "Navegar para dentro da pasta 'Financeiro' para visualizar seu conteúdo.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Financeiro",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 19,
+      "intent": "O usuário quis acessar a seção ou módulo 'Financeiro' do sistema.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Financeiro",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 20,
+      "intent": "Abrir menu de contexto para gerenciar a pasta 'Contas a pagar'",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Contas a pagar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Contas a pagar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 21,
+      "intent": "O usuário quis gerenciar ou visualizar as permissões da pasta 'Contas a pagar'.",
+      "validation": {
+        "target_selector": "text=\"Permissões\"",
+        "fallback_text": "Permissões",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Permissões'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 22,
+      "intent": "Aplicar as permissões configuradas para a pasta atual ('Contas a pagar') também para suas subpastas e arquivos internos.",
+      "validation": {
+        "target_selector": "[id='s-button-71']",
+        "fallback_text": "Aplicar permissões às subpastas e arquiv",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Aplicar permissões às subpastas e arquiv'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 23,
+      "intent": "O usuário quis confirmar a aplicação das permissões da pasta atual para as subpastas e arquivos de primeiro nível.",
+      "validation": {
+        "target_selector": "[id='s-button-73']",
+        "fallback_text": "Sim",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Sim'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 24,
+      "intent": "O usuário clicou no checkbox para ativar ou desativar a herança de permissões da pasta superior ('Financeiro') para a pasta atual ('Contas a pagar').",
+      "validation": {
+        "target_selector": ".ui-g:has-text(\"Permissões da pasta: Contas a pagar Usar\") .ui-chkbox .ui-chkbox-box",
+        "fallback_text": "Checkbox de: Permissões da pasta: Contas",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Checkbox de: Permissões da pasta: Contas'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 25,
+      "intent": "Salvar as permissões configuradas para os papéis e usuários na tela de gerenciamento de permissões.",
+      "validation": {
+        "target_selector": "[id='s-button-42']",
+        "fallback_text": "Salvar permissões",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar permissões'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "mission_id": "GED_-_Gerenciar_Assuntos",
+  "title": "GED - Gerenciar Assuntos",
+  "module": "GED",
+  "difficulty": "iniciante",
+  "scoring": {
+    "base_xp": 50,
+    "no_help_bonus": 25,
+    "time_target_sec": 45
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Acessar ou navegar para a funcionalidade 'Senior Flow' dentro do sistema.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Navegar para a seção principal ou página inicial do GED (Gerenciamento Eletrônico de Documentos) dentro do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "Gerenciar os assuntos do sistema, como visualizar, adicionar ou editar categorias de assuntos.",
+      "validation": {
+        "target_selector": "[aria-label='Gerenciar Assuntos']",
+        "fallback_text": "Gerenciar Assuntos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Gerenciar Assuntos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

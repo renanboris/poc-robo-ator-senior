@@ -1,0 +1,601 @@
+{
+  "mission_id": "GED_-_M01.A02_-_Construindo_a_Taxonomia",
+  "title": "GED - M01.A02 - Construindo a Taxonomia (Pastas)",
+  "module": "GED",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 735
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "O usuário clicou no item 'Senior Flow' no menu lateral para acessar as funcionalidades ou a página correspondente a este módulo.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "Menu principal Senior Flow",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Senior Flow'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário clicou no item 'Documentos' no menu lateral para acessar a seção de gerenciamento de documentos do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "Criar uma nova pasta no sistema de gerenciamento de documentos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "Renomear a pasta 'Financeiro'.",
+      "validation": {
+        "target_selector": "[id='file_0']",
+        "fallback_text": "Financeiro",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "O usuário deseja criar uma nova pasta para organizar documentos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Renomear a pasta 'Comercial'",
+      "validation": {
+        "target_selector": "[id='file_1']",
+        "fallback_text": "Comercial",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Comercial'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "Criar uma nova pasta para organizar documentos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "Renomear a pasta 'RH'.",
+      "validation": {
+        "target_selector": "[id='file_2']",
+        "fallback_text": "RH",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'RH'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "Criar uma nova pasta para organizar documentos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 11,
+      "intent": "Renomear a pasta 'Tecnologia' ou confirmar a edição do seu nome.",
+      "validation": {
+        "target_selector": "[id='file_3']",
+        "fallback_text": "Tecnologia",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Tecnologia'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 12,
+      "intent": "Abrir a pasta 'Financeiro' para visualizar seu conteúdo.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Financeiro",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 13,
+      "intent": "O usuário clicou no botão 'Nova pasta' com a intenção de criar uma nova pasta dentro do diretório atual, que é 'Financeiro'.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 14,
+      "intent": "Renomear ou confirmar o nome da pasta 'Contas a pagar'.",
+      "validation": {
+        "target_selector": "[id='file_0']",
+        "fallback_text": "Contas a pagar",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Contas a pagar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 15,
+      "intent": "Criar uma nova pasta no diretório atual.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 16,
+      "intent": "Renomear a pasta 'Contas a receber' ou confirmar a edição do seu nome.",
+      "validation": {
+        "target_selector": "[id='file_1']",
+        "fallback_text": "Contas a receber",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Contas a receber'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 17,
+      "intent": "Navegar para a página inicial ou dashboard do sistema.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 18,
+      "intent": "O usuário clicou na pasta 'Comercial' para abri-la ou selecioná-la, provavelmente para visualizar seu conteúdo ou realizar ações sobre ela.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Comercial",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Comercial'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 19,
+      "intent": "O usuário clicou no botão 'Nova pasta' com a intenção de criar uma nova pasta dentro do diretório atual, que é 'Comercial'.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 20,
+      "intent": "Renomear a pasta 'Marketing' ou confirmar o nome da pasta após edição.",
+      "validation": {
+        "target_selector": "[id='file_0']",
+        "fallback_text": "Marketing",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Marketing'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 21,
+      "intent": "O usuário quis criar uma nova pasta no sistema de gerenciamento de documentos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 22,
+      "intent": "Renomear a pasta 'Vendas' ou confirmar uma edição no nome da pasta.",
+      "validation": {
+        "target_selector": "[id='file_1']",
+        "fallback_text": "Vendas",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Vendas'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 23,
+      "intent": "Navegar para a página inicial ou o diretório raiz do sistema de gerenciamento de documentos.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 24,
+      "intent": "O usuário clicou no item 'RH' para visualizar os documentos ou subpastas contidos na pasta de Recursos Humanos.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "RH",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'RH'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 25,
+      "intent": "Criar uma nova pasta no sistema de gerenciamento de documentos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 26,
+      "intent": "Abrir a pasta 'Colaboradores'",
+      "validation": {
+        "target_selector": "[id='file_0']",
+        "fallback_text": "Colaboradores",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Colaboradores'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 27,
+      "intent": "Criar uma nova pasta no diretório atual.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 28,
+      "intent": "Renomear a pasta 'Benefícios'.",
+      "validation": {
+        "target_selector": "[id='file_1']",
+        "fallback_text": "Benefícios",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Benefícios'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 29,
+      "intent": "Navegar para a página inicial ou dashboard da seção de Recursos Humanos (RH).",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 30,
+      "intent": "O usuário clicou na pasta 'Comercial' para navegar para dentro dela e visualizar seu conteúdo.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Comercial",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Comercial'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 31,
+      "intent": "Abrir a pasta 'Marketing' para visualizar seu conteúdo ou selecionar a pasta para realizar ações.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Marketing",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Marketing'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 32,
+      "intent": "Criar uma nova pasta dentro do diretório atual.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 33,
+      "intent": "Renomear ou confirmar o nome de uma pasta para '2025'",
+      "validation": {
+        "target_selector": "[id='file_0']",
+        "fallback_text": "2025",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '2025'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 34,
+      "intent": "Criar uma nova pasta dentro do diretório atual ('Marketing').",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 35,
+      "intent": "Renomear a pasta '2026' ou confirmar o nome da pasta '2026'.",
+      "validation": {
+        "target_selector": "[id='file_1']",
+        "fallback_text": "2026",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '2026'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 36,
+      "intent": "Abrir a pasta '2026' para visualizar seu conteúdo.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "2026",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '2026'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 37,
+      "intent": "Criar uma nova pasta no diretório atual.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 38,
+      "intent": "Renomear a pasta '01 - Janeiro' ou confirmar a edição do seu nome.",
+      "validation": {
+        "target_selector": "[id='file_0']",
+        "fallback_text": "01 - Janeiro",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '01 - Janeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 39,
+      "intent": "Criar uma nova pasta no diretório atual.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 40,
+      "intent": "Renomear a pasta '02 - Fevereiro'.",
+      "validation": {
+        "target_selector": "[id='file_1']",
+        "fallback_text": "02 - Fevereiro",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '02 - Fevereiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 41,
+      "intent": "Criar uma nova pasta no diretório atual.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 42,
+      "intent": "Renomear a pasta '03 - Março'.",
+      "validation": {
+        "target_selector": "[id='file_2']",
+        "fallback_text": "03 - Março",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '03 - Março'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 43,
+      "intent": "Navegar para a pasta 'Marketing' para visualizar seu conteúdo ou gerenciar os arquivos dentro dela.",
+      "validation": {
+        "target_selector": "text=\"Marketing\"",
+        "fallback_text": "Marketing",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Marketing'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 44,
+      "intent": "Navegar para a pasta ou seção 'Comercial', que é o diretório pai da pasta atual 'Marketing'.",
+      "validation": {
+        "target_selector": "text=\"Comercial\"",
+        "fallback_text": "Comercial",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Comercial'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 45,
+      "intent": "Navegar para a página inicial ou dashboard do sistema.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 46,
+      "intent": "O usuário quis acessar o conteúdo da pasta 'RH'.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "RH",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'RH'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 47,
+      "intent": "Acessar as opções de contexto ou ações disponíveis para a pasta 'Colaboradores'.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Colaboradores",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Colaboradores'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 48,
+      "intent": "Adicionar a pasta 'Colaboradores' aos favoritos para acesso rápido.",
+      "validation": {
+        "target_selector": "text=\"Favoritar pasta\"",
+        "fallback_text": "Favoritar pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Favoritar pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 49,
+      "intent": "Visualizar ou acessar o conteúdo da pasta 'Colaboradores'.",
+      "validation": {
+        "target_selector": "text=\"Colaboradores\"",
+        "fallback_text": "Colaboradores",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Colaboradores'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

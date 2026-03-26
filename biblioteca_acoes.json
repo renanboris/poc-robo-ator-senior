@@ -6862,6 +6862,144 @@
     "micro_narracao": "...e pronto, é só Salvar.",
     "_source": "Senior_Flow_-_GED_-_Teste003.json"
   },
+  "acessar a funcionalidade de compartilhamento ou de fluxos (senior flow)": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a funcionalidade de compartilhamento ou de fluxos (Senior Flow)",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone que representa dois quadrados interligados por linhas, similar a um diagrama de fluxo ou compartilhamento. Está localizado na barra lateral esquerda, abaixo do ícone de carrinho de compras e acima do ícone de monitor, e parece estar selecionado ou ativo.",
+      "contexto_tela": "O usuário está na barra de navegação lateral esquerda do sistema Senior X Platform, que exibe diversas opções de menu e funcionalidades.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0223,
+        "y_pct": 0.6586,
+        "w_pct": 0.0164,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-ocg-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "Acessamos o Senior Flow, nosso centro de automação...",
+    "_source": "Senior_Flow_-_GED_-_Teste005.json"
+  },
+  "acessar o módulo ou funcionalidades relacionadas a gerenciamento eletrônico de documentos (ged).": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar o módulo ou funcionalidades relacionadas a Gerenciamento Eletrônico de Documentos (GED).",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, com o texto 'GED' em branco sobre um fundo cinza escuro. À esquerda do texto, há um ícone de seta apontando para a esquerda.",
+      "contexto_tela": "O usuário está na navegação principal do sistema Senior X, dentro do menu 'Senior Flow'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-ocg-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-ocg-c143=\"\"><em _ngcontent-ocg-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED — Gestão Eletrônica de Documentos.",
+    "_source": "Senior_Flow_-_GED_-_Teste005.json"
+  },
+  "o usuário quis navegar para a seção ou módulo do sistema responsável por gerenciar assuntos, tópicos ou itens relacionados a 'assuntos'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou módulo do sistema responsável por gerenciar assuntos, tópicos ou itens relacionados a 'Assuntos'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu textual com o rótulo 'Gerenciar Assuntos', localizado na barra de navegação lateral esquerda do sistema.",
+      "contexto_tela": "O usuário está na interface principal do sistema, possivelmente em uma tela inicial ou dashboard, com uma barra de navegação lateral visível para acessar diferentes funcionalidades.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Gerenciar Assuntos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Gerenciar Assuntos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-ocg-c143=\"\" class=\"pull left menu-label\">Gerenciar Assuntos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "Agora, em Gerenciar Assuntos, onde tudo se organiza.",
+    "_source": "Senior_Flow_-_GED_-_Teste005.json"
+  },
+  "preencher o campo de texto para inserir o nome de um novo assunto.": {
+    "acao": "clique",
+    "intencao_semantica": "Preencher o campo de texto para inserir o nome de um novo assunto.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto retangular com fundo branco e borda vermelha, contendo o texto de exemplo 'Ex: Recursos Humanos'. Acima dele, está o rótulo 'Nome *'.",
+      "contexto_tela": "O usuário está na tela 'Assuntos' e abriu um modal para criar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Ex: Recursos Humanos",
+      "coordenadas_relativas": {
+        "x_pct": 0.4609,
+        "y_pct": 0.4842,
+        "w_pct": 0.3172,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-ono-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ng-pristine ng-invalid ui-inputtext ui-corner-all ui-state-default ui-widget\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pattern=\"/^[\\"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Teste005.json"
+  },
+  "preencher o nome de um novo assunto para adicioná-lo ao sistema.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Preencher o nome de um novo assunto para adicioná-lo ao sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com o rótulo 'Nome *' e o valor 'ERP X' preenchido, localizado dentro de uma janela modal intitulada 'NOVO ASSUNTO'. O campo está realçado com uma borda vermelha.",
+      "contexto_tela": "O usuário está na tela de 'Assuntos' e abriu uma janela modal para criar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "ERP X",
+      "coordenadas_relativas": {
+        "x_pct": 0.4609,
+        "y_pct": 0.4842,
+        "w_pct": 0.3172,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='subjectName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-ono-c16=\"\" autocomplete=\"off\" class=\"input-subject ng-untouched ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled ng-valid\" formcontrolname=\"subjectName\" id=\"subjectName\" name=\"subjectName\" pinputtext=\"\" type=\"text\" placeholder=\"Ex: Recursos Humanos\" pa"
+    },
+    "valor_input": "ERP X",
+    "micro_narracao": "Aqui, o nome do nosso novo assunto: ERP X.",
+    "_source": "Senior_Flow_-_GED_-_Teste005.json"
+  },
+  "salvar um novo assunto com o nome 'erp x'.": {
+    "acao": "clique",
+    "intencao_semantica": "Salvar um novo assunto com o nome 'ERP X'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão azul com o texto 'Salvar' em branco, localizado na parte inferior direita de uma janela modal.",
+      "contexto_tela": "O usuário está na tela de gerenciamento de 'Assuntos' e abriu uma janela modal para adicionar um 'NOVO ASSUNTO'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Salvar",
+      "coordenadas_relativas": {
+        "x_pct": 0.5992,
+        "y_pct": 0.6496,
+        "w_pct": 0.0312,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='s-button-5']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-ono-c5=\"\" class=\"s-button-text ng-star-inserted\">Salvar</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "E Salvar, pra registrar o novo assunto.",
+    "_source": "Senior_Flow_-_GED_-_Teste005.json"
+  },
   "acessar a funcionalidade ou módulo 'sign' do sistema.": {
     "acao": "clique",
     "intencao_semantica": "Acessar a funcionalidade ou módulo 'SIGN' do sistema.",
@@ -6952,6 +7090,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...no menu lateral, o Senior Flow...",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste4.json"
   },
   "o usuário quis acessar a funcionalidade ou página para gerenciar assuntos dentro do sistema senior flow.": {
@@ -6964,10 +7104,10 @@
       "confianca_captura": "alta",
       "label_curto": "Gerenciar Assuntos",
       "coordenadas_relativas": {
-        "x_pct": 0.0,
-        "y_pct": 0.0,
-        "w_pct": 0.0,
-        "h_pct": 0.0
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
       },
       "seletor_hint": "[aria-label='Gerenciar Assuntos']",
       "iframe_hint": null,
@@ -6975,6 +7115,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...agora, Gerenciar Assuntos.",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste4.json"
   },
   "o usuário pretende inserir um novo nome de assunto no campo de texto.": {
@@ -6998,6 +7140,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...aqui, o campo de nome...",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste4.json"
   },
   "preencher o nome do novo assunto com 'ucs' no campo de texto.": {
@@ -7021,6 +7165,8 @@
     },
     "valor_input": "UCS",
     "micro_narracao": "",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste4.json"
   },
   "salvar um novo assunto com o nome 'ucs'.": {
@@ -7044,6 +7190,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...e pronto, é só Salvar.",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste4.json"
   },
   "o usuário quis acessar ou ativar o menu principal 'senior flow' para navegar para a seção correspondente ou expandir suas opções.": {

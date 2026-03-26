@@ -1,0 +1,361 @@
+{
+  "mission_id": "M02.A01_-_Upload_e_Publicacao_de_Documen",
+  "title": "M02.A01 - Upload e Publicação de Documentos",
+  "module": "Senior X",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 435
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Navegar para a funcionalidade ou módulo 'Senior Flow' dentro do sistema.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "Menu principal Senior Flow",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Senior Flow'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "O usuário quis acessar ou navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) dentro do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário quis acessar a seção de documentos ou visualizar os documentos disponíveis no sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "O usuário quis fazer upload de um arquivo para o sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Upload file']",
+        "fallback_text": "Campo de entrada",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Campo de entrada'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "Selecionar o documento 'Universidade Corporativa.pdf' para realizar uma ação posterior, como aprovar, enviar, revisar, mover, copiar, excluir ou baixar.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "O usuário quis visualizar ou editar as propriedades do documento 'Teste Arquivo Cript.xlsx'.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Teste Arquivo Cript.xlsx",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Teste Arquivo Cript.xlsx'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Definir ou selecionar o autor do documento a partir de uma lista de opções.",
+      "validation": {
+        "target_selector": "[id='authors']",
+        "fallback_text": "Definir autor",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Definir autor'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "O usuário quis editar ou selecionar o autor do documento, que é representado por um endereço de e-mail.",
+      "validation": {
+        "target_selector": "[id='p-highlighted-option']",
+        "fallback_text": "adriana@trn47827227.com.br",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'adriana@trn47827227.com.br'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "O usuário clicou no campo 'Assunto' para selecionar ou digitar o assunto do documento, que é 'Recurso Humano'.",
+      "validation": {
+        "target_selector": "[id='subjects']",
+        "fallback_text": "Ex.: Recurso Humanos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Ex.: Recurso Humanos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "Adicionar 'Financeiro' como assunto ou tag para o documento, confirmando a seleção ao digitar e pressionar Enter.",
+      "validation": {
+        "target_selector": "[id='subjects']",
+        "fallback_text": "Financeiro",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 11,
+      "intent": "O usuário quis inserir ou editar a descrição do documento.",
+      "validation": {
+        "target_selector": "[name='description']",
+        "fallback_text": "description",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'description'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 12,
+      "intent": "Preencher a descrição do documento com o texto 'Aditivo de Contrato 2026'.",
+      "validation": {
+        "target_selector": "[name='description']",
+        "fallback_text": "Aditivo de Contrato 2026",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Aditivo de Contrato 2026'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 13,
+      "intent": "O usuário pretende editar ou inserir a versão do documento.",
+      "validation": {
+        "target_selector": "[name='version']",
+        "fallback_text": "Ex.: 1.0.1 - versão final.",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Ex.: 1.0.1 - versão final.'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 14,
+      "intent": "Preencher o campo de versão do documento para identificar a revisão atual do arquivo.",
+      "validation": {
+        "target_selector": "[name='version']",
+        "fallback_text": "versao1",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'versao1'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 15,
+      "intent": "Selecionar uma data de expiração para o documento.",
+      "validation": {
+        "target_selector": "[name='expirationDate']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 16,
+      "intent": "O usuário quis abrir o seletor de data para definir a data de obsolescência do documento.",
+      "validation": {
+        "target_selector": "[name='deprecationDate']",
+        "fallback_text": "ui-btn",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'ui-btn'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 17,
+      "intent": "Salvar as propriedades do documento que foram preenchidas ou alteradas e continuar para uma próxima etapa ou fechar a edição.",
+      "validation": {
+        "target_selector": "[id='saveContinueButton']",
+        "fallback_text": "Salvar e continuar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar e continuar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 18,
+      "intent": "O usuário quis buscar por um papel ou usuário para definir permissões.",
+      "validation": {
+        "target_selector": "[name='search']",
+        "fallback_text": "search",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'search'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 19,
+      "intent": "Buscar e selecionar o papel ou grupo de usuários 'Financeiro' para configurar as permissões do documento.",
+      "validation": {
+        "target_selector": "[name='search']",
+        "fallback_text": "financeiro",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 20,
+      "intent": "Gerenciar ou visualizar as permissões do papel 'Financeiro' para o documento 'Aditivo de Contrato.pdf', que já foi adicionado.",
+      "validation": {
+        "target_selector": "text=\"Financeiro ADICIONADO\"",
+        "fallback_text": "Financeiro ADICIONADO",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro ADICIONADO'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 21,
+      "intent": "Conceder a permissão de 'Editar' para o usuário 'renan.kirsch@senior.com.br' no documento 'Aditivo de Contrato.pdf'.",
+      "validation": {
+        "target_selector": "[aria-label='Tabela de permissões'] span",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 22,
+      "intent": "Salvar as permissões configuradas para o documento e avançar para a próxima etapa do processo, que é a atribuição de um revisor.",
+      "validation": {
+        "target_selector": "[id='saveContinueButton']",
+        "fallback_text": "Salvar e continuar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar e continuar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 23,
+      "intent": "Habilitar a funcionalidade de atribuição de revisor para o documento.",
+      "validation": {
+        "target_selector": "[id='needReviewer']",
+        "fallback_text": "on",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'on'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 24,
+      "intent": "O usuário quis ativar ou desativar a funcionalidade de busca de usuário, ou alternar um modo de busca, ao interagir com o controle de alternância (toggle switch) associado à busca de revisores.",
+      "validation": {
+        "target_selector": "[id='needReviewerSwitch']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 25,
+      "intent": "O usuário quis buscar por um usuário para atribuir como revisor.",
+      "validation": {
+        "target_selector": "[name='search']",
+        "fallback_text": "search",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'search'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 26,
+      "intent": "Buscar um usuário específico, 'renan', para atribuí-lo como revisor do documento.",
+      "validation": {
+        "target_selector": "[name='search']",
+        "fallback_text": "renan",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'renan'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 27,
+      "intent": "Interagir com o revisor 'Renan Bóris Kirsch' que já foi adicionado, possivelmente para confirmar a seleção ou gerenciar sua atribuição.",
+      "validation": {
+        "target_selector": "text=\"Renan Bóris Kirsch ADICIONADO\"",
+        "fallback_text": "Renan Bóris Kirsch ADICIONADO",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Renan Bóris Kirsch ADICIONADO'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 28,
+      "intent": "O usuário deseja enviar o documento 'Aditivo de Contrato.pdf' para revisão, após ter selecionado um revisor.",
+      "validation": {
+        "target_selector": "[id='concludeButton']",
+        "fallback_text": "Enviar para revisão",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Enviar para revisão'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 29,
+      "intent": "Aprovar o documento 'Aditivo de Contrato.pdf' que está sendo visualizado.",
+      "validation": {
+        "target_selector": "[id='s-button-79']",
+        "fallback_text": "Aprovar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Aprovar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

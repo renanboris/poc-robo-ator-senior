@@ -1,0 +1,61 @@
+{
+  "mission_id": "GED_-_Criar_nova_pasta",
+  "title": "GED - Criar nova pasta",
+  "module": "GED",
+  "difficulty": "iniciante",
+  "scoring": {
+    "base_xp": 100,
+    "no_help_bonus": 50,
+    "time_target_sec": 60
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "O usuario quis acessar ou iniciar o fluxo 'Senior Flow', possivelmente para compartilhar informacoes ou gerenciar um processo especifico dentro do sistema.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "O usuário quis acessar a funcionalidade ou módulo de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário quis acessar a seção de documentos do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "O usuário quis criar uma nova pasta para organizar documentos ou arquivos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

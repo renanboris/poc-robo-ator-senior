@@ -1,0 +1,193 @@
+{
+  "mission_id": "GEDSIGN_-_M03.A01_-_Coleta_de_Assinatura",
+  "title": "GED/SIGN - M03.A01 - Coleta de Assinatura Eletrônica",
+  "module": "GED",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 225
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "O usuário quis navegar para a seção 'Senior Flow' do sistema, possivelmente para visualizar ou interagir com funcionalidades relacionadas a fluxos de trabalho ou compartilhamento, dado o ícone associado.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "Menu principal Senior Flow",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Senior Flow'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "Acessar a seção de documentos do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "O usuario quis acessar um menu de contexto para realizar acoes relacionadas ao documento 'Aditivo de Contrato.pdf', como visualizar, editar, mover, copiar ou excluir.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Aditivo de Contrato.pdf",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Aditivo de Contrato.pdf'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "O usuário quis iniciar ou configurar o processo de coleta de assinaturas para o documento selecionado, 'ADITIVO DE CONTRATO.PDF'.",
+      "validation": {
+        "target_selector": "text=\"Coletar assinaturas\"",
+        "fallback_text": "Coletar assinaturas",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Coletar assinaturas'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Adicionar um destinatário para assinar o documento.",
+      "validation": {
+        "target_selector": "[id='contactLookupDialog-autocomplete']",
+        "fallback_text": " ",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em ' '.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em ''.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "O usuário quis habilitar a coleta de geolocalização para as assinaturas do documento.",
+      "validation": {
+        "target_selector": "[id='collectGeolocation']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "O usuário pretende inserir instruções ou um texto explicativo para os assinantes do documento 'Aditivo de Contrato.pdf'.",
+      "validation": {
+        "target_selector": "[name='instructions']",
+        "fallback_text": "Preencha com instruções para os assinant",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Preencha com instruções para os assinant'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "O usuário quis fornecer instruções para os assinantes do documento 'ADITIVO DE CONTRATO.PDF'.",
+      "validation": {
+        "target_selector": "[name='instructions']",
+        "fallback_text": "Favor conferir e assinar",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Favor conferir e assinar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 11,
+      "intent": "O usuário quis iniciar o processo de coleta de assinaturas para o documento 'ADITIVO DE CONTRATO.PDF', enviando-o para os destinatários selecionados.",
+      "validation": {
+        "target_selector": "[id='sendSign']",
+        "fallback_text": "Enviar para assinatura",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Enviar para assinatura'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 12,
+      "intent": "Visualizar o status ou detalhes das assinaturas do documento 'Aditivo de Contrato.pdf'.",
+      "validation": {
+        "target_selector": "[id='signatureStatus']",
+        "fallback_text": "em",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'em'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 13,
+      "intent": "Enviar um e-mail para o signatário ou visualizar detalhes da comunicação por e-mail relacionada à assinatura do documento.",
+      "validation": {
+        "target_selector": "[id='s-button-44']",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 14,
+      "intent": "Copiar o link de acesso ou acompanhamento da assinatura do documento.",
+      "validation": {
+        "target_selector": "[id='s-button-45']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 15,
+      "intent": "Remover o filtro ou tag 'ACOMPANHAR ASSINATURAS'.",
+      "validation": {
+        "target_selector": "[id='signatoriesList']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

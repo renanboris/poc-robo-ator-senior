@@ -1,0 +1,97 @@
+{
+  "mission_id": "Senior_Flow_-_GED_-_Teste_Final",
+  "title": "Senior Flow - GED - Teste Final",
+  "module": "Senior Flow",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 100,
+    "no_help_bonus": 50,
+    "time_target_sec": 105
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Navegar para a funcionalidade 'SIGN' ou acessar suas opções, que parece estar relacionada a compartilhamento ou conexão.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "O usuário clicou no item 'GED' no menu lateral, indicando a intenção de navegar para a seção ou módulo de Gestão Eletrônica de Documentos (GED) dentro do sistema Senior Flow.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "Acessar a seção de documentos do sistema para visualizar ou gerenciar arquivos.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "Criar uma nova pasta para organizar documentos ou arquivos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "Confirmar ou definir o nome de uma pasta como 'Aula 1'",
+      "validation": {
+        "target_selector": "[id='file_13']",
+        "fallback_text": "Aula 1",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Aula 1'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Abrir o menu de contexto para interagir com a pasta 'Aula 1'",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Aula 1",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Aula 1'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Clica no item Excluir do menu de contexto que abriu",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em ''.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

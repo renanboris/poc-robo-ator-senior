@@ -1,0 +1,49 @@
+{
+  "mission_id": "Teste_Semantico_2",
+  "title": "Teste Semantico 2",
+  "module": "Senior X",
+  "difficulty": "iniciante",
+  "scoring": {
+    "base_xp": 50,
+    "no_help_bonus": 25,
+    "time_target_sec": 45
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Abrir o menu Senior Flow",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "ícone de menu",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'ícone de menu'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Abrir o menu GED",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "Navegar para a seção de Documentos",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

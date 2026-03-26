@@ -1,0 +1,133 @@
+{
+  "mission_id": "Senior_Flow_-_GED_-_Teste001",
+  "title": "Senior Flow - GED - Teste001",
+  "module": "Senior Flow",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 150
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Acessar a funcionalidade ou módulo 'SIGN' da plataforma Senior X.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "O usuário quis navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário quis acessar a funcionalidade para gerenciar assuntos.",
+      "validation": {
+        "target_selector": "[aria-label='Gerenciar Assuntos']",
+        "fallback_text": "Gerenciar Assuntos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Gerenciar Assuntos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "Adicionar um novo assunto ao sistema.",
+      "validation": {
+        "target_selector": "[id='s-button-7']",
+        "fallback_text": "Adicionar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Adicionar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "O usuário pretende inserir o nome de um novo assunto no campo de texto.",
+      "validation": {
+        "target_selector": "[name='subjectName']",
+        "fallback_text": "Ex: Recursos Humanos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Ex: Recursos Humanos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Preencher o nome de um novo assunto para criação",
+      "validation": {
+        "target_selector": "[name='subjectName']",
+        "fallback_text": "Liderança",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Liderança'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Salvar o novo assunto 'Liderança' que foi inserido no campo de texto do formulário.",
+      "validation": {
+        "target_selector": "[id='s-button-5']",
+        "fallback_text": "Salvar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "O usuário clicou no botão 'Ações' para visualizar as opções disponíveis para o item 'Financeiro', que incluem editar, gerenciar interessados ou excluir o item.",
+      "validation": {
+        "target_selector": "[id='s-button-15']",
+        "fallback_text": "Ações",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Ações'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "O usuário clicou em 'Interessados' para acessar a seção ou página dedicada a gerenciar os interessados relacionados ao assunto 'Liderança'.",
+      "validation": {
+        "target_selector": "[id='interesteds']",
+        "fallback_text": "Interessados",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Interessados'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "Salvar as alterações feitas na lista de interessados adicionados para a liderança.",
+      "validation": {
+        "target_selector": "[id='s-button-16']",
+        "fallback_text": "Salvar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

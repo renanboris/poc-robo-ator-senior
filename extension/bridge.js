@@ -1,5 +1,6 @@
 // bridge.js - A Ponte Veloz (Mundo MAIN)
-// ✅ CORRIGIDO: Handler de AURA_PRE_CAPTURE e repasse do "historico" para a IA
+// ✅ MANTIDO: Handler de AURA_PRE_CAPTURE e repasse do "historico" para a IA
+// ✅ ADICIONADO: Ponte para AURA_FETCH_MISSION (Contorna CORS)
 
 (function() {
     document.documentElement.setAttribute('data-aura-id', chrome.runtime.id);
@@ -16,14 +17,24 @@
 
         if (event.data.type === "AURA_PRE_CAPTURE") {
             try {
-                // 🟢 FIX: Opcional, mas boa prática passar um callback vazio se a action retorna "true"
                 chrome.runtime.sendMessage({ action: "pre_capture" }, () => {
-                    const err = chrome.runtime.lastError; // Consome o erro silenciosamente se houver
+                    const err = chrome.runtime.lastError; 
                 });
                 console.log("Aura Bridge: Pre-capture solicitado ao background.");
             } catch (err) {
                 console.warn("Aura Bridge: Falha ao solicitar pre-capture:", err.message);
             }
+            return;
+        }
+
+        // 🟢 PONTE PARA BUSCAR MISSÕES (Magic Link)
+        if (event.data.type === "AURA_FETCH_MISSION") {
+            chrome.runtime.sendMessage({ action: "fetch_mission", mission_id: event.data.mission_id }, (response) => {
+                window.postMessage({
+                    type: "AURA_FETCH_MISSION_RESPONSE",
+                    payload: response
+                }, window.location.origin);
+            });
             return;
         }
 
@@ -37,7 +48,6 @@
                 dom_context: event.data.dom_context || "",
                 user_name:   event.data.user_name   || "Utilizador",
                 tenant_id:   event.data.tenant_id   || "senior_default",
-                // 🟢 FIX: Agora a IA vai lembrar do que foi falado antes!
                 historico:   event.data.historico   || [] 
             }, (response) => {
 

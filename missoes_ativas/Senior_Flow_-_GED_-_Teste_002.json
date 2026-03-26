@@ -1,0 +1,97 @@
+{
+  "mission_id": "Senior_Flow_-_GED_-_Teste_002",
+  "title": "Senior Flow - GED - Teste 002",
+  "module": "Senior Flow",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 100,
+    "no_help_bonus": 50,
+    "time_target_sec": 105
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "O usuário quis acessar ou ativar o menu principal 'Senior Flow' para navegar para a seção correspondente ou expandir suas opções.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "Menu principal Senior Flow",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Senior Flow'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário quis acessar a funcionalidade ou módulo de gerenciamento de assuntos dentro do sistema Senior X, provavelmente para visualizar, criar ou editar assuntos.",
+      "validation": {
+        "target_selector": "[aria-label='Gerenciar Assuntos']",
+        "fallback_text": "Gerenciar Assuntos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Gerenciar Assuntos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "Adicionar um novo assunto ao sistema.",
+      "validation": {
+        "target_selector": "[id='s-button-7']",
+        "fallback_text": "Adicionar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Adicionar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "O usuário clicou no campo de entrada para digitar o nome de um novo assunto.",
+      "validation": {
+        "target_selector": "[name='subjectName']",
+        "fallback_text": "Ex: Recursos Humanos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Ex: Recursos Humanos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Preencher o campo de nome para criar um novo assunto com o valor 'Treinamento UCS'.",
+      "validation": {
+        "target_selector": "[name='subjectName']",
+        "fallback_text": "Treinamento UCS",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Treinamento UCS'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Salvar o novo assunto 'Treinamento UCS' que foi inserido no campo de texto.",
+      "validation": {
+        "target_selector": "[id='s-button-5']",
+        "fallback_text": "Salvar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

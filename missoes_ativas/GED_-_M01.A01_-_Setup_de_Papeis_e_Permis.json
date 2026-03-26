@@ -1,0 +1,985 @@
+{
+  "mission_id": "GED_-_M01.A01_-_Setup_de_Papeis_e_Permis",
+  "title": "GED - M01.A01 - Setup de Papéis e Permissões Globais",
+  "module": "GED",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 1215
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Aplicar ou gerenciar um filtro relacionado a 'Tecnologia' nos indicadores de incorporação.",
+      "validation": {
+        "target_selector": "[id='menu-item-Tecnologia']",
+        "fallback_text": "Menu principal Tecnologia",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Tecnologia'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "O usuário quis acessar a seção de administração do sistema, provavelmente para gerenciar configurações ou usuários.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus Administração']",
+        "fallback_text": "Administração",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Administração'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário quis acessar a funcionalidade de gestão de usuários do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Gestão dos Usuários']",
+        "fallback_text": "Gestão dos Usuários",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Gestão dos Usuários'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "O usuário quis iniciar uma pesquisa por login, nome ou e-mail para filtrar a lista de usuários.",
+      "validation": {
+        "target_selector": "[aria-label='search']",
+        "fallback_text": "Pesquise por login, nome ou e-mail",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Pesquise por login, nome ou e-mail'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "Filtrar a lista de usuários pelo nome, login ou e-mail 'Renan'",
+      "validation": {
+        "target_selector": "[aria-label='search']",
+        "fallback_text": "Renan",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Renan'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Aplicar os filtros selecionados para exibir os usuários correspondentes.",
+      "validation": {
+        "target_selector": "[id='list-search-form']",
+        "fallback_text": "Filtrar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Filtrar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Visualizar as opções de ações disponíveis para o usuário 'Renan Bóris Kirsch'.",
+      "validation": {
+        "target_selector": "[id='s-button-25']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "Visualizar os detalhes do usuário 'Renan Bóris Kirsch'.",
+      "validation": {
+        "target_selector": "[id='edit-user']",
+        "fallback_text": "Detalhes",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Detalhes'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "Adicionar um novo papel (role) para o usuário que está sendo cadastrado ou editado.",
+      "validation": {
+        "target_selector": "[id='new-button']",
+        "fallback_text": "Adicionar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Adicionar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "Pesquisar por papéis disponíveis para seleção.",
+      "validation": {
+        "target_selector": "[aria-label='search-user']",
+        "fallback_text": "Pesquisar papéis",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Pesquisar papéis'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 11,
+      "intent": "Pesquisar por papéis disponíveis que contenham o termo 'ged'.",
+      "validation": {
+        "target_selector": "[aria-label='search-user']",
+        "fallback_text": "ged",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'ged'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 12,
+      "intent": "Filtrar a lista de papéis disponíveis com base no texto inserido no campo de busca, que é 'ged'.",
+      "validation": {
+        "target_selector": "text=\"Filtrar\"",
+        "fallback_text": "Filtrar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Filtrar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 13,
+      "intent": "Selecionar o papel 'GED Usuário' para adicioná-lo à lista de papéis selecionados.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 14,
+      "intent": "Selecionar o papel 'GED Administrador' para adicioná-lo à lista de papéis selecionados ou para confirmar sua seleção.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 15,
+      "intent": "Salvar as seleções de papéis realizadas na tela.",
+      "validation": {
+        "target_selector": "[id='save-button']",
+        "fallback_text": "Salvar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 16,
+      "intent": "Navegar para a página inicial ou dashboard do sistema.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 17,
+      "intent": "Navegar para a seção 'Tecnologia' do sistema.",
+      "validation": {
+        "target_selector": "[id='menu-item-Tecnologia']",
+        "fallback_text": "Menu principal Tecnologia",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Tecnologia'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 18,
+      "intent": "O usuário clicou no item 'Autorização' no menu lateral para acessar as configurações ou funcionalidades relacionadas à autorização de usuários ou recursos do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus Autorização']",
+        "fallback_text": "Autorização",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Autorização'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 19,
+      "intent": "Gerenciar os papéis (roles) de usuários no sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Gestão dos Papéis']",
+        "fallback_text": "Gestão dos Papéis",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Gestão dos Papéis'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 20,
+      "intent": "O usuário quis pesquisar por papéis no sistema.",
+      "validation": {
+        "target_selector": "[id='list-search-input']",
+        "fallback_text": "Pesquisar papéis",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Pesquisar papéis'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 21,
+      "intent": "Filtrar a lista de papéis pelo termo 'GED'.",
+      "validation": {
+        "target_selector": "[id='list-search-input']",
+        "fallback_text": "GED",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 22,
+      "intent": "Filtrar a lista de papéis com base no termo de busca 'GED'.",
+      "validation": {
+        "target_selector": "[id='list-apply-search-button']",
+        "fallback_text": "Filtrar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Filtrar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 23,
+      "intent": "Editar as configurações ou permissões do papel 'GED Usuário'.",
+      "validation": {
+        "target_selector": "text=\"Editar\"",
+        "fallback_text": "Editar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Editar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 24,
+      "intent": "O usuário deseja visualizar ou configurar as permissões associadas ao papel que está sendo gerenciado.",
+      "validation": {
+        "target_selector": "[id='ui-tabpanel-1-label']",
+        "fallback_text": "Permissões",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Permissões'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 25,
+      "intent": "O usuário pretende pesquisar ou filtrar domínios/serviços na lista exibida.",
+      "validation": {
+        "target_selector": "[id='list-search-input']",
+        "fallback_text": "Pesquisar domínios / serviços",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Pesquisar domínios / serviços'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 26,
+      "intent": "O usuário preencheu o campo de busca para filtrar os domínios/serviços relacionados a 'ged' na tela de configuração de permissões.",
+      "validation": {
+        "target_selector": "[id='list-search-input']",
+        "fallback_text": "ged",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'ged'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 27,
+      "intent": "Filtrar a lista de domínios/serviços exibida, aplicando o termo de busca 'ged'.",
+      "validation": {
+        "target_selector": "[id='list-apply-search-button']",
+        "fallback_text": "Filtrar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Filtrar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 28,
+      "intent": "Expandir o item 'platform / ecm_ged' para visualizar suas permissões ou detalhes.",
+      "validation": {
+        "target_selector": "i:nth-child(1)",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 29,
+      "intent": "Selecionar ou desmarcar todos os itens para a ação de Download.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 30,
+      "intent": "Desmarcar a opção 'Download' para todos os recursos listados na tabela, desativando a permissão de download em massa.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 31,
+      "intent": "Habilitar a permissão de 'Editar' para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 32,
+      "intent": "Alterar a permissão de edição para o recurso 'Adicionar responsáveis a envelopes'",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 33,
+      "intent": "O usuário quis habilitar a permissão de 'Excluir' para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 34,
+      "intent": "Habilitar a permissão de 'Excluir' para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 35,
+      "intent": "Habilitar a permissão de 'Incluir' para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 36,
+      "intent": "Habilitar a permissão de 'Incluir' para o recurso 'Adicionar responsáveis a envelopes'.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 37,
+      "intent": "O usuário quis conceder ou revogar a permissão 'Remover' para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 38,
+      "intent": "Habilitar a permissão 'Remover' para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 39,
+      "intent": "Habilitar a permissão de 'Visualizar' para o recurso 'Arquivo'",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 40,
+      "intent": "Habilitar a permissão de 'Visualizar' para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 41,
+      "intent": "Alterar a permissão de edição para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 42,
+      "intent": "Selecionar a permissão 'Excluir' para o recurso 'Arquivo'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 43,
+      "intent": "Habilitar a permissão de 'Visualizar' para o recurso 'Arquivo'",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 44,
+      "intent": "Salvar as alterações realizadas na configuração ou nos dados exibidos na tela.",
+      "validation": {
+        "target_selector": "[id='button-save-role']",
+        "fallback_text": "Salvar ui-btn",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar ui-btn'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 45,
+      "intent": "O usuário quis navegar para a seção ou funcionalidade relacionada à 'Tecnologia' dentro do sistema, provavelmente para acessar configurações ou recursos específicos dessa área.",
+      "validation": {
+        "target_selector": "[id='menu-item-Tecnologia']",
+        "fallback_text": "Menu principal Tecnologia",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Tecnologia'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 46,
+      "intent": "Voltar para a tela anterior ou fechar a seção de Autorização.",
+      "validation": {
+        "target_selector": "[aria-label='Voltar']",
+        "fallback_text": "Voltar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Voltar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 47,
+      "intent": "O usuário quis acessar a funcionalidade de gestão de usuários do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Gestão dos Usuários']",
+        "fallback_text": "Gestão dos Usuários",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Gestão dos Usuários'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 48,
+      "intent": "O usuário pretende iniciar uma busca por usuários, utilizando o login, nome ou e-mail como critério de pesquisa.",
+      "validation": {
+        "target_selector": "[aria-label='search']",
+        "fallback_text": "Pesquise por login, nome ou e-mail",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Pesquise por login, nome ou e-mail'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 49,
+      "intent": "Pesquisar por um usuário com o nome 'Renan'.",
+      "validation": {
+        "target_selector": "[aria-label='search']",
+        "fallback_text": "Renan",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Renan'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 50,
+      "intent": "Filtrar a lista de usuários com base nos critérios inseridos, especificamente pelo nome 'Renan'.",
+      "validation": {
+        "target_selector": "[id='list-search-form']",
+        "fallback_text": "Filtrar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Filtrar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 51,
+      "intent": "O usuário deseja visualizar ou executar ações específicas relacionadas ao usuário 'Renan Bóris Kirsch'.",
+      "validation": {
+        "target_selector": "[id='s-button-25']",
+        "fallback_text": "Ações",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Ações'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 52,
+      "intent": "Visualizar os detalhes do usuário selecionado na tabela.",
+      "validation": {
+        "target_selector": "[id='edit-user']",
+        "fallback_text": "Detalhes",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Detalhes'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 53,
+      "intent": "Adicionar um novo papel (role) para o usuário.",
+      "validation": {
+        "target_selector": "[id='new-button']",
+        "fallback_text": "Adicionar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Adicionar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 54,
+      "intent": "O usuário quis pesquisar por papéis disponíveis para seleção.",
+      "validation": {
+        "target_selector": "[aria-label='search-user']",
+        "fallback_text": "Pesquisar papéis",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Pesquisar papéis'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 55,
+      "intent": "Filtrar a lista de papéis disponíveis para encontrar aqueles que contêm 'ged' no nome ou descrição.",
+      "validation": {
+        "target_selector": "[aria-label='search-user']",
+        "fallback_text": "ged",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'ged'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 56,
+      "intent": "Filtrar a lista de papéis disponíveis com base no texto digitado no campo de busca.",
+      "validation": {
+        "target_selector": "text=\"Filtrar\"",
+        "fallback_text": "Filtrar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Filtrar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 57,
+      "intent": "Salvar as seleções de papéis realizadas na tela.",
+      "validation": {
+        "target_selector": "[id='save-button']",
+        "fallback_text": "Salvar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 58,
+      "intent": "Navegar para a seção ou módulo de 'Tecnologia' do sistema.",
+      "validation": {
+        "target_selector": "[id='menu-item-Tecnologia']",
+        "fallback_text": "Menu principal Tecnologia",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Tecnologia'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 59,
+      "intent": "Navegar para a seção de gerenciamento de autorizações do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus Autorização']",
+        "fallback_text": "Autorização",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Autorização'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 60,
+      "intent": "Acessar a funcionalidade de gestão de papéis para configurar ou visualizar os diferentes perfis de usuário no sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Gestão dos Papéis']",
+        "fallback_text": "Gestão dos Papéis",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Gestão dos Papéis'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 61,
+      "intent": "Pesquisar por papéis no sistema.",
+      "validation": {
+        "target_selector": "[id='list-search-input']",
+        "fallback_text": "Pesquisar papéis",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Pesquisar papéis'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 62,
+      "intent": "O usuário quis filtrar a lista de papéis digitando 'ged' no campo de busca.",
+      "validation": {
+        "target_selector": "[id='list-search-input']",
+        "fallback_text": "ged",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'ged'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 63,
+      "intent": "Editar as configurações ou permissões do papel 'GED Administrador'.",
+      "validation": {
+        "target_selector": "text=\"Editar\"",
+        "fallback_text": "Editar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Editar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 64,
+      "intent": "O usuário quis visualizar ou configurar as permissões associadas ao papel que está sendo gerenciado.",
+      "validation": {
+        "target_selector": "[id='ui-tabpanel-1-label']",
+        "fallback_text": "Permissões",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Permissões'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 65,
+      "intent": "O usuário deseja pesquisar por domínios ou serviços para configurar as permissões do papel.",
+      "validation": {
+        "target_selector": "[id='list-search-input']",
+        "fallback_text": "Pesquisar domínios / serviços",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Pesquisar domínios / serviços'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 66,
+      "intent": "O usuário preencheu o campo de busca para filtrar domínios ou serviços relacionados a 'ged' na configuração de permissões do papel.",
+      "validation": {
+        "target_selector": "[id='list-search-input']",
+        "fallback_text": "ged",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'ged'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 67,
+      "intent": "Filtrar a lista de domínios/serviços ou permissões com base no termo 'ged'.",
+      "validation": {
+        "target_selector": "[id='list-apply-search-button']",
+        "fallback_text": "Filtrar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Filtrar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 68,
+      "intent": "Expandir a seção do serviço 'platform / ecm_ged' para visualizar ou gerenciar suas permissões detalhadas.",
+      "validation": {
+        "target_selector": "i:nth-child(1)",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 69,
+      "intent": "Selecionar ou desmarcar a permissão de 'Download' para todos os recursos listados na tabela.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 70,
+      "intent": "Habilitar a permissão de 'Download' para o recurso 'Platform / ecm_ged'",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 71,
+      "intent": "Remover a permissão de 'Editar' para o recurso 'Adicionar responsáveis a envelopes'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 72,
+      "intent": "Habilitar a permissão de 'Editar' para o recurso 'Assinantes externos' no domínio 'platform / ecm_ged'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 73,
+      "intent": "Gerenciar a permissão de 'Excluir' para todos os recursos listados, provavelmente desmarcando a opção para todos, dado que o checkbox já está marcado em vermelho.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 74,
+      "intent": "O usuário clicou na caixa de seleção 'Excluir' no cabeçalho da tabela de recursos, provavelmente para selecionar ou desmarcar a permissão de exclusão para todos os recursos listados.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 75,
+      "intent": "Habilitar a permissão de 'Incluir' para o recurso 'Assinantes externos' dentro do domínio/serviço 'platform / ecm_ged'.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 76,
+      "intent": "O usuário clicou no checkbox 'Incluir' no cabeçalho da tabela, provavelmente para selecionar ou desmarcar a permissão de inclusão para todos os recursos listados abaixo.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 77,
+      "intent": "Desmarcar a permissão 'Remover' para todos os recursos listados na tabela de gerenciamento de permissões.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 78,
+      "intent": "Habilitar a permissão de 'Remover' para o recurso 'Arquivo' dentro da configuração de permissões da plataforma 'ecm_ged'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 79,
+      "intent": "O usuário clicou no checkbox 'Visualizar' no cabeçalho da tabela, indicando a intenção de selecionar ou desmarcar a permissão de 'Visualizar' para todos os recursos listados na tabela.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 80,
+      "intent": "Ativar ou desativar a permissão 'Visualizar' para o recurso 'Assinar Envelopes em Lote'.",
+      "validation": {
+        "target_selector": "div:nth-child(2)",
+        "fallback_text": "div",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'div'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 81,
+      "intent": "Salvar as alterações de permissões ou configurações realizadas na tela.",
+      "validation": {
+        "target_selector": "[id='button-save-role']",
+        "fallback_text": "Salvar ui-btn",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar ui-btn'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

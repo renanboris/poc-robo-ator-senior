@@ -1,0 +1,145 @@
+{
+  "mission_id": "Senior_Flow_-_GED_-_Teste_de_Nova_Pasta",
+  "title": "Senior Flow - GED - Teste de Nova Pasta",
+  "module": "Senior Flow",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 165
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "O usuário quis acessar uma funcionalidade relacionada a compartilhamento, conexão ou integração de dados/sistemas, possivelmente para gerenciar plugins ou conectores, dado o ícone e a proximidade com o item 'Plugin (Conector)' no menu.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "O usuário quis navegar para a seção ou módulo de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "Acessar ou gerenciar documentos dentro do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "O usuário deseja criar uma nova pasta para organizar documentos ou arquivos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "Renomear um item (pasta ou arquivo) para 'A1' ou confirmar a criação de uma nova pasta com o nome 'A1'.",
+      "validation": {
+        "target_selector": "[id='file_9']",
+        "fallback_text": "A1",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'A1'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Criar uma nova pasta para organizar documentos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Renomear a pasta ou documento 'A2'.",
+      "validation": {
+        "target_selector": "[id='file_10']",
+        "fallback_text": "A2",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'A2'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "O usuário provavelmente quis abrir ou ativar o item de menu ou link identificado como 'A1'.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "A1",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'A1'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "Criar uma nova pasta no sistema de gerenciamento de documentos.",
+      "validation": {
+        "target_selector": "[id='newFolderButton']",
+        "fallback_text": "Nova pasta",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Nova pasta'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "Renomear a pasta ou documento 'A1.1'",
+      "validation": {
+        "target_selector": "[id='file_0']",
+        "fallback_text": "A1.1",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'A1.1'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 11,
+      "intent": "Navegar para a tela inicial ou dashboard do sistema.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

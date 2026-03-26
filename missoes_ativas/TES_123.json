@@ -1,0 +1,37 @@
+{
+  "mission_id": "TES_123",
+  "title": "TES 123",
+  "module": "Senior X",
+  "difficulty": "iniciante",
+  "scoring": {
+    "base_xp": 50,
+    "no_help_bonus": 25,
+    "time_target_sec": 30
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Acessar a funcionalidade 'Senior Flow'",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "i",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'i'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Acessar a página principal ou o módulo de Gestão Eletrônica de Documentos (GED).",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "mission_id": "Teste_Semantico_1",
+  "title": "Teste Semantico 1",
+  "module": "Senior X",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 100,
+    "no_help_bonus": 50,
+    "time_target_sec": 105
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Avançar para a próxima etapa do processo de login",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "botão",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'botão'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Focar no campo de senha",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "Senha",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Senha'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "Tentar autenticar o usuário",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "botão",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'botão'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "Digitar a senha",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "input",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'input'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "Alternar a visibilidade da senha digitada",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "ícone de olho",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'ícone de olho'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Autenticar o usuário no sistema.",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "botão",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'botão'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Autenticar o utilizador no sistema",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "botão",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'botão'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

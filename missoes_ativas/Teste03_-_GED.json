@@ -1,0 +1,49 @@
+{
+  "mission_id": "Teste03_-_GED",
+  "title": "Teste03 - GED",
+  "module": "GED",
+  "difficulty": "iniciante",
+  "scoring": {
+    "base_xp": 50,
+    "no_help_bonus": 25,
+    "time_target_sec": 45
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Abrir a pasta Financeiro",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "Financeiro",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Abrir a pasta Financeiro",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "Financeiro",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "Ativar a busca",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "Busca",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Busca'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "mission_id": "Teste08_-_Navegar_no_GED",
+  "title": "Teste08 - Navegar no GED",
+  "module": "GED",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 135
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "O usuário deseja navegar para a seção de documentos do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário quis navegar para dentro da pasta 'Financeiro' para visualizar seu conteúdo.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Financeiro",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "Abrir a pasta 'Contas a pagar' para visualizar seu conteúdo.",
+      "validation": {
+        "target_selector": "[id='file_0']",
+        "fallback_text": "em",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'em'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "O usuário quis navegar para a seção 'Financeiro' do sistema, possivelmente para explorar outras subseções ou documentos relacionados a finanças.",
+      "validation": {
+        "target_selector": "text=\"Financeiro\"",
+        "fallback_text": "Financeiro",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Financeiro'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Abrir a pasta 'Contas a receber' para visualizar seu conteúdo.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Contas a receber",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Contas a receber'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "O usuário deseja acessar a funcionalidade de gestão de envelopes para visualizar, criar ou gerenciar envelopes no sistema.",
+      "validation": {
+        "target_selector": "[id='s-button-28']",
+        "fallback_text": "Gestão de Envelopes",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Gestão de Envelopes'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "O usuário quis cancelar ou desistir do tour de apresentação do sistema Senior Flow.",
+      "validation": {
+        "target_selector": "[id='s-button-9']",
+        "fallback_text": "Desistir do tour",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Desistir do tour'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "O usuário quis fechar a tela ou o modal atual, optando por não continuar com o tour ou processo que estava sendo incentivado.",
+      "validation": {
+        "target_selector": "[id='s-button-11']",
+        "fallback_text": "Fechar tela mesmo assim",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Fechar tela mesmo assim'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

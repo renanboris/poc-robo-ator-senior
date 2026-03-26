@@ -1,0 +1,25 @@
+{
+  "mission_id": "Teste_da_Adriana",
+  "title": "Teste da Adriana",
+  "module": "Senior X",
+  "difficulty": "iniciante",
+  "scoring": {
+    "base_xp": 50,
+    "no_help_bonus": 25,
+    "time_target_sec": 15
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "Avançar para a próxima etapa do login",
+      "validation": {
+        "target_selector": "",
+        "fallback_text": "botão",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'botão'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

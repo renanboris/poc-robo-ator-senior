@@ -1,0 +1,157 @@
+{
+  "mission_id": "Teste6_-_Criar_permissoes_para_uma_pasta",
+  "title": "Teste6 - Criar permissões para uma pasta no GED",
+  "module": "GED",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 180
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "O usuário quis acessar a funcionalidade ou página relacionada ao 'Senior Flow' através do menu lateral.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "Menu principal Senior Flow",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Senior Flow'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "Navegar para a seção de documentos do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "Acessar o menu de contexto para a pasta 'Logistica' e realizar uma ação específica, como mover, copiar, excluir ou visualizar propriedades.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Logistica",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Logistica'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "Gerenciar ou visualizar as permissões da pasta selecionada.",
+      "validation": {
+        "target_selector": "text=\"Permissões\"",
+        "fallback_text": "Permissões",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Permissões'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Abrir o menu suspenso para selecionar um papel (role) para atribuir permissões.",
+      "validation": {
+        "target_selector": "[id='selectPermissionType']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Alterar o tipo de busca ou filtro de permissões de 'Papel' para 'Usuário' dentro do modal de gerenciamento de permissões.",
+      "validation": {
+        "target_selector": "[aria-label='Usuário']",
+        "fallback_text": "Usuário",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Usuário'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "O usuário quis buscar por um usuário específico para gerenciar suas permissões na pasta 'Logistica'.",
+      "validation": {
+        "target_selector": "[aria-label='Botão de busca']",
+        "fallback_text": "Buscar usuário...",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Buscar usuário...'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "O usuário quis buscar por um usuário específico para gerenciar suas permissões na pasta 'Logistica'.",
+      "validation": {
+        "target_selector": "[aria-label='Botão de busca']",
+        "fallback_text": "Adriana",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Adriana'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "Selecionar o usuário 'Adriana Conceição' para gerenciar suas permissões ou interagir com suas configurações dentro do modal de permissões.",
+      "validation": {
+        "target_selector": "text=\"Adriana Conceição\"",
+        "fallback_text": "Adriana Conceição",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Adriana Conceição'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 11,
+      "intent": "Liberar a opção de Download para a usuária Adriana.",
+      "validation": {
+        "target_selector": "tr:has-text(\"Adriana Conceição\") >> p-radiobutton:has-text(\"Download\")",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 12,
+      "intent": "Salvar as alterações de permissões feitas para a pasta 'Logistica'.",
+      "validation": {
+        "target_selector": "[id='s-button-7']",
+        "fallback_text": "Salvar permissões",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar permissões'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

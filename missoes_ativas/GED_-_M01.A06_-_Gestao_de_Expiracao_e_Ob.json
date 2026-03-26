@@ -1,0 +1,181 @@
+{
+  "mission_id": "GED_-_M01.A06_-_Gestao_de_Expiracao_e_Ob",
+  "title": "GED - M01.A06 - Gestão de Expiração e Obsolescência",
+  "module": "GED",
+  "difficulty": "intermediario",
+  "scoring": {
+    "base_xp": 200,
+    "no_help_bonus": 100,
+    "time_target_sec": 210
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "intent": "O usuário quis navegar para a funcionalidade ou seção 'Senior Flow' do sistema, acessando-a através do menu lateral.",
+      "validation": {
+        "target_selector": "[id='menu-item-Senior Flow']",
+        "fallback_text": "Menu principal Senior Flow",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Menu principal Senior Flow'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 2,
+      "intent": "Navegar para a seção ou módulo de GED (Gerenciamento Eletrônico de Documentos) do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Grupo de menus GED']",
+        "fallback_text": "GED",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'GED'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 3,
+      "intent": "O usuário deseja navegar para a seção de documentos ou acessar funcionalidades relacionadas a documentos dentro do sistema.",
+      "validation": {
+        "target_selector": "[aria-label='Documentos']",
+        "fallback_text": "Documentos",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Documentos'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 4,
+      "intent": "Acessar um menu de contexto para realizar ações específicas no documento 'Folha Demonstrativo de Pagamento.pdf'.",
+      "validation": {
+        "target_selector": "[id='itemTitle']",
+        "fallback_text": "Folha Demonstrativo de Pagamento.pdf",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Folha Demonstrativo de Pagamento.pdf'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 5,
+      "intent": "O usuário quis visualizar ou editar as propriedades do documento ou pasta selecionado.",
+      "validation": {
+        "target_selector": "text=\"Propriedades\"",
+        "fallback_text": "Propriedades",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Propriedades'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 6,
+      "intent": "Selecionar uma data de expiração para o documento.",
+      "validation": {
+        "target_selector": "[name='expirationDate']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 7,
+      "intent": "Navegar para o próximo mês no seletor de data.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 8,
+      "intent": "Preencher a data de expiração do documento.",
+      "validation": {
+        "target_selector": "[name='expirationDate']",
+        "fallback_text": "__/__/____",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '__/__/____'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 9,
+      "intent": "Selecionar o dia 30 de abril de 2026 como uma data, provavelmente para o campo 'Data de expiração' ou 'Data de obsolescência' do documento.",
+      "validation": {
+        "target_selector": "text=\"30\"",
+        "fallback_text": "30",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '30'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 10,
+      "intent": "Selecionar uma data para a propriedade 'Obsolescência' do documento.",
+      "validation": {
+        "target_selector": "[name='deprecationDate']",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 11,
+      "intent": "Navegar para o próximo mês no seletor de data.",
+      "validation": {
+        "target_selector": "span:nth-child(1)",
+        "fallback_text": "span",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'span'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 12,
+      "intent": "Definir a data de obsolescência do documento",
+      "validation": {
+        "target_selector": "[name='deprecationDate']",
+        "fallback_text": "__/__/____",
+        "rule_type": "input_text"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '__/__/____'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 13,
+      "intent": "O usuário quis selecionar o dia 30 no calendário para definir uma data, provavelmente a data de expiração ou a data de obsolescência do documento.",
+      "validation": {
+        "target_selector": "text=\"30\"",
+        "fallback_text": "30",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em '30'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    },
+    {
+      "step_id": 14,
+      "intent": "Salvar as alterações nas propriedades do documento.",
+      "validation": {
+        "target_selector": "[id='saveContinueButton']",
+        "fallback_text": "Salvar",
+        "rule_type": "click"
+      },
+      "help_tooltip": "Precisa de ajuda? O próximo clique é em 'Salvar'.",
+      "xp_penalty_per_hint": 15,
+      "timeout_for_hint_sec": 12
+    }
+  ]
+}

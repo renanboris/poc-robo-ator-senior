@@ -1,0 +1,12 @@
+{
+  "mission_id": "Teste5_-_Criar_permissoes_para_uma_pasta",
+  "title": "Teste5 - Criar permissões para uma pasta no GED",
+  "module": "GED",
+  "difficulty": "iniciante",
+  "scoring": {
+    "base_xp": 50,
+    "no_help_bonus": 25,
+    "time_target_sec": 0
+  },
+  "steps": []
+}

@@ -13,8 +13,10 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+import glob
 import uvicorn
 import os
 import json
@@ -428,6 +430,39 @@ class DapRequest(BaseModel):
 # ==============================================================
 # ROTAS DA API
 # ==============================================================
+
+@app.get("/api/missoes")
+def listar_missoes_ativas():
+    """Retorna o catálogo de missões da Academia Operacional."""
+    pasta = "missoes_ativas"
+    if not os.path.exists(pasta):
+        return []
+    
+    missoes = []
+    for arq in glob.glob(os.path.join(pasta, "*.json")):
+        try:
+            with open(arq, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+                missoes.append({
+                    "id": dados.get("mission_id"),
+                    "titulo": dados.get("title"),
+                    "modulo": dados.get("module"),
+                    "dificuldade": dados.get("difficulty"),
+                    "xp_maximo": dados.get("scoring", {}).get("base_xp", 0),
+                    "arquivo": os.path.basename(arq)
+                })
+        except:
+            continue
+    return missoes
+
+@app.get("/api/missoes/{mission_id}")
+def obter_detalhes_missao(mission_id: str):
+    """Retorna o JSON completo da missão com os passos e validações."""
+    caminho = os.path.join("missoes_ativas", f"{mission_id}.json")
+    if not os.path.exists(caminho):
+        return {"erro": "Missão não encontrada"}
+    with open(caminho, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
