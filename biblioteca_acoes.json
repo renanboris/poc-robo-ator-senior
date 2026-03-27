@@ -6221,6 +6221,305 @@
     },
     "_source": "Senior_Flow_-_GED_-_Criando_uma_aula.json"
   },
+  "acessar funcionalidades de compartilhamento ou uma seção relacionada a compartilhamento dentro do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar funcionalidades de compartilhamento ou uma seção relacionada a compartilhamento dentro do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone branco de compartilhamento (representando dois quadrados conectados por uma seta) localizado na barra de navegação lateral esquerda, sobre um fundo cinza escuro.",
+      "contexto_tela": "O usuário está na tela principal da plataforma Senior X, interagindo com o menu de navegação lateral esquerdo.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "i",
+      "coordenadas_relativas": {
+        "x_pct": 0.0148,
+        "y_pct": 0.7079,
+        "w_pct": 0.0109,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-rih-c117=\"\" aria-hidden=\"true\" class=\"fa fa-lg icon-share-2 ng-star-inserted\"><!----></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...no menu lateral, o Senior Flow...",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "acessar a funcionalidade ou módulo de gerenciamento eletrônico de documentos (ged).": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a funcionalidade ou módulo de Gerenciamento Eletrônico de Documentos (GED).",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu com o texto 'GED' em branco, localizado em uma barra lateral escura, abaixo de 'Senior Flow' e com um ícone de seta apontando para a esquerda ao lado do texto.",
+      "contexto_tela": "O usuário está na barra de navegação lateral esquerda do sistema Senior X Platform, que exibe diversas opções de módulos e funcionalidades.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-rih-c143=\"\" class=\"pull left menu-label\">GED</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED...",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "o usuário quis acessar ou gerenciar documentos no sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou gerenciar documentos no sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu com o texto 'Documentos', localizado na barra de navegação lateral esquerda. É um rótulo de texto que provavelmente acompanha um ícone.",
+      "contexto_tela": "O usuário está na tela principal do sistema, com uma barra de navegação lateral esquerda visível, que contém diversos ícones e rótulos de menu.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-rih-c143=\"\" class=\"pull left menu-label\">Documentos</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, a seção de Documentos.",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "acessar menu de contexto para ações relacionadas ao arquivo 'aditivo de contrato.pdf'": {
+    "acao": "clique_direito",
+    "intencao_semantica": "Acessar menu de contexto para ações relacionadas ao arquivo 'Aditivo de Contrato.pdf'",
+    "elemento_alvo": {
+      "descricao_visual": "Um item na lista de documentos com o nome 'Aditivo de Contrato.pdf', acompanhado de um ícone de PDF e destacado em cinza, indicando que está selecionado. O status do documento é 'PUBLICADO'.",
+      "contexto_tela": "O usuário está na tela principal de um sistema de gerenciamento de documentos (GED), visualizando uma lista de arquivos e pastas com detalhes como nome, autor, tamanho, última modificação e status.",
+      "tipo_elemento": "link",
+      "confianca_captura": "alta",
+      "label_curto": "Aditivo de Contrato.pdf",
+      "coordenadas_relativas": {
+        "x_pct": 0.1344,
+        "y_pct": 0.7481,
+        "w_pct": 0.074,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-ith-c34=\"\" id=\"itemTitle\">Aditivo de Contrato.pdf</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...no 'Aditivo de Contrato.pdf', um clique direito...",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "o usuário quis iniciar o processo de coleta de assinaturas para um documento.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis iniciar o processo de coleta de assinaturas para um documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Um texto em destaque que serve como título para a janela modal, indicando a ação principal. Não possui estilo de botão ou link aparente, sendo parte do cabeçalho da modal.",
+      "contexto_tela": "O usuário está no sistema GED (Gerenciamento Eletrônico de Documentos), e acabou de abrir (ou está interagindo com) uma modal para configurar o processo de coleta de assinaturas para um documento, provavelmente o 'Aditivo de Contrato.pdf'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "media",
+      "label_curto": "Coletar assinaturas",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "text=\"Coletar assinaturas\"",
+      "iframe_hint": "ci",
+      "html_hint": "<div _ngcontent-ith-c33=\"\">Coletar assinaturas</div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e a opção 'Coletar assinaturas'.",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "o usuário quis inserir um endereço de e-mail para um novo assinante.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis inserir um endereço de e-mail para um novo assinante.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com o placeholder 'E-mail', realçado com uma borda vermelha, localizado na seção 'Assinantes' de um modal.",
+      "contexto_tela": "O usuário está em um modal de 'Coletar Assinaturas' para um 'Aditivo de Contrato', dentro de um sistema de gerenciamento de documentos (GED).",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "E-mail",
+      "coordenadas_relativas": {
+        "x_pct": 0.5844,
+        "y_pct": 0.1884,
+        "w_pct": 0.1281,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='email']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-ith-c58=\"\" autocomplete=\"off\" formcontrolname=\"email\" name=\"email\" pinputtext=\"\" type=\"email\" placeholder=\"E-mail\" class=\"ng-untouched ng-pristine ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "adicionar o e-mail de um signatário para coletar assinaturas no documento 'aditivo de contrato.pdf'.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Adicionar o e-mail de um signatário para coletar assinaturas no documento 'ADITIVO DE CONTRATO.PDF'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto para e-mail, preenchido com 'renan.kirsch@senior.com.br', localizado abaixo do título 'Assinantes' e ao lado de campos para 'Nome' e 'Telefone'.",
+      "contexto_tela": "O usuário está na tela de coleta de assinaturas para o documento 'ADITIVO DE CONTRATO.PDF', especificamente na seção de adição de signatários.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "renan.kirsch@senior.com.br",
+      "coordenadas_relativas": {
+        "x_pct": 0.5844,
+        "y_pct": 0.1884,
+        "w_pct": 0.1281,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='email']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-ith-c58=\"\" autocomplete=\"off\" formcontrolname=\"email\" name=\"email\" pinputtext=\"\" type=\"email\" placeholder=\"E-mail\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\"\">"
+    },
+    "valor_input": "renan.kirsch@senior.com.br",
+    "micro_narracao": "...o e-mail do Renan...",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "o usuário preencheu o campo de nome do signatário para o documento 'aditivo de contrato.pdf'.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "O usuário preencheu o campo de nome do signatário para o documento 'ADITIVO DE CONTRATO.PDF'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto retangular com borda vermelha, preenchido com o nome 'Renan', localizado ao lado de um campo de e-mail e antes de um campo de telefone, sob a seção 'Assinantes'. O placeholder do campo é 'Nome'.",
+      "contexto_tela": "O usuário está na tela de coleta de assinaturas para o documento 'ADITIVO DE CONTRATO.PDF', especificamente na seção para adicionar ou editar os dados dos assinantes.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Renan",
+      "coordenadas_relativas": {
+        "x_pct": 0.7167,
+        "y_pct": 0.1884,
+        "w_pct": 0.1281,
+        "h_pct": 0.036
+      },
+      "seletor_hint": "[name='name']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-ith-c58=\"\" autocomplete=\"off\" formcontrolname=\"name\" name=\"name\" pinputtext=\"\" type=\"text\" placeholder=\"Nome\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\"\">"
+    },
+    "valor_input": "Renan",
+    "micro_narracao": "...e o nome dele.",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "o usuário pretende inserir instruções ou informações adicionais para os signatários do documento.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende inserir instruções ou informações adicionais para os signatários do documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto multilinha (textarea) com o placeholder 'Preencha com instruções para os assinantes', localizado abaixo do título 'Instruções'.",
+      "contexto_tela": "O usuário está na tela de coleta de assinaturas para o documento 'ADITIVO DE CONTRATO.PDF', especificamente na seção onde pode definir as instruções para os assinantes.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Preencha com instruções para os assinant",
+      "coordenadas_relativas": {
+        "x_pct": 0.6188,
+        "y_pct": 0.3672,
+        "w_pct": 0.1969,
+        "h_pct": 0.1058
+      },
+      "seletor_hint": "[name='instructions']",
+      "iframe_hint": "ci",
+      "html_hint": "<textarea _ngcontent-ith-c58=\"\" formcontrolname=\"instructionsToSigner\" id=\"instructions\" name=\"instructions\" pinputtextarea=\"\" placeholder=\"Preencha com instruções para os assinantes\" class=\"ng-untouched ng-pristine ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget\" style=\"\"></textarea>"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "fornecer instruções para o assinante do documento.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Fornecer instruções para o assinante do documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto grande (textarea) com o texto 'Favor revisar arquivo e assinar' preenchido, localizado abaixo do título 'Instruções' e com uma borda vermelha indicando que foi preenchido ou está em foco.",
+      "contexto_tela": "O usuário está na tela de coleta de assinaturas para o documento 'ADITIVO DE CONTRATO.PDF', onde pode adicionar assinantes e definir instruções e opções para a assinatura.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Favor revisar arquivo e assinar",
+      "coordenadas_relativas": {
+        "x_pct": 0.6188,
+        "y_pct": 0.3672,
+        "w_pct": 0.1969,
+        "h_pct": 0.1058
+      },
+      "seletor_hint": "[name='instructions']",
+      "iframe_hint": "ci",
+      "html_hint": "<textarea _ngcontent-ith-c58=\"\" formcontrolname=\"instructionsToSigner\" id=\"instructions\" name=\"instructions\" pinputtextarea=\"\" placeholder=\"Preencha com instruções para os assinantes\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\""
+    },
+    "valor_input": "Favor revisar arquivo e assinar",
+    "micro_narracao": "...as instruções para o Renan...",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "habilitar ou desabilitar a coleta de geolocalização para a assinatura do documento": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Habilitar ou desabilitar a coleta de geolocalização para a assinatura do documento",
+    "elemento_alvo": {
+      "descricao_visual": "Checkbox com o texto 'Habilitar coleta de geolocalização' ao lado",
+      "contexto_tela": "Na tela de 'Coletar Assinaturas' para o documento 'Aditivo de Contrato.pdf', dentro da seção 'Opções'",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "undefined",
+      "coordenadas_relativas": {
+        "x_pct": 0.7286,
+        "y_pct": 0.3249,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "p-checkbox#collectGeolocation .ui-chkbox .ui-chkbox-box",
+      "iframe_hint": "ci",
+      "html_hint": "<input type=\"checkbox\" name=\"undefined\" value=\"undefined\" style=\"\" class=\"ui-state-focus\">"
+    },
+    "valor_input": "undefined",
+    "micro_narracao": "...e ativamos a geolocalização.",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "enviar o documento 'aditivo de contrato.pdf' para os destinatários configurados para coleta de assinatura.": {
+    "acao": "clique",
+    "intencao_semantica": "Enviar o documento 'ADITIVO DE CONTRATO.PDF' para os destinatários configurados para coleta de assinatura.",
+    "elemento_alvo": {
+      "descricao_visual": "Botão retangular azul com texto branco 'Enviar para assinatura' localizado na parte inferior de um painel lateral ou modal.",
+      "contexto_tela": "O usuário está na tela de configuração para coletar assinaturas de um documento, onde ele pode adicionar signatários, instruções e opções.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Enviar para assinatura",
+      "coordenadas_relativas": {
+        "x_pct": 0.5677,
+        "y_pct": 0.9291,
+        "w_pct": 0.0729,
+        "h_pct": 0.0169
+      },
+      "seletor_hint": "[id='sendSign']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-ith-c5=\"\" class=\"s-button-text ng-star-inserted\">Enviar para assinatura</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
+  "verificar o status da assinatura do documento 'aditivo de contrato.pdf'.": {
+    "acao": "clique",
+    "intencao_semantica": "Verificar o status da assinatura do documento 'Aditivo de Contrato.pdf'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de assinatura, de cor vermelha/laranja, localizado à direita do nome do documento 'Aditivo de Contrato.pdf'.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos, visualizando uma lista de arquivos e pastas, com um modal 'ACOMPANHAR ASSINATURAS' sobreposto à lista.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "em",
+      "coordenadas_relativas": {
+        "x_pct": 0.1823,
+        "y_pct": 0.7466,
+        "w_pct": 0.0125,
+        "h_pct": 0.0201
+      },
+      "seletor_hint": "[id='signatureStatus']",
+      "iframe_hint": "ci",
+      "html_hint": "<em _ngcontent-ith-c34=\"\" id=\"signatureStatus\" tooltipposition=\"top\" class=\"signtaure-status pending-signature fas fa-signature ng-star-inserted\"></em>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o ícone de assinatura pendente.",
+    "_source": "Senior_Flow_-_GED_-_Enviar_arquivo_para.json"
+  },
   "o usuário quis acessar ou expandir as opções relacionadas a 'senior flow' dentro do menu de navegação lateral.": {
     "acao": "clique",
     "intencao_semantica": "O usuário quis acessar ou expandir as opções relacionadas a 'Senior Flow' dentro do menu de navegação lateral.",
@@ -6883,6 +7182,8 @@
     },
     "valor_input": "",
     "micro_narracao": "Acessamos o Senior Flow, nosso centro de automação...",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste005.json"
   },
   "acessar o módulo ou funcionalidades relacionadas a gerenciamento eletrônico de documentos (ged).": {
@@ -6895,10 +7196,10 @@
       "confianca_captura": "alta",
       "label_curto": "GED",
       "coordenadas_relativas": {
-        "x_pct": 0.0,
-        "y_pct": 0.0,
-        "w_pct": 0.0,
-        "h_pct": 0.0
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
       },
       "seletor_hint": "[aria-label='Grupo de menus GED']",
       "iframe_hint": null,
@@ -6906,6 +7207,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...e dentro dele, o GED — Gestão Eletrônica de Documentos.",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste005.json"
   },
   "o usuário quis navegar para a seção ou módulo do sistema responsável por gerenciar assuntos, tópicos ou itens relacionados a 'assuntos'.": {
@@ -6918,10 +7221,10 @@
       "confianca_captura": "alta",
       "label_curto": "Gerenciar Assuntos",
       "coordenadas_relativas": {
-        "x_pct": 0.0,
-        "y_pct": 0.0,
-        "w_pct": 0.0,
-        "h_pct": 0.0
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
       },
       "seletor_hint": "[aria-label='Gerenciar Assuntos']",
       "iframe_hint": null,
@@ -6929,6 +7232,8 @@
     },
     "valor_input": "",
     "micro_narracao": "Agora, em Gerenciar Assuntos, onde tudo se organiza.",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste005.json"
   },
   "preencher o campo de texto para inserir o nome de um novo assunto.": {
@@ -6952,6 +7257,8 @@
     },
     "valor_input": "",
     "micro_narracao": "",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste005.json"
   },
   "preencher o nome de um novo assunto para adicioná-lo ao sistema.": {
@@ -6975,6 +7282,8 @@
     },
     "valor_input": "ERP X",
     "micro_narracao": "Aqui, o nome do nosso novo assunto: ERP X.",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste005.json"
   },
   "salvar um novo assunto com o nome 'erp x'.": {
@@ -6998,6 +7307,8 @@
     },
     "valor_input": "",
     "micro_narracao": "E Salvar, pra registrar o novo assunto.",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_-_Teste005.json"
   },
   "acessar a funcionalidade ou módulo 'sign' do sistema.": {

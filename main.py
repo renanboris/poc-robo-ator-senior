@@ -422,6 +422,30 @@ async def executar_roteiro(caminho_json: str) -> None:
     passos_lista = roteiro.get("passos", [])
     total_passos = len(passos_lista)
 
+    # ── Pré-aquecimento de áudios ──────────────────────────────────────────────
+    # Gera todos os arquivos TTS em paralelo antes de abrir o browser.
+    # Na segunda execução os arquivos já existem e retornam instantaneamente.
+    # Isso elimina o delay de geração durante o loop de execução.
+    print("Pré-gerando áudios do roteiro...", flush=True)
+    tarefas_audio: list = []
+    for passo in passos_lista:
+        id_p   = passo.get("id_passo", passos_lista.index(passo) + 1)
+        ancora = passo.get("pedagogia", {}).get("ancora", "")
+        if ancora:
+            tarefas_audio.append(
+                gerar_audio(ancora, f"passo_{id_p}_ancora", nome_arquivo_base, voz_escolhida)
+            )
+        for i, acao_tec in enumerate(passo.get("acoes_tecnicas", [])):
+            micro = acao_tec.get("micro_narracao", "")
+            if micro:
+                tarefas_audio.append(
+                    gerar_audio(micro, f"passo_{id_p}_acao_{i}", nome_arquivo_base, voz_escolhida)
+                )
+    if tarefas_audio:
+        await asyncio.gather(*tarefas_audio)
+    print(f"✅ {len(tarefas_audio)} áudio(s) prontos. Iniciando gravação...", flush=True)
+    # ──────────────────────────────────────────────────────────────────────────
+
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=False, args=["--start-fullscreen", "--disable-infobars"])
         tempo_inicio_contexto = time.time()
@@ -513,7 +537,7 @@ async def executar_roteiro(caminho_json: str) -> None:
 
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.15)
 
                 if passo.get("is_conclusao", False):
                     await exibir_encerramento_cinema(page)

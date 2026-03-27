@@ -13,9 +13,10 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
-from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from contextlib import asynccontextmanager
+import unicodedata
 import glob
 import uvicorn
 import os
@@ -31,19 +32,12 @@ import logging
 import time
 import generator_engine
 import lego_builder
-
 import dap_engine
-
-app = FastAPI(title="Senior Training OS")
 
 # ==============================================================
 # WEBSOCKET MANAGER (Sprint 4) & LIFECYCLE
 # ==============================================================
 main_loop = None
-
-# FIX Bug #APP-03: @app.on_event("startup") foi deprecado no FastAPI 0.103+
-# Substituído por contextmanager de lifespan.
-from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,16 +46,12 @@ async def lifespan(app: FastAPI):
     logging.info("WebSocket Event Loop capturado com sucesso.")
     yield
 
-app_old_ref = app  # Mantém referência antes de recriar
-# Recria o app com lifespan declarado (necessário para compatibilidade com CORS já adicionado)
-# NOTA: Se usar lifespan, passe lifespan=lifespan no construtor do FastAPI acima.
-# Esta correção documenta a mudança necessária — aplique no construtor: FastAPI(title=..., lifespan=lifespan)
+def _norm(s: str) -> str:
+    """Normaliza string para comparação: remove acentos, lowercase, strip."""
+    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode().lower().strip()
 
-@app.on_event("startup")  # Mantido por compatibilidade — migre para lifespan quando possível
-async def startup_event():
-    global main_loop
-    main_loop = asyncio.get_running_loop()
-    logging.info("WebSocket Event Loop capturado com sucesso.")
+
+app = FastAPI(title="Senior Training OS", lifespan=lifespan)
 
 class ConnectionManager:
     def __init__(self):
@@ -116,19 +106,22 @@ MAX_REQUESTS_PER_MINUTE = 20
 
 def verificar_rate_limit(ip: str):
     agora = time.time()
+    # Expira entradas antigas por IP individualmente (evita clear() global que burla o limite)
     _rate_limit_cache[ip] = [t for t in _rate_limit_cache.get(ip, []) if agora - t < 60]
-    
+
     if len(_rate_limit_cache[ip]) >= MAX_REQUESTS_PER_MINUTE:
         logging.warning(f"Rate limit excedido para o IP: {ip}")
         raise HTTPException(status_code=429, detail="Limite de requisições excedido. Tente novamente em um minuto.")
-    
+
     _rate_limit_cache[ip].append(agora)
 
-    # FIX Bug #APP-04: Memory leak — dict de IPs nunca era purgado.
-    # Remove IPs sem requisições recentes para evitar crescimento indefinido da memória.
+    # Purga IPs sem requisições recentes para evitar crescimento indefinido da memória.
+    # Feito por expiração individual, não por clear() global.
     if len(_rate_limit_cache) > 10_000:
-        _rate_limit_cache.clear()
-        logging.info("Rate limit cache resetado (limpeza de memória preventiva).")
+        expirados = [k for k, v in _rate_limit_cache.items() if not v]
+        for k in expirados:
+            del _rate_limit_cache[k]
+        logging.info(f"Rate limit cache: {len(expirados)} IPs expirados removidos.")
 
 
 # ==============================================================
@@ -138,8 +131,12 @@ API_KEY_NAME = "Authorization"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 def verificar_token(api_key: str = Security(api_key_header)):
-    chave_mestra = f"Bearer {os.getenv('AURA_API_SECRET', 'senior_training_secreto_2026')}"
-    
+    secret = os.getenv("AURA_API_SECRET")
+    if not secret:
+        logging.critical("AURA_API_SECRET não configurado. Defina a variável de ambiente.")
+        raise HTTPException(status_code=500, detail="Configuração de segurança ausente no servidor.")
+    chave_mestra = f"Bearer {secret}"
+
     if not api_key or api_key != chave_mestra:
         logging.warning("Tentativa de acesso bloqueada: Token inválido ou ausente.")
         raise HTTPException(status_code=401, detail="Acesso não autorizado. Credenciais inválidas.")
@@ -153,8 +150,9 @@ def limpar_nome(nome: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
 
 def _validar_caminho(nome_arquivo: str, diretorio_base: str) -> str:
-    base    = os.path.realpath(diretorio_base)
-    destino = os.path.realpath(os.path.join(diretorio_base, nome_arquivo))
+    # Resolve o base em relação ao cwd no momento da chamada para garantir consistência
+    base    = os.path.realpath(os.path.abspath(diretorio_base))
+    destino = os.path.realpath(os.path.join(base, os.path.basename(nome_arquivo)))
     if not destino.startswith(base + os.sep) and destino != base:
         raise HTTPException(status_code=400, detail="Nome de arquivo inválido.")
     return destino
@@ -172,6 +170,8 @@ PDF_DIR      = "documentacao_pdf";os.makedirs(PDF_DIR,      exist_ok=True)
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/videos", StaticFiles(directory=VIDEOS_DIR), name="videos")
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ==============================================================
 # GERENCIADOR DE TAREFAS EM BACKGROUND
@@ -354,9 +354,9 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
         with _estado_lock:
             processo_atual = None
 
-@app.get("/dashboard.html", response_class=HTMLResponse)
-async def dashboard_antigo(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+@app.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 # ==============================================================
 # MODELOS DE DADOS (PYDANTIC)
@@ -433,25 +433,48 @@ class DapRequest(BaseModel):
 
 @app.get("/api/missoes")
 def listar_missoes_ativas():
-    """Retorna o catálogo de missões da Academia Operacional."""
+    """Retorna o catálogo de missões da Academia Operacional.
+    
+    Filtra automaticamente missões com status != 'producao' e nomes de teste
+    (padrão: Teste*, TES_*, roteiros com sufixo numérico simples).
+    Passe ?incluir_testes=1 para ver todas.
+    """
+    from fastapi import Request as _Req
     pasta = "missoes_ativas"
     if not os.path.exists(pasta):
         return []
-    
+
+    _PADRAO_TESTE = re.compile(
+        r'^(teste|test|TES_|Teste_?\d|Teste\d|Teste\s*\d)',
+        re.IGNORECASE
+    )
+
     missoes = []
     for arq in glob.glob(os.path.join(pasta, "*.json")):
         try:
             with open(arq, "r", encoding="utf-8") as f:
                 dados = json.load(f)
-                missoes.append({
-                    "id": dados.get("mission_id"),
-                    "titulo": dados.get("title"),
-                    "modulo": dados.get("module"),
-                    "dificuldade": dados.get("difficulty"),
-                    "xp_maximo": dados.get("scoring", {}).get("base_xp", 0),
-                    "arquivo": os.path.basename(arq)
-                })
-        except:
+
+            # Filtra missões de rascunho/teste pelo campo status
+            status = dados.get("status", "producao")
+            if status not in ("producao", "production"):
+                continue
+
+            # Filtra pelo nome do arquivo (convenção de nomenclatura)
+            nome_arq = os.path.basename(arq)
+            if _PADRAO_TESTE.match(nome_arq):
+                continue
+
+            missoes.append({
+                "id":          dados.get("mission_id"),
+                "titulo":      dados.get("title"),
+                "modulo":      dados.get("module"),
+                "dificuldade": dados.get("difficulty"),
+                "xp_maximo":   dados.get("scoring", {}).get("base_xp", 0),
+                "arquivo":     nome_arq
+            })
+        except Exception as e:
+            logging.warning(f"Erro ao ler missão '{arq}': {e}")
             continue
     return missoes
 
@@ -464,9 +487,9 @@ def obter_detalhes_missao(mission_id: str):
     with open(caminho, "r", encoding="utf-8") as f:
         return json.load(f)
 
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/dashboard", response_class=HTMLResponse)
+async def pagina_dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 @app.get("/api/metricas")
 async def get_metricas():
@@ -485,8 +508,9 @@ async def get_metricas():
         qtd_aulas = len([f for f in os.listdir(ROTEIROS_DIR) if f.endswith(".json")])
 
         # CÁLCULOS DE ROI
+        # Referência: HH Consultor Senior = R$150/h (alinhado com tooltip do dashboard)
         horas_poupadas_aulas = qtd_aulas * 6
-        economia_aulas_reais = horas_poupadas_aulas * 50
+        economia_aulas_reais = horas_poupadas_aulas * 150
         economia_tokens_reais = (sucesso_recuperacao + dap_respostas_salvas) * 0.05
 
         return {
@@ -508,7 +532,9 @@ async def get_metricas():
 @app.get("/api/status")
 async def get_status():
     with _estado_lock:
-        return estado_servidor.copy()
+        estado = estado_servidor.copy()
+    estado["user_name"] = os.getenv("APP_USER_NAME", "Operador")
+    return estado
 
 # 🟢 SPRINT 4: A Nova Rota WebSocket (Substitui o Status-Stream antigo)
 @app.websocket("/api/ws/status")
@@ -575,8 +601,8 @@ async def listar_roteiros():
                 "origem":          dados.get("metadata", {}).get("origem", "manual"),
                 "hitl_validado":   dados.get("metadata", {}).get("hitl_validado", False),
             })
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Erro ao processar roteiro '{arquivo}': {e}")
     roteiros.sort(key=lambda x: x["mtime"], reverse=True)
     return roteiros
 
@@ -850,10 +876,8 @@ async def rebuild_library():
 
 
 def carregarMetricas_bg():
-    """Dispara atualização de métricas em background sem bloquear o endpoint."""
-    # A rota /api/metricas já lê do disco — não há estado a sincronizar.
-    # Esta função existe para garantir que logs/cache interno sejam atualizados.
-    pass  # extensível futuramente com invalidação de cache Redis, etc.
+    """Reservado para futura invalidação de cache (ex: Redis). Atualmente no-op."""
+    pass
 
 
 
@@ -938,10 +962,6 @@ async def get_gps_roteiro(
                 # Match robusto: normaliza acentos e caixa antes de comparar.
                 # O Pinecone pode retornar o nome com variação de capitalização
                 # ou acento diferente do que está salvo no JSON.
-                import unicodedata
-                def _norm(s):
-                    return unicodedata.normalize("NFD", s).encode("ascii","ignore").decode().lower().strip()
-
                 alvo_norm = _norm(nome_aula_alvo)
                 if (_norm(nome_roteiro) == alvo_norm or
                         _norm(id_trein) == alvo_norm or

@@ -55,6 +55,7 @@
         // 🟢 Utilizando a sua classe original .aura-badge do style.css
         auraContainer.innerHTML = `
             <div class="aura-badge" id="aura-notification-badge">1</div>
+            <div id="aura-chat-stack"></div>
             <dotlottie-player id="aura-lottie-player" src="chrome-extension://${extensionId}/aura.json" background="transparent" speed="1"></dotlottie-player>
             <div id="aura-speech-bubble">
                 <button class="aura-btn-close" id="aura-btn-close" aria-label="Fechar">✕</button>
@@ -74,6 +75,59 @@
         const player = document.getElementById('aura-lottie-player');
         const bubble = document.getElementById('aura-speech-bubble');
         let _animacaoRodando = false;
+
+        // ── Balões sequenciais estilo WhatsApp ────────────────────────────────
+        let _chatStackTimers = [];
+
+        function exibirBaloesSequenciais(mensagens) {
+            _chatStackTimers.forEach(t => clearTimeout(t));
+            _chatStackTimers = [];
+
+            const stack = document.getElementById('aura-chat-stack');
+            if (!stack) return;
+            stack.innerHTML = '';
+
+            bubble.classList.remove('active');
+
+            // Timing humanizado: delay crescente simulando digitação
+            const DELAYS     = [0, 1100, 2000];   // ms para aparecer cada bolha
+            const VIDA_BOLHA = 7000;               // ms de vida após aparecer
+            const DUR_FADE   = 600;
+
+            // Opacidades progressivas: só aplica fade quando a 3ª bolha aparecer
+            // idx 0 = bolha mais antiga, idx 1 = segunda mais antiga
+            const OPACIDADES_ANTERIORES = [0.25, 0.55];
+
+            mensagens.forEach((texto, i) => {
+                const delay = DELAYS[i] ?? (i * 900);
+
+                const t1 = setTimeout(() => {
+                    // Só aplica fade a partir da 3ª bolha (i === 2)
+                    if (i >= 2) {
+                        const existentes = stack.querySelectorAll('.aura-chat-bubble:not(.aura-bubble-out)');
+                        existentes.forEach((el, j) => {
+                            const idx = existentes.length - 1 - j;
+                            const op = OPACIDADES_ANTERIORES[idx] ?? 0.15;
+                            el.style.transition = 'opacity 0.5s ease';
+                            el.style.opacity = op;
+                        });
+                    }
+
+                    const el = document.createElement('div');
+                    el.className = 'aura-chat-bubble';
+                    el.textContent = texto;
+                    stack.appendChild(el);
+
+                    const t2 = setTimeout(() => {
+                        el.classList.add('aura-bubble-out');
+                        setTimeout(() => el.remove(), DUR_FADE);
+                    }, VIDA_BOLHA);
+                    _chatStackTimers.push(t2);
+                }, delay);
+                _chatStackTimers.push(t1);
+            });
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         function tocarAnimacaoUmaVez() {
             if (_animacaoRodando) return;
@@ -131,19 +185,35 @@
             e.stopPropagation(); 
         });
 
+        // Trava de engajamento: qualquer interação dentro do balão cancela o auto-hide
+        bubble.addEventListener('mouseenter', () => {
+            _bubbleEngajada = true;
+            clearTimeout(_bubbleTimeout);
+        });
+        document.getElementById('aura-prompt-input').addEventListener('focus', () => {
+            _bubbleEngajada = true;
+            clearTimeout(_bubbleTimeout);
+        });
+
         player.addEventListener('click', (e) => {
             if (wasDragged) { wasDragged = false; return; }
 
             tocarAnimacaoUmaVez();
-            
-            // 🟢 Apaga o badge assim que o utilizador clica
+
             const badge = document.getElementById('aura-notification-badge');
             if (badge) badge.classList.remove('active');
 
+            // Clique direto: toggle do balão principal com input
             if (bubble.classList.contains('active')) {
                 bubble.classList.remove('active');
             } else {
-                exibirBalaoAura("Precisa de ajuda com esta tela?", []);
+                // Limpa qualquer sequência proativa que esteja rodando
+                _chatStackTimers.forEach(t => clearTimeout(t));
+                _chatStackTimers = [];
+                const stack = document.getElementById('aura-chat-stack');
+                if (stack) stack.innerHTML = '';
+
+                exibirBalaoAura("Como posso te ajudar nesta tela?", []);
             }
         });
 
@@ -157,6 +227,9 @@
         document.getElementById('aura-btn-close').addEventListener('click', (e) => {
             e.stopPropagation();
             bubble.classList.remove('active');
+            _bubbleEngajada = false;
+            const badge = document.getElementById('aura-notification-badge');
+            if (badge && !_mission.ativa) badge.classList.add('active');
         });
 
         document.addEventListener('click', (e) => {
@@ -170,7 +243,7 @@
 
         // ─── MOTOR DE PROATIVIDADE (IDLE TIMER) ──────────────────────────────────
         let tempoInativo = 0;
-        const TEMPO_LIMITE_SEGUNDOS = 30;
+        const TEMPO_LIMITE_SEGUNDOS = 15;
         let _throttleTimer = null;
 
         function resetarCronometro() {
@@ -186,7 +259,7 @@
 
         setInterval(() => {
             tempoInativo++;
-            if (tempoInativo === TEMPO_LIMITE_SEGUNDOS) {
+            if (tempoInativo >= TEMPO_LIMITE_SEGUNDOS && tempoInativo % TEMPO_LIMITE_SEGUNDOS === 0) {
                 const bubbleElement = document.getElementById('aura-speech-bubble');
                 const badgeElement = document.getElementById('aura-notification-badge');
                 
@@ -194,10 +267,11 @@
                     // 🟢 Se ainda não ofereceu o balão nesta tela, abre o balão.
                     if (!_jaOfereceuAjudaProativa) {
                         _jaOfereceuAjudaProativa = true;
-                        exibirBalaoAura("Vejo que você parou nesta tela. Precisa de alguma ajuda para continuar? 🤔", [
-                            { label: "Sim, me ajude",  action: () => dispararAnaliseIA("O que devo fazer nesta tela?") },
-                            { label: "Não, obrigado",  action: () => { bubbleElement.classList.remove('active'); resetarCronometro(); } }
-                        ]);
+                        exibirBaloesSequenciais(["Oiii! 👋", "Se precisar de ajuda", "Estou aqui! ✨"]);
+                        // Auto-hide: após as bubbles sumirem, acende o badge
+                        setTimeout(() => {
+                            if (badgeElement && !_mission.ativa) badgeElement.classList.add('active');
+                        }, 8000);
                     } else {
                         // 🟢 Se já ofereceu, acende APENAS o badge vermelho silenciosamente.
                         if (badgeElement) badgeElement.classList.add('active');
@@ -235,7 +309,7 @@
                     document.getElementById('aura-backdrop')?.remove();
                     const bubbleEl = document.getElementById('aura-speech-bubble');
                     if (bubbleEl?.classList.contains('active') && !_mission.ativa) {
-                        exibirBalaoAura(`Olá, ${descobrirNomeUsuario()}! Precisa de ajuda nesta nova tela?`, []);
+                        exibirBaloesSequenciais(["Oiii! 👋", "Tela nova!", "Precisa de ajuda? ✨"]);
                     }
                 }
             }, 300);
@@ -248,14 +322,19 @@
     }
 
     let _ultimoPromptParaFeedback = '';
+    let _bubbleEngajada = false; // trava: true enquanto o usuário está interagindo
 
     function exibirBalaoAura(texto, opcoes = [], mostrarFeedback = false) {
         const bubble = document.getElementById('aura-speech-bubble');
         const badge = document.getElementById('aura-notification-badge');
         if (!bubble) return;
 
+        // Limpa balões sequenciais se estiverem visíveis
+        const stack = document.getElementById('aura-chat-stack');
+        if (stack) stack.innerHTML = '';
+
         clearTimeout(_bubbleTimeout);
-        // Esconde a notificação se o balão abriu
+        _bubbleEngajada = false; // reset ao abrir nova mensagem
         if (badge) badge.classList.remove('active');
 
         bubble.querySelector('.aura-text').innerText = texto;
@@ -278,9 +357,9 @@
 
         bubble.classList.add('active');
 
-        // 🟢 AUTO-HIDE com Notificação: Recolhe o balão em 12s e acende o badge
+        // AUTO-HIDE: só fecha se o usuário não interagiu com o balão
         _bubbleTimeout = setTimeout(() => {
-            if (bubble.classList.contains('active')) {
+            if (bubble.classList.contains('active') && !_bubbleEngajada) {
                 bubble.classList.remove('active');
                 if (badge && !_mission.ativa) {
                     badge.classList.add('active');

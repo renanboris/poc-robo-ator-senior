@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2300e5e5'/><path d='M45 20 L30 55 L48 55 L45 80 L70 45 L52 45 Z' fill='%23060a14'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/os-tokens.css">
 <script>
   (function() {
     var saved = localStorage.getItem('training-os-theme');
@@ -18,122 +19,15 @@
 </script>
 <style>
 /* ═══════════════════════════════════════════
-   TOKENS & RESET
+   DASHBOARD — Layout & Components
+   (tokens globais vêm de /static/os-tokens.css)
 ═══════════════════════════════════════════ */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --bg:          #060a14;
-  --bg-2:        #0a0f1e;
-  --bg-3:        #0f1628;
-  --surface:     #111827;
-  --surface-2:   #1a2438;
-  --surface-3:   #1f2d45;
-  --border:      rgba(255,255,255,0.06);
-  --border-2:    rgba(255,255,255,0.10);
-  --cyan:        #00e5e5;
-  --cyan-2:      #00b8b8;
-  --cyan-dim:    rgba(0,229,229,0.08);
-  --cyan-glow:   rgba(0,229,229,0.25);
-  --amber:       #f59e0b;
-  --amber-dim:   rgba(245,158,11,0.1);
-  --green:       #10b981;
-  --green-dim:   rgba(16,185,129,0.1);
-  --red:         #ef4444;
-  --red-dim:     rgba(239,68,68,0.1);
-  --violet:      #8b5cf6;
-  --violet-dim:  rgba(139,92,246,0.1);
-  --blue:        #3b82f6;
-  --blue-dim:    rgba(59,130,246,0.1);
-  --text:        #f1f5f9;
-  --text-2:      #94a3b8;
-  --text-3:      #475569;
-  --font-display: 'Outfit', system-ui, sans-serif;
-  --font-ui:      'Geist', system-ui, sans-serif;
-  --font-mono:    'JetBrains Mono', 'Courier New', monospace;
-  --radius:       12px;
-  --radius-sm:    8px;
-  --radius-xs:    6px;
-  --ease-out:     cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* ═══════════════════════════════════════════
-   LIGHT THEME TOKENS
-═══════════════════════════════════════════ */
-html.light {
-  --bg:          #f5f7fa;
-  --bg-2:        #eef1f6;
-  --bg-3:        #e4e8f0;
-  --surface:     #ffffff;
-  --surface-2:   #f0f3f9;
-  --surface-3:   #e2e7f0;
-  --border:      rgba(0,0,0,0.07);
-  --border-2:    rgba(0,0,0,0.12);
-  --cyan:        #007a7a;
-  --cyan-2:      #006060;
-  --cyan-dim:    rgba(0,122,122,0.08);
-  --cyan-glow:   rgba(0,122,122,0.18);
-  --amber:       #b45309;
-  --amber-dim:   rgba(180,83,9,0.08);
-  --green:       #059669;
-  --green-dim:   rgba(5,150,105,0.08);
-  --red:         #dc2626;
-  --red-dim:     rgba(220,38,38,0.08);
-  --violet:      #6d28d9;
-  --violet-dim:  rgba(109,40,217,0.08);
-  --blue:        #1d4ed8;
-  --blue-dim:    rgba(29,78,216,0.08);
-  --text:        #0f172a;
-  --text-2:      #475569;
-  --text-3:      #94a3b8;
-}
-
-html.light body::after { opacity: 0.012; }
+/* Dashboard precisa de overflow:hidden no body */
+html, body { overflow: hidden; }
 
 html.light #sidebar::before {
   background: radial-gradient(ellipse 120% 60% at 50% 0%, rgba(0,122,122,0.05) 0%, transparent 70%);
-}
-
-/* Smooth theme transitions */
-*, *::before, *::after {
-  transition-property: background-color, border-color, color, box-shadow;
-  transition-duration: 0.25s;
-  transition-timing-function: ease;
-}
-/* Exclude animation-driven elements */
-/* FIX BUG-HTML-3: .bar-fill REMOVIDO desta lista. transition:none cancelava
-   o transform:scaleX 1.2s das barras de velocidade, fazendo-as saltar.
-   Apenas elementos genuinamente animados ficam aqui. */
-.loader-ring, .live-dot, .rec-dot, .roadmap-progress-fill,
-.toast, [class*="pulse"], canvas { transition: none !important; }
-
-html, body {
-  height: 100%; width: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-ui);
-  overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* ═══════════════════════════════════════════
-   SCROLLBAR
-═══════════════════════════════════════════ */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
-
-/* ═══════════════════════════════════════════
-   NOISE TEXTURE OVERLAY
-═══════════════════════════════════════════ */
-body::after {
-  content: '';
-  position: fixed; inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity: 0.022; pointer-events: none; z-index: 9999;
 }
 
 /* ═══════════════════════════════════════════
@@ -1368,7 +1262,7 @@ html.light .theme-opt.active {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>AI Coach (DAP)</span>
           </div>
-          <span class="roadmap-badge badge-soon">Q3</span>
+          <span class="roadmap-badge badge-wip">Em Dev</span>
         </div>
 
         <div class="nav-roadmap-item">
@@ -1390,10 +1284,10 @@ html.light .theme-opt.active {
     </div>
 
     <div class="sidebar-footer">
-      <div class="user-avatar">A</div>
+      <div class="user-avatar" id="sidebar-avatar">—</div>
       <div class="user-info">
-        <div class="user-name">Admin</div>
-        <div class="user-version">v2.7.0 · build 420</div>
+        <div class="user-name" id="sidebar-username">Carregando...</div>
+        <div class="user-version">Training OS · v2.7</div>
       </div>
       <div class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" data-tip="Alternar tema">
         <div class="theme-opt" id="theme-opt-dark" title="Dark">🌙</div>
@@ -1408,7 +1302,7 @@ html.light .theme-opt.active {
 
       <div class="overview-header">
         <div>
-          <h1 class="overview-title">Olá, Renan 👋<br>Bem-vindo de volta ao <em>Training OS</em>.</h1>
+          <h1 class="overview-title">Olá, <span id="overview-username">...</span> 👋<br>Bem-vindo de volta ao <em>Training OS</em>.</h1>
           <p class="overview-sub">
             Aqui está o resumo da produtividade da sua esteira hoje
             <span class="date-chip" id="current-date">—</span>
@@ -1558,11 +1452,11 @@ html.light .theme-opt.active {
               <div class="roadmap-content">
                 <div class="roadmap-feat">
                   AI Coach DAP
-                  <span class="roadmap-badge badge-soon">Q3 2025</span>
+                  <span class="roadmap-badge badge-wip">Em Dev</span>
                 </div>
-                <div class="roadmap-eta">Assistente contextual em sobreposição na tela</div>
+                <div class="roadmap-eta">Aura DAP — assistente contextual ativo no Senior X</div>
                 <div class="roadmap-progress">
-                  <div class="roadmap-progress-fill" style="width:25%;background:var(--amber)" data-pct="0.25"></div>
+                  <div class="roadmap-progress-fill" style="width:70%;background:var(--amber)" data-pct="0.25"></div>
                 </div>
               </div>
             </div>
@@ -2058,6 +1952,7 @@ let sseSource = null;
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   atualizarData();
+  carregarNomeUsuario();
   carregarRoteiros();
   carregarMetricas();
   iniciarSSE();
@@ -2089,6 +1984,22 @@ function atualizarData() {
   document.getElementById('current-date').textContent =
     d.toLocaleDateString('pt-BR', opts);
 }
+// Carrega nome do usuário via APP_USER_NAME no .env
+async function carregarNomeUsuario() {
+  let nome = 'Usuário';
+  try {
+    const r = await fetch('/api/status');
+    if (r.ok) { const d = await r.json(); if (d.user_name) nome = d.user_name; }
+  } catch {}
+  const iniciais = nome.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+  const elAvatar   = document.getElementById('sidebar-avatar');
+  const elUsername = document.getElementById('sidebar-username');
+  const elOverview = document.getElementById('overview-username');
+  if (elAvatar)   elAvatar.textContent   = iniciais;
+  if (elUsername) elUsername.textContent = nome;
+  if (elOverview) elOverview.textContent = nome;
+}
+
 
 // ════════════════════════════════════════
 // TAB NAVIGATION
