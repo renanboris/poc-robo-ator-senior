@@ -691,9 +691,10 @@ html.light #sidebar::before {
   font-size: 8px; font-weight: 700; padding: 1px 5px;
   border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px;
 }
-.mb-video  { background: var(--blue-dim); color: var(--blue); }
-.mb-scorm  { background: var(--violet-dim); color: var(--violet); }
-.mb-pdf    { background: var(--green-dim); color: var(--green); }
+.mb-video   { background: var(--blue-dim);   color: var(--blue); }
+.mb-scorm   { background: var(--violet-dim); color: var(--violet); }
+.mb-pdf     { background: var(--green-dim);  color: var(--green); }
+.mb-simlink { background: var(--cyan-dim);   color: var(--cyan); }
 
 /* Studio main editor area */
 #studio-main {
@@ -746,12 +747,13 @@ html.light #sidebar::before {
 }
 .pipe-btn:hover { border-color: var(--border-2); color: var(--text); background: var(--surface-2); }
 
-.pipe-btn.robo  { --clr: var(--blue); }
-.pipe-btn.video { --clr: var(--cyan); }
-.pipe-btn.scorm { --clr: var(--violet); }
-.pipe-btn.pdf   { --clr: var(--green); }
-.pipe-btn.hitl  { --c: var(--amber); }
-.pipe-btn.coach { --clr: var(--amber); }
+.pipe-btn.robo    { --clr: var(--blue); }
+.pipe-btn.video   { --clr: var(--cyan); }
+.pipe-btn.scorm   { --clr: var(--violet); }
+.pipe-btn.pdf     { --clr: var(--green); }
+.pipe-btn.simlink { --clr: var(--cyan); }
+.pipe-btn.hitl    { --c: var(--amber); }
+.pipe-btn.coach   { --clr: var(--amber); }
 
 .pipe-btn.pulse {
   border-color: var(--clr);
@@ -1647,9 +1649,14 @@ html.light .theme-opt.active {
               <span class="lbl">4. E-book</span>
               <div class="notif"></div>
             </button>
+            <button id="btn-gen-simlink" class="pipe-btn simlink" onclick="gerarSimLink()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span class="lbl">5. SimLink</span>
+              <div class="notif"></div>
+            </button>
             <button id="btn-gen-coach" class="pipe-btn coach" onclick="ingestarCoachIA()" data-tip="Alimentar Base da IA">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 12 2.1 7.1"/></svg>
-              <span class="lbl">5. Coach IA</span>
+              <span class="lbl">6. Coach IA</span>
             </button>
 
             <div class="pipeline-sep"></div>
@@ -1665,6 +1672,10 @@ html.light .theme-opt.active {
             <a id="btn-baixar-pdf" class="btn-consume" href="#" target="_blank" title="Visualizar E-book PDF">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
               Ver Playbook
+            </a>
+            <a id="btn-preview-simlink" class="btn-consume" href="#" target="_blank" title="Abrir SimLink no navegador">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              SimLink
             </a>
           </div>
         </div>
@@ -2361,9 +2372,10 @@ function renderizarListaRoteiros() {
     passos.textContent = `${r.qtd_passos || 0} passos`;
     meta.appendChild(passos);
 
-    if (r.tem_video)  { const b = document.createElement('span'); b.className='media-badge mb-video'; b.textContent='Vídeo'; meta.appendChild(b); }
-    if (r.tem_scorm)  { const b = document.createElement('span'); b.className='media-badge mb-scorm'; b.textContent='SCORM'; meta.appendChild(b); }
-    if (r.tem_pdf)    { const b = document.createElement('span'); b.className='media-badge mb-pdf'; b.textContent='PDF'; meta.appendChild(b); }
+    if (r.tem_video)   { const b = document.createElement('span'); b.className='media-badge mb-video';   b.textContent='Vídeo';   meta.appendChild(b); }
+    if (r.tem_scorm)   { const b = document.createElement('span'); b.className='media-badge mb-scorm';   b.textContent='SCORM';   meta.appendChild(b); }
+    if (r.tem_pdf)     { const b = document.createElement('span'); b.className='media-badge mb-pdf';     b.textContent='PDF';     meta.appendChild(b); }
+    if (r.tem_simlink) { const b = document.createElement('span'); b.className='media-badge mb-simlink'; b.textContent='SimLink'; meta.appendChild(b); }
     if (r.origem === 'ia') {
       const bIA = document.createElement('span');
       if (r.hitl_validado) {
@@ -2510,6 +2522,16 @@ async function gerarPDF() {
     }
 }
 
+async function gerarSimLink() {
+  if (!arquivoAtual) return;
+  try {
+    await salvarRoteiro(false);
+    const r = await fetch(`/api/gerar-simlink/${arquivoAtual}`, { method: 'POST' });
+    if (!r.ok) throw new Error('Falha ao gerar SimLink');
+    toast('🔗 Gerando SimLink (simulador standalone)...', 'info');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
 async function ingestarCoachIA() {
     if (!arquivoAtual) return;
     try {
@@ -2598,13 +2620,15 @@ function atualizarBotoesPipeline() {
   const btnV = document.getElementById('btn-gen-video');
   const btnS = document.getElementById('btn-gen-scorm');
   const btnP = document.getElementById('btn-gen-pdf');
+  const btnSL = document.getElementById('btn-gen-simlink');
   const btnC = document.getElementById('btn-gen-coach');
   
-  const btnA = document.getElementById('btn-assistir');
-  const btnD = document.getElementById('btn-baixar-scorm');
+  const btnA  = document.getElementById('btn-assistir');
+  const btnD  = document.getElementById('btn-baixar-scorm');
   const btnDP = document.getElementById('btn-baixar-pdf');
+  const btnDSL = document.getElementById('btn-preview-simlink');
 
-[btnR, btnV, btnS, btnP, btnC].forEach(b => {
+[btnR, btnV, btnS, btnP, btnSL, btnC].forEach(b => {
       if(b) {
           b.classList.remove('pulse');
           b.style.borderColor = '';
@@ -2629,6 +2653,9 @@ function atualizarBotoesPipeline() {
     btnS.querySelector('.lbl').textContent = '3. Gerar SCORM';
   } else if (!cfg.tem_pdf) {
     btnP?.classList.add('pulse');
+  } else if (!cfg.tem_simlink) {
+    btnSL?.classList.add('pulse');
+    btnSL?.querySelector('.lbl') && (btnSL.querySelector('.lbl').textContent = '5. Gerar SimLink');
   } else if (!cfg.tem_coach) {
     btnC?.classList.add('pulse'); // Pisca a Aura pedindo para ser ensinada
   } else {
@@ -2643,11 +2670,14 @@ function atualizarBotoesPipeline() {
   if (cfg.tem_video)  { btnA.classList.add('visible'); btnA.dataset.url = cfg.video_url || ''; }
   else                { btnA.classList.remove('visible'); }
   
-  if (cfg.tem_scorm)  { btnD.classList.add('visible'); btnD.href = cfg.scorm_url || '#'; }
-  else                { btnD.classList.remove('visible'); }
+  if (cfg.tem_scorm)   { btnD.classList.add('visible');   btnD.href   = cfg.scorm_url   || '#'; }
+  else                 { btnD.classList.remove('visible'); }
   
-  if (cfg.tem_pdf)    { btnDP?.classList.add('visible'); btnDP.href = cfg.pdf_url || '#'; }
-  else                { btnDP?.classList.remove('visible'); }
+  if (cfg.tem_pdf)     { btnDP?.classList.add('visible');  btnDP.href  = cfg.pdf_url     || '#'; }
+  else                 { btnDP?.classList.remove('visible'); }
+
+  if (cfg.tem_simlink) { btnDSL?.classList.add('visible'); btnDSL.href = cfg.simlink_url || '#'; }
+  else                 { btnDSL?.classList.remove('visible'); }
 }
 
 // ════════════════════════════════════════

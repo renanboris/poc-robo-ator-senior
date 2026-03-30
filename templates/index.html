@@ -768,6 +768,7 @@ const STEPS = [
   { label: '🎬 Renderização do vídeo (MP4)',       endpoint: n => `/api/renderizar/${n}` },
   { label: '📦 Geração do pacote SCORM',           endpoint: n => `/api/gerar-scorm/${n}` },
   { label: '📜 Geração do documento PDF',          endpoint: n => `/api/gerar-pdf/${n}` },
+  { label: '🔗 Geração do SimLink',                endpoint: n => `/api/gerar-simlink/${n}` },
   { label: '🧠 Indexação na base de conhecimento', endpoint: n => `/api/ingest/${n}` },
 ];
 
@@ -847,10 +848,11 @@ async function addDeliverables(arquivoJson) {
     }
   } catch (e) {}
 
-  const video = `${API}/videos/${baseName}.mp4`;
-  const pdf   = `${API}/api/download-pdf/${baseName}`;
-  const scorm = `${API}/api/download-scorm/${baseName}`;
-  const link  = `${window.location.origin}/videos/${baseName}.mp4`;
+  const video   = `${API}/videos/${baseName}.mp4`;
+  const pdf     = `${API}/api/download-pdf/${baseName}`;
+  const scorm   = `${API}/api/download-scorm/${baseName}`;
+  const simlink = `${API}/api/preview-simlink/${baseName}`;
+  const link    = `${window.location.origin}/videos/${baseName}.mp4`;
 
   append(`<div class="msg msg-agent" style="align-items:flex-start">
     ${agentIcon()}
@@ -868,9 +870,13 @@ async function addDeliverables(arquivoJson) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             PDF
           </a>
-          <a href="${scorm}" target="_blank" class="dl-btn">
+          <a href="${scorm}" download class="dl-btn">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             SCORM
+          </a>
+          <a href="${simlink}" target="_blank" class="dl-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            SimLink
           </a>
           <button class="dl-btn" onclick="copyToClipboard('${link}', this)">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
