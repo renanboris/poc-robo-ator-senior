@@ -65,7 +65,7 @@
 /* ─── 3. STACK DE BALÕES FLUTUANTES (PROATIVO / SEQUENCIAL) ──────────────── */
 #aura-chat-stack {
     position: absolute !important;
-    bottom: 185px !important;
+    bottom: 148px !important;
     right: -10px !important;
     width: 280px !important;
     display: flex !important;

@@ -44,7 +44,6 @@ TARGET_DIM         = 3072
 cliques_capturados: list = []
 _id_acao_global: int    = 0
 _lock_id: asyncio.Lock  = None
-_pending_tasks: set     = set()
 
 def limpar_nome(nome: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
@@ -257,22 +256,6 @@ async def _injetar_em_contexto(contexto):
         }, true);
 
         let clickTimeout = null;
-        let _lastMousedownTarget = null;
-
-        const flushPending = () => {
-            if (clickTimeout !== null && _lastMousedownTarget !== null) {
-                clearTimeout(clickTimeout);
-                clickTimeout = null;
-                processarEvento(_lastMousedownTarget, 'clique');
-                _lastMousedownTarget = null;
-            }
-        };
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') flushPending();
-        });
-        window.addEventListener('pagehide', flushPending);
-
         document.addEventListener('mousedown', (e) => {
             // Se for botão direito (2), processa na hora, sem delays!
             if (e.button === 2) { 
@@ -280,9 +263,8 @@ async def _injetar_em_contexto(contexto):
                 return; 
             }
             if (e.button === 0) {
-                if (clickTimeout !== null) { clearTimeout(clickTimeout); clickTimeout = null; _lastMousedownTarget = null; return; }
-                _lastMousedownTarget = e.target;
-                clickTimeout = setTimeout(() => { processarEvento(e.target, 'clique'); clickTimeout = null; _lastMousedownTarget = null; }, 250);
+                if (clickTimeout !== null) { clearTimeout(clickTimeout); clickTimeout = null; return; }
+                clickTimeout = setTimeout(() => { processarEvento(e.target, 'clique'); clickTimeout = null; }, 250);
             }
         }, true);
         
@@ -393,18 +375,9 @@ async def on_capturar_elemento(source, args):
     except Exception as e:
         logger.error(f"Erro ao processar captura: {e}")
 
-def _track(coro):
-    """Wrap a coroutine in a tracked asyncio Task so it can be drained on session close."""
-    task = asyncio.ensure_future(coro)
-    _pending_tasks.add(task)
-    task.add_done_callback(_pending_tasks.discard)
-    return task
-
-
 async def capturar_cliques_na_tela():
-    global _lock_id, _pending_tasks
+    global _lock_id
     _lock_id = asyncio.Lock()
-    _pending_tasks = set()  # reset stale state from any previous run
 
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
     usuario    = os.getenv("SENIOR_USER")
@@ -419,7 +392,7 @@ async def capturar_cliques_na_tela():
         context = await browser.new_context(no_viewport=True)
         page    = await context.new_page()
 
-        await context.expose_binding("capturarElemento", lambda source, args: _track(on_capturar_elemento(source, args)), handle=True)
+        await context.expose_binding("capturarElemento", on_capturar_elemento, handle=True)
         logger.info("Abrindo Senior X para Mapeamento...")
         print("A iniciar o navegador e a tentar login...", flush=True)
 
@@ -519,13 +492,6 @@ async def capturar_cliques_na_tela():
                     break
         except Exception:
             pass
-
-        # Drain all in-flight on_capturar_elemento tasks before returning,
-        # so clicks processed during the last moments of the session are not lost.
-        if _pending_tasks:
-            logger.info(f"Aguardando {len(_pending_tasks)} tarefa(s) pendente(s) antes de encerrar...")
-            await asyncio.gather(*_pending_tasks, return_exceptions=True)
-        _pending_tasks.clear()
 
 def _validar_roteiro(roteiro: dict) -> tuple[bool, str]:
     """
@@ -734,18 +700,14 @@ def iniciar_esteira_de_producao():
             nome_aula = input("Qual e o nome desta aula? (Ex: Criando Pastas e Subpastas)\n> ")
             objetivo  = input("Qual e o objetivo do treinamento?\n> ")
 
-        async def _pipeline(nome_aula_inner, objetivo_inner):
-            await capturar_cliques_na_tela()
-            if cliques_capturados:
-                logger.info(f"{len(cliques_capturados)} acoes capturadas. Processando Roteiro...")
-                return await orquestrador_pos_captura(nome_aula_inner, objetivo_inner)
-            return None
-
-        caminho_roteiro_gerado = asyncio.run(_pipeline(nome_aula, objetivo))
+        asyncio.run(capturar_cliques_na_tela())
 
         if not cliques_capturados:
             print("AVISO: Nenhuma acao capturada. O navegador foi fechado sem interacoes.", flush=True)
             sys.exit(1)
+
+        logger.info(f"{len(cliques_capturados)} acoes capturadas. Processando Roteiro...")
+        caminho_roteiro_gerado = asyncio.run(orquestrador_pos_captura(nome_aula, objetivo))
 
         if caminho_roteiro_gerado:
             if is_auto:

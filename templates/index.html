@@ -435,7 +435,7 @@ function conectarWS() {
   _ws.onerror = () => { _ws.close(); };
 }
 
-function asalvarStatus(timeoutMs = 180000) {
+function aguardarStatus(timeoutMs = 180000) {
   return new Promise((resolve) => {
     if (_ws && _ws.readyState === WebSocket.OPEN) {
       const timer = setTimeout(() => {
@@ -462,7 +462,7 @@ async function _pollFallback(resolve, timeoutMs) {
   resolve({ sucesso: false, mensagem: 'Tempo esgotado. O processo excedeu 3 minutos.' });
 }
 
-const pollStatus = () => asalvarStatus();
+const pollStatus = () => aguardarStatus();
 
 // ─── Sanitização Inteligente ───────────────────────────────
 function formatarNomeArquivo(nome) {
@@ -894,7 +894,7 @@ async function addDeliverables(arquivoJson) {
   scrollBottom();
 }
 
-// pollStatus() → alias para asalvarStatus() via WebSocket
+// pollStatus() → alias para aguardarStatus() via WebSocket
 
 // ─── Input control ─────────────────────────────────────────
 function setInputEnabled(on) {

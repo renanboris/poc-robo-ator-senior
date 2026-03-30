@@ -431,6 +431,26 @@ async def _aguardar_estabilidade(page: Page, timeout_ms: int = 2000) -> None:
         await asyncio.sleep(0.4)
 
 
+async def _digitar_humanizado(page: Page, valor: str) -> None:
+    """
+    Digita um valor caractere por caractere com delay variável,
+    simulando ritmo humano real. Usa press_sequentially (keydown/keyup
+    por char) em vez de keyboard.type, que é mais mecânico.
+
+    Delay base: 65ms por caractere.
+    Variação aleatória: ±30ms por caractere (ruído natural).
+    Pausa extra: 10% de chance de micro-pausa de 120-250ms
+    (simula hesitação humana ao digitar).
+    """
+    import random
+    for char in valor:
+        delay = random.randint(45, 95)  # 45–95ms por caractere
+        await page.keyboard.press(char, delay=delay)
+        # micro-pausa ocasional (~10% dos caracteres)
+        if random.random() < 0.10:
+            await asyncio.sleep(random.uniform(0.12, 0.25))
+
+
 async def _executar_acao(locator, page, acao: str, valor: str) -> None:
     try:
         await locator.scroll_into_view_if_needed(timeout=2000)
@@ -528,7 +548,7 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
         await page.keyboard.press("Control+A")
         await page.keyboard.press("Backspace")
         if valor:
-            await page.keyboard.type(valor, delay=40)
+            await _digitar_humanizado(page, valor)
         await page.keyboard.press("Enter")
     elif acao == "preencher_campo":
         await locator.click(timeout=2000)
@@ -536,7 +556,7 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
         await page.keyboard.press("Control+A")
         await page.keyboard.press("Backspace")
         if valor:
-            await page.keyboard.type(valor, delay=40)
+            await _digitar_humanizado(page, valor)
     else:
         await locator.click(timeout=3000)
 

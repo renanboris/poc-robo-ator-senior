@@ -295,22 +295,36 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
             # reconstrói a biblioteca de peças automaticamente.
             # Usa daemon thread para não travar o broadcast do WebSocket.
             if "capture.py" in " ".join(comando):
-                def _auto_rebuild():
+                # Extrai o caminho exato do roteiro emitido pelo capture.py via stdout.
+                # Isso evita o glob+mtime que lia o arquivo errado quando outros
+                # roteiros tinham sido tocados mais recentemente.
+                roteiro_gerado_path = None
+                for _l in linhas_log:
+                    if _l.startswith("ROTEIRO_GERADO:"):
+                        roteiro_gerado_path = _l.split("ROTEIRO_GERADO:", 1)[1].strip()
+                        break
+
+                def _auto_rebuild(roteiro_path=roteiro_gerado_path):
                     """
                     Portão de qualidade para o caminho Dashboard.
-                    Como capture.py rodou em subprocess, não temos o roteiro_final
-                    em memória — lemos o JSON mais recente de roteiros_salvos/
-                    e validamos antes de reconstruir a biblioteca.
+                    Usa o caminho exato emitido pelo capture.py (ROTEIRO_GERADO:).
+                    Fallback para glob+mtime apenas se a linha não foi encontrada.
                     """
                     try:
-                        # Encontra o roteiro mais recente gerado por este mapeamento
-                        import glob
-                        arquivos = glob.glob(os.path.join(ROTEIROS_DIR, "*.json"))
-                        if not arquivos:
-                            logging.warning("Auto-rebuild: nenhum roteiro encontrado.")
-                            return
-
-                        roteiro_recente = max(arquivos, key=os.path.getmtime)
+                        if roteiro_path and os.path.exists(roteiro_path):
+                            roteiro_recente = roteiro_path
+                        else:
+                            # Fallback de segurança — não deveria ser necessário
+                            import glob
+                            arquivos = glob.glob(os.path.join(ROTEIROS_DIR, "*.json"))
+                            if not arquivos:
+                                logging.warning("Auto-rebuild: nenhum roteiro encontrado.")
+                                return
+                            roteiro_recente = max(arquivos, key=os.path.getmtime)
+                            logging.warning(
+                                "Auto-rebuild: ROTEIRO_GERADO não encontrado no stdout — "
+                                "usando fallback mtime. Verifique capture.py."
+                            )
 
                         # Portão de qualidade — mesmos critérios do capture.py
                         try:

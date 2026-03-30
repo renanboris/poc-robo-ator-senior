@@ -193,6 +193,7 @@
         document.getElementById('aura-prompt-input').addEventListener('focus', () => {
             _bubbleEngajada = true;
             clearTimeout(_bubbleTimeout);
+            window.postMessage({ type: "AURA_PRE_CAPTURE" }, window.location.origin);
         });
 
         player.addEventListener('click', (e) => {
@@ -315,10 +316,6 @@
             }, 300);
         });
         observerSPA.observe(document.body, { childList: true, subtree: true });
-
-        document.getElementById('aura-prompt-input').addEventListener('focus', () => {
-            window.postMessage({ type: "AURA_PRE_CAPTURE" }, window.location.origin);
-        });
     }
 
     let _ultimoPromptParaFeedback = '';

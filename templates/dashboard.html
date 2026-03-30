@@ -1955,7 +1955,6 @@ document.addEventListener('DOMContentLoaded', () => {
   carregarNomeUsuario();
   carregarRoteiros();
   carregarMetricas();
-  iniciarSSE();
   animarBarras();
   animarRoadmap();
 
@@ -2015,17 +2014,11 @@ function showTab(name) {
 // ════════════════════════════════════════
 // SSE — REAL-TIME STATUS (com fallback polling)
 // ════════════════════════════════════════
+// SSE removido — WebSocket (script abaixo) é o canal principal.
+// pollingFallback mantido como backup leve para o live-indicator.
 function iniciarSSE() {
-  try {
-    sseSource = new EventSource('/api/status-stream');
-    sseSource.onmessage = e => processarStatus(JSON.parse(e.data));
-    sseSource.onerror = () => {
-      sseSource.close();
-      setTimeout(pollingFallback, 3000);
-    };
-  } catch {
-    setTimeout(pollingFallback, 3000);
-  }
+  // Inicia polling leve apenas para o live-indicator
+  setTimeout(pollingFallback, 5000);
 }
 
 async function pollingFallback() {

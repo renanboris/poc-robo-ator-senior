@@ -28,6 +28,7 @@ logger = logging.getLogger("capture_hybrid_shadow")
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
 gemini_client = genai.Client(api_key=GOOGLE_API_KEY) if (GOOGLE_API_KEY and genai) else None
+HYBRID_DISABLE_GEMINI = os.getenv("HYBRID_DISABLE_GEMINI", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 cliques_capturados = []
 _processing_queue = None
@@ -36,12 +37,54 @@ _recording_active = False
 _id_acao_global = 0
 _lock_id = None
 
+# Sprint 4: estado para promoção clique → duplo_clique
+_ultimo_evento_queue: dict = {}   # guarda o último item enfileirado para promoção
+_DBLCLICK_JANELA_MS = 600         # janela de consolidação em ms
+
 JS_HYBRID = r"""
 (() => {
     if (window.__hybridCaptureLoaded) return;
     window.__hybridCaptureLoaded = true;
 
-    function getElementName(el) {
+    // ── Sprint 1: Detecta se estamos no shell ou num módulo iframe ──
+    function getCaptureScope() {
+        try {
+            if (window !== window.top) return 'module_iframe';
+        } catch(e) {}
+        return 'shell';
+    }
+
+    // ── Sprint 2: Label inteligente — sobe a árvore em ícones "burros" ──
+    // Ícones (i, svg, span.fa-*) não têm texto próprio.
+    // Subimos até o pai interativo e tentamos aria-label, title, texto próximo.
+    function getSmartLabel(el) {
+        const ICON_TAGS = new Set(['I', 'SVG', 'PATH', 'USE']);
+        const isIconEl = ICON_TAGS.has(el.tagName)
+            || (el.tagName === 'SPAN' && Array.from(el.classList).some(c => /^(fa-|icon-|mdi-|material-)/.test(c)));
+
+        // Para ícones, sobe imediatamente para o pai interativo
+        if (isIconEl) {
+            let cur = el.parentElement;
+            for (let i = 0; i < 5; i++) {
+                if (!cur) break;
+                const aria = cur.getAttribute && cur.getAttribute('aria-label');
+                if (aria) return aria;
+                const title = cur.getAttribute && cur.getAttribute('title');
+                if (title) return title;
+                const txt = (cur.innerText || cur.textContent || '').trim().replace(/\s+/g, ' ');
+                if (txt && txt.length > 1 && txt.length < 80) return txt;
+                cur = cur.parentElement;
+            }
+            // Tenta pegar o breadcrumb mais próximo como contexto
+            const bc = document.querySelector('.ui-breadcrumb, [aria-label*="breadcrumb"], nav[aria-label]');
+            if (bc) {
+                const bcText = (bc.innerText || bc.textContent || '').trim().replace(/\s+/g, ' ');
+                if (bcText && bcText.length < 80) return `Ícone (${bcText})`;
+            }
+            return 'ícone de ação';
+        }
+
+        // Elemento editável
         const isEditable = ['INPUT','TEXTAREA','SELECT'].includes(el.tagName);
         if (isEditable) {
             return el.getAttribute('aria-label')
@@ -49,8 +92,12 @@ JS_HYBRID = r"""
                 || el.getAttribute('name')
                 || 'Campo de entrada';
         }
+
+        // Texto direto
         const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-        if (text && text.length < 120) return text;
+        if (text && text.length > 1 && text.length < 120) return text;
+
+        // Sobe a árvore procurando aria-label ou title
         let cur = el;
         for (let i = 0; i < 4; i++) {
             if (!cur) break;
@@ -62,6 +109,9 @@ JS_HYBRID = r"""
         }
         return (el.tagName || 'elemento').toLowerCase();
     }
+
+    // Mantém getElementName como alias para compatibilidade
+    function getElementName(el) { return getSmartLabel(el); }
 
     function getUniqueSelector(el) {
         if (!el || el === document.body) return '';
@@ -154,11 +204,12 @@ JS_HYBRID = r"""
         return {
             acao: action,
             tag: (target.tagName || '').toLowerCase(),
-            text_hint: getElementName(target).substring(0, 120),
+            text_hint: getSmartLabel(target).substring(0, 120),
             aria_hint: target.getAttribute ? (target.getAttribute('aria-label') || '') : '',
             title_hint: target.getAttribute ? (target.getAttribute('title') || '') : '',
             role_hint: target.getAttribute ? (target.getAttribute('role') || '') : '',
             iframe_hint: getFrameId(),
+            capture_scope: getCaptureScope(),
             seletor_css: getUniqueSelector(interactiveEl) || getUniqueSelector(target),
             seletor_fallback: getUniqueSelector(target),
             html_snapshot: (target.outerHTML || '').substring(0, 400),
@@ -182,7 +233,7 @@ JS_HYBRID = r"""
     }, true);
 
     document.addEventListener('dblclick', (e) => {
-        const payload = buildBasePayload(e.target, 'duplo_clique', {});
+        const payload = buildBasePayload(e.target, 'duplo_clique', { is_dblclick_promotion: true });
         if (window.registrarCliqueHybrid) window.registrarCliqueHybrid(payload).catch(console.error);
     }, true);
 
@@ -244,7 +295,7 @@ def limpar_nome(nome):
     return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:60].strip("_")
 
 async def descrever_tela_bytes(screenshot_bytes, contexto=""):
-    if not gemini_client:
+    if not gemini_client or HYBRID_DISABLE_GEMINI:
         return {"onde_estou": "", "tela_id": "", "sidebar_estado": "", "sidebar_item_ativo": "", "conteudo_central": ""}
     prompt = f"""Analise esta tela de ERP e descreva em JSON:
 {{
@@ -261,43 +312,166 @@ async def descrever_tela_bytes(screenshot_bytes, contexto=""):
         response = await asyncio.to_thread(
             gemini_client.models.generate_content,
             model="gemini-2.5-flash",
-            contents=[prompt, types.Part.from_bytes(data=screenshot_bytes, mime_type="image/jpeg")],
+            contents=[types.Part.from_bytes(data=screenshot_bytes, mime_type="image/jpeg"), prompt],
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0),
         )
         return json.loads(response.text)
-    except Exception:
+    except Exception as e:
+        logger.error(f"Gemini tela falhou: {e}")
         return {"onde_estou": "", "tela_id": "", "sidebar_estado": "", "sidebar_item_ativo": "", "conteudo_central": ""}
 
-def infer_semantic_action_from_hints(payload):
-    blob = " ".join([
-        str(payload.get("acao", "")),
-        str(payload.get("text_hint", "")),
-        str(payload.get("aria_hint", "")),
-        str(payload.get("title_hint", "")),
-        str(payload.get("page_title", "")),
-    ]).lower()
+def infer_semantic_action_from_hints(payload: dict) -> str:
+    """
+    Heurística local de semantic_action — sem Gemini.
+    Regras ordenadas por especificidade: mais específico primeiro.
+    """
+    acao_raw = payload.get("acao", "")
+    text = (payload.get("text_hint", "") or "").strip().lower()
+    aria  = (payload.get("aria_hint", "") or "").lower()
+    title = (payload.get("title_hint", "") or "").lower()
+    sel   = (payload.get("seletor_css", "") or "").lower()
+    tag   = (payload.get("tag", "") or "").lower()
+    blob  = f"{acao_raw} {text} {aria} {title} {payload.get('page_title','')}"
 
-    if payload.get("acao") == "selecionar_opcao":
+    if acao_raw == "selecionar_opcao":
         return "select"
-    if payload.get("acao") == "tecla":
-        if "ctrl+s" in blob:
+
+    if acao_raw == "tecla":
+        tecla = (payload.get("tecla", "") or "").lower()
+        if "ctrl+s" in tecla:
             return "save"
-        if "escape" in blob:
+        if "escape" in tecla:
             return "close"
+        if "delete" in tecla:
+            return "delete"
+        # Enter em campo editável = fill/confirm de edição
+        if tecla == "enter":
+            if tag in ("input", "textarea") or payload.get("role_hint", "") in ("textbox", "searchbox"):
+                return "fill"
+            return "confirm"
         return "confirm"
-    if any(k in blob for k in ["pesquisar", "buscar", "filtrar", "filtro"]):
-        return "search"
-    if any(k in blob for k in ["salvar", "gravar"]):
-        return "save"
-    if any(k in blob for k in ["confirmar", "ok"]):
+
+    # Confirmação explícita — palavras de botão de modal
+    if text in ("sim", "yes", "ok", "confirmar", "confirm", "aplicar", "apply", "aceitar"):
         return "confirm"
-    if any(k in blob for k in ["excluir", "remover", "apagar", "deletar"]):
-        return "delete"
-    if any(k in blob for k in ["abrir", "visualizar", "detalhar"]):
+
+    # Criação / abertura
+    if any(k in blob for k in ["nova pasta", "novo", "criar", "new folder", "adicionar", "add"]):
         return "open"
-    if any(k in blob for k in ["menu", "aba", "navegar"]):
+
+    # Exclusão
+    if any(k in blob for k in ["excluir", "remover", "apagar", "deletar", "delete", "remove"]):
+        return "delete"
+
+    # Salvar
+    if any(k in blob for k in ["salvar", "gravar", "save"]):
+        return "save"
+
+    # Busca / filtro
+    if any(k in blob for k in ["pesquisar", "buscar", "filtrar", "filtro", "search"]):
+        return "search"
+
+    # Fechar / cancelar
+    if any(k in blob for k in ["cancelar", "fechar", "cancel", "close", "voltar"]):
+        return "close"
+
+    # Visualizar / abrir
+    if any(k in blob for k in ["abrir", "visualizar", "detalhar", "open", "ver"]):
+        return "open"
+
+    # Navegação de menu/aba
+    if any(k in blob for k in ["menu", "aba", "navegar", "navigate"]):
         return "navigate"
+
+    # Seletor indica toolbar/modal button
+    if any(k in sel for k in ["button", "btn", "toolbar", "action"]):
+        return "open"
+
     return "navigate"
+
+
+def infer_pattern_from_hints(payload: dict) -> str:
+    """
+    Heurística local de pattern_detectado — sem Gemini.
+    Usa seletor CSS, texto e contexto para classificar o padrão de interação.
+    """
+    sel  = (payload.get("seletor_css", "") or "").lower()
+    text = (payload.get("text_hint", "") or "").strip().lower()
+    tag  = (payload.get("tag", "") or "").lower()
+    acao = payload.get("acao", "")
+    scope = payload.get("capture_scope", "")
+
+    # Modal buttons: #s-button-*, [id*="button"], botões de confirmação
+    if re.search(r"#s-button|#btn-|\.modal.*button|\.dialog.*button", sel):
+        return "modal_action"
+    if text in ("sim", "não", "ok", "confirmar", "cancelar", "yes", "no"):
+        return "modal_action"
+
+    # Toolbar actions: #newFolderButton, #uploadButton, botões de barra
+    if re.search(r"#new|#upload|#download|#delete|toolbar|action-bar", sel):
+        return "toolbar_action"
+
+    # Breadcrumb navigation
+    if re.search(r"breadcrumb|ui-breadcrumb|\.bc-|home.*icon|fa-home", sel):
+        return "breadcrumb_navigation"
+
+    # Tree / list item (GED folders, tabelas)
+    if re.search(r"#itemtitle|\.tree-node|\.folder-item|\.list-item|ui-treenode", sel):
+        return "tree_item_open" if acao == "duplo_clique" else "table_selection"
+
+    # Menu navigation (shell sidebar)
+    if scope == "shell" or re.search(r"#menu-item|#apps-menu|sidebar|nav-item", sel):
+        return "menu_navigation"
+
+    # Search / filter fields
+    if tag in ("input", "textarea") or re.search(r"search|filter|busca|pesquisa", sel):
+        return "search_debounce" if tag in ("input", "textarea") else "form_fill"
+
+    # Select / dropdown
+    if acao == "selecionar_opcao" or tag == "select":
+        return "form_fill"
+
+    # Tecla funcional
+    if acao == "tecla":
+        return "form_fill"
+
+    # Clique genérico em botão
+    if tag in ("button", "a") or re.search(r"button|btn", sel):
+        return "button_click"
+
+    return "unknown"
+
+
+def is_noise_event(payload: dict) -> bool:
+    """
+    Retorna True para eventos que provavelmente não devem virar passo de treinamento.
+    Marcados como is_noise=True no evento — o gerador decide se descarta ou não.
+    Critérios:
+      - Clique em breadcrumb/home (navegação utilitária)
+      - Enter isolado sem valor de input (sem edição prévia)
+      - Clique em ícone utilitário sem label semântico
+    """
+    sel  = (payload.get("seletor_css", "") or "").lower()
+    text = (payload.get("text_hint", "") or "").strip().lower()
+    acao = payload.get("acao", "")
+    tag  = payload.get("tag", "")
+
+    # Breadcrumb / home
+    if re.search(r"breadcrumb|fa-home|home.*icon", sel):
+        return True
+
+    # Enter sem valor de input (tecla solta)
+    if acao == "tecla":
+        tecla = (payload.get("tecla", "") or "").lower()
+        valor = (payload.get("valor_input", "") or "").strip()
+        if tecla == "enter" and not valor:
+            return True
+
+    # Ícone sem label semântico (tag i/svg sem texto resolvido)
+    if tag in ("i", "svg", "path") and text in ("", "ícone de ação", "i", "svg"):
+        return True
+
+    return False
 
 def infer_business_entity_from_hints(payload):
     blob = " ".join([
@@ -326,13 +500,14 @@ async def analisar_semantica_hibrida(b64_img, payload, contexto_fluxo=None):
         "semantic_action": infer_semantic_action_from_hints(payload),
         "business_entity": infer_business_entity_from_hints(payload),
         "business_target": payload.get("text_hint", ""),
-        "pattern_detected": "unknown",
+        "pattern_detected": infer_pattern_from_hints(payload),
         "confidence": 0.25,
         "expected_effect": "A tela mudou conforme esperado",
         "intent_description": f"{payload.get('acao','clique')} em {payload.get('text_hint') or 'elemento'}",
         "validation_expected": {"alvo": "A tela mudou conforme esperado"},
     }
-    if not gemini_client:
+    if not gemini_client or HYBRID_DISABLE_GEMINI:
+        return fallback
         return fallback
 
     prompt = f"""
@@ -389,7 +564,45 @@ Responda em JSON:
     except Exception:
         return fallback
 
-def infer_change(antes, depois):
+def _inferir_contexto_leve(payload_antes: dict, payload_depois: dict | None = None) -> dict:
+    """
+    Contexto semântico leve, sem Gemini.
+    Usa url, page_title e iframe do payload técnico para preencher
+    tela_antes/tela_depois e o_que_mudou mesmo quando Gemini está desligado.
+    """
+    def _tela_from_payload(p: dict) -> dict:
+        if not p:
+            return {}
+        return {
+            "tela_id": p.get("page_title", ""),
+            "url": p.get("url_hint", ""),
+            "iframe": p.get("iframe_hint", ""),
+            "scope": p.get("capture_scope", ""),
+        }
+
+    tela_antes = _tela_from_payload(payload_antes)
+    tela_depois = _tela_from_payload(payload_depois) if payload_depois else {}
+
+    mudancas = []
+    if tela_antes.get("url") and tela_depois.get("url") and tela_antes["url"] != tela_depois["url"]:
+        # Extrai a parte mais legível da URL (último segmento não-vazio)
+        url_depois = tela_depois["url"]
+        segmento = next((s for s in reversed(url_depois.split("/")) if s and not s.startswith("#")), url_depois)
+        mudancas.append(f"url mudou → {segmento}")
+    if tela_antes.get("tela_id") and tela_depois.get("tela_id") and tela_antes["tela_id"] != tela_depois["tela_id"]:
+        mudancas.append(f"tela mudou para '{tela_depois['tela_id']}'")
+    if tela_antes.get("iframe") != tela_depois.get("iframe") and tela_depois.get("iframe"):
+        mudancas.append(f"entrou no iframe '{tela_depois['iframe']}'")
+
+    return {
+        "tela_antes": tela_antes,
+        "tela_depois": tela_depois,
+        "o_que_mudou": "; ".join(mudancas) if mudancas else "",
+    }
+
+
+def infer_change(antes: dict, depois: dict) -> str:
+    """Usado quando Gemini retorna descrições ricas de tela."""
     partes = []
     if antes.get("tela_id") != depois.get("tela_id"):
         partes.append(f"tela mudou de '{antes.get('tela_id','')}' para '{depois.get('tela_id','')}'")
@@ -420,54 +633,88 @@ async def processar_evento_hibrido(item):
     # =========================================================
     screenshot_bytes_depois = None
     screenshot_b64_depois = ""
-    
+    payload_depois = None
+
     if page and not page.is_closed():
         try:
-            await asyncio.sleep(1.0) # Tempo para a tela reagir ao clique (abrir modal, menu, etc)
+            await asyncio.sleep(1.0)
             screenshot_bytes_depois = await page.screenshot(type="jpeg", quality=60, full_page=False)
             screenshot_b64_depois = base64.b64encode(screenshot_bytes_depois).decode("utf-8")
+            # Captura o estado técnico da tela depois para contexto leve
+            payload_depois = {
+                "page_title": await page.title(),
+                "url_hint": page.url,
+                "iframe_hint": payload.get("iframe_hint", ""),
+                "capture_scope": payload.get("capture_scope", ""),
+            }
         except Exception:
             pass
 
     # =========================================================
-    # 2. ETAPA COGNITIVA: Analisar com a IA (Pode demorar o tempo que quiser)
+    # 2. ETAPA COGNITIVA: Analisar com a IA (se disponível)
     # =========================================================
     descricao_antes = {}
     descricao_depois = {}
-    
+
     if screenshot_bytes_antes:
         descricao_antes = await descrever_tela_bytes(screenshot_bytes_antes, "imediatamente antes do evento")
-        
+
     if screenshot_bytes_depois:
         descricao_depois = await descrever_tela_bytes(screenshot_bytes_depois, "após o evento")
 
     sem = await analisar_semantica_hibrida(b64_img_antes, payload, montar_contexto_fluxo())
 
     # =========================================================
-    # 3. MONTAGEM DO EVENTO ENRIQUECIDO
+    # 3. Sprint 3: Contexto semântico — Gemini se disponível,
+    #    senão contexto leve via url/title/iframe
     # =========================================================
+    if descricao_antes or descricao_depois:
+        # Gemini rodou — usa resultado rico
+        contexto_sem = {
+            "tela_antes": descricao_antes,
+            "tela_depois": descricao_depois,
+            "o_que_mudou": infer_change(descricao_antes, descricao_depois),
+        }
+    else:
+        # Gemini desligado — usa contexto leve determinístico
+        contexto_sem = _inferir_contexto_leve(payload, payload_depois)
+
+    # =========================================================
+    # 4. MONTAGEM DO EVENTO ENRIQUECIDO
+    # =========================================================
+    # Resolve label_curto — nunca deixa "i", "span", "elemento"
+    raw_label = payload.get("text_hint", "") or sem["business_target"]
+    TAGS_BURRAS = {"i", "span", "div", "a", "elemento", "ícone de ação", ""}
+    label_curto = raw_label if raw_label.lower() not in TAGS_BURRAS else sem["business_target"] or "ação"
+
+    # Se Gemini retornou unknown, aplica heurística local como fallback
+    pattern_final = sem["pattern_detected"]
+    if pattern_final == "unknown":
+        pattern_final = infer_pattern_from_hints(payload)
+
+    # Marca eventos de ruído — o gerador decide se descarta
+    noise = is_noise_event(payload)
+
     acao = {
         "id_acao": id_acao,
         "captured_at": utc_now(),
         "acao": payload.get("acao", "clique"),
+        "capture_scope": payload.get("capture_scope", "shell"),
+        "is_noise": noise,
         "intencao_semantica": sem["intent_description"],
         "semantic_action": sem["semantic_action"],
         "business_entity": sem["business_entity"],
-        "business_target": sem["business_target"],
-        "pattern_detectado": sem["pattern_detected"],
+        "business_target": sem["business_target"] or label_curto,
+        "pattern_detectado": pattern_final,
         "valor_input": payload.get("valor_input", "") or payload.get("valor_selecionado", ""),
         "micro_narracao": f".{(sem['intent_description'] or '').lower()}.",
-        "contexto_semantico": {
-            "tela_antes": descricao_antes,
-            "tela_depois": descricao_depois,
-            "o_que_mudou": infer_change(descricao_antes, descricao_depois),
-        },
+        "contexto_semantico": contexto_sem,
         "validacao_esperada": sem.get("validation_expected", {}),
         "elemento_alvo": {
-            "descricao_visual": payload.get("text_hint", "") or sem["business_target"],
+            "descricao_visual": raw_label or sem["business_target"],
             "contexto_tela": descricao_antes.get("onde_estou", "") or payload.get("page_title", ""),
             "tipo_elemento": payload.get("tag") or sem["business_entity"],
-            "label_curto": (payload.get("text_hint", "") or sem["business_target"])[:60],
+            "label_curto": label_curto[:60],
             "coordenadas_relativas": {
                 "x_pct": float(payload.get("x_pct", 0.5)),
                 "y_pct": float(payload.get("y_pct", 0.5)),
@@ -485,7 +732,9 @@ async def processar_evento_hibrido(item):
     }
 
     cliques_capturados.append(acao)
-    logger.info(f"#{id_acao:03d} | {acao['acao']} | {acao['semantic_action']} | {acao['business_target']} | {acao['pattern_detectado']}")
+    noise_tag = " [NOISE]" if noise else ""
+    scope_tag = f"[{acao['capture_scope']}]" if acao.get("capture_scope") else ""
+    logger.info(f"#{id_acao:03d} {scope_tag}{noise_tag} | {acao['acao']} | {acao['semantic_action']} | {label_curto} | {pattern_final}")
 
 async def worker(worker_id):
     while True:
@@ -508,12 +757,36 @@ def _log_task_exception(task):
         logger.error(f"Task falhou: {exc}")
 
 async def registrar_clique_hibrido(source, payload):
-    global _id_acao_global
+    global _id_acao_global, _ultimo_evento_queue
     if not _recording_active:
         return
 
     frame = getattr(source, "frame", None)
-    page = frame.page if frame else None
+    page = getattr(source, "page", None)
+    if page is None and frame is not None:
+        page = frame.page
+
+    # ── Sprint 4: Promoção clique → duplo_clique ──────────────────
+    # Quando chega um duplo_clique, verifica se o último evento enfileirado
+    # é um clique simples no mesmo alvo (±3% posição, dentro de 600ms).
+    # Se sim, promove o item já na fila em vez de criar um passo novo.
+    if payload.get("is_dblclick_promotion"):
+        import time as _time
+        agora_ms = _time.monotonic() * 1000
+        prev = _ultimo_evento_queue
+        if prev:
+            delta_ms = agora_ms - prev.get("ts_ms", 0)
+            dx = abs(payload.get("x_pct", -1) - prev["payload"].get("x_pct", -1))
+            dy = abs(payload.get("y_pct", -1) - prev["payload"].get("y_pct", -1))
+            if delta_ms < _DBLCLICK_JANELA_MS and dx < 0.03 and dy < 0.03:
+                # Promove o payload já na fila — não cria novo item
+                prev["payload"]["acao"] = "duplo_clique"
+                logger.info(
+                    f"   [DblClick] ⚡ Clique #{prev['id_acao']} promovido para duplo_clique "
+                    f"(Δt={delta_ms:.0f}ms)"
+                )
+                return
+        # Sem clique anterior correspondente — registra como passo novo normalmente
 
     async with _lock_id:
         _id_acao_global += 1
@@ -526,11 +799,56 @@ async def registrar_clique_hibrido(source, payload):
     except Exception:
         pass
 
-    await _processing_queue.put({"id_acao": my_id, "payload": payload, "screenshot_bytes": screenshot_bytes, "page": page})
+    import time as _time
+    item = {
+        "id_acao": my_id,
+        "payload": payload,
+        "screenshot_bytes": screenshot_bytes,
+        "page": page,
+        "ts_ms": _time.monotonic() * 1000,
+    }
+    _ultimo_evento_queue = item
+    await _processing_queue.put(item)
 
 async def _binding_handler(source, payload):
     task = asyncio.create_task(registrar_clique_hibrido(source, payload))
     task.add_done_callback(_log_task_exception)
+
+async def _inject_in_frame(frame):
+    """Tenta injetar o JS no frame com retry — frames de SPA/iframe podem não estar prontos."""
+    for _ in range(20):
+        try:
+            await frame.evaluate(JS_HYBRID)
+            return True
+        except Exception:
+            await asyncio.sleep(0.5)
+    return False
+
+async def _inject_everywhere(context, page):
+    """Injeta via add_init_script (novos contextos) + avalia em todos os frames existentes."""
+    try:
+        await context.add_init_script(JS_HYBRID)
+    except Exception:
+        pass
+    try:
+        await page.evaluate(JS_HYBRID)
+    except Exception:
+        pass
+    for frame in page.frames:
+        await _inject_in_frame(frame)
+
+async def _rebind_frames_loop(page, stop_flag):
+    """Loop periódico que injeta o JS em frames novos que aparecem dinamicamente."""
+    seen = set()
+    while not stop_flag["stop"]:
+        for frame in page.frames:
+            key = id(frame)
+            if key in seen:
+                continue
+            ok = await _inject_in_frame(frame)
+            if ok:
+                seen.add(key)
+        await asyncio.sleep(1.0)
 
 async def capturar_hibrido(nome_aula, objetivo):
     global _processing_queue, _workers, _recording_active, _lock_id
@@ -596,8 +914,9 @@ async def capturar_hibrido(nome_aula, objetivo):
 
         print("Aguardando estabilização da tela...")
         await asyncio.sleep(8.0)
-        await page.evaluate(JS_HYBRID)
-        page.on("framenavigated", lambda frame: asyncio.create_task(page.evaluate(JS_HYBRID)) if frame == page.main_frame else None)
+        await _inject_everywhere(context, page)
+        stop_flag = {"stop": False}
+        rebind_task = asyncio.create_task(_rebind_frames_loop(page, stop_flag))
 
         _recording_active = True
 
@@ -608,6 +927,13 @@ async def capturar_hibrido(nome_aula, objetivo):
         print("=" * 60 + "\n")
 
         await page.wait_for_event("close", timeout=0)
+
+        _recording_active = False
+        stop_flag["stop"] = True
+        try:
+            await rebind_task
+        except Exception:
+            pass
 
         print("Aguardando a fila terminar...")
         await _processing_queue.join()
@@ -620,6 +946,36 @@ async def capturar_hibrido(nome_aula, objetivo):
         out_json.parent.mkdir(parents=True, exist_ok=True)
         out_jsonl.parent.mkdir(parents=True, exist_ok=True)
 
+        passos = []
+        for i, acao in enumerate(cliques_capturados):
+            acao_out = {
+                "acao": acao.get("acao", "clique"),
+                "capture_scope": acao.get("capture_scope", "shell"),
+                "is_noise": acao.get("is_noise", False),
+                "intencao_semantica": acao.get("intencao_semantica", ""),
+                "elemento_alvo": {
+                    **acao.get("elemento_alvo", {}),
+                    "confianca_captura": "media",
+                },
+                "valor_input": acao.get("valor_input", ""),
+                "micro_narracao": acao.get("micro_narracao", ""),
+                "seletor_css": acao.get("technical", {}).get("seletor_css") or acao.get("elemento_alvo", {}).get("seletor_hint", ""),
+                "validacao_esperada": {
+                    "tipo": "estado_visual",
+                    **(acao.get("validacao_esperada", {}) or {}),
+                },
+            }
+            passos.append({
+                "id_passo": i + 1,
+                "tipo_passo": "action",
+                "peso_narrativo": 2,
+                "pause_sugerida": 2.5,
+                "pedagogia": {"ancora": acao.get("intencao_semantica", ""), "tooltip_dap": ""},
+                "alerta_instrutor": None,
+                "is_conclusao": False,
+                "acoes_tecnicas": [acao_out],
+            })
+
         roteiro = {
             "metadata": {
                 "nome_aula": nome_aula,
@@ -628,15 +984,8 @@ async def capturar_hibrido(nome_aula, objetivo):
                 "objetivo": objetivo,
                 "captured_at": utc_now(),
             },
-            "passos": [
-                {
-                    "id_passo": i + 1,
-                    "tipo_passo": "action",
-                    "pedagogia": {"ancora": acao["intencao_semantica"]},
-                    "acoes_tecnicas": [acao],
-                }
-                for i, acao in enumerate(cliques_capturados)
-            ],
+            "configuracao_gravacao": {"gravar_video": True, "pasta_destino": "videos_gerados", "voz_ia": "pt-BR-FranciscaNeural"},
+            "passos": passos,
         }
 
         out_json.write_text(json.dumps(roteiro, ensure_ascii=False, indent=2), encoding="utf-8")
