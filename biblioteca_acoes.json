@@ -9357,6 +9357,75 @@
     "micro_narracao": "...e confirmamos a exclusão.",
     "_source": "Senior_Flow_-_GED_102.json"
   },
+  "acessar a funcionalidade ou o menu 'senior flow' do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a funcionalidade ou o menu 'Senior Flow' do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone que se assemelha a um símbolo de compartilhamento (duas bolinhas conectadas por linhas), localizado na barra de navegação lateral esquerda, e que está atualmente destacado.",
+      "contexto_tela": "O usuário está na interface principal do sistema Senior X, com um menu de navegação vertical à esquerda e uma área de conteúdo principal vazia à direita.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0258,
+        "y_pct": 0.6639,
+        "w_pct": 0.05,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-wov-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-wov-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-wov-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o Senior Flow, nosso ponto de partida...",
+    "_source": "Senior_Flow_-_GED_105.json"
+  },
+  "navegar para a seção principal do módulo de gerenciamento eletrônico de documentos (ged) dentro do sistema senior x.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção principal do módulo de Gerenciamento Eletrônico de Documentos (GED) dentro do sistema Senior X.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu de texto branco, localizado em uma barra lateral de navegação vertical escura. À sua esquerda, há um ícone de seta apontando para a esquerda. Ele está posicionado abaixo de 'Senior Flow' e acima de 'Documentos', com outros sub-itens visíveis abaixo dele.",
+      "contexto_tela": "O usuário está na barra lateral de navegação principal do sistema Senior X, dentro da seção 'Senior Flow', onde 'GED' é um módulo ou categoria principal com sub-itens como 'Documentos' e 'Gerenciar Assuntos' já visíveis.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-wov-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-wov-c143=\"\"><em _ngcontent-wov-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED — Gestão Eletrônica de Documentos.",
+    "_source": "Senior_Flow_-_GED_105.json"
+  },
+  "o usuário quis acessar ou visualizar a seção de documentos do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou visualizar a seção de documentos do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um ícone localizado na barra de navegação vertical à esquerda da tela. Ele representa um prédio com um documento, desenhado em contorno branco sobre um fundo cinza escuro. Faz parte de uma lista de atalhos para diferentes funcionalidades ou aplicações do sistema.",
+      "contexto_tela": "O usuário está na interface principal do sistema Senior X, que apresenta um painel de navegação fixo no lado esquerdo e uma grande área de conteúdo central vazia. Há um indicador 'MAPEAMENTO ATIVO' no canto inferior direito.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-wov-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui ó, a área de Documentos.",
+    "_source": "Senior_Flow_-_GED_105.json"
+  },
   "acessar a funcionalidade 'senior flow'": {
     "acao": "clique",
     "intencao_semantica": "Acessar a funcionalidade 'Senior Flow'",

@@ -33,6 +33,7 @@ import time
 import generator_engine
 import lego_builder
 import dap_engine
+import sim_link_builder
 
 # ==============================================================
 # WEBSOCKET MANAGER (Sprint 4) & LIFECYCLE
@@ -167,6 +168,7 @@ VIDEOS_DIR   = "videos_prontos";  os.makedirs(VIDEOS_DIR,   exist_ok=True)
 SCORM_DIR    = "scorm_exports";   os.makedirs(SCORM_DIR,    exist_ok=True)
 AUDIOS_DIR   = "audios_gerados";  os.makedirs(AUDIOS_DIR,   exist_ok=True)
 PDF_DIR      = "documentacao_pdf";os.makedirs(PDF_DIR,      exist_ok=True)
+SIM_LINKS_DIR = "sim_links";      os.makedirs(SIM_LINKS_DIR, exist_ok=True)
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/videos", StaticFiles(directory=VIDEOS_DIR), name="videos")
@@ -593,6 +595,7 @@ async def listar_roteiros():
             tem_video = os.path.exists(os.path.join(VIDEOS_DIR, f"{base}.mp4"))
             tem_scorm = os.path.exists(os.path.join(SCORM_DIR,  f"{base}_SCORM.zip"))
             tem_pdf   = os.path.exists(os.path.join(PDF_DIR,    f"{base}_Playbook.pdf"))
+            tem_simlink = os.path.exists(os.path.join(SIM_LINKS_DIR, f"{base}_SimLink.html"))
             # Avalia qualidade do roteiro para exibir badge no card do Studio
             _q_aprovado, _q_motivo = _validar_roteiro_app(dados)
             _q_status = "aprovado" if _q_aprovado else (
@@ -606,10 +609,12 @@ async def listar_roteiros():
                 "mtime":     os.path.getmtime(caminho),
                 "tem_audio": os.path.exists(os.path.join(AUDIOS_DIR, base)),
                 "tem_video": tem_video, "tem_scorm": tem_scorm, "tem_pdf": tem_pdf,
+                "tem_simlink": tem_simlink,
                 "tem_coach": dados.get("metadata", {}).get("ingestado_dap", False),
-                "video_url": f"/videos/{base}.mp4"           if tem_video else None,
-                "scorm_url": f"/api/download-scorm/{base}"   if tem_scorm else None,
-                "pdf_url":   f"/api/download-pdf/{base}"     if tem_pdf   else None,
+                "video_url":   f"/videos/{base}.mp4"              if tem_video   else None,
+                "scorm_url":   f"/api/download-scorm/{base}"      if tem_scorm   else None,
+                "pdf_url":     f"/api/download-pdf/{base}"        if tem_pdf     else None,
+                "simlink_url": f"/api/preview-simlink/{base}"     if tem_simlink else None,
                 "qualidade":        _q_status,
                 "qualidade_motivo": _q_motivo,
                 "origem":          dados.get("metadata", {}).get("origem", "manual"),
@@ -689,6 +694,40 @@ async def gerar_pdf(arquivo: str):
                      "📜 Forjando os pergaminhos sagrados (PDF)...", "📖 Playbook gerado. Conhecimento imortalizado.")
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
+@app.post("/api/gerar-simlink/{arquivo}")
+async def gerar_simlink(arquivo: str):
+    """Gera um SimLink — simulador standalone sem necessidade de LMS."""
+    caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
+    ok = _iniciar_bg(
+        [sys.executable, "sim_link_builder.py", caminho],
+        "🔗 Construindo o SimLink (simulador standalone)...",
+        "🎮 SimLink pronto. Compartilhe o link direto, sem LMS."
+    )
+    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+
+@app.get("/api/preview-simlink/{nome_base}", response_class=HTMLResponse)
+async def preview_simlink(nome_base: str):
+    """Serve o SimLink diretamente no navegador (link compartilhável)."""
+    nome_seguro = limpar_nome(nome_base)
+    caminho_html = os.path.join(SIM_LINKS_DIR, f"{nome_seguro}_SimLink.html")
+    if os.path.exists(caminho_html):
+        with open(caminho_html, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return JSONResponse(status_code=404, content={"erro": "SimLink não encontrado."})
+
+@app.get("/api/download-simlink/{nome_base}")
+async def download_simlink(nome_base: str):
+    """Faz download do arquivo HTML do SimLink."""
+    nome_seguro = limpar_nome(nome_base)
+    caminho_html = os.path.join(SIM_LINKS_DIR, f"{nome_seguro}_SimLink.html")
+    if os.path.exists(caminho_html):
+        return FileResponse(
+            path=caminho_html,
+            filename=f"{nome_seguro}_SimLink.html",
+            media_type="text/html"
+        )
+    return JSONResponse(status_code=404, content={"erro": "SimLink não encontrado."})
+
 @app.get("/api/download-scorm/{nome_base}")
 async def download_scorm(nome_base: str):
     nome_seguro = limpar_nome(nome_base)
@@ -740,7 +779,7 @@ async def renomear_roteiro(arquivo: str, req: RenomearReq):
     dados["metadata"]["nome_aula"]      = req.novo_nome
     dados["metadata"]["id_treinamento"] = new_base
     try:
-        for ext, pasta in [(".mp4", VIDEOS_DIR), ("_SCORM.zip", SCORM_DIR), ("_Playbook.pdf", PDF_DIR)]:
+        for ext, pasta in [(".mp4", VIDEOS_DIR), ("_SCORM.zip", SCORM_DIR), ("_Playbook.pdf", PDF_DIR), ("_SimLink.html", SIM_LINKS_DIR)]:
             old_f = os.path.join(pasta, f"{old_base}{ext}")
             new_f = os.path.join(pasta, f"{new_base}{ext}")
             if os.path.exists(old_f):

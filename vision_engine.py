@@ -226,6 +226,71 @@ def _e_seletor_fragil(seletor: str) -> bool:
     return tag in _TAGS_FRAGEIS
 
 
+def _contem_indice_posicional(seletor: str) -> bool:
+    """
+    Detecta se um seletor CSS contém índice posicional instável.
+
+    Padrões detectados:
+      - #\\w*\\d+          ex: #file_1, #row3, #item_42
+      - :nth-child(\\d+)   ex: tr:nth-child(2)
+      - :nth-of-type(\\d+) ex: li:nth-of-type(3)
+      - item#\\w+\\d+      ex: item#file_1
+
+    ATENÇÃO: [data-testid='item-102'] NÃO é posicional — o número está dentro
+    de aspas como valor de atributo. O lookahead (?![^'\"]*['\"]) garante que
+    o padrão #\\w*\\d+ não dispare dentro de valores de atributos.
+    """
+    if not seletor:
+        return False
+    padroes = [
+        r"#\w*\d+(?![^'\"]*['\"])",   # #file_1, #row3 — mas não dentro de ['...']
+        r":nth-child\(\d+\)",
+        r":nth-of-type\(\d+\)",
+        r"item#\w+\d+",
+    ]
+    return any(re.search(p, seletor) for p in padroes)
+
+
+async def _verificar_identidade_elemento(locator, label_curto: str) -> bool:
+    """
+    Verifica se o elemento (ou seu pai imediato) contém o texto do label_curto.
+
+    Estratégia:
+      1. Tenta inner_text() do próprio elemento.
+      2. Se não bater, tenta inner_text() do elemento pai ("..").
+      3. Retorna True se qualquer um contiver label_curto (case-insensitive, strip).
+      4. Retorna True em caso de exceção APENAS se nenhum texto foi lido com sucesso
+         (fail-open — não bloquear quando texto não é acessível, ex: checkboxes sem
+         texto visível). Se o texto foi lido mas não bate, retorna False.
+    """
+    if not label_curto:
+        return True
+    needle = label_curto.strip().lower()
+    texto_lido = False
+
+    try:
+        texto = await locator.inner_text(timeout=1000)
+        texto_lido = True
+        if needle in texto.strip().lower():
+            return True
+    except Exception:
+        return True  # fail-open: não conseguiu ler texto, não bloquear
+
+    # Texto foi lido mas não bateu — tenta o pai
+    try:
+        texto_pai = await locator.locator("..").inner_text(timeout=1000)
+        texto_lido = True
+        if needle in texto_pai.strip().lower():
+            return True
+    except Exception:
+        # Pai inacessível — se o elemento principal foi lido e não bateu, retorna False
+        if texto_lido:
+            return False
+        return True  # fail-open
+
+    return False
+
+
 def _extrair_atributo(seletor: str, atributo: str) -> Optional[str]:
     # FIX Bug #VIS-01: O primeiro regex tinha character class [\'\",]+
     # que incluía vírgula e aspas como caracteres válidos DENTRO do valor —
@@ -899,14 +964,31 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
 
     # ── 3. Seletor Hint Original ──────────────────────────────────────────────
     if seletor_hint and not _e_seletor_fragil(seletor_hint):
-        cand_hint = TentativaLocalizacao(
-            seletor=seletor_hint, iframe_hint=iframe_hint,
-            descricao=f"hint original '{seletor_hint[:40]}'",
-        )
-        if await _tentar_candidato(page, cand_hint, acao, valor):
-            logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
-            _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
-            return True
+        # Verificação de identidade para seletores posicionais (fix bug item errado)
+        if _contem_indice_posicional(seletor_hint) and label_curto and not is_tag_generica:
+            logger.warning("[Hint] Seletor posicional detectado — validando identidade antes de executar")
+            locator = page.locator(seletor_hint).first
+            identidade_ok = await _verificar_identidade_elemento(locator, label_curto)
+            if not identidade_ok:
+                logger.warning("[Hint] Identidade não confirmada — descartando seletor posicional, escalando")
+            else:
+                cand_hint = TentativaLocalizacao(
+                    seletor=seletor_hint, iframe_hint=iframe_hint,
+                    descricao=f"hint original '{seletor_hint[:40]}'",
+                )
+                if await _tentar_candidato(page, cand_hint, acao, valor):
+                    logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
+                    _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
+                    return True
+        else:
+            cand_hint = TentativaLocalizacao(
+                seletor=seletor_hint, iframe_hint=iframe_hint,
+                descricao=f"hint original '{seletor_hint[:40]}'",
+            )
+            if await _tentar_candidato(page, cand_hint, acao, valor):
+                logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
+                _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
+                return True
 
     # ── 4. Busca Profunda em Todos os Frames ──────────────────────────────────
     if candidatos:
