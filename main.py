@@ -407,7 +407,7 @@ async def executar_roteiro(caminho_json: str) -> None:
 
     if os.path.exists("trilha.mp3"):
         pygame.mixer.music.load("trilha.mp3")
-        pygame.mixer.music.set_volume(0.15)
+        pygame.mixer.music.set_volume(0.10)
         pygame.mixer.music.play(loops=-1)
 
     timeline_audios: list = []
@@ -439,7 +439,14 @@ async def executar_roteiro(caminho_json: str) -> None:
     async with async_playwright() as pw:
         # 🟢 A MÁGICA 1: TELA MAXIMIZADA
         # Alterado de --start-fullscreen para --start-maximized para melhor compatibilidade com o SO
-        browser = await pw.chromium.launch(headless=False, args=["--start-maximized", "--disable-infobars"])
+        browser = await pw.chromium.launch(headless=False, args=[
+            "--start-maximized",
+            "--disable-infobars",
+            "--disable-features=Translate",
+            "--lang=pt-BR",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ])
         tempo_inicio_contexto = time.time()
 
         # 🟢 Garantia do viewport flexível com no_viewport=True
@@ -447,6 +454,7 @@ async def executar_roteiro(caminho_json: str) -> None:
             no_viewport=True,
             record_video_dir="videos_gerados",
             record_video_size={"width": 1920, "height": 1080},
+            locale="pt-BR",
         )
         page = await context.new_page()
         await instalar_cursor(page)

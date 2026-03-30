@@ -415,8 +415,14 @@ async def capturar_cliques_na_tela():
         return
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False, args=["--start-maximized"])
-        context = await browser.new_context(no_viewport=True)
+        browser = await p.chromium.launch(headless=False, args=[
+            "--start-maximized",
+            "--disable-features=Translate",
+            "--lang=pt-BR",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ])
+        context = await browser.new_context(no_viewport=True, locale="pt-BR")
         page    = await context.new_page()
 
         await context.expose_binding("capturarElemento", lambda source, args: _track(on_capturar_elemento(source, args)), handle=True)

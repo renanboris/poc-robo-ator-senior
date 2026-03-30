@@ -9081,6 +9081,282 @@
     "micro_narracao": "...aqui, selecionamos a pasta 'TIC'.",
     "_source": "Senior_Flow_-_GED_020.json"
   },
+  "o usuário clicou em 'ged' para acessar a seção ou módulo de gestão eletrônica de documentos (ged) do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou em 'GED' para acessar a seção ou módulo de Gestão Eletrônica de Documentos (GED) do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu de texto branco, localizado na barra lateral esquerda escura, abaixo de 'Senior Flow'. Possui um ícone de seta apontando para a esquerda ao seu lado, indicando que pode ser um item de navegação ou um menu expansível.",
+      "contexto_tela": "O usuário está na barra de navegação principal do sistema 'Senior X Platform', visualizando as opções de módulos e funcionalidades disponíveis.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-yee-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-yee-c143=\"\"><em _ngcontent-yee-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED — Gestão Eletrônica de Documentos.",
+    "_source": "Senior_Flow_-_GED_100.json"
+  },
+  "renomear ou definir o nome de uma pasta para 'tec'": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "Renomear ou definir o nome de uma pasta para 'TEC'",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto editável exibindo 'TEC', precedido por um ícone de pasta amarela. O campo está realçado por uma borda vermelha, indicando que está em foco ou sendo editado.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), visualizando uma lista de arquivos e pastas.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "TEC",
+      "coordenadas_relativas": {
+        "x_pct": 0.2398,
+        "y_pct": 0.8571,
+        "w_pct": 0.2375,
+        "h_pct": 0.0541
+      },
+      "seletor_hint": "[id='file_11']",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-hcq-c34=\"\" class=\"file-name\" contenteditable=\"true\" style=\"\"><span _ngcontent-hcq-c34=\"\" id=\"itemTitle\">TEC</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "TEC",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_100.json"
+  },
+  "o usuário quis acessar ou navegar para a funcionalidade 'senior flow' dentro do sistema.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou navegar para a funcionalidade 'Senior Flow' dentro do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "É um item de menu na barra lateral esquerda, destacado como ativo, com um ícone de compartilhamento ou fluxo e o texto 'Senior Flow' ao lado.",
+      "contexto_tela": "O usuário está na tela principal ou em uma área de navegação do sistema 'Senior X Platform', interagindo com o menu lateral.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0258,
+        "y_pct": 0.6639,
+        "w_pct": 0.05,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-fcm-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-fcm-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-fcm-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o Senior Flow...",
+    "_source": "Senior_Flow_-_GED_101.json"
+  },
+  "acessar as funcionalidades relacionadas ao gerenciamento eletrônico de documentos (ged).": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar as funcionalidades relacionadas ao Gerenciamento Eletrônico de Documentos (GED).",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu em uma barra de navegação lateral escura, posicionado abaixo de 'Senior Flow'. Ele possui um ícone de seta apontando para a esquerda ao seu lado esquerdo, sugerindo que pode ser um item de navegação ou um botão de 'voltar' dentro de uma hierarquia.",
+      "contexto_tela": "O usuário está na interface principal do sistema Senior X Platform, interagindo com o menu de navegação lateral esquerdo, dentro da seção 'Senior Flow'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-fcm-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-fcm-c143=\"\"><em _ngcontent-fcm-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED...",
+    "_source": "Senior_Flow_-_GED_101.json"
+  },
+  "criar uma nova pasta para organizar arquivos.": {
+    "acao": "clique",
+    "intencao_semantica": "Criar uma nova pasta para organizar arquivos.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão retangular com um ícone de adição (+) e o texto 'Nova pasta' ao lado, localizado na parte superior direita da tela, próximo ao botão 'Upload'.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos (GED), que exibe uma lista de pastas e arquivos, com opções de navegação e ações como 'Gestão de Envelopes', 'Pendentes', 'Favoritos' e 'Upload'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Nova pasta",
+      "coordenadas_relativas": {
+        "x_pct": 0.7551,
+        "y_pct": 0.0481,
+        "w_pct": 0.0555,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='newFolderButton']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-jht-c5=\"\" class=\"s-button-text ng-star-inserted\">Nova pasta</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o botão Nova pasta...",
+    "_source": "Senior_Flow_-_GED_101.json"
+  },
+  "renomear a pasta \"ucs 100\".": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "Renomear a pasta \"UCS 100\".",
+    "elemento_alvo": {
+      "descricao_visual": "Um texto \"UCS 100\" ao lado de um ícone de pasta amarela, dentro de uma lista de arquivos e pastas. O texto está em uma linha destacada por uma caixa vermelha na imagem original, indicando que é editável.",
+      "contexto_tela": "O usuário está na tela principal do sistema GED, visualizando uma lista de documentos e pastas.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "UCS 100",
+      "coordenadas_relativas": {
+        "x_pct": 0.2398,
+        "y_pct": 0.8571,
+        "w_pct": 0.2375,
+        "h_pct": 0.0541
+      },
+      "seletor_hint": "[id='file_13']",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-jht-c34=\"\" class=\"file-name\" contenteditable=\"true\" style=\"\"><span _ngcontent-jht-c34=\"\" id=\"itemTitle\">UCS 100</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "UCS 100",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_101.json"
+  },
+  "abrir ou visualizar o item 'ucs 100', que provavelmente representa um documento ou uma pasta, dado o contexto de gerenciamento de documentos.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "Abrir ou visualizar o item 'UCS 100', que provavelmente representa um documento ou uma pasta, dado o contexto de gerenciamento de documentos.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento com o rótulo 'UCS 100' não está visível na captura de tela fornecida. A posição relativa indica que estaria na parte inferior esquerda da área de conteúdo principal.",
+      "contexto_tela": "O usuário está na seção 'Documentos', que é a área principal para visualizar e gerenciar arquivos e pastas no sistema.",
+      "tipo_elemento": "link",
+      "confianca_captura": "media",
+      "label_curto": "UCS 100",
+      "coordenadas_relativas": {
+        "x_pct": 0.1434,
+        "y_pct": 0.8504,
+        "w_pct": 0.0445,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-jht-c34=\"\" id=\"itemTitle\">UCS 100</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...duplo clique na pasta UCS 100.",
+    "_source": "Senior_Flow_-_GED_101.json"
+  },
+  "acessar ou navegar para a funcionalidade 'senior flow' dentro da plataforma.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar ou navegar para a funcionalidade 'Senior Flow' dentro da plataforma.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, com um ícone de fluxo/compartilhamento à esquerda e o texto 'Senior Flow' à direita. O item está destacado com um fundo cinza escuro, indicando que está ativo ou selecionado.",
+      "contexto_tela": "O usuário está na interface principal da plataforma Senior X, interagindo com o menu de navegação lateral.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0258,
+        "y_pct": 0.6639,
+        "w_pct": 0.05,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-gip-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-gip-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-gip-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "...no menu lateral, o Senior Flow...",
+    "_source": "Senior_Flow_-_GED_102.json"
+  },
+  "renomear a pasta 'ged 102'": {
+    "acao": "digitar_e_enter",
+    "intencao_semantica": "Renomear a pasta 'GED 102'",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de pasta amarela seguido pelo texto 'GED 102', que está sublinhado por uma caixa vermelha, indicando que é um campo editável.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos, que exibe uma lista de pastas e arquivos com detalhes como nome, remetente, tamanho e data de modificação.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "GED 102",
+      "coordenadas_relativas": {
+        "x_pct": 0.2398,
+        "y_pct": 0.8571,
+        "w_pct": 0.2375,
+        "h_pct": 0.0541
+      },
+      "seletor_hint": "[id='file_14']",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-qul-c34=\"\" class=\"file-name\" contenteditable=\"true\" style=\"\"><span _ngcontent-qul-c34=\"\" id=\"itemTitle\">GED 102</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "GED 102",
+    "micro_narracao": "",
+    "_source": "Senior_Flow_-_GED_102.json"
+  },
+  "selecionar o item 'ged 102' na lista de documentos para realizar uma ação em lote ou individual.": {
+    "acao": "clique",
+    "intencao_semantica": "Selecionar o item 'GED 102' na lista de documentos para realizar uma ação em lote ou individual.",
+    "elemento_alvo": {
+      "descricao_visual": "Uma caixa de seleção (checkbox) azul com um ícone de 'check' branco, indicando que o item 'GED 102' está selecionado. Está localizada à esquerda do nome do documento/pasta.",
+      "contexto_tela": "O usuário está na tela 'Documentos' do sistema, visualizando uma lista de arquivos e pastas. Há opções de ações em lote como 'Aprovar pendências', 'Enviar ao envelope', 'Revisão', 'Mover', 'Copiar', 'Excluir' e 'Download' disponíveis na parte superior da lista.",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "Caixa de selecao Angular",
+      "coordenadas_relativas": {
+        "x_pct": 0.0492,
+        "y_pct": 0.6677,
+        "w_pct": 0.0156,
+        "h_pct": 0.0301
+      },
+      "seletor_hint": "item#file_1 .ui-chkbox .ui-chkbox-box",
+      "iframe_hint": "ci",
+      "html_hint": "<div class=\"ui-chkbox-box ui-widget ui-corner-all ui-state-default ui-state-active ui-state-focus\"><span class=\"ui-chkbox-icon ui-clickable pi pi-check\"></span></div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...selecionamos a pasta 'GED 102'...",
+    "_source": "Senior_Flow_-_GED_102.json"
+  },
+  "o usuário clicou na palavra \"excluir\" dentro do resumo da validação da ação em lote, provavelmente buscando mais detalhes sobre a ação de exclusão ou suas regras específicas neste contexto.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou na palavra \"Excluir\" dentro do resumo da validação da ação em lote, provavelmente buscando mais detalhes sobre a ação de exclusão ou suas regras específicas neste contexto.",
+    "elemento_alvo": {
+      "descricao_visual": "A palavra \"Excluir\" aparece como texto simples, sem formatação especial (como sublinhado ou cor diferente), dentro da frase \"Itens aptos para ação em lote de Excluir\" em uma janela modal.",
+      "contexto_tela": "O usuário está em uma janela modal de \"VALIDAÇÃO PROCESSAMENTO DA AÇÃO EM LOTE\", que exibe um resumo dos itens selecionados e sua elegibilidade para a ação de exclusão em lote.",
+      "tipo_elemento": "link",
+      "confianca_captura": "media",
+      "label_curto": "Excluir",
+      "coordenadas_relativas": {
+        "x_pct": 0.6625,
+        "y_pct": 0.3444,
+        "w_pct": 0.0328,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='delete-batch-button']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-qul-c5=\"\" class=\"s-button-text ng-star-inserted\">Excluir</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o botão Excluir...",
+    "_source": "Senior_Flow_-_GED_102.json"
+  },
+  "o usuário quis finalizar ou aceitar uma ação ou configuração pendente. a ação específica que está sendo confirmada não pode ser determinada a partir da imagem fornecida, pois o botão 'confirmar' não está visível.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis finalizar ou aceitar uma ação ou configuração pendente. A ação específica que está sendo confirmada não pode ser determinada a partir da imagem fornecida, pois o botão 'Confirmar' não está visível.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão com o texto 'Confirmar'. Não é possível descrever sua aparência exata ou elementos circundantes, pois não está visível na imagem.",
+      "contexto_tela": "O usuário está na seção 'Documentos' de um sistema de gestão de documentos (GED). A tela exibe uma lista de pastas/documentos ('Financeiro', 'GED 102', 'Jurídico', 'Recursos Humanos', 'TEC') e opções de ações em lote como 'Aprovar pendências', 'Enviar ao envelope', 'Revisão', 'Mover', 'Copiar', 'Excluir' e 'Download'. O botão 'Confirmar' não está visível na imagem, mas sua posição relativa sugere que ele poderia fazer parte de um diálogo modal, um formulário ou uma etapa de confirmação para uma das ações listadas.",
+      "tipo_elemento": "button",
+      "confianca_captura": "baixa",
+      "label_curto": "Confirmar",
+      "coordenadas_relativas": {
+        "x_pct": 0.5824,
+        "y_pct": 0.697,
+        "w_pct": 0.0336,
+        "h_pct": 0.0165
+      },
+      "seletor_hint": "[id='confirmButton']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-qul-c5=\"\" class=\"s-button-text ng-star-inserted\">Confirmar</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e confirmamos a exclusão.",
+    "_source": "Senior_Flow_-_GED_102.json"
+  },
   "acessar a funcionalidade 'senior flow'": {
     "acao": "clique",
     "intencao_semantica": "Acessar a funcionalidade 'Senior Flow'",

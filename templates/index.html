@@ -435,12 +435,12 @@ function conectarWS() {
   _ws.onerror = () => { _ws.close(); };
 }
 
-function aguardarStatus(timeoutMs = 180000) {
+function aguardarStatus(timeoutMs = 1800000) {
   return new Promise((resolve) => {
     if (_ws && _ws.readyState === WebSocket.OPEN) {
       const timer = setTimeout(() => {
         _wsResolve = null;
-        resolve({ sucesso: false, mensagem: 'Tempo esgotado. O processo excedeu 3 minutos.' });
+        resolve({ sucesso: false, mensagem: 'Tempo esgotado. O processo excedeu 30 minutos.' });
       }, timeoutMs);
       _wsResolve = (result) => { clearTimeout(timer); resolve(result); };
     } else {
@@ -459,7 +459,7 @@ async function _pollFallback(resolve, timeoutMs) {
       if (!data.ocupado) { resolve({ sucesso: !data.erro, mensagem: data.erro || data.sucesso || '' }); return; }
     } catch {}
   }
-  resolve({ sucesso: false, mensagem: 'Tempo esgotado. O processo excedeu 3 minutos.' });
+  resolve({ sucesso: false, mensagem: 'Tempo esgotado. O processo excedeu 30 minutos.' });
 }
 
 const pollStatus = () => aguardarStatus();

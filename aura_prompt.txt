@@ -133,6 +133,20 @@ GUARDRAIL 3 — NENHUM CLIQUE OMITIDO (QUEBRA SILENCIOSA):
 Todo id_acao do log deve aparecer em ids_acoes_tecnicas ou acoes_ignoradas.
 Omitir um "clique" ou "duplo_clique" quebra a automação sem aviso de erro.
 
+GUARDRAIL 3B — RESTRIÇÃO DE acoes_ignoradas (EM CASO DE DÚVIDA, INCLUA):
+acoes_ignoradas só é permitido para ações que se enquadrem ESTRITAMENTE em:
+  - Teclas de sistema sem intenção pedagógica (ESC, F5, Alt+Tab)
+  - Clique acidental imediatamente revertido pelo usuário (ex: abriu e fechou o mesmo modal)
+  - Ação duplicada idêntica consecutiva no mesmo elemento (ex: dois cliques no mesmo botão)
+
+NUNCA coloque em acoes_ignoradas:
+  - "duplo_clique" — sempre representa abertura intencional de item
+  - Qualquer ação que modifica estado do sistema (checkbox, exclusão, confirmação, formulário)
+  - Ações que o instrutor realizou mas que "parecem" fora do fluxo — você não sabe a intenção real
+  - Ações com base em julgamento de "relevância pedagógica" — isso é decisão do instrutor, não sua
+
+REGRA DE OURO: em caso de dúvida entre incluir ou ignorar, SEMPRE inclua no roteiro.
+
 GUARDRAIL 4 — PASSO DE CONCLUSÃO:
 Último passo: is_conclusao: true, peso_narrativo: 3, âncora celebrativa + próxima aplicação.
 Sem ids_acoes_tecnicas, micro_narracoes: [], validacoes_esperadas: [].
@@ -358,6 +372,8 @@ A professora variou o ritmo. O drone de gerúndio foi quebrado intencionalmente.
 
 □ Todo id_acao do log está em ids_acoes_tecnicas ou acoes_ignoradas?
 □ Nenhum "clique" ou "duplo_clique" foi omitido?
+□ acoes_ignoradas contém APENAS teclas de sistema, cliques acidentais revertidos ou duplicatas idênticas consecutivas?
+□ Nenhuma ação que modifica estado do sistema foi colocada em acoes_ignoradas?
 □ Nenhum campo "intencao_semantica" ou "elemento_alvo" foi modificado?
 □ micro_narracoes, validacoes_esperadas e ids_acoes_tecnicas têm o MESMO tamanho?
 □ No máximo 40% das micro-narrações usam formato gerúndio "...Xando..."?

@@ -866,9 +866,16 @@ class HitlValidator:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(
                 headless=False,
-                args=["--start-fullscreen", "--disable-infobars"],
+                args=[
+                    "--start-fullscreen",
+                    "--disable-infobars",
+                    "--disable-features=Translate",
+                    "--lang=pt-BR",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                ],
             )
-            context = await browser.new_context(no_viewport=True)
+            context = await browser.new_context(no_viewport=True, locale="pt-BR")
             page    = await context.new_page()
 
             # Instala cursor humanizado (visual de depuração)
