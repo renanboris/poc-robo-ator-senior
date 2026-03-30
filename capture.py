@@ -142,7 +142,6 @@ async def _injetar_em_contexto(contexto):
         }
 
         const getElementName = (el) => {
-            // HACK: textContent no lugar de innerText para varrer o DOM invisivel do Angular
             const isCheckbox = el.closest('p-checkbox, mat-checkbox, [type="checkbox"], .ui-chkbox');
             if (isCheckbox) {
                 const parentRow = el.closest('tr, item, li, .ui-g, .list-item, .row');
@@ -175,8 +174,6 @@ async def _injetar_em_contexto(contexto):
             const customCheckbox = el.closest('p-checkbox, mat-checkbox, [role="checkbox"], .ui-chkbox');
             if (customCheckbox) {
                 let tagCheck = customCheckbox.tagName.toLowerCase();
-                
-                // HACK: Direciona o clique para a caixa visual interna do PrimeNG
                 let cliqueInterno = tagCheck;
                 if (tagCheck === 'p-checkbox') {
                     cliqueInterno = 'p-checkbox .ui-chkbox-box';
@@ -184,7 +181,6 @@ async def _injetar_em_contexto(contexto):
                     cliqueInterno = '.ui-chkbox .ui-chkbox-box';
                 }
 
-                // SELETOR SUPREMO: "Linha que tem este texto" > Checkbox
                 const parentRow = customCheckbox.closest('tr, item, li, .ui-g, .list-item, .row');
                 if (parentRow) {
                     let text = parentRow.textContent || '';
@@ -254,18 +250,29 @@ async def _injetar_em_contexto(contexto):
             setTimeout(() => target.style.outline = orig, 200);
         };
 
+        // 🟢 MUDANÇA CRUCIAL: Bloquear o menu nativo do Chrome para ele não estragar a captura
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        }, true);
+
         let clickTimeout = null;
         document.addEventListener('mousedown', (e) => {
-            if (e.button === 2) { processarEvento(e.target, 'clique_direito'); return; }
+            // Se for botão direito (2), processa na hora, sem delays!
+            if (e.button === 2) { 
+                processarEvento(e.target, 'clique_direito'); 
+                return; 
+            }
             if (e.button === 0) {
                 if (clickTimeout !== null) { clearTimeout(clickTimeout); clickTimeout = null; return; }
                 clickTimeout = setTimeout(() => { processarEvento(e.target, 'clique'); clickTimeout = null; }, 250);
             }
         }, true);
+        
         document.addEventListener('dblclick', (e) => {
             clearTimeout(clickTimeout); clickTimeout = null;
             processarEvento(e.target, 'duplo_clique');
         }, true);
+        
         let ultimoEnterTarget = null, ultimoEnterTime = 0;
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -273,6 +280,7 @@ async def _injetar_em_contexto(contexto):
                 processarEvento(e.target, 'digitar_e_enter', e.target.value || e.target.innerText || '');
             }
         }, true);
+        
         document.addEventListener('blur', (e) => {
             const tag = e.target.tagName.toLowerCase();
             if (e.target === ultimoEnterTarget && Date.now() - ultimoEnterTime < 500) return;

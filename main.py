@@ -2,6 +2,8 @@
 main.py — Training OS · Motor de Gravacao e Renderizacao
 =========================================================
 Correcoes aplicadas:
+  - Tela Maximizada (--start-maximized e no_viewport=True)
+  - Digitação humanizada no Login (press_sequentially)
   - limpar_nome removida (DRY): importada de app.py
   - import shutil movido para o topo
   - tempo_corte_segundos usa None como sentinel (nao -1)
@@ -9,7 +11,7 @@ Correcoes aplicadas:
   - Threads de audio protegidas com try/except individual
   - wait_for_load_state com timeout explicito
   - LOGIN HÍBRIDO (Resiliente e com Fallback Humano)
-  - [NOVO] Chaveador de Vozes (Edge TTS vs ElevenLabs)
+  - Chaveador de Vozes (Edge TTS vs ElevenLabs)
 """
 
 import sys
@@ -20,7 +22,7 @@ import time
 import re
 import shutil  
 import logging
-import requests # NOVO: Para fazer as requisições pro ElevenLabs
+import requests 
 
 import edge_tts
 import pygame
@@ -115,7 +117,6 @@ async def gerar_audio(
     arquivo_mp3 = os.path.join(pasta_audio, f"audio_{id_unico}.mp3")
 
     if not os.path.exists(arquivo_mp3):
-        # 🟢 A Trava Inteligente: Decide quem vai narrar
         if voz == "elevenlabs":
             api_key = os.getenv("ELEVENLABS_API_KEY")
             if not api_key:
@@ -123,8 +124,6 @@ async def gerar_audio(
                 await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
             else:
                 try:
-                    # ID do Antoni (Voz Masculina PT-BR boa para tutoriais)
-                    # Você pode trocar esse ID por qualquer outro do ElevenLabs
                     voice_id = "cjVigY5qzO86Huf0OWal" 
                     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
                     
@@ -143,7 +142,6 @@ async def gerar_audio(
                         }
                     }
                     
-                    # Roda de forma síncrona (requests bloqueia a thread, mas ok pra MVP)
                     response = requests.post(url, json=data, headers=headers)
                     if response.status_code == 200:
                         with open(arquivo_mp3, 'wb') as f:
@@ -157,7 +155,6 @@ async def gerar_audio(
                     print(f"⚠️  Falha ao conectar no ElevenLabs: {e}. Fallback gratuito ativado.", flush=True)
                     await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
         else:
-            # Modo Rascunho / Gratuito
             await edge_tts.Communicate(texto_falado, voz, rate="-12%").save(arquivo_mp3)
 
     _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"
@@ -341,8 +338,6 @@ def renderizar_video_final(
     except Exception as e:
         print(f"Erro na Pos-Producao: {e}")
     finally:
-        # 🟢 MUDANÇA CRÍTICA: Fechar rigorosamente todos os objetos da memória!
-        # Sem isto, o Windows impede o Python de apagar os áudios antigos (Memory Leak).
         if video:
             try: video.close() 
             except: pass
@@ -422,10 +417,6 @@ async def executar_roteiro(caminho_json: str) -> None:
     passos_lista = roteiro.get("passos", [])
     total_passos = len(passos_lista)
 
-    # ── Pré-aquecimento de áudios ──────────────────────────────────────────────
-    # Gera todos os arquivos TTS em paralelo antes de abrir o browser.
-    # Na segunda execução os arquivos já existem e retornam instantaneamente.
-    # Isso elimina o delay de geração durante o loop de execução.
     print("Pré-gerando áudios do roteiro...", flush=True)
     tarefas_audio: list = []
     for passo in passos_lista:
@@ -444,12 +435,14 @@ async def executar_roteiro(caminho_json: str) -> None:
     if tarefas_audio:
         await asyncio.gather(*tarefas_audio)
     print(f"✅ {len(tarefas_audio)} áudio(s) prontos. Iniciando gravação...", flush=True)
-    # ──────────────────────────────────────────────────────────────────────────
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=False, args=["--start-fullscreen", "--disable-infobars"])
+        # 🟢 A MÁGICA 1: TELA MAXIMIZADA
+        # Alterado de --start-fullscreen para --start-maximized para melhor compatibilidade com o SO
+        browser = await pw.chromium.launch(headless=False, args=["--start-maximized", "--disable-infobars"])
         tempo_inicio_contexto = time.time()
 
+        # 🟢 Garantia do viewport flexível com no_viewport=True
         context = await browser.new_context(
             no_viewport=True,
             record_video_dir="videos_gerados",
@@ -466,7 +459,9 @@ async def executar_roteiro(caminho_json: str) -> None:
 
             campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
             await campo_usr.wait_for(state="visible", timeout=10000)
-            await campo_usr.fill(usuario)
+            
+            # 🟢 A MÁGICA 2: Digitação Humanizada no Login
+            await campo_usr.press_sequentially(usuario, delay=85)
             await asyncio.sleep(0.5)
 
             try:
@@ -476,7 +471,9 @@ async def executar_roteiro(caminho_json: str) -> None:
 
             campo_senha = page.locator("input[type='password']").first
             await campo_senha.wait_for(state="visible", timeout=10000)
-            await campo_senha.fill(senha)
+            
+            # 🟢 A MÁGICA 2: Digitação Humanizada na Senha
+            await campo_senha.press_sequentially(senha, delay=85)
             await asyncio.sleep(0.5)
             await page.keyboard.press("Enter")
 

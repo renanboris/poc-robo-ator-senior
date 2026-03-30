@@ -435,7 +435,7 @@ function conectarWS() {
   _ws.onerror = () => { _ws.close(); };
 }
 
-function aguardarStatus(timeoutMs = 180000) {
+function asalvarStatus(timeoutMs = 180000) {
   return new Promise((resolve) => {
     if (_ws && _ws.readyState === WebSocket.OPEN) {
       const timer = setTimeout(() => {
@@ -462,7 +462,7 @@ async function _pollFallback(resolve, timeoutMs) {
   resolve({ sucesso: false, mensagem: 'Tempo esgotado. O processo excedeu 3 minutos.' });
 }
 
-const pollStatus = () => aguardarStatus();
+const pollStatus = () => asalvarStatus();
 
 // ─── Sanitização Inteligente ───────────────────────────────
 function formatarNomeArquivo(nome) {
@@ -894,7 +894,7 @@ async function addDeliverables(arquivoJson) {
   scrollBottom();
 }
 
-// pollStatus() → alias para aguardarStatus() via WebSocket
+// pollStatus() → alias para asalvarStatus() via WebSocket
 
 // ─── Input control ─────────────────────────────────────────
 function setInputEnabled(on) {
@@ -981,7 +981,7 @@ async function carregarRoteirosExistentes() {
     
     removeTyping();
     if (roteiros.length === 0) {
-      addAgent('Não encontrei nenhuma aula salva na base de dados.');
+      addAgent('Não encontrei nenhuma aula salva no banco de dados.');
       addChips([{ label: 'Construir nova aula', action: 'start_new' }]);
       return;
     }
@@ -1016,7 +1016,7 @@ function chipClick(action, label = '', payload = '') {
     return;
   }
 
-  // Quando o utilizador escolhe uma aula da lista
+  // Quando o usuário escolhe uma aula da lista
   if (action === 'select_existing') {
     addUser(label);
     session.titulo = label;
@@ -1025,7 +1025,7 @@ function chipClick(action, label = '', payload = '') {
     showTyping();
     setTimeout(() => {
       removeTyping();
-      addAgent(`O roteiro **${label}** foi carregado da base de dados. O que deseja fazer com ele?`);
+      addAgent(`O roteiro **${label}** foi carregado do banco de dados. O que deseja fazer com ele?`);
       addChips([
         { label: '🤖 Iniciar Gravação (Robô)', action: 'start_robo' },
         { label: '🚀 Iniciar Produção Direta', action: 'start_factory' }
@@ -1084,13 +1084,13 @@ async function confirmarInicio() {
   renderHistory();
 
   if (!apiOnline) {
-    addNotice('A API local está offline (porta 8000). Verifique se o servidor está a correr.');
+    addNotice('A API local está offline (porta 8000). Verifique se o servidor está em execução.');
     setInputEnabled(true);
     appState = 'CONFIRM';
     return;
   }
 
-  addNotice('Uma janela do browser será aberta para o agente mapear o fluxo. **Não a feche** — isso é normal.');
+  addNotice('Uma janela do navegador será aberta para o agente mapear o fluxo. **Não feche** — isso é normal.');
   await sleep(700);
   showTyping();
 
@@ -1116,7 +1116,7 @@ async function confirmarInicio() {
       return;
     }
 
-    addAgent('Mapeamento concluído com sucesso! O próximo passo é colocar o Robô Ator para testar esse roteiro e gravar a tela e as locuções oficiais.');
+    addAgent('Mapeamento concluído com sucesso! O próximo passo é colocar o Robô Ator para testar esse roteiro e gravar a tela e as narrações oficiais.');
     addChips([{ label: '🤖 Iniciar Gravação (Robô)', action: 'start_robo' }]);
 
   } catch (e) {
@@ -1133,12 +1133,12 @@ async function iniciarRobo() {
   appState = 'ROBO';
   setInputEnabled(false);
   
-  addNotice('A acordar o motor cinemático. **Por favor, solte o rato.** O robô vai assumir o controlo da sua máquina em 3 segundos.');
+  addNotice('Iniciando o motor cinemático. **Por favor, solte o mouse.** O robô vai assumir o controle da sua máquina em 3 segundos.');
   await sleep(700);
   showTyping();
 
   try {
-    // 🟢 MUDANÇA: Usa o ficheiro carregado ou constrói o nome novo
+    // 🟢 MUDANÇA: Usa o arquivo carregado ou constrói o nome novo
     const arquivoJson = session.arquivoJson || formatarNomeArquivo(`${session.produto} - ${session.titulo}`);
 
     await fetch(`${API}/api/limpar-status`, { method: 'POST' }).catch(() => {});
@@ -1156,7 +1156,7 @@ async function iniciarRobo() {
       return;
     }
 
-    addAgent('Gravação visual e locuções concluídas perfeitamente! As peças brutas estão criadas.\nPosso ligar a linha de montagem final para renderizar todos os materiais?');
+    addAgent('Gravação visual e narrações concluídas perfeitamente! As arquivos brutos foram gerados.\nPosso acionar a linha de produção final para renderizar todos os materiais?');
     addChips([{ label: '🚀 Iniciar Produção', action: 'start_factory' }]);
 
   } catch (e) {
@@ -1174,7 +1174,7 @@ async function iniciarProducao() {
   addAgent('A linha de produção final foi acionada. Acompanhe os pacotes a serem montados:');
   await sleep(300);
 
-  // 🟢 MUDANÇA: Usa o ficheiro carregado ou constrói o nome novo
+  // 🟢 MUDANÇA: Usa o arquivo carregado ou constrói o nome novo
   const arquivoJson = session.arquivoJson || formatarNomeArquivo(`${session.produto} - ${session.titulo}`);
 
   const result  = await runStepper(arquivoJson);
