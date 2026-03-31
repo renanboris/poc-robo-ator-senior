@@ -507,6 +507,14 @@ def obter_detalhes_missao(mission_id: str):
 async def pagina_dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
+@app.get("/v2", response_class=HTMLResponse)
+async def index_v2(request: Request):
+    return templates.TemplateResponse("index_v2.html", {"request": request})
+
+@app.get("/dashboard/v2", response_class=HTMLResponse)
+async def dashboard_v2(request: Request):
+    return templates.TemplateResponse("dashboard_v2.html", {"request": request})
+
 @app.get("/api/metricas")
 async def get_metricas():
     try:

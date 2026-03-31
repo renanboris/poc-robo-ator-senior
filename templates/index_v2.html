@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SeniorOS · VLA Engine</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23444CE7'/><path d='M45 20 L30 55 L48 55 L45 80 L70 45 L52 45 Z' fill='%23fff'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ─── SmartPlayer Design System Tokens ─────────────────── */
+:root {
+  --font: 'Inter', sans-serif;
+
+  /* Brand (SmartPlayer primary) */
+  --brand-25:  #F5F8FF;
+  --brand-50:  #EEF4FF;
+  --brand-100: #E0EAFF;
+  --brand-200: #C7D7FE;
+  --brand-300: #A4BCFD;
+  --brand-400: #8098F9;
+  --brand-500: #6172F3;
+  --brand-600: #444CE7;
+  --brand-700: #3538CD;
+  --brand-800: #2D31A6;
+  --brand-900: #2D3282;
+  --brand-950: #1F235B;
+
+  /* Neutrals */
+  --gray-0:   #FFFFFF;
+  --gray-25:  #FCFCFD;
+  --gray-50:  #F9FAFB;
+  --gray-100: #F2F4F7;
+  --gray-200: #EAECF0;
+  --gray-300: #D0D5DD;
+  --gray-400: #98A2B3;
+  --gray-500: #667085;
+  --gray-600: #475467;
+  --gray-700: #344054;
+  --gray-800: #182230;
+  --gray-900: #101828;
+  --gray-950: #0C111D;
+
+  /* Semantic */
+  --success: #17B26A;
+  --success-bg: #ECFDF3;
+  --warning: #F79009;
+  --warning-bg: #FFFAEB;
+  --error:   #F04438;
+  --error-bg: #FEF3F2;
+
+  /* Surface */
+  --bg:        var(--gray-950);
+  --bg-2:      var(--gray-900);
+  --bg-3:      var(--gray-800);
+  --surface:   #182230;
+  --border:    var(--gray-800);
+  --border-2:  var(--gray-700);
+
+  /* Text */
+  --text:   var(--gray-0);
+  --text-2: var(--gray-300);
+  --text-3: var(--gray-500);
+  --muted:  var(--gray-500);
+  --muted2: var(--gray-400);
+
+  /* Accent = brand-600 */
+  --accent:  var(--brand-600);
+  --accent2: var(--brand-700);
+  --accent-dim: rgba(68,76,231,0.12);
+
+  /* Radius (SmartPlayer: 8px) */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+
+  /* Sidebar */
+  --sidebar: 248px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 8px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Light mode */
+html.light {
+  --bg:      var(--gray-50);
+  --bg-2:    var(--gray-0);
+  --bg-3:    var(--gray-100);
+  --surface: var(--gray-0);
+  --border:  var(--gray-200);
+  --border-2: var(--gray-300);
+  --text:    var(--gray-900);
+  --text-2:  var(--gray-700);
+  --text-3:  var(--gray-500);
+  --muted:   var(--gray-500);
+  --muted2:  var(--gray-600);
+  --accent-dim: rgba(68,76,231,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  height: 100dvh;
+  display: flex;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+</style>
+</head>
+<body>
+
+<style>
+/* ─── Sidebar ───────────────────────────────────────────── */
+aside {
+  width: var(--sidebar);
+  background: var(--bg-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.logo {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo-icon {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.logo-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.logo-name span { color: var(--brand-400); }
+
+.api-badge {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  border-radius: 99px;
+  cursor: default;
+  user-select: none;
+  transition: all .2s;
+}
+.api-badge.online  { color: var(--success); border-color: rgba(23,178,106,.25); background: rgba(23,178,106,.08); }
+.api-badge.offline { color: var(--error);   border-color: rgba(240,68,56,.25);  background: rgba(240,68,56,.08); }
+.api-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.api-badge.online .api-dot { animation: pulse .9s ease-in-out infinite; }
+
+.sidebar-actions {
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ─── Buttons (SmartPlayer style) ──────────────────────── */
+.btn-primary {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 9px 14px;
+  font-size: 13px; font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background .15s, box-shadow .15s;
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+.btn-primary:hover { background: var(--accent2); box-shadow: 0 0 0 3px rgba(68,76,231,.2); }
+
+.btn-ghost {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  background: transparent;
+  color: var(--text-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 13px; font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all .15s;
+  text-decoration: none;
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--border-2); background: var(--bg-3); }
+
+/* ─── History ───────────────────────────────────────────── */
+.sidebar-history { flex: 1; overflow-y: auto; padding: 12px 8px 8px; }
+
+.sidebar-label {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted);
+  padding: 0 8px; margin-bottom: 6px;
+}
+
+.history-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: none; border: none;
+  cursor: pointer;
+  transition: background .12s;
+  font-family: var(--font);
+  overflow: hidden; text-align: left;
+}
+.history-item:hover { background: var(--bg-3); }
+.history-item:hover .hi-title { color: var(--text); }
+
+.hi-body { flex: 1; min-width: 0; }
+.hi-title {
+  font-size: 12.5px; color: var(--muted2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: block; transition: color .12s;
+}
+.hi-meta { display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.hi-date { font-size: 10px; color: var(--muted); }
+
+.hi-delete {
+  margin-left: auto; opacity: 0;
+  background: none; border: none;
+  color: var(--muted); cursor: pointer;
+  padding: 3px; border-radius: 4px;
+  transition: all .12s; flex-shrink: 0;
+}
+.history-item:hover .hi-delete { opacity: 1; }
+.hi-delete:hover { color: var(--error); background: var(--error-bg); }
+
+.tag {
+  font-size: 9px; font-weight: 600;
+  padding: 2px 6px; border-radius: 99px;
+  letter-spacing: .04em; flex-shrink: 0;
+  text-transform: uppercase;
+}
+.tag-flow   { background: var(--accent-dim); color: var(--brand-400); border: 1px solid rgba(68,76,231,.2); }
+.tag-hcm    { background: rgba(23,178,106,.1); color: var(--success); border: 1px solid rgba(23,178,106,.2); }
+.tag-erpx   { background: rgba(247,144,9,.1);  color: var(--warning); border: 1px solid rgba(247,144,9,.2); }
+.tag-outros { background: var(--bg-3); color: var(--text-3); border: 1px solid var(--border); }
+
+.sidebar-empty {
+  font-size: 12px; color: var(--muted);
+  text-align: center; padding: 20px 12px; line-height: 1.6;
+}
+
+.sidebar-user {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 9px;
+  font-size: 13px; color: var(--muted2);
+}
+.avatar {
+  width: 30px; height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; color: var(--brand-400);
+  flex-shrink: 0; border: 1px solid var(--border);
+}
+
+/* ─── Main ──────────────────────────────────────────────── */
+main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+#chat-container { flex: 1; overflow-y: auto; padding: 32px 24px 0; }
+#chat-content {
+  max-width: 680px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 20px;
+  padding-bottom: 8px;
+}
+#scroll-anchor { height: 1px; }
+
+/* ─── Messages ──────────────────────────────────────────── */
+.msg { display: flex; gap: 12px; animation: msgIn .25s ease-out both; }
+@keyframes msgIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.msg-agent { align-items: flex-start; }
+.msg-user  { justify-content: flex-end; }
+
+.agent-icon {
+  width: 32px; height: 32px;
+  border-radius: var(--radius);
+  background: var(--accent-dim);
+  border: 1px solid rgba(68,76,231,.25);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 2px;
+  color: var(--brand-400);
+}
+
+.bubble-agent {
+  color: var(--text-2);
+  font-size: 14px; line-height: 1.65;
+  max-width: 88%; padding-top: 4px;
+}
+.bubble-agent strong { color: var(--text); font-weight: 600; }
+
+.bubble-user {
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: 12px 12px 4px 12px;
+  padding: 10px 16px;
+  font-size: 14px; color: var(--text);
+  max-width: 72%;
+}
+
+/* ─── Chips ─────────────────────────────────────────────── */
+.chips {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding-left: 44px;
+  animation: msgIn .25s ease-out .08s both;
+}
+.chip {
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  color: var(--text-3);
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 13px; font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all .15s;
+}
+.chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ─── Typing ────────────────────────────────────────────── */
+.typing-row { display: flex; gap: 12px; align-items: center; animation: msgIn .2s ease-out both; }
+.typing-dots { display: flex; gap: 4px; padding-top: 2px; }
+.dot { width: 5px; height: 5px; background: var(--muted); border-radius: 50%; animation: bounce 1.3s ease-in-out infinite; }
+.dot:nth-child(2) { animation-delay: .15s; }
+.dot:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+
+/* ─── Card ──────────────────────────────────────────────── */
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-size: 14px;
+}
+.card-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 8px 0; border-bottom: 1px solid var(--border); gap: 12px;
+}
+.card-row:last-of-type { border-bottom: none; }
+.card-row label { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; flex-shrink: 0; }
+.card-row span  { color: var(--text); font-weight: 500; text-align: right; }
+.card-actions   { display: flex; gap: 8px; margin-top: 14px; }
+
+.btn-confirm {
+  flex: 1; background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius); padding: 10px;
+  font-size: 13px; font-weight: 600; font-family: var(--font);
+  cursor: pointer; transition: background .15s;
+  letter-spacing: -0.01em;
+}
+.btn-confirm:hover { background: var(--accent2); }
+
+.btn-edit {
+  background: transparent; color: var(--text-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius); padding: 10px 14px;
+  font-size: 13px; font-family: var(--font);
+  cursor: pointer; transition: all .15s;
+}
+.btn-edit:hover { color: var(--text); border-color: var(--border-2); background: var(--bg-3); }
+
+/* ─── Notice ────────────────────────────────────────────── */
+.notice {
+  background: rgba(247,144,9,.08);
+  border: 1px solid rgba(247,144,9,.25);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 13px; color: var(--warning);
+  display: flex; gap: 9px; align-items: flex-start;
+  animation: msgIn .25s ease-out both;
+  margin-left: 44px;
+}
+.notice svg { flex-shrink: 0; margin-top: 1px; }
+
+/* ─── Stepper ───────────────────────────────────────────── */
+.stepper {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.step {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--muted);
+  opacity: 0; transform: translateX(-8px);
+  transition: all .35s ease-out;
+}
+.step.visible { opacity: 1; transform: none; }
+.step.done    { color: var(--text-2); }
+.step.error   { color: var(--error); }
+.step-icon {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.step-icon.spinning {
+  border: 1.5px solid var(--accent);
+  border-top-color: transparent;
+  animation: spin .8s linear infinite;
+}
+.step-icon.ok  { background: rgba(23,178,106,.12); border: 1.5px solid rgba(23,178,106,.3); color: var(--success); }
+.step-icon.err { background: rgba(240,68,56,.1);   border: 1.5px solid rgba(240,68,56,.25); color: var(--error); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Deliverables ──────────────────────────────────────── */
+.deliverables {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.deliverables h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+.video-wrap {
+  border-radius: var(--radius-sm); overflow: hidden; background: #000;
+  margin-bottom: 14px; aspect-ratio: 16/9;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border);
+}
+.video-wrap video { width: 100%; height: 100%; object-fit: contain; }
+.dl-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.dl-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg-3); border: 1px solid var(--border-2);
+  color: var(--text-3); border-radius: var(--radius);
+  padding: 7px 12px; font-size: 13px; font-weight: 500;
+  text-decoration: none; transition: all .15s;
+  font-family: var(--font); cursor: pointer;
+}
+.dl-btn:hover { color: var(--text); border-color: var(--accent); background: var(--accent-dim); }
+.sep { height: 1px; background: var(--border); margin: 12px 0; }
+.next-row { display: flex; gap: 6px; }
+.btn-next {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+  background: transparent; border: 1px solid var(--border-2);
+  color: var(--text-3); border-radius: var(--radius);
+  padding: 9px 12px; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+  text-decoration: none; font-family: var(--font);
+}
+.btn-next:hover { color: var(--text); border-color: var(--accent); background: var(--accent-dim); }
+
+/* ─── Input area ────────────────────────────────────────── */
+.input-area { padding: 12px 24px 20px; flex-shrink: 0; }
+.input-wrap { max-width: 680px; margin: 0 auto; }
+
+.suggestions {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
+  animation: msgIn .2s ease-out both;
+}
+.suggestion {
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--muted); border-radius: var(--radius);
+  padding: 5px 11px; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all .15s; font-family: var(--font);
+}
+.suggestion:hover { color: var(--text); border-color: var(--border-2); background: var(--bg-3); }
+
+.input-row {
+  display: flex; align-items: center;
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  padding: 4px 4px 4px 14px;
+  transition: border-color .15s, box-shadow .15s;
+  gap: 6px;
+}
+.input-row:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(68,76,231,.15);
+}
+.input-row input {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--text); font-size: 14px; font-family: var(--font);
+  padding: 8px 0; font-weight: 400;
+}
+.input-row input::placeholder { color: var(--muted); }
+
+.send-btn {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--accent); border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; flex-shrink: 0;
+  transition: background .15s;
+}
+.send-btn:hover { background: var(--accent2); }
+.send-btn:disabled { opacity: .35; cursor: default; }
+
+.input-footer {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-top: 8px;
+}
+.input-hint { font-size: 11px; color: var(--muted); }
+.kbd {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 500;
+  color: var(--muted); background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  padding: 1px 5px; border-radius: 4px;
+}
+
+/* ─── Animations ────────────────────────────────────────── */
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ─── Responsive ────────────────────────────────────────── */
+@media (max-width: 640px) {
+  aside { display: none; }
+  #chat-container { padding: 20px 16px 0; }
+  .input-area { padding: 10px 16px 14px; }
+}
+</style>
+
+<aside>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
+        <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="logo-name">Senior<span>OS</span></div>
+    <div class="api-badge" id="api-badge" title="Status da API local">
+      <div class="api-dot"></div>
+      <span id="api-label">...</span>
+    </div>
+  </div>
+
+  <div class="sidebar-actions">
+    <button class="btn-primary" onclick="newSession()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      Nova sessão
+    </button>
+    <a href="/dashboard" class="btn-ghost">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+  </div>
+
+  <div class="sidebar-history">
+    <div class="sidebar-label">Sessões recentes</div>
+    <div id="history-list"></div>
+  </div>
+
+  <div class="sidebar-user">
+    <div class="avatar" id="vla-avatar">—</div>
+    <span id="vla-username">Carregando...</span>
+  </div>
+</aside>
+
+<main>
+  <div id="chat-container">
+    <div id="chat-content"></div>
+    <div id="scroll-anchor"></div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-wrap">
+      <div class="suggestions" id="suggestions" style="display:none"></div>
+      <form id="form" onsubmit="handleSubmit(event)">
+        <div class="input-row">
+          <input id="input" type="text" autocomplete="off"
+            placeholder="Descreva o que deseja construir..."
+            oninput="onInputChange()" onfocus="showSuggestionsIfEmpty()">
+          <button type="submit" class="send-btn" id="send-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+      </form>
+      <div class="input-footer">
+        <span class="input-hint">VLA Engine · API local</span>
+        <span class="kbd">Enter</span>
+        <span class="input-hint">enviar</span>
+        <span class="kbd">Esc</span>
+        <span class="input-hint">voltar</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+'use strict';
+
+const API          = 'http://localhost:8000';
+const STORAGE_KEY  = 'seniorOS_sessions';
+const MAX_SESSIONS = 20;
+
+let appState     = 'IDLE';
+let session      = { titulo: '', produto: '', objetivo: '', arquivoJson: '' };
+let apiOnline    = false;
+let _nomeUsuario = 'Operador';
+let _ws = null, _wsResolve = null;
+
+function conectarWS() {
+  const url = API.replace('http', 'ws') + '/api/ws/status';
+  _ws = new WebSocket(url);
+  _ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (!data.ocupado && _wsResolve) { const r = _wsResolve; _wsResolve = null; r({ sucesso: !data.erro, mensagem: data.erro || data.sucesso || '' }); }
+    } catch {}
+  };
+  _ws.onclose = () => { setTimeout(conectarWS, 3000); };
+  _ws.onerror = () => { _ws.close(); };
+}
+
+function aguardarStatus(timeoutMs = 1800000) {
+  return new Promise((resolve) => {
+    if (_ws && _ws.readyState === WebSocket.OPEN) {
+      const timer = setTimeout(() => { _wsResolve = null; resolve({ sucesso: false, mensagem: 'Tempo esgotado.' }); }, timeoutMs);
+      _wsResolve = (result) => { clearTimeout(timer); resolve(result); };
+    } else { _pollFallback(resolve, timeoutMs); }
+  });
+}
+
+async function _pollFallback(resolve, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await sleep(2000);
+    try { const res = await fetch(`${API}/api/status`); const data = await res.json(); if (!data.ocupado) { resolve({ sucesso: !data.erro, mensagem: data.erro || data.sucesso || '' }); return; } } catch {}
+  }
+  resolve({ sucesso: false, mensagem: 'Tempo esgotado.' });
+}
+
+const pollStatus = () => aguardarStatus();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function formatarNomeArquivo(nome) {
+  return nome.normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/[\\/*?:"<>|]/g, "").replace(/ /g, "_").substring(0, 40).replace(/_+$/, "") + ".json";
+}
+
+function loadSessions() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } }
+function saveSession(sess) { const s = loadSessions().filter(s => s.id !== sess.id); s.unshift(sess); try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s.slice(0, MAX_SESSIONS))); } catch {} }
+function deleteSession(id) { if (!confirm('Remover esta sessão do histórico?')) return; const s = loadSessions().filter(s => s.id !== id); try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {} renderHistory(); }
+
+function tagClass(p) { p = (p||'').toLowerCase(); if(p.includes('flow')) return 'tag-flow'; if(p.includes('hcm')) return 'tag-hcm'; if(p.includes('erpx')) return 'tag-erpx'; return 'tag-outros'; }
+function tagLabel(p) { if(!p) return ''; p=p.toLowerCase(); if(p.includes('flow')) return 'Flow'; if(p.includes('hcm')) return 'HCM'; if(p.includes('erpx')) return 'ERP X'; return p.slice(0,5); }
+function relativeDate(ts) { const d=(Date.now()-ts)/1000; if(d<60) return 'agora'; if(d<3600) return `${Math.floor(d/60)}m`; if(d<86400) return `${Math.floor(d/3600)}h`; return `${Math.floor(d/86400)}d`; }
+
+function safe(text) { const d = document.createElement('div'); d.textContent = String(text); return d.innerHTML; }
+function md(text) { return safe(text).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/`(.*?)`/g,'<code style="font-family:monospace;font-size:12px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px">$1</code>').replace(/\n/g,'<br>'); }
+function scrollBottom() { setTimeout(() => document.getElementById('scroll-anchor').scrollIntoView({ behavior:'smooth', block:'end' }), 60); }
+function append(html) { document.getElementById('chat-content').insertAdjacentHTML('beforeend', html); scrollBottom(); }
+
+function agentIcon() { return `<div class="agent-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`; }
+function addAgent(text) { append(`<div class="msg msg-agent">${agentIcon()}<div class="bubble-agent">${md(text)}</div></div>`); setTimeout(() => document.getElementById('input').focus(), 80); }
+function addUser(text)  { append(`<div class="msg msg-user"><div class="bubble-user">${safe(text)}</div></div>`); }
+function showTyping()   { append(`<div class="typing-row" id="typing">${agentIcon()}<div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`); }
+function removeTyping() { const el = document.getElementById('typing'); if (el) el.remove(); }
+function hideSuggestions() { document.getElementById('suggestions').style.display = 'none'; }
+function onInputChange() { if (document.getElementById('input').value.trim()) hideSuggestions(); }
+function showSuggestionsIfEmpty() {}
+
+function addNotice(text) { append(`<div class="notice"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg><span>${md(text)}</span></div>`); }
+
+function copyToClipboard(text, btn) { navigator.clipboard.writeText(text).then(() => { const o=btn.innerHTML; btn.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg> Copiado`; setTimeout(()=>{btn.innerHTML=o;},2000); }); }
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  const sessions = loadSessions();
+  if (!sessions.length) { list.innerHTML = `<div class="sidebar-empty">Nenhuma sessão ainda.<br>Crie a sua primeira aula.</div>`; return; }
+  list.innerHTML = sessions.map(s => `<div class="history-item" role="button" tabindex="0"><div class="hi-body" onclick="loadHistorySession('${s.id}')"><span class="hi-title">${safe(s.titulo||'Sem título')}</span><div class="hi-meta">${s.produto?`<span class="tag ${tagClass(s.produto)}">${tagLabel(s.produto)}</span>`:''}<span class="hi-date">${relativeDate(s.ts)}</span></div></div><button class="hi-delete" onclick="deleteSession('${s.id}')" title="Remover"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join('');
+}
+
+function loadHistorySession(id) {
+  const sess = loadSessions().find(s => s.id === id);
+  if (!sess) return;
+  newSession();
+  setTimeout(() => { addAgent(`Retomando: **${sess.titulo}**\n\nProduto: ${sess.produto}\nObjetivo: ${sess.objetivo}\n\nDeseja executar novamente ou criar uma nova versão?`); session = { ...sess, arquivoJson: '' }; addChips([{ label: 'Executar novamente', action: 'retry_session' },{ label: 'Nova versão', action: 'start_new' }]); }, 100);
+}
+
+async function checkApiStatus() {
+  const badge = document.getElementById('api-badge'), label = document.getElementById('api-label');
+  try { const res = await fetch(`${API}/api/status`, { signal: AbortSignal.timeout(2500) }); if (res.ok) { apiOnline=true; badge.className='api-badge online'; label.textContent='online'; return; } } catch {}
+  apiOnline=false; badge.className='api-badge offline'; label.textContent='offline';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (['CONFIRM','PRODUCT','OBJECTIVE'].includes(appState)) { e.preventDefault(); addUser('← Voltar'); backState(); } return; }
+  if ((e.ctrlKey||e.metaKey) && e.key === 'Enter') { const c = document.querySelector('.btn-confirm'); if (c) { e.preventDefault(); c.click(); } }
+});
+
+function backState() {
+  if (appState==='PRODUCT') { appState='TITLE'; addAgent('Qual será o título desta aula?'); }
+  else if (appState==='OBJECTIVE') { appState='PRODUCT'; addAgent('A qual produto esta aula pertence?'); addChips([{label:'Senior Flow',action:'set_product'},{label:'HCM',action:'set_product'},{label:'ERP',action:'set_product'},{label:'WMS',action:'set_product'},{label:'CRM',action:'set_product'}]); }
+  else if (appState==='CONFIRM') { appState='OBJECTIVE'; addAgent('Qual é o objetivo desta aula?'); }
+}
+
+function addChips(options) {
+  const btns = options.map(o => { const p = o.payload ? `,'${safe(o.payload)}'` : ''; return `<button class="chip" onclick="chipClick('${o.action}','${safe(o.label)}'${p})">${safe(o.label)}</button>`; }).join('');
+  append(`<div class="chips">${btns}</div>`);
+}
+
+function addConfirmCard() {
+  append(`<div class="msg msg-agent" style="align-items:flex-start">${agentIcon()}<div style="flex:1;max-width:88%"><div class="card"><div class="card-row"><label>Título</label><span>${safe(session.titulo)}</span></div><div class="card-row"><label>Produto</label><span>${safe(session.produto)}</span></div><div class="card-row"><label>Objetivo</label><span>${safe(session.objetivo)}</span></div><div class="card-actions"><button class="btn-confirm" onclick="confirmarInicio()">Confirmar e iniciar mapeamento</button><button class="btn-edit" onclick="editarSessao()">Editar</button></div><div style="margin-top:10px;font-size:11px;color:var(--muted);text-align:right">Ctrl+Enter para confirmar · Esc para editar</div></div></div></div>`);
+}
+</script>
+
+<script>
+// ─── Stepper + Deliverables ────────────────────────────────
+const STEPS = [
+  { label: '🎬 Renderização do vídeo (MP4)',  endpoint: n => `/api/renderizar/${n}` },
+  { label: '📦 Geração do pacote SCORM',      endpoint: n => `/api/gerar-scorm/${n}` },
+  { label: '📜 Geração do documento PDF',     endpoint: n => `/api/gerar-pdf/${n}` },
+  { label: '🔗 Geração do SimLink',           endpoint: n => `/api/gerar-simlink/${n}` },
+  { label: '🧠 Indexação na base de conhecimento', endpoint: n => `/api/ingest/${n}` },
+];
+
+function checkIcon(type) {
+  if (type==='ok')  return `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>`;
+  if (type==='err') return `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
+  return '';
+}
+
+function setStepState(el, type) {
+  const icon = el.querySelector('.step-icon');
+  icon.className = `step-icon ${type}`;
+  icon.innerHTML = checkIcon(type);
+  el.classList.add(type==='ok' ? 'done' : 'error');
+}
+
+async function runStepper(nomeArquivo) {
+  const id = 'step-' + Date.now();
+  append(`<div class="msg msg-agent" style="align-items:flex-start">${agentIcon()}<div style="flex:1;max-width:88%"><div class="stepper" id="${id}"></div></div></div>`);
+  const container = document.getElementById(id);
+
+  for (let i = 0; i < STEPS.length; i++) {
+    const s = STEPS[i], stepId = `step-${id}-${i}`;
+    container.insertAdjacentHTML('beforeend', `<div class="step" id="${stepId}"><div class="step-icon spinning"></div><span>${safe(s.label)}</span></div>`);
+    const el = document.getElementById(stepId);
+    requestAnimationFrame(() => el.classList.add('visible'));
+    scrollBottom();
+    try {
+      await fetch(`${API}/api/limpar-status`, { method: 'POST' }).catch(() => {});
+      const res = await fetch(`${API}${s.endpoint(nomeArquivo)}`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await pollStatus();
+      if (!result.sucesso) { setStepState(el, 'err'); return { sucesso: false, mensagem: result.mensagem }; }
+      setStepState(el, 'ok');
+    } catch (e) { setStepState(el, 'err'); return { sucesso: false, mensagem: e.message }; }
+  }
+  container.insertAdjacentHTML('beforeend', `<div class="step visible done" style="font-weight:600;color:var(--success)"><div class="step-icon ok">${checkIcon('ok')}</div><span>Produção concluída</span></div>`);
+  scrollBottom();
+  return { sucesso: true };
+}
+
+async function addDeliverables(arquivoJson) {
+  let baseName = arquivoJson.replace('.json', '');
+  try { const res = await fetch(`${API}/api/roteiros/${arquivoJson}`); if (res.ok) { const data = await res.json(); if (data.metadata?.id_treinamento) baseName = formatarNomeArquivo(data.metadata.id_treinamento).replace('.json',''); } } catch {}
+  const video = `${API}/videos/${baseName}.mp4`, pdf = `${API}/api/download-pdf/${baseName}`, scorm = `${API}/api/download-scorm/${baseName}`, simlink = `${API}/api/preview-simlink/${baseName}`, link = `${window.location.origin}/videos/${baseName}.mp4`;
+  append(`<div class="msg msg-agent" style="align-items:flex-start">${agentIcon()}<div style="flex:1;max-width:88%"><div class="deliverables"><h3>Materiais de <strong>${safe(session.titulo)}</strong></h3><div class="video-wrap"><video controls><source src="${video}" type="video/mp4">Vídeo indisponível.</video></div><div class="dl-row"><a href="${pdf}" target="_blank" class="dl-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF</a><a href="${scorm}" download class="dl-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>SCORM</a><a href="${simlink}" target="_blank" class="dl-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>SimLink</a><button class="dl-btn" onclick="copyToClipboard('${link}',this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copiar link</button></div><div class="sep"></div><div class="next-row"><a href="/dashboard" class="btn-next"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/></svg>Refinar</a><button class="btn-next" onclick="newSession()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Nova sessão</button></div></div></div></div>`);
+  scrollBottom();
+}
+
+function setInputEnabled(on) {
+  const inp = document.getElementById('input'), btn = document.getElementById('send-btn');
+  inp.disabled = !on; btn.disabled = !on;
+  inp.placeholder = on ? 'Descreva o que deseja construir...' : 'Aguardando o processo...';
+}
+
+// ─── Fluxo principal ───────────────────────────────────────
+window.onload = async () => {
+  renderHistory(); checkApiStatus(); setInterval(checkApiStatus, 15000); conectarWS();
+  try { const r = await fetch(`${API}/api/status`, { signal: AbortSignal.timeout(2000) }); if (r.ok) { const d = await r.json(); if (d.user_name) _nomeUsuario = d.user_name; } } catch {}
+  const iniciais = _nomeUsuario.split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2);
+  const elA = document.getElementById('vla-avatar'), elU = document.getElementById('vla-username');
+  if (elA) elA.textContent = iniciais; if (elU) elU.textContent = _nomeUsuario;
+  addAgent(`Olá, ${_nomeUsuario}. O que vamos construir hoje?`);
+  addChips([{ label: 'Construir nova aula', action: 'start_new' },{ label: 'Gerar vídeo de aula existente', action: 'load_existing' }]);
+  document.getElementById('input').focus();
+};
+
+function handleSubmit(e) {
+  e.preventDefault();
+  const text = document.getElementById('input').value.trim();
+  if (!text || document.getElementById('send-btn').disabled) return;
+  document.getElementById('input').value = ''; hideSuggestions(); addUser(text); processInput(text);
+}
+
+async function processInput(text) {
+  showTyping(); await sleep(480); removeTyping();
+  if (appState==='IDLE') { if (/nova|aula|criar|construir/i.test(text)) chipClick('start_new'); else addAgent('Selecione uma opção acima para começarmos.'); }
+  else if (appState==='TITLE') { session.titulo=text; appState='PRODUCT'; addAgent('Ótimo. A qual produto esta aula pertence?'); addChips([{label:'Senior Flow',action:'set_product'},{label:'HCM',action:'set_product'},{label:'ERP',action:'set_product'},{label:'WMS',action:'set_product'},{label:'CRM',action:'set_product'}]); }
+  else if (appState==='OBJECTIVE') { session.objetivo=text; appState='CONFIRM'; addAgent('Revise os dados antes de iniciar:'); addConfirmCard(); }
+}
+
+async function carregarRoteirosExistentes() {
+  try {
+    const res = await fetch(`${API}/api/roteiros`); if (!res.ok) throw new Error('Falha');
+    const roteiros = await res.json(); removeTyping();
+    if (!roteiros.length) { addAgent('Não encontrei nenhuma aula salva no banco de dados.'); addChips([{label:'Construir nova aula',action:'start_new'}]); return; }
+    addAgent('Aqui estão as aulas recentes salvas no sistema. Qual deseja produzir?');
+    addChips(roteiros.slice(0,10).map(r => ({ label: r.nome, action: 'select_existing', payload: r.arquivo })));
+  } catch { removeTyping(); addAgent('⚠️ Erro ao buscar os roteiros na API local.'); }
+}
+
+function chipClick(action, label='', payload='') {
+  if (event?.target?.parentElement) event.target.parentElement.style.display = 'none';
+  if (action==='load_existing') { addUser(label); appState='LOADING_EXISTING'; showTyping(); carregarRoteirosExistentes(); return; }
+  if (action==='select_existing') { addUser(label); session.titulo=label; session.arquivoJson=payload; appState='READY_EXISTING'; showTyping(); setTimeout(() => { removeTyping(); addAgent(`O roteiro **${label}** foi carregado. O que deseja fazer?`); addChips([{label:'🤖 Iniciar Gravação (Robô)',action:'start_robo'},{label:'🚀 Iniciar Produção Direta',action:'start_factory'}]); }, 500); return; }
+  if (action==='unsupported') { if(label) addUser(label); showTyping(); setTimeout(()=>{removeTyping();addAgent('Esta funcionalidade estará disponível em breve.');},500); return; }
+  if (action==='start_new') { if(!label) addUser('Construir nova aula'); appState='TITLE'; showTyping(); setTimeout(()=>{removeTyping();addAgent('Qual será o título desta aula?');},500); return; }
+  if (action==='set_product') { addUser(label); session.produto=label; appState='OBJECTIVE'; showTyping(); setTimeout(()=>{removeTyping();addAgent('Qual é o objetivo desta aula? Descreva o que o usuário aprenderá a fazer.');},500); return; }
+  if (action==='retry_session') { addUser('Executar novamente'); appState='CONFIRM'; addConfirmCard(); return; }
+  if (chipHandlers[action]) { if(label) addUser(label); chipHandlers[action](); }
+}
+window.chipClick = chipClick;
+
+function editarSessao() { session={titulo:'',produto:'',objetivo:'',arquivoJson:''}; appState='TITLE'; addAgent('Tudo bem, vamos recomeçar. Qual será o título?'); }
+
+async function confirmarInicio() {
+  document.querySelectorAll('.card').forEach(c => c.closest('.msg')?.remove());
+  addUser('Confirmar e iniciar mapeamento'); appState='RUNNING'; setInputEnabled(false);
+  const sessId = 'sess_' + Date.now(); session.id=sessId; session.ts=Date.now(); saveSession({...session}); renderHistory();
+  if (!apiOnline) { addNotice('A API local está offline (porta 8000). Verifique se o servidor está em execução.'); setInputEnabled(true); appState='CONFIRM'; return; }
+  addNotice('Uma janela do navegador será aberta para o agente mapear o fluxo. **Não feche** — isso é normal.');
+  await sleep(700); showTyping();
+  try {
+    await fetch(`${API}/api/limpar-status`, { method: 'POST' }).catch(()=>{});
+    const res = await fetch(`${API}/api/gravar`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nome_aula: `${session.produto} - ${session.titulo}`, objetivo: session.objetivo }) });
+    if (!res.ok) throw new Error('A API rejeitou o comando de gravação.');
+    const result = await pollStatus(); removeTyping();
+    if (!result.sucesso) { addAgent(`Problema no mapeamento:\n\`${result.mensagem}\`\n\nDeseja tentar novamente?`); addChips([{label:'Tentar novamente',action:'retry_session'}]); setInputEnabled(true); return; }
+    addAgent('Mapeamento concluído! O próximo passo é colocar o Robô Ator para testar o roteiro e gravar a tela.');
+    addChips([{label:'🤖 Iniciar Gravação (Robô)',action:'start_robo'}]);
+  } catch (e) { removeTyping(); addAgent(`Erro ao conectar à API:\n\`${e.message}\``); setInputEnabled(true); appState='CONFIRM'; }
+}
+
+async function iniciarRobo() {
+  addUser('Iniciar Gravação (Robô)'); appState='ROBO'; setInputEnabled(false);
+  addNotice('Iniciando o motor cinemático. **Por favor, solte o mouse.** O robô vai assumir o controle em 3 segundos.');
+  await sleep(700); showTyping();
+  try {
+    const arquivoJson = session.arquivoJson || formatarNomeArquivo(`${session.produto} - ${session.titulo}`);
+    await fetch(`${API}/api/limpar-status`, { method: 'POST' }).catch(()=>{});
+    const res = await fetch(`${API}/api/executar-robo/${arquivoJson}`, { method: 'POST' });
+    if (!res.ok) throw new Error('Falha ao acionar o endpoint do Robô.');
+    const result = await pollStatus(); removeTyping();
+    if (!result.sucesso) { addAgent(`⚠️ A execução do robô falhou:\n\`${result.mensagem}\``); addChips([{label:'🤖 Tentar Robô Novamente',action:'start_robo'}]); setInputEnabled(true); return; }
+    addAgent('Gravação concluída! Posso acionar a linha de produção final para renderizar todos os materiais?');
+    addChips([{label:'🚀 Iniciar Produção',action:'start_factory'}]);
+  } catch (e) { removeTyping(); addAgent(`Erro ao comunicar com a API do Robô:\n\`${e.message}\``); setInputEnabled(true); }
+}
+
+async function iniciarProducao() {
+  addUser('Iniciar produção'); appState='FACTORY'; setInputEnabled(false);
+  addAgent('A linha de produção final foi acionada. Acompanhe os pacotes a serem montados:');
+  await sleep(300);
+  const arquivoJson = session.arquivoJson || formatarNomeArquivo(`${session.produto} - ${session.titulo}`);
+  const result = await runStepper(arquivoJson);
+  if (!result.sucesso) { addAgent(`A produção foi interrompida:\n\`${result.mensagem}\``); addChips([{label:'🔄 Tentar novamente',action:'start_factory'}]); setInputEnabled(true); return; }
+  await sleep(500); addDeliverables(arquivoJson); appState='DONE'; setInputEnabled(true);
+}
+
+const chipHandlers = {
+  start_robo:    iniciarRobo,
+  start_factory: iniciarProducao,
+  retry_mapping: confirmarInicio,
+  retry_session: () => { appState='CONFIRM'; addConfirmCard(); },
+};
+
+function newSession() {
+  session={titulo:'',produto:'',objetivo:'',arquivoJson:''}; appState='IDLE';
+  document.getElementById('chat-content').innerHTML = ''; setInputEnabled(true); hideSuggestions();
+  addAgent(`Olá, ${_nomeUsuario}. O que vamos construir hoje?`);
+  addChips([{label:'Construir nova aula',action:'start_new'},{label:'Gerar vídeo de aula existente',action:'load_existing'}]);
+  document.getElementById('input').focus();
+}
+window.newSession = newSession;
+</script>
+</body>
+</html>

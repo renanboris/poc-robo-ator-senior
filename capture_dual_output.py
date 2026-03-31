@@ -150,6 +150,21 @@ def _montar_evento_shadow(*,
     pattern = _infer_pattern_from_capture(acao, label, dados.get("seletor", ""), dados.get("tag", ""), capture_scope)
     is_noise = _is_noise_event(label, dados.get("seletor", ""), acao, dados.get("tag", ""), capture_scope, valor_input)
 
+    # micro_narracao curta: máximo 60 chars, sem pontos duplos
+    _intencao_raw = analise.get("intencao") or f"{acao} em {label}"
+    micro_narracao_curta = _intencao_raw[:60].rstrip()
+
+    # validacao_esperada varia por tipo de acao
+    _validacoes = {
+        "fill":     "Campo preenchido com o valor correto",
+        "search":   "Resultados filtrados conforme o termo",
+        "save":     "Registro salvo com sucesso",
+        "delete":   "Item removido da listagem",
+        "confirm":  "Operação confirmada",
+        "open":     "Conteúdo ou modal aberto",
+    }
+    validacao_alvo = _validacoes.get(semantic_action, "A tela mudou conforme esperado")
+
     return {
         "id_acao": id_acao,
         "captured_at": utc_now(),
@@ -162,7 +177,7 @@ def _montar_evento_shadow(*,
         "business_target": label,
         "pattern_detectado": pattern,
         "valor_input": valor_input,
-        "micro_narracao": f".{(analise.get('intencao') or f'{acao} em {label}').lower()}.",
+        "micro_narracao": micro_narracao_curta,
         "contexto_semantico": {
             "tela_atual": {
                 "tela_id": page_title,
@@ -172,7 +187,7 @@ def _montar_evento_shadow(*,
             }
         },
         "validacao_esperada": {
-            "alvo": "A tela mudou conforme esperado"
+            "alvo": validacao_alvo
         },
         "elemento_alvo": {
             "descricao_visual": analise.get("descricao_visual", f"Elemento '{label}'"),
@@ -209,8 +224,10 @@ def _salvar_shadow_jsonl(nome_aula: str, objetivo_aula: str, eventos: list[dict]
     try:
         os.makedirs("shadow_exports", exist_ok=True)
         caminho = os.path.join("shadow_exports", f"{limpar_nome(nome_aula)}_shadow.jsonl")
+        # Garante ordem cronológica por id_acao, independente de race conditions no asyncio
+        eventos_ordenados = sorted(eventos, key=lambda e: e.get("id_acao", 0))
         with open(caminho, "w", encoding="utf-8") as f:
-            for evento in eventos:
+            for evento in eventos_ordenados:
                 f.write(json.dumps(evento, ensure_ascii=False) + "\n")
         logger.info(f"Shadow JSONL salvo em: {caminho}")
         print(f"SHADOW_GERADO:{caminho}", flush=True)
@@ -329,9 +346,13 @@ async def _injetar_em_contexto(contexto):
 
             const tag = el.tagName.toLowerCase();
             const isEditable = tag === 'input' || tag === 'textarea' || el.getAttribute('contenteditable') === 'true';
-            if (isEditable) return el.placeholder || el.name || el.title || 'Campo de entrada';
+            if (isEditable) {
+                // Filtra atributos Angular não resolvidos (name="undefined", placeholder="undefined")
+                const clean = (v) => (v && v !== 'undefined' && v !== 'null') ? v : '';
+                return clean(el.placeholder) || clean(el.name) || clean(el.title) || 'Campo de entrada';
+            }
             const text = el.innerText?.trim().replace(/\\n/g, ' ') || '';
-            if (text && text.length > 0 && text.length < 100) return text;
+            if (text && text.length > 0 && text.length < 100 && text !== 'undefined') return text;
             let cur = el;
             for (let i = 0; i < 4; i++) {
                 if (!cur) break;
@@ -410,8 +431,23 @@ async def _injetar_em_contexto(contexto):
             return 'Pagina Principal';
         };
 
+        const getRectComFallback = (el) => {
+            // Elementos Angular da sidebar (position:fixed, ng-star-inserted) podem retornar
+            // rect zerado se ainda estao em transicao de layout. Sobe na arvore ate achar
+            // um ancestral com dimensoes validas, ou usa o centro da viewport como ultimo recurso.
+            let cur = el;
+            for (let i = 0; i < 6; i++) {
+                if (!cur) break;
+                const r = cur.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) return r;
+                cur = cur.parentElement;
+            }
+            // Fallback: centro da viewport (melhor que zero para o cursor_engine)
+            return { x: window.innerWidth / 2, y: window.innerHeight / 2, width: 40, height: 20 };
+        };
+
         const processarEvento = (target, acao, valor = '') => {
-            const rect = target.getBoundingClientRect();
+            const rect = getRectComFallback(target);
             window.capturarElemento(JSON.stringify({
                 tag: target.tagName.toLowerCase(),
                 texto_encontrado: valor || getElementName(target),
@@ -446,6 +482,12 @@ async def _injetar_em_contexto(contexto):
         }, true);
         document.addEventListener('blur', (e) => {
             const tag = e.target.tagName.toLowerCase();
+            const tipo = (e.target.getAttribute('type') || '').toLowerCase();
+            // Ignora checkboxes e radios — nunca geram preencher_campo
+            // Ignora valores "undefined"/"null" que vazam de inputs ocultos do PrimeNG/Angular
+            if (tipo === 'checkbox' || tipo === 'radio') return;
+            const val = e.target.value || '';
+            if (!val.trim() || val === 'undefined' || val === 'null') return;
             if (e.target === ultimoEnterTarget && Date.now() - ultimoEnterTime < 500) return;
             if ((tag === 'input' || tag === 'textarea' || e.target.isContentEditable) && e.target.value) {
                 processarEvento(e.target, 'preencher_campo', e.target.value);
@@ -514,9 +556,9 @@ async def on_capturar_elemento(source, args):
             logger.warning(f"Falha ao tirar print: {e}")
 
         coords  = _extrair_coordenadas_relativas(dados.get("posicao_visual", ""), vp_w, vp_h)
-        # Aviso quando coordenadas são zero — indica que getBoundingClientRect retornou vazio
-        if coords.get("x_pct", 0) == 0.5 and coords.get("y_pct", 0) == 0.5:
-            logger.warning(f"[FOTO {meu_id_acao}] Coordenadas padrão (0.5/0.5) — elemento pode ter sido capturado fora da viewport.")
+        # Aviso quando coordenadas ainda são padrão após fallback no JS
+        if coords.get("x_pct") == 0.5 and coords.get("y_pct") == 0.5:
+            logger.warning(f"[FOTO {meu_id_acao}] Coordenadas padrão (0.5/0.5) — fallback de viewport usado para '{label}'.")
         analise = (
             await _analisar_elemento_com_gemini(
                 screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
@@ -806,10 +848,20 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
             for i, id_tec in enumerate(passo_ia.get("ids_acoes_tecnicas", [])):
                 acao_bruta = next((item for item in log_mapeador if item["id_acao"] == id_tec), None)
                 if acao_bruta:
+                    # capture_scope e pattern_detectado vêm do shadow (se disponível),
+                    # ficam em _capture_meta para não interferir no executor
+                    shadow_ref = next((s for s in shadow_capturado if s.get("id_acao") == id_tec), None)
+                    capture_meta = {}
+                    if shadow_ref:
+                        capture_meta = {
+                            "capture_scope":    shadow_ref.get("capture_scope"),
+                            "pattern_detectado": shadow_ref.get("pattern_detectado"),
+                        }
                     passo_mesclado["acoes_tecnicas"].append({
                         "acao": acao_bruta["acao"], "intencao_semantica": acao_bruta["intencao_semantica"],
                         "elemento_alvo": acao_bruta["elemento_alvo"], "valor_input": acao_bruta["valor_input"],
                         "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
+                        "_capture_meta": capture_meta,
                     })
             if passo_mesclado["is_conclusao"]:
                 passo_mesclado["acoes_tecnicas"].append({"acao": "concluir_video"})

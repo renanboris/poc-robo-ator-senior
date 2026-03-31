@@ -5360,6 +5360,278 @@
     },
     "_source": "GED_HYBRID_-_004_hybrid.json"
   },
+  "acessar ged": {
+    "acao": "clique",
+    "capture_scope": "shell",
+    "is_noise": false,
+    "intencao_semantica": "Acessar GED",
+    "semantic_action": "navigate",
+    "pattern_detectado": "",
+    "business_entity": "",
+    "business_target": "",
+    "elemento_alvo": {
+      "descricao_visual": "GED",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "a",
+      "confianca_captura": "media",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.16861979961395263,
+        "y_pct": 0.4,
+        "w_pct": 0.21223959922790528,
+        "h_pct": 0.06766917293233082
+      },
+      "seletor_hint": "#apps-menu-item-1",
+      "iframe_hint": "Pagina Principal",
+      "html_hint": "<a _ngcontent-auo-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\"><span _ngcontent-auo-c143=\"\"><em _ngcontent-auo-c143=\"\" class=\"fa fa-lg pull-right fa-an"
+    },
+    "valor_input": "",
+    "micro_narracao": ".acessamos ged.",
+    "seletor_css": "#apps-menu-item-1",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "GED_HYBRID_-_TESTE_005_executor.json"
+  },
+  "acessar documentos": {
+    "acao": "clique",
+    "capture_scope": "shell",
+    "is_noise": false,
+    "intencao_semantica": "Acessar Documentos",
+    "semantic_action": "navigate",
+    "pattern_detectado": "",
+    "business_entity": "",
+    "business_target": "",
+    "elemento_alvo": {
+      "descricao_visual": "Documentos",
+      "contexto_tela": "Senior | Plataforma de solução",
+      "tipo_elemento": "a",
+      "confianca_captura": "media",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.16861979961395263,
+        "y_pct": 0.3323308270676692,
+        "w_pct": 0.21223959922790528,
+        "h_pct": 0.06766917293233082
+      },
+      "seletor_hint": "#apps-menu-item-0",
+      "iframe_hint": "Pagina Principal",
+      "html_hint": "<a _ngcontent-auo-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": ".acessamos documentos.",
+    "seletor_css": "#apps-menu-item-0",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "GED_HYBRID_-_TESTE_005_executor.json"
+  },
+  "acessar financeiro": {
+    "acao": "duplo_clique",
+    "capture_scope": "shell",
+    "is_noise": false,
+    "intencao_semantica": "Acessar Financeiro",
+    "semantic_action": "navigate",
+    "pattern_detectado": "",
+    "business_entity": "",
+    "business_target": "",
+    "elemento_alvo": {
+      "descricao_visual": "Financeiro",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "span",
+      "confianca_captura": "media",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.15930438284146584,
+        "y_pct": 0.6422926464283412,
+        "w_pct": 0.05540254237288136,
+        "h_pct": 0.02326757810184554
+      },
+      "seletor_hint": "#itemTitle",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-sba-c34=\"\" id=\"itemTitle\">Financeiro</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": ".acessamos financeiro.",
+    "seletor_css": "#itemTitle",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "GED_HYBRID_-_TESTE_005_executor.json"
+  },
+  "acessar nova pasta": {
+    "acao": "clique",
+    "capture_scope": "shell",
+    "is_noise": false,
+    "intencao_semantica": "Acessar Nova pasta",
+    "semantic_action": "navigate",
+    "pattern_detectado": "",
+    "business_entity": "",
+    "business_target": "",
+    "elemento_alvo": {
+      "descricao_visual": "Nova pasta",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "span",
+      "confianca_captura": "media",
+      "label_curto": "Nova pasta",
+      "coordenadas_relativas": {
+        "x_pct": 0.8188250719490698,
+        "y_pct": 0.04830551436891686,
+        "w_pct": 0.060019425214347194,
+        "h_pct": 0.024279210925644917
+      },
+      "seletor_hint": "#newFolderButton",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-sba-c5=\"\" class=\"s-button-text ng-star-inserted\">Nova pasta</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": ".acessamos nova pasta.",
+    "seletor_css": "#newFolderButton",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "GED_HYBRID_-_TESTE_005_executor.json"
+  },
+  "acessar ucs teste": {
+    "acao": "tecla",
+    "capture_scope": "shell",
+    "is_noise": false,
+    "intencao_semantica": "Acessar UCS TESTE",
+    "semantic_action": "navigate",
+    "pattern_detectado": "",
+    "business_entity": "",
+    "business_target": "",
+    "elemento_alvo": {
+      "descricao_visual": "UCS TESTE",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "h1",
+      "confianca_captura": "media",
+      "label_curto": "UCS TESTE",
+      "coordenadas_relativas": {
+        "x_pct": 0.2604608180159229,
+        "y_pct": 0.8652551213960546,
+        "w_pct": 0.25771541272179554,
+        "h_pct": 0.05401176024279211
+      },
+      "seletor_hint": "#file_8 > div:nth-child(1) > div:nth-child(2) > h1:nth-child(1)",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-sba-c34=\"\" class=\"file-name\" contenteditable=\"true\"><span _ngcontent-sba-c34=\"\" id=\"itemTitle\">UCS TESTE</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "",
+    "micro_narracao": ".acessamos ucs teste.",
+    "seletor_css": "#file_8 > div:nth-child(1) > div:nth-child(2) > h1:nth-child(1)",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "GED_HYBRID_-_TESTE_005_executor.json"
+  },
+  "acessar excluir": {
+    "acao": "clique",
+    "capture_scope": "shell",
+    "is_noise": false,
+    "intencao_semantica": "Acessar Excluir",
+    "semantic_action": "navigate",
+    "pattern_detectado": "",
+    "business_entity": "",
+    "business_target": "",
+    "elemento_alvo": {
+      "descricao_visual": "Excluir",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "div",
+      "confianca_captura": "media",
+      "label_curto": "Excluir",
+      "coordenadas_relativas": {
+        "x_pct": 0.22945356692297983,
+        "y_pct": 0.8139700303490136,
+        "w_pct": 0.035602049100196966,
+        "h_pct": 0.03186646433990895
+      },
+      "seletor_hint": "ul.dropdown-menu.show > li:nth-child(12) > a:nth-child(1)",
+      "iframe_hint": "ci",
+      "html_hint": "<div _ngcontent-sba-c33=\"\">Excluir</div>"
+    },
+    "valor_input": "",
+    "micro_narracao": ".acessamos excluir.",
+    "seletor_css": "ul.dropdown-menu.show > li:nth-child(12) > a:nth-child(1)",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "GED_HYBRID_-_TESTE_005_executor.json"
+  },
+  "acessar sim": {
+    "acao": "clique",
+    "capture_scope": "shell",
+    "is_noise": false,
+    "intencao_semantica": "Acessar Sim",
+    "semantic_action": "navigate",
+    "pattern_detectado": "",
+    "business_entity": "",
+    "business_target": "",
+    "elemento_alvo": {
+      "descricao_visual": "Sim",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "span",
+      "confianca_captura": "media",
+      "label_curto": "Sim",
+      "coordenadas_relativas": {
+        "x_pct": 0.6313559499837584,
+        "y_pct": 0.5794132678389369,
+        "w_pct": 0.032768362659519004,
+        "h_pct": 0.024279210925644917
+      },
+      "seletor_hint": "#s-button-70",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-sba-c5=\"\" class=\"s-button-text ng-star-inserted\">Sim</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": ".acessamos sim.",
+    "seletor_css": "#s-button-70",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "GED_HYBRID_-_TESTE_005_executor.json"
+  },
+  "acessar documentos regras ações em lote": {
+    "acao": "clique",
+    "capture_scope": "shell",
+    "is_noise": false,
+    "intencao_semantica": "Acessar Documentos Regras ações em lote",
+    "semantic_action": "navigate",
+    "pattern_detectado": "",
+    "business_entity": "",
+    "business_target": "",
+    "elemento_alvo": {
+      "descricao_visual": "Documentos Regras ações em lote",
+      "contexto_tela": "GED | X Platform",
+      "tipo_elemento": "span",
+      "confianca_captura": "media",
+      "label_curto": "Documentos Regras ações em lote",
+      "coordenadas_relativas": {
+        "x_pct": 0.16964160466598252,
+        "y_pct": 0.30663569310004507,
+        "w_pct": 0.01694915254237288,
+        "h_pct": 0.021244309559939303
+      },
+      "seletor_hint": "#s-button-89",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-sba-c5=\"\" aria-hidden=\"true\" class=\"fas fa-redo s-button-icon ng-star-inserted\"></span>"
+    },
+    "valor_input": "",
+    "micro_narracao": ".acessamos documentos regras ações em lote.",
+    "seletor_css": "#s-button-89",
+    "validacao_esperada": {
+      "tipo": "estado_visual",
+      "alvo": "A tela mudou conforme esperado"
+    },
+    "_source": "GED_HYBRID_-_TESTE_005_executor.json"
+  },
   "clique em nova pasta": {
     "acao": "clique",
     "intencao_semantica": "clique em Nova pasta",
@@ -9378,6 +9650,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...aqui, o Senior Flow, nosso ponto de partida...",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_105.json"
   },
   "navegar para a seção principal do módulo de gerenciamento eletrônico de documentos (ged) dentro do sistema senior x.": {
@@ -9390,10 +9664,10 @@
       "confianca_captura": "alta",
       "label_curto": "GED",
       "coordenadas_relativas": {
-        "x_pct": 0.0,
-        "y_pct": 0.0,
-        "w_pct": 0.0,
-        "h_pct": 0.0
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
       },
       "seletor_hint": "[aria-label='Grupo de menus GED']",
       "iframe_hint": null,
@@ -9401,6 +9675,8 @@
     },
     "valor_input": "",
     "micro_narracao": "...e dentro dele, o GED — Gestão Eletrônica de Documentos.",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_105.json"
   },
   "o usuário quis acessar ou visualizar a seção de documentos do sistema.": {
@@ -9413,10 +9689,10 @@
       "confianca_captura": "alta",
       "label_curto": "Documentos",
       "coordenadas_relativas": {
-        "x_pct": 0.0,
-        "y_pct": 0.0,
-        "w_pct": 0.0,
-        "h_pct": 0.0
+        "x_pct": 0,
+        "y_pct": 0,
+        "w_pct": 0,
+        "h_pct": 0
       },
       "seletor_hint": "[aria-label='Documentos']",
       "iframe_hint": null,
@@ -9424,7 +9700,536 @@
     },
     "valor_input": "",
     "micro_narracao": "...aqui ó, a área de Documentos.",
+    "seletor_css": "",
+    "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_105.json"
+  },
+  "navegar para a seção de gerenciamento eletrônico de documentos (ged) ou expandir o menu relacionado a ged para ver suas sub-opções.": {
+    "acao": "clique",
+    "intencao_semantica": "Navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) ou expandir o menu relacionado a GED para ver suas sub-opções.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra lateral esquerda, com o texto 'GED' em branco sobre um fundo cinza escuro. À esquerda do texto, há um ícone de seta apontando para a esquerda, e o item está abaixo de 'Senior Flow'.",
+      "contexto_tela": "O usuário está na tela principal do sistema Senior X Platform, interagindo com o menu de navegação lateral esquerdo.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.5156,
+        "y_pct": 0.5158,
+        "w_pct": 0.0312,
+        "h_pct": 0.0301
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-xda-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-xda-c143=\"\"><em _ngcontent-xda-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e dentro dele, o GED...",
+    "_capture_meta": {
+      "capture_scope": "shell",
+      "pattern_detectado": "menu_navigation"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "o usuário quis abrir o item 'financeiro' para visualizar seu conteúdo, provavelmente um documento ou uma pasta.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "O usuário quis abrir o item 'Financeiro' para visualizar seu conteúdo, provavelmente um documento ou uma pasta.",
+    "elemento_alvo": {
+      "descricao_visual": "Um texto com o rótulo 'Financeiro', exibido como um título ou nome de item em uma lista, sem ícones visíveis diretamente associados a ele na imagem fornecida.",
+      "contexto_tela": "O usuário está na tela principal de gerenciamento de documentos, onde pode filtrar dados, visualizar uma lista de documentos/pastas e realizar ações como criar novas pastas ou fazer upload de arquivos.",
+      "tipo_elemento": "folder",
+      "confianca_captura": "alta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.2398,
+        "y_pct": 0.6376,
+        "w_pct": 0.2375,
+        "h_pct": 0.0301
+      },
+      "seletor_hint": "[id='file_0']",
+      "iframe_hint": "ci",
+      "html_hint": "<h1 _ngcontent-tom-c34=\"\" class=\"file-name\"><span _ngcontent-tom-c34=\"\" id=\"itemTitle\">Financeiro</span><!----><!----><!----><!----></h1>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...entramos na pasta 'Financeiro'...",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "table_selection"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "acessar opções de gerenciamento ou ações contextuais para o documento 'contas a receber01.pdf'.": {
+    "acao": "clique_direito",
+    "intencao_semantica": "Acessar opções de gerenciamento ou ações contextuais para o documento 'Contas a receber01.pdf'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um texto 'Contas a receber01.pdf' exibido em uma linha de uma tabela, precedido por um ícone de documento PDF e uma caixa de seleção. A linha completa representa um item de arquivo dentro de uma lista de documentos.",
+      "contexto_tela": "O usuário está na seção 'Financeiro' de um sistema de gerenciamento de documentos (GED), visualizando uma lista de arquivos e pastas. A tela exibe colunas como 'Nome', 'Autor', 'Tamanho', 'Última modificação' e 'Status documento'.",
+      "tipo_elemento": "list_item",
+      "confianca_captura": "alta",
+      "label_curto": "Contas a receber01.pdf",
+      "coordenadas_relativas": {
+        "x_pct": 0.1781,
+        "y_pct": 0.7782,
+        "w_pct": 0.1141,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-tom-c34=\"\" id=\"itemTitle\">Contas a receber01.pdf</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e no documento, o menu de contexto.",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "table_selection"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "o usuário pretende adicionar ou editar as instruções para o processo de coleta de assinaturas do documento.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende adicionar ou editar as instruções para o processo de coleta de assinaturas do documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto (text area) com o placeholder 'Preencha com instruções para os assinantes', localizado na seção 'Instruções'. Embora visualmente seja um campo de texto, o sistema identificou o elemento clicado com o rótulo 'Coletar assinaturas'.",
+      "contexto_tela": "O usuário está na tela de configuração para a coleta de assinaturas de um documento específico ('CONTAS A RECEBER01.PDF'), onde pode gerenciar assinantes, instruções e outras opções relacionadas ao processo de assinatura.",
+      "tipo_elemento": "input",
+      "confianca_captura": "media",
+      "label_curto": "Coletar assinaturas",
+      "coordenadas_relativas": {
+        "x_pct": 0.4766,
+        "y_pct": 0.5113,
+        "w_pct": 0.0312,
+        "h_pct": 0.0301
+      },
+      "seletor_hint": "text=\"Coletar assinaturas\"",
+      "iframe_hint": "ci",
+      "html_hint": "<div _ngcontent-tom-c33=\"\">Coletar assinaturas</div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...a opção 'Coletar assinaturas'...",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "unknown"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "o usuário pretende inserir o endereço de e-mail de um novo assinante para coletar assinaturas em um documento de 'contas a receber'.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende inserir o endereço de e-mail de um novo assinante para coletar assinaturas em um documento de 'Contas a Receber'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto retangular com borda vermelha, contendo o placeholder 'E-mail'.",
+      "contexto_tela": "O usuário está na tela de 'Coletar Assinaturas' para um documento de 'Contas a Receber', dentro da seção 'Assinantes'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "E-mail",
+      "coordenadas_relativas": {
+        "x_pct": 0.3773,
+        "y_pct": 0.2662,
+        "w_pct": 0.1922,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='email']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-tom-c58=\"\" autocomplete=\"off\" formcontrolname=\"email\" name=\"email\" pinputtext=\"\" type=\"email\" placeholder=\"E-mail\" class=\"ng-untouched ng-pristine ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o campo de e-mail...",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "form_fill"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "informar o e-mail de um assinante para coletar a assinatura de um documento.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Informar o e-mail de um assinante para coletar a assinatura de um documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto para e-mail, preenchido com 'renan.kirsch@senior.com.br', localizado na seção 'Assinantes' de um formulário de coleta de assinaturas.",
+      "contexto_tela": "O usuário está na tela de 'Coletar Assinaturas' para o documento 'CONTAS A RECEBER01.PDF', que é uma funcionalidade do sistema GED, dentro da área 'Financeiro'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "renan.kirsch@senior.com.br",
+      "coordenadas_relativas": {
+        "x_pct": 0.3773,
+        "y_pct": 0.2662,
+        "w_pct": 0.1922,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='email']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-tom-c58=\"\" autocomplete=\"off\" formcontrolname=\"email\" name=\"email\" pinputtext=\"\" type=\"email\" placeholder=\"E-mail\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\"\">"
+    },
+    "valor_input": "renan.kirsch@senior.com.br",
+    "micro_narracao": "...o e-mail do Renan...",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "form_fill"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "preencher o nome do destinatário que irá assinar o documento, especificamente o campo de nome para o assinante 'renan'.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Preencher o nome do destinatário que irá assinar o documento, especificamente o campo de nome para o assinante 'Renan'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto, preenchido com 'Renan', localizado ao lado de um campo de e-mail e antes de um campo de telefone, dentro da seção 'Assinantes'. Possui um placeholder 'Nome' e está realçado com uma borda vermelha.",
+      "contexto_tela": "O usuário está na tela de 'Coletar Assinaturas' para o documento 'CONTAS A RECEBER01.PDF', especificamente na seção para adicionar ou editar os 'Assinantes'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Renan",
+      "coordenadas_relativas": {
+        "x_pct": 0.5758,
+        "y_pct": 0.2662,
+        "w_pct": 0.1922,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='name']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-tom-c58=\"\" autocomplete=\"off\" formcontrolname=\"name\" name=\"name\" pinputtext=\"\" type=\"text\" placeholder=\"Nome\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\"\">"
+    },
+    "valor_input": "Renan",
+    "micro_narracao": "...e o nome dele.",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "form_fill"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "o usuário quis inserir instruções ou informações adicionais para os assinantes do documento.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis inserir instruções ou informações adicionais para os assinantes do documento.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é uma caixa de texto grande e retangular, com borda vermelha destacando-a, contendo o texto de placeholder 'Preencha com instruções para os assinantes'.",
+      "contexto_tela": "O usuário está na tela de coleta de assinaturas para o documento 'CONTAS A RECEBER01.PDF', especificamente na seção de 'Instruções' para os assinantes.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Preencha com instruções para os assinant",
+      "coordenadas_relativas": {
+        "x_pct": 0.4289,
+        "y_pct": 0.5203,
+        "w_pct": 0.2953,
+        "h_pct": 0.1504
+      },
+      "seletor_hint": "[name='instructions']",
+      "iframe_hint": "ci",
+      "html_hint": "<textarea _ngcontent-tom-c58=\"\" formcontrolname=\"instructionsToSigner\" id=\"instructions\" name=\"instructions\" pinputtextarea=\"\" placeholder=\"Preencha com instruções para os assinantes\" class=\"ng-untouched ng-pristine ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget\" style=\"\"></textarea>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o campo de instruções...",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "form_fill"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "o usuário quis fornecer instruções específicas para os assinantes do documento 'contas a receber01.pdf' durante o processo de coleta de assinaturas.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "O usuário quis fornecer instruções específicas para os assinantes do documento 'CONTAS A RECEBER01.PDF' durante o processo de coleta de assinaturas.",
+    "elemento_alvo": {
+      "descricao_visual": "É uma caixa de texto multilinha (textarea) com o texto 'Analisar e assinar' preenchido, localizada sob o título 'Instruções'.",
+      "contexto_tela": "O usuário está em uma tela modal ou pop-up para 'COLETAR ASSINATURAS' de um documento, especificamente na seção onde se definem os assinantes e as instruções para eles. O documento em questão é 'CONTAS A RECEBER01.PDF'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Analisar e assinar",
+      "coordenadas_relativas": {
+        "x_pct": 0.4289,
+        "y_pct": 0.5203,
+        "w_pct": 0.2953,
+        "h_pct": 0.1504
+      },
+      "seletor_hint": "[name='instructions']",
+      "iframe_hint": "ci",
+      "html_hint": "<textarea _ngcontent-tom-c58=\"\" formcontrolname=\"instructionsToSigner\" id=\"instructions\" name=\"instructions\" pinputtextarea=\"\" placeholder=\"Preencha com instruções para os assinantes\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\""
+    },
+    "valor_input": "Analisar e assinar",
+    "micro_narracao": "...aqui, 'Analisar e assinar'...",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "form_fill"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "habilitar a coleta de geolocalização para a assinatura do documento.": {
+    "acao": "clique",
+    "intencao_semantica": "Habilitar a coleta de geolocalização para a assinatura do documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Uma caixa de seleção quadrada, marcada com um 'check' azul, ao lado do texto 'Habilitar coleta de geolocalização'.",
+      "contexto_tela": "O usuário está na tela de 'Coletar Assinaturas' para o documento 'CONTAS A RECEBER01.PDF', especificamente na seção de 'Opções'.",
+      "tipo_elemento": "checkbox",
+      "confianca_captura": "alta",
+      "label_curto": "Caixa de selecao Angular",
+      "coordenadas_relativas": {
+        "x_pct": 0.6023,
+        "y_pct": 0.4782,
+        "w_pct": 0.0156,
+        "h_pct": 0.0301
+      },
+      "seletor_hint": "p-checkbox#collectGeolocation .ui-chkbox .ui-chkbox-box",
+      "iframe_hint": "ci",
+      "html_hint": "<div class=\"ui-chkbox-box ui-widget ui-corner-all ui-state-default ui-state-active ui-state-focus\"><span class=\"ui-chkbox-icon ui-clickable pi pi-check\"></span></div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e a coleta de geolocalização.",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "unknown"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "o usuário quis finalizar o processo de configuração de coleta de assinaturas para o documento 'contas a receber01.pdf' e enviá-lo para os destinatários assinarem.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis finalizar o processo de configuração de coleta de assinaturas para o documento 'CONTAS A RECEBER01.PDF' e enviá-lo para os destinatários assinarem.",
+    "elemento_alvo": {
+      "descricao_visual": "É um botão retangular de cor azul com o texto 'Enviar para assinatura' em branco, localizado na parte inferior esquerda de um modal de coleta de assinaturas, ao lado de um link 'Cancelar'.",
+      "contexto_tela": "O usuário está em um modal de 'Coletar Assinaturas' dentro do módulo 'Financeiro' de um sistema de gestão de documentos (GED), configurando o envio de um documento PDF ('CONTAS A RECEBER01.PDF') para assinatura. Neste modal, ele pode definir os assinantes, instruções e opções de coleta.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Enviar para assinatura",
+      "coordenadas_relativas": {
+        "x_pct": 0.3523,
+        "y_pct": 0.9414,
+        "w_pct": 0.1094,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='sendSign']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-tom-c5=\"\" class=\"s-button-text ng-star-inserted\">Enviar para assinatura</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "",
+    "_capture_meta": {
+      "capture_scope": "module_iframe",
+      "pattern_detectado": "unknown"
+    },
+    "_source": "TESTE_DUAL_002.json"
+  },
+  "o usuário clicou no item 'senior flow' para navegar para a seção ou módulo correspondente dentro da plataforma senior x.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no item 'Senior Flow' para navegar para a seção ou módulo correspondente dentro da plataforma Senior X.",
+    "elemento_alvo": {
+      "descricao_visual": "É um item de menu na barra lateral esquerda. Possui um ícone que representa duas pessoas conectadas e o texto 'Senior Flow'. Está localizado na parte superior da seção de navegação principal, abaixo da foto de perfil do usuário.",
+      "contexto_tela": "O usuário está na tela principal ou dashboard da plataforma Senior X, com o menu de navegação principal visível à esquerda.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0258,
+        "y_pct": 0.6639,
+        "w_pct": 0.05,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-kym-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-kym-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-kym-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, o Senior Flow...",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "o usuário quis acessar ou navegar para a seção principal do módulo ged (gestão eletrônica de documentos) dentro do senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar ou navegar para a seção principal do módulo GED (Gestão Eletrônica de Documentos) dentro do Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'GED' é um item de menu de texto branco, localizado na barra lateral esquerda escura, abaixo de 'Senior Flow'. Ele possui um ícone de seta apontando para a esquerda ao seu lado esquerdo e está acima de uma lista de sub-itens como 'Documentos' e 'Gerenciar Assuntos'.",
+      "contexto_tela": "O usuário está na tela principal do sistema Senior X Platform, navegando pelo menu lateral esquerdo, especificamente dentro da área 'Senior Flow', onde 'GED' é um dos módulos ou categorias principais.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "GED",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus GED']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-kym-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-1\" href=\"#/Senior Flow/1/documents\" aria-label=\"Grupo de menus GED\" style=\"\"><span _ngcontent-kym-c143=\"\"><em _ngcontent-kym-c143=\"\" class=\"fa fa-lg pull-ri"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e o GED, nosso Gestão Eletrônica de Documentos.",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "navegar para a seção de 'financeiro' do sistema.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "Navegar para a seção de 'Financeiro' do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, identificado pelo texto 'Financeiro'.",
+      "contexto_tela": "O usuário está na tela principal do sistema, visualizando a seção de 'Documentos', e interagindo com o menu de navegação lateral.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.1465,
+        "y_pct": 0.3331,
+        "w_pct": 0.0508,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-wjg-c34=\"\" id=\"itemTitle\">Financeiro</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...a pasta Financeiro.",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "o usuário quis acessar um menu de contexto para realizar ações específicas no documento 'contas a receber01.pdf', como abrir, editar, mover, copiar ou excluir.": {
+    "acao": "clique_direito",
+    "intencao_semantica": "O usuário quis acessar um menu de contexto para realizar ações específicas no documento 'Contas a receber01.pdf', como abrir, editar, mover, copiar ou excluir.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um texto 'Contas a receber01.pdf' exibido ao lado de um ícone de documento (PDF), dentro de uma linha de uma tabela que lista arquivos e pastas. A linha inteira está levemente destacada, indicando que o item foi selecionado ou está sob foco.",
+      "contexto_tela": "O usuário está na seção 'Financeiro' de um sistema de gestão de documentos (GED), visualizando uma lista de arquivos e pastas. A navegação indica 'Home > Financeiro'.",
+      "tipo_elemento": "document_item",
+      "confianca_captura": "alta",
+      "label_curto": "Contas a receber01.pdf",
+      "coordenadas_relativas": {
+        "x_pct": 0.1781,
+        "y_pct": 0.6429,
+        "w_pct": 0.1141,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-wjg-c34=\"\" id=\"itemTitle\">Contas a receber01.pdf</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o menu de contexto do 'Contas a receber01.pdf'.",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "o usuário pretende inserir o endereço de e-mail de um novo assinante para o documento.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende inserir o endereço de e-mail de um novo assinante para o documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com o placeholder 'E-mail', realçado com uma borda vermelha, localizado na seção 'Assinantes' do formulário.",
+      "contexto_tela": "O usuário está na tela de 'Coletar Assinaturas' para documentos relacionados a 'Contas a Receber', especificamente na seção para adicionar novos assinantes.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "E-mail",
+      "coordenadas_relativas": {
+        "x_pct": 0.3773,
+        "y_pct": 0.2662,
+        "w_pct": 0.1922,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='email']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-wjg-c58=\"\" autocomplete=\"off\" formcontrolname=\"email\" name=\"email\" pinputtext=\"\" type=\"email\" placeholder=\"E-mail\" class=\"ng-untouched ng-pristine ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o campo de e-mail...",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "informar o endereço de e-mail de um assinante para o documento 'contas a receber01.pdf'.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Informar o endereço de e-mail de um assinante para o documento 'CONTAS A RECEBER01.PDF'.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto com borda vermelha, preenchido com 'renan.kirsch@senior.com.br', localizado abaixo do título 'Assinantes' e ao lado de campos para 'Nome' e 'Telefone'.",
+      "contexto_tela": "O usuário está na tela de 'Coletar Assinaturas' para o documento 'CONTAS A RECEBER01.PDF', especificamente na seção para adicionar assinantes.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "renan.kirsch@senior.com.br",
+      "coordenadas_relativas": {
+        "x_pct": 0.3773,
+        "y_pct": 0.2662,
+        "w_pct": 0.1922,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='email']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-wjg-c58=\"\" autocomplete=\"off\" formcontrolname=\"email\" name=\"email\" pinputtext=\"\" type=\"email\" placeholder=\"E-mail\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\"\">"
+    },
+    "valor_input": "renan.kirsch@senior.com.br",
+    "micro_narracao": "",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "preencher o nome do signatário para a coleta de assinaturas do documento.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Preencher o nome do signatário para a coleta de assinaturas do documento.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto, preenchido com 'Renan', localizado ao lado do campo de e-mail do signatário.",
+      "contexto_tela": "O usuário está na tela de coleta de assinaturas, especificamente na seção para adicionar ou editar os dados de um signatário para o documento 'CONTAS A RECEBER01.PDF'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Renan",
+      "coordenadas_relativas": {
+        "x_pct": 0.5758,
+        "y_pct": 0.2662,
+        "w_pct": 0.1922,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[name='name']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-wjg-c58=\"\" autocomplete=\"off\" formcontrolname=\"name\" name=\"name\" pinputtext=\"\" type=\"text\" placeholder=\"Nome\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\"\">"
+    },
+    "valor_input": "Renan",
+    "micro_narracao": "...o nome do assinante...",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "o usuário pretende inserir instruções ou informações adicionais para os assinantes do documento.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende inserir instruções ou informações adicionais para os assinantes do documento.",
+    "elemento_alvo": {
+      "descricao_visual": "É uma caixa de texto grande (textarea) com o placeholder 'Preencha com instruções para os assinantes', localizada abaixo do título 'Instruções'.",
+      "contexto_tela": "O usuário está na tela de 'Coletar Assinaturas' para o documento 'CONTAS A RECEBER01.PDF', dentro da seção 'Financeiro' do sistema.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Preencha com instruções para os assinant",
+      "coordenadas_relativas": {
+        "x_pct": 0.4289,
+        "y_pct": 0.5203,
+        "w_pct": 0.2953,
+        "h_pct": 0.1504
+      },
+      "seletor_hint": "[name='instructions']",
+      "iframe_hint": "ci",
+      "html_hint": "<textarea _ngcontent-wjg-c58=\"\" formcontrolname=\"instructionsToSigner\" id=\"instructions\" name=\"instructions\" pinputtextarea=\"\" placeholder=\"Preencha com instruções para os assinantes\" class=\"ng-untouched ng-pristine ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget\" style=\"\"></textarea>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e as instruções para ele...",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "fornecer instruções específicas para os assinantes do documento 'contas a receber01.pdf' no processo de coleta de assinaturas.": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Fornecer instruções específicas para os assinantes do documento 'CONTAS A RECEBER01.PDF' no processo de coleta de assinaturas.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto multilinha (textarea) com o texto 'Verificar e assinar' preenchido, destacado por uma borda vermelha, localizado abaixo do título 'Instruções'.",
+      "contexto_tela": "O usuário está em uma tela modal ou pop-up para 'COLETAR ASSINATURAS' de um documento PDF ('CONTAS A RECEBER01.PDF'), dentro da seção de 'Instruções' para os assinantes.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Verificar e assinar",
+      "coordenadas_relativas": {
+        "x_pct": 0.4289,
+        "y_pct": 0.5203,
+        "w_pct": 0.2953,
+        "h_pct": 0.1504
+      },
+      "seletor_hint": "[name='instructions']",
+      "iframe_hint": "ci",
+      "html_hint": "<textarea _ngcontent-wjg-c58=\"\" formcontrolname=\"instructionsToSigner\" id=\"instructions\" name=\"instructions\" pinputtextarea=\"\" placeholder=\"Preencha com instruções para os assinantes\" class=\"ng-untouched ng-valid ui-inputtext ui-corner-all ui-state-default ui-widget ng-dirty ui-state-filled\" style=\""
+    },
+    "valor_input": "Verificar e assinar",
+    "micro_narracao": "",
+    "_source": "TESTE_Dual_Output.json"
+  },
+  "o usuário quis finalizar o processo de coleta de assinaturas para o documento 'contas a receber01.pdf', enviando-o para os destinatários especificados.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis finalizar o processo de coleta de assinaturas para o documento 'CONTAS A RECEBER01.PDF', enviando-o para os destinatários especificados.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um botão retangular azul com o texto 'Enviar para assinatura' em branco, localizado na parte inferior esquerda da janela modal.",
+      "contexto_tela": "O usuário está em uma janela modal intitulada 'COLETAR ASSINATURAS: CONTAS A RECEBER01.PDF', que permite configurar os signatários, instruções e opções para a assinatura de um documento. Esta modal está sobreposta à seção 'Financeiro' do sistema GED.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Enviar para assinatura",
+      "coordenadas_relativas": {
+        "x_pct": 0.3523,
+        "y_pct": 0.9414,
+        "w_pct": 0.1094,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='sendSign']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-wjg-c5=\"\" class=\"s-button-text ng-star-inserted\">Enviar para assinatura</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...o botão de enviar.",
+    "_source": "TESTE_Dual_Output.json"
   },
   "acessar a funcionalidade 'senior flow'": {
     "acao": "clique",
