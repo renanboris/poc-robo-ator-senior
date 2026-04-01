@@ -6,7 +6,7 @@ import logging
 from google import genai
 from google.genai import types
 import dap_engine
-from utils import limpar_nome, validar_roteiro
+from utils import limpar_nome, validar_roteiro, validar_roteiro_ia
 
 logger = logging.getLogger("generator_engine")
 
@@ -213,10 +213,10 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
     logger.info(f"Roteiro '{nome_arquivo}' gerado com {len(roteiro_final['passos'])} passos.")
 
     # ── Portão de qualidade semântico (não bloqueia o retorno) ──────────────
-    aprovado, motivo_qualidade = validar_roteiro(roteiro_final)
+    aprovado, motivo_qualidade = validar_roteiro_ia(roteiro_final)
     if not aprovado:
         logger.warning(
-            f"[Generator] Portão de qualidade: REPROVADO — {motivo_qualidade}. "
+            f"[Generator] Portão de qualidade IA: REPROVADO — {motivo_qualidade}. "
             f"Roteiro salvo em '{caminho}' para revisão manual."
         )
     # ────────────────────────────────────────────────────────────────────────

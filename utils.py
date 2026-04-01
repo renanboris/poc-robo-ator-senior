@@ -72,3 +72,57 @@ def validar_roteiro(roteiro: dict) -> tuple[bool, str]:
         f"OK — {len(passos)} passos, {total_acoes} ações, "
         f"{pct_seletor:.0%} com seletor, {pct_baixa:.0%} baixa confiança."
     )
+
+
+def validar_roteiro_ia(roteiro: dict) -> tuple[bool, str]:
+    """
+    Portão de qualidade para roteiros gerados por IA.
+    Fonte canônica — não duplicar em outros módulos.
+
+    Critérios diferentes de validar_roteiro — não verifica seletor_hint
+    (roteiros de IA não têm seletor_hint preenchido por design).
+
+    Critérios:
+      - >= 2 passos
+      - Pelo menos 1 passo com ancora pedagógica preenchida
+      - Pelo menos 1 ação técnica com elemento_alvo não vazio (excluindo concluir_video)
+      - Nenhum passo não-conclusão com acoes_tecnicas completamente vazia
+
+    Retorna (aprovado: bool, motivo: str).
+    """
+    passos = roteiro.get("passos", [])
+    if len(passos) < 2:
+        return False, f"Apenas {len(passos)} passo(s) — roteiro insuficiente."
+
+    # Pelo menos 1 passo com ancora pedagógica preenchida
+    tem_ancora = any(
+        p.get("pedagogia", {}).get("ancora", "").strip()
+        for p in passos
+    )
+    if not tem_ancora:
+        return False, "Nenhum passo possui âncora pedagógica (ancora) preenchida."
+
+    # Pelo menos 1 ação com elemento_alvo não vazio (excluindo concluir_video)
+    tem_elemento = any(
+        bool(a.get("elemento_alvo"))
+        for p in passos
+        for a in p.get("acoes_tecnicas", [])
+        if a.get("acao") != "concluir_video"
+    )
+    if not tem_elemento:
+        return False, "Nenhuma ação técnica possui elemento_alvo definido."
+
+    # Nenhum passo não-conclusão com acoes_tecnicas completamente vazia
+    for passo in passos:
+        if passo.get("is_conclusao"):
+            continue
+        acoes = [
+            a for a in passo.get("acoes_tecnicas", [])
+            if a.get("acao") != "concluir_video"
+        ]
+        if not acoes:
+            return False, (
+                f"Passo {passo.get('id_passo', '?')} não tem ações técnicas definidas."
+            )
+
+    return True, f"OK — {len(passos)} passos com conteúdo pedagógico e técnico."

@@ -49,6 +49,7 @@ cliques_capturados: list = []
 _id_acao_global: int    = 0
 _lock_id: asyncio.Lock  = None
 _pending_tasks: set     = set()
+_nome_aula_sessao: str  = ""   # definido em iniciar_esteira_de_producao antes de capturar
 
 def _gerar_embedding_openai(texto: str) -> list[float]:
     resp = _openai_client.embeddings.create(input=texto, model=OPENAI_EMBED_MODEL, dimensions=TARGET_DIM)
@@ -354,7 +355,8 @@ async def on_capturar_elemento(source, args):
         label      = (dados["texto_encontrado"] or dados["tag"])[:40]
         logger.info(f"[FOTO {meu_id_acao}] | {acao.upper()} | {label}")
 
-        screenshot_bytes = screenshot_b64 = None
+        screenshot_bytes = None
+        screenshot_ref   = None   # path relativo em disco ou base64 fallback
         vp_w, vp_h = 1920, 1080
 
         try:
@@ -362,9 +364,23 @@ async def on_capturar_elemento(source, args):
             if frame:
                 page_ref         = frame.page
                 screenshot_bytes = await page_ref.screenshot(type="jpeg", quality=80, full_page=False)
-                screenshot_b64   = base64.b64encode(screenshot_bytes).decode("utf-8")
                 vp               = await page_ref.evaluate("() => ({w: window.innerWidth, h: window.innerHeight})")
                 vp_w, vp_h       = vp["w"], vp["h"]
+                # Externaliza screenshot para disco; fallback para base64 se falhar
+                if screenshot_bytes and _nome_aula_sessao:
+                    pasta_screenshots = os.path.join(
+                        "audios_gerados", limpar_nome(_nome_aula_sessao), "screenshots"
+                    )
+                    os.makedirs(pasta_screenshots, exist_ok=True)
+                    screenshot_path = os.path.join(pasta_screenshots, f"acao_{meu_id_acao}.jpg")
+                    try:
+                        with open(screenshot_path, "wb") as f_img:
+                            f_img.write(screenshot_bytes)
+                        screenshot_ref = screenshot_path
+                    except Exception:
+                        screenshot_ref = base64.b64encode(screenshot_bytes).decode("utf-8")
+                elif screenshot_bytes:
+                    screenshot_ref = base64.b64encode(screenshot_bytes).decode("utf-8")
         except PlaywrightError as e:
             if "Target closed" in str(e) or "browser has been closed" in str(e):
                 return
@@ -401,7 +417,7 @@ async def on_capturar_elemento(source, args):
                 "seletor_hint":          dados["seletor"],
                 "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
                 "html_hint":             dados.get("html_snapshot", "")[:300],
-                "screenshot_referencia": screenshot_b64,
+                "screenshot_referencia": screenshot_ref,
             },
             "valor_input": dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else "",
         })
@@ -708,6 +724,8 @@ def iniciar_esteira_de_producao():
             objetivo  = input("Qual e o objetivo do treinamento?\n> ")
 
         async def _pipeline(nome_aula_inner, objetivo_inner):
+            global _nome_aula_sessao
+            _nome_aula_sessao = nome_aula_inner  # disponibiliza para on_capturar_elemento
             await capturar_cliques_na_tela()
             if cliques_capturados:
                 logger.info(f"{len(cliques_capturados)} acoes capturadas. Processando Roteiro...")

@@ -755,6 +755,34 @@ async def _buscar_em_todos_os_frames(
 # ──────────────────────────────────────────────────────────────
 # GEMINI VISION & COORDENADAS
 # ──────────────────────────────────────────────────────────────
+
+def _resolver_screenshot_ref(ref: Optional[str]) -> Optional[bytes]:
+    """
+    Resolve screenshot_referencia para bytes, independentemente do formato.
+
+    Suporta:
+      - Path relativo em disco (ex: "audios_gerados/Aula/screenshots/acao_1.jpg")
+      - String base64 JPEG (roteiros legados pré-Fase 3)
+      - None / ausente
+
+    Nunca lança exceção — retorna None em caso de falha.
+    """
+    if not ref:
+        return None
+    # Tenta como path de arquivo primeiro
+    if os.path.exists(ref):
+        try:
+            with open(ref, "rb") as f:
+                return f.read()
+        except Exception:
+            return None
+    # Fallback: tenta decodificar como base64
+    try:
+        return base64.b64decode(ref)
+    except Exception:
+        return None
+
+
 async def _gemini_localizar_elemento(
     screenshot_atual: bytes, screenshot_ref_b64: Optional[str],
     descricao_visual: str, intencao: str, contexto_tela: str,
@@ -767,13 +795,13 @@ async def _gemini_localizar_elemento(
     logger.info("   [Gemini Vision] Acionando a IA para reparar o script...")
     contents: list = []
 
+    # screenshot_ref_b64 pode ser base64 (legado) ou path relativo (Fase 3)
+    # _resolver_screenshot_ref detecta automaticamente o formato
     if screenshot_ref_b64:
-        try:
-            ref_bytes = base64.b64decode(screenshot_ref_b64)
+        ref_bytes = _resolver_screenshot_ref(screenshot_ref_b64)
+        if ref_bytes:
             contents.append("IMAGEM 1 - REFERENCIA (estado da tela na gravacao original):")
             contents.append(types.Part.from_bytes(data=ref_bytes, mime_type="image/jpeg"))
-        except Exception:
-            pass
 
     contents.append("IMAGEM 2 - TELA ATUAL (onde o elemento deve ser clicado agora):")
     contents.append(types.Part.from_bytes(data=screenshot_atual, mime_type="image/jpeg"))
