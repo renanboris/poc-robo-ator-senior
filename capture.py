@@ -6,6 +6,9 @@ Correcoes aplicadas:
   - Try/Except global com flush=True para garantir que o painel leia erros reais.
   - Blindagem contra TargetClosedError (Falso Positivo ao fechar o navegador).
   - [NOVO] Hack Supremo para Checkboxes Angular/PrimeNG (textContent + :has-text).
+  - [FIX] limpar_nome e validar_roteiro centralizados em utils.py (DRY).
+  - [FIX] Validação de IDs alucinados pelo Gemini em _invocar_aura_sync.
+  - [FIX] getRectComFallback no JS injetado para coordenadas Angular.
 """
 
 import asyncio
@@ -17,6 +20,7 @@ import logging
 import re
 import traceback
 from dotenv import load_dotenv
+from utils import limpar_nome, validar_roteiro
 
 from playwright.async_api import async_playwright, Error as PlaywrightError
 from google import genai
@@ -45,9 +49,6 @@ cliques_capturados: list = []
 _id_acao_global: int    = 0
 _lock_id: asyncio.Lock  = None
 _pending_tasks: set     = set()
-
-def limpar_nome(nome: str) -> str:
-    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
 
 def _gerar_embedding_openai(texto: str) -> list[float]:
     resp = _openai_client.embeddings.create(input=texto, model=OPENAI_EMBED_MODEL, dimensions=TARGET_DIM)
@@ -236,8 +237,22 @@ async def _injetar_em_contexto(contexto):
             return 'Pagina Principal';
         };
 
+        const getRectComFallback = (el) => {
+            // Elementos Angular (position:fixed, ng-star-inserted) podem retornar
+            // rect zerado se ainda estao em transicao de layout. Sobe na arvore
+            // ate achar um ancestral com dimensoes validas.
+            let cur = el;
+            for (let i = 0; i < 5; i++) {
+                if (!cur) break;
+                const r = cur.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) return r;
+                cur = cur.parentElement;
+            }
+            return el.getBoundingClientRect();
+        };
+
         const processarEvento = (target, acao, valor = '') => {
-            const rect = target.getBoundingClientRect();
+            const rect = getRectComFallback(target);
             window.capturarElemento(JSON.stringify({
                 tag: target.tagName.toLowerCase(),
                 texto_encontrado: valor || getElementName(target),
@@ -533,59 +548,6 @@ async def capturar_cliques_na_tela():
             await asyncio.gather(*_pending_tasks, return_exceptions=True)
         _pending_tasks.clear()
 
-def _validar_roteiro(roteiro: dict) -> tuple[bool, str]:
-    """
-    Portao de qualidade: verifica se o roteiro gerado tem estrutura minima valida
-    antes de permitir que o auto-rebuild aconteca.
-    
-    Retorna (aprovado: bool, motivo: str).
-    Criterios minimos:
-      - Tem campo 'passos' com pelo menos 2 passos (1 real + 1 conclusao)
-      - Pelo menos 50% dos passos tem acoes_tecnicas com seletor_hint preenchido
-      - Menos de 70% das acoes com confianca='baixa' (indicativo de captura ruim)
-    """
-    passos = roteiro.get("passos", [])
-    if len(passos) < 2:
-        return False, f"Apenas {len(passos)} passo(s) gerado(s) — mapeamento insuficiente."
-
-    total_acoes = 0
-    acoes_com_seletor = 0
-    acoes_baixa_confianca = 0
-
-    for passo in passos:
-        for acao in passo.get("acoes_tecnicas", []):
-            if acao.get("acao") == "concluir_video":
-                continue
-            total_acoes += 1
-            alvo = acao.get("elemento_alvo", {})
-            if alvo.get("seletor_hint", "").strip():
-                acoes_com_seletor += 1
-            if alvo.get("confianca_captura") == "baixa":
-                acoes_baixa_confianca += 1
-
-    if total_acoes == 0:
-        return False, "Nenhuma acao tecnica valida encontrada no roteiro."
-
-    pct_seletor       = acoes_com_seletor / total_acoes
-    pct_baixa_conf    = acoes_baixa_confianca / total_acoes
-
-    if pct_seletor < 0.50:
-        return False, (
-            f"Apenas {pct_seletor:.0%} das acoes tem seletor — "
-            "roteiro pode nao reproduzir corretamente."
-        )
-    if pct_baixa_conf > 0.70:
-        return False, (
-            f"{pct_baixa_conf:.0%} das acoes tem confianca baixa — "
-            "qualidade do mapeamento insuficiente para indexar."
-        )
-
-    return True, (
-        f"OK — {len(passos)} passos, {total_acoes} acoes, "
-        f"{pct_seletor:.0%} com seletor, {pct_baixa_conf:.0%} baixa confianca."
-    )
-
-
 def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, contexto_rag: str):
     if not gemini_client:
         logger.error("Gemini nao configurado. Impossivel gerar roteiro.")
@@ -649,12 +611,17 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
             micro_narracoes = passo_ia.get("micro_narracoes", [])
             for i, id_tec in enumerate(passo_ia.get("ids_acoes_tecnicas", [])):
                 acao_bruta = next((item for item in log_mapeador if item["id_acao"] == id_tec), None)
-                if acao_bruta:
-                    passo_mesclado["acoes_tecnicas"].append({
-                        "acao": acao_bruta["acao"], "intencao_semantica": acao_bruta["intencao_semantica"],
-                        "elemento_alvo": acao_bruta["elemento_alvo"], "valor_input": acao_bruta["valor_input"],
-                        "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
-                    })
+                if acao_bruta is None:
+                    logger.warning(
+                        f"[Aura] ID alucinado ignorado: id_tec={id_tec!r} não existe no log. "
+                        f"Aula: {nome_aula!r}"
+                    )
+                    continue
+                passo_mesclado["acoes_tecnicas"].append({
+                    "acao": acao_bruta["acao"], "intencao_semantica": acao_bruta["intencao_semantica"],
+                    "elemento_alvo": acao_bruta["elemento_alvo"], "valor_input": acao_bruta["valor_input"],
+                    "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
+                })
             if passo_mesclado["is_conclusao"]:
                 passo_mesclado["acoes_tecnicas"].append({"acao": "concluir_video"})
             roteiro_final["passos"].append(passo_mesclado)
@@ -672,7 +639,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
         # O roteiro é SEMPRE salvo — o analista pode revisá-lo manualmente.
         # O auto-rebuild só acontece se o roteiro passar no portão de qualidade,
         # evitando que peças ruins contaminem o dicionário da IA.
-        aprovado, motivo_validacao = _validar_roteiro(roteiro_final)
+        aprovado, motivo_validacao = validar_roteiro(roteiro_final)
 
         if aprovado:
             logger.info(f"Portão de qualidade: APROVADO — {motivo_validacao}")

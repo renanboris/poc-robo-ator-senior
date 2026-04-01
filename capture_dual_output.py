@@ -6,6 +6,7 @@ Correcoes aplicadas:
   - Try/Except global com flush=True para garantir que o painel leia erros reais.
   - Blindagem contra TargetClosedError (Falso Positivo ao fechar o navegador).
   - [NOVO] Hack Supremo para Checkboxes Angular/PrimeNG (textContent + :has-text).
+  - [FIX] limpar_nome centralizado em utils.py (DRY).
 """
 
 import asyncio
@@ -18,6 +19,7 @@ import re
 import traceback
 from datetime import datetime, timezone
 from dotenv import load_dotenv
+from utils import limpar_nome
 
 from playwright.async_api import async_playwright, Error as PlaywrightError
 from google import genai
@@ -50,9 +52,6 @@ _lock_id: asyncio.Lock  = None
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-def limpar_nome(nome: str) -> str:
-    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
 
 
 def _infer_capture_scope(iframe_id: str | None) -> str:

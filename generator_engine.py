@@ -6,6 +6,7 @@ import logging
 from google import genai
 from google.genai import types
 import dap_engine
+from utils import limpar_nome, validar_roteiro
 
 logger = logging.getLogger("generator_engine")
 
@@ -15,9 +16,6 @@ _MAX_BIBLIOTECA_CHARS = 300_000
 # ─── Número máximo de tentativas na API Gemini ────────────────────────────────
 _MAX_TENTATIVAS = 2
 
-def limpar_nome(nome: str) -> str:
-    """Sanitiza o nome para uso como nome de arquivo."""
-    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
 
 def _validar_estrutura_roteiro(roteiro: dict) -> str | None:
     """Valida que o JSON gerado pelo Gemini tem a estrutura mínima esperada."""
@@ -213,4 +211,14 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
         json.dump(roteiro_final, f, indent=2, ensure_ascii=False)
 
     logger.info(f"Roteiro '{nome_arquivo}' gerado com {len(roteiro_final['passos'])} passos.")
+
+    # ── Portão de qualidade semântico (não bloqueia o retorno) ──────────────
+    aprovado, motivo_qualidade = validar_roteiro(roteiro_final)
+    if not aprovado:
+        logger.warning(
+            f"[Generator] Portão de qualidade: REPROVADO — {motivo_qualidade}. "
+            f"Roteiro salvo em '{caminho}' para revisão manual."
+        )
+    # ────────────────────────────────────────────────────────────────────────
+
     return {"status": "sucesso", "arquivo": nome_arquivo, "roteiro": roteiro_final}

@@ -148,8 +148,9 @@ def _registrar_sucesso_cache(
     chave      = _chave_cache(intencao)
     coords_str = json.dumps(coords) if coords else None
 
-    # Descarta seletores muito vagos (nao comecam com text=, [, #)
-    if seletor and not seletor.startswith(("text=", "[", "#")):
+    # Descarta seletores muito vagos — aceita prefixos Angular/PrimeNG e :has-text(
+    _PREFIXOS_VALIDOS = ("text=", "[", "#", "button.", "p-", "mat-")
+    if seletor and not seletor.startswith(_PREFIXOS_VALIDOS) and ":has-text(" not in seletor:
         seletor = None
 
     try:

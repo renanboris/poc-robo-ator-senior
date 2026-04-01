@@ -13,6 +13,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
+from utils import limpar_nome
 
 try:
     from google import genai
@@ -291,9 +292,6 @@ JS_HYBRID = r"""
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
-def limpar_nome(nome):
-    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:60].strip("_")
-
 async def descrever_tela_bytes(screenshot_bytes, contexto=""):
     if not gemini_client or HYBRID_DISABLE_GEMINI:
         return {"onde_estou": "", "tela_id": "", "sidebar_estado": "", "sidebar_item_ativo": "", "conteudo_central": ""}
@@ -507,7 +505,6 @@ async def analisar_semantica_hibrida(b64_img, payload, contexto_fluxo=None):
         "validation_expected": {"alvo": "A tela mudou conforme esperado"},
     }
     if not gemini_client or HYBRID_DISABLE_GEMINI:
-        return fallback
         return fallback
 
     prompt = f"""

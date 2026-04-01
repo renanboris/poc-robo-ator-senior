@@ -25,6 +25,7 @@ from openai import OpenAI
 from google import genai
 from google.genai import types
 import sqlite3
+from utils import limpar_nome
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aura_engine")
@@ -205,7 +206,7 @@ def ingestar_para_pinecone(roteiro: dict, tenant_id: str = "senior_default") -> 
 
             texto_vetorizar = f"AULA: {nome_aula}. INSTRUCAO: {ancora}. DICA: {tooltip}"
             embedding       = gerar_embedding(texto_vetorizar)
-            id_vetor        = f"{nome_aula}_passo_{passo.get('id_passo')}".replace(" ", "_")
+            id_vetor = f"{limpar_nome(nome_aula)}_passo_{passo.get('id_passo')}"
 
             vetores.append({
                 "id":     id_vetor,

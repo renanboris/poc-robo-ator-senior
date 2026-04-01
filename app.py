@@ -34,6 +34,7 @@ import generator_engine
 import lego_builder
 import dap_engine
 import sim_link_builder
+from utils import limpar_nome, validar_roteiro
 
 # ==============================================================
 # WEBSOCKET MANAGER (Sprint 4) & LIFECYCLE
@@ -144,12 +145,6 @@ def verificar_token(api_key: str = Security(api_key_header)):
     return api_key
 
 
-# ==============================================================
-# FUNÇÕES DE HIGIENIZAÇÃO GLOBAL
-# ==============================================================
-def limpar_nome(nome: str) -> str:
-    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
-
 def _validar_caminho(nome_arquivo: str, diretorio_base: str) -> str:
     # Resolve o base em relação ao cwd no momento da chamada para garantir consistência
     base    = os.path.realpath(os.path.abspath(diretorio_base))
@@ -205,47 +200,6 @@ def _set_estado(**kwargs):
         except Exception as e:
             logging.error(f"Erro ao disparar broadcast via WebSocket: {e}")
 
-
-def _validar_roteiro_app(roteiro: dict) -> tuple[bool, str]:
-    """
-    Portão de qualidade idêntico ao _validar_roteiro do capture.py.
-    Duplicado aqui para que app.py não importe capture.py
-    (evita efeitos colaterais da inicialização do motor de captura).
-
-    Critérios mínimos para liberar auto-rebuild:
-      · Pelo menos 2 passos (1 real + 1 conclusão)
-      · >= 50% das ações com seletor_hint preenchido
-      · <= 70% das ações com confianca_captura = 'baixa'
-    """
-    passos = roteiro.get("passos", [])
-    if len(passos) < 2:
-        return False, f"Apenas {len(passos)} passo(s) — mapeamento insuficiente."
-
-    total_acoes = acoes_com_seletor = acoes_baixa_conf = 0
-
-    for passo in passos:
-        for acao in passo.get("acoes_tecnicas", []):
-            if acao.get("acao") == "concluir_video":
-                continue
-            total_acoes += 1
-            alvo = acao.get("elemento_alvo", {})
-            if alvo.get("seletor_hint", "").strip():
-                acoes_com_seletor += 1
-            if alvo.get("confianca_captura") == "baixa":
-                acoes_baixa_conf += 1
-
-    if total_acoes == 0:
-        return False, "Nenhuma ação técnica válida encontrada."
-
-    pct_seletor   = acoes_com_seletor / total_acoes
-    pct_baixa     = acoes_baixa_conf  / total_acoes
-
-    if pct_seletor < 0.50:
-        return False, f"Apenas {pct_seletor:.0%} das ações tem seletor CSS válido."
-    if pct_baixa > 0.70:
-        return False, f"{pct_baixa:.0%} das ações com confiança baixa."
-
-    return True, f"{len(passos)} passos, {total_acoes} ações, {pct_seletor:.0%} com seletor."
 
 def executar_processo_bg(comando, msg_executando, msg_sucesso):
     global processo_atual
@@ -336,7 +290,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
                             logging.warning(f"Auto-rebuild: erro ao ler roteiro: {e_read}")
                             return
 
-                        aprovado, motivo = _validar_roteiro_app(roteiro_dados)
+                        aprovado, motivo = validar_roteiro(roteiro_dados)
                         if not aprovado:
                             msg_rb = f"⚠️ Rebuild bloqueado: {motivo}"
                             _set_estado(sucesso=msg_rb)
@@ -605,7 +559,7 @@ async def listar_roteiros():
             tem_pdf   = os.path.exists(os.path.join(PDF_DIR,    f"{base}_Playbook.pdf"))
             tem_simlink = os.path.exists(os.path.join(SIM_LINKS_DIR, f"{base}_SimLink.html"))
             # Avalia qualidade do roteiro para exibir badge no card do Studio
-            _q_aprovado, _q_motivo = _validar_roteiro_app(dados)
+            _q_aprovado, _q_motivo = validar_roteiro(dados)
             _q_status = "aprovado" if _q_aprovado else (
                 "sem_acoes" if "Nenhuma ação" in _q_motivo or "passo(s)" in _q_motivo
                 else "reprovado"
@@ -850,7 +804,7 @@ async def ingestar_no_dap(arquivo: str):
             logamos mas não bloqueamos o ingest em si (só o rebuild).
             """
             try:
-                aprovado, motivo = _validar_roteiro_app(dados)
+                aprovado, motivo = validar_roteiro(dados)
                 if not aprovado:
                     logging.warning(
                         f"Auto-rebuild pós-ingest bloqueado: {motivo}. "

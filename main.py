@@ -46,11 +46,7 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 import moviepy.audio.fx.all as afx
 
-try:
-    from app import limpar_nome
-except ImportError:
-    def limpar_nome(nome: str) -> str:
-        return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
+from utils import limpar_nome
 
 load_dotenv()
 
