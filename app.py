@@ -176,11 +176,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 _estado_lock = threading.Lock()
 
 estado_servidor = {
-    "ocupado":   False,
-    "mensagem":  "",
-    "progresso": None,
-    "erro":      "",
-    "sucesso":   "",
+    "ocupado":     False,
+    "mensagem":    "",
+    "progresso":   None,
+    "erro":        "",
+    "sucesso":     "",
+    "shadow_path": None,   # caminho do shadow JSONL gerado pelo modo dual
 }
 processo_atual = None
 
@@ -203,7 +204,7 @@ def _set_estado(**kwargs):
 
 def executar_processo_bg(comando, msg_executando, msg_sucesso):
     global processo_atual
-    _set_estado(ocupado=True, mensagem=msg_executando, progresso=None, erro="", sucesso="")
+    _set_estado(ocupado=True, mensagem=msg_executando, progresso=None, erro="", sucesso="", shadow_path=None)
 
     try:
         env_vars = os.environ.copy()
@@ -231,6 +232,9 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
                         _set_estado(progresso=pct)
                     except Exception:
                         pass
+                if linha_limpa.startswith("SHADOW_GERADO:"):
+                    _shadow_path = linha_limpa.split("SHADOW_GERADO:", 1)[1].strip()
+                    _set_estado(shadow_path=_shadow_path)
 
         proc.wait()
 
@@ -250,7 +254,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
             # AUTO-REBUILD: se o processo concluído era um mapeamento (capture.py),
             # reconstrói a biblioteca de peças automaticamente.
             # Usa daemon thread para não travar o broadcast do WebSocket.
-            if "capture.py" in " ".join(comando):
+            if "capture.py" in " ".join(comando) or "capture_dual_output.py" in " ".join(comando):
                 # Extrai o caminho exato do roteiro emitido pelo capture.py via stdout.
                 # Isso evita o glob+mtime que lia o arquivo errado quando outros
                 # roteiros tinham sido tocados mais recentemente.
@@ -623,6 +627,16 @@ def _iniciar_bg(comando, msg_exec, msg_ok):
 async def gravar_aula(req: NovaAulaReq):
     ok = _iniciar_bg([sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"],
                      "🔍 Vasculhando o DOM (com autorização)...", "🎯 Tela capturada. A IA já pode enxergar.")
+    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+
+@app.post("/api/gravar-dual")
+async def gravar_aula_dual(req: NovaAulaReq):
+    """Captura no modo dual: gera roteiro legado + shadow JSONL semântico em paralelo."""
+    ok = _iniciar_bg(
+        [sys.executable, "capture_dual_output.py", req.nome_aula, req.objetivo, "--auto"],
+        "🔍 Captura Dual ativa — gerando roteiro + shadow semântico...",
+        "🎯 Captura dual concluída. Roteiro e shadow prontos."
+    )
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
 # FIX Bug #APP-01: Rota /api/gerar-ia duplicada removida aqui.

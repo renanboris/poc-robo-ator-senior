@@ -7,13 +7,13 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 from utils import limpar_nome
+from shadow_builder import utc_now
 
 try:
     from google import genai
@@ -288,9 +288,6 @@ JS_HYBRID = r"""
     }
 })();
 """
-
-def utc_now():
-    return datetime.now(timezone.utc).isoformat()
 
 async def descrever_tela_bytes(screenshot_bytes, contexto=""):
     if not gemini_client or HYBRID_DISABLE_GEMINI:
