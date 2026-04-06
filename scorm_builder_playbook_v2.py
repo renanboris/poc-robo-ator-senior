@@ -79,7 +79,6 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
             tipo_passo = passo.get("tipo_passo", "navigation")
 
             # Âncora usa screenshot do passo ANTERIOR (estado da tela antes de começar)
-            # para não adiantar visualmente o que o usuário ainda vai fazer.
             img_ancora = None
             if idx > 0:
                 passo_anterior = passos[idx - 1]
@@ -668,11 +667,10 @@ body, html {
     if (s.imagem_b64 && bg.src !== "data:image/jpeg;base64," + s.imagem_b64) {
       // Imagem nova: seta src e aguarda onload para posicionar
       bg.classList.remove("visible");
-      bg.onload = null; // limpa qualquer onload anterior
+      bg.onload = null;
       bg.src = "data:image/jpeg;base64," + s.imagem_b64;
       bg.onload = () => {
         bg.classList.add("visible");
-        // requestAnimationFrame garante que o container terminou o layout
         requestAnimationFrame(() => posicionar());
       };
     } else if (s.imagem_b64) {
@@ -720,22 +718,9 @@ body, html {
       prefix.style.color = "#94a3b8";
       btnHint.style.display = "none";
       btnNext.style.display = "inline-flex";
-      // Destaca o botão Avançar para sinalizar claramente que é necessário clicar
-      btnNext.style.background = "#00e5e5";
-      btnNext.style.color = "#000";
-      btnNext.style.borderColor = "#00e5e5";
-      btnNext.style.fontWeight = "800";
-      // Expande o painel automaticamente para âncoras (contexto é o conteúdo principal)
-      const panel = document.getElementById("story-panel");
-      panel.classList.remove("collapsed");
       return;
     }
 
-    // Restaura estilo padrão do botão Avançar para slides de interação
-    btnNext.style.background = "";
-    btnNext.style.color = "";
-    btnNext.style.borderColor = "";
-    btnNext.style.fontWeight = "";
     btnNext.style.display = "none";
     btnHint.style.display = "inline-flex";
 
@@ -751,10 +736,7 @@ body, html {
 
     const posicionar = () => {
       const container = document.getElementById("container");
-      // Se a imagem não carregou (sem b64), usa as dimensões do container diretamente
-      const natW = bg.naturalWidth || container.clientWidth;
-      const natH = bg.naturalHeight || container.clientHeight;
-      const ir = natW / natH;
+      const ir = bg.naturalWidth / bg.naturalHeight;
       const cr = container.clientWidth / container.clientHeight;
       let rw, rh, ox = 0, oy = 0;
 
@@ -815,9 +797,6 @@ body, html {
 
   function acertou(el) {
     acertos++;
-    // Garante que acertos nunca ultrapasse o total de interações
-    const totalInteracoes = slides.filter(s => s.tipo === "interacao").length;
-    if (acertos > totalInteracoes) acertos = totalInteracoes;
     esconderCallout();
     clearTimeout(hintTimer);
     document.getElementById("story-alert").style.display = "none";
