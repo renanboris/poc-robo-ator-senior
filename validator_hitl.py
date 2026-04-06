@@ -129,10 +129,18 @@ def _nivel_confianca(acao_tec: dict) -> NivelConfianca:
 # CHECKPOINT — VALIDAÇÃO DE ESTADO VIA GEMINI VISION
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def _validar_checkpoint(page: Page, tooltip_dap: str, ancora: str) -> tuple[bool, str]:
+async def _validar_checkpoint(
+    page: Page,
+    tooltip_dap: str,
+    ancora: str,
+    screenshot_ref_b64: str | None = None,
+) -> tuple[bool, str]:
     """
     Tira screenshot e pede ao Gemini Vision para avaliar se a tela atual
     corresponde ao estado esperado descrito no roteiro.
+
+    Fase 3.3: se screenshot_ref_b64 estiver disponível (gravação original),
+    envia ambas as imagens para comparação visual direta.
 
     Retorna (estado_ok: bool, observacao: str).
     """
@@ -140,25 +148,41 @@ async def _validar_checkpoint(page: Page, tooltip_dap: str, ancora: str) -> tupl
         return True, "Checkpoint desabilitado."
 
     try:
-        screenshot = await page.screenshot(type="jpeg", quality=60, full_page=False)
+        screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
+
+        contents = []
+
+        # Fase 3.3: inclui screenshot de referência se disponível
+        if screenshot_ref_b64:
+            try:
+                import base64
+                ref_bytes = base64.b64decode(screenshot_ref_b64)
+                contents.append("IMAGEM 1 — REFERÊNCIA (como a tela estava na gravação original):")
+                contents.append(gtypes.Part.from_bytes(data=ref_bytes, mime_type="image/jpeg"))
+                contents.append("IMAGEM 2 — TELA ATUAL (estado após executar o passo):")
+            except Exception:
+                pass  # referência inválida — continua sem ela
+
+        contents.append(gtypes.Part.from_bytes(data=screenshot_atual, mime_type="image/jpeg"))
+
+        modo_comparacao = "Compare as duas imagens e avalie se a tela atual corresponde ao estado esperado." if screenshot_ref_b64 else "Analise o screenshot."
 
         prompt = (
             f"Você está validando a execução de um roteiro de treinamento no ERP Senior X.\n\n"
             f"Após executar um passo, o estado esperado da tela é:\n"
             f"- Localização: {tooltip_dap}\n"
             f"- Descrição: {ancora[:200] if ancora else 'Não informado'}\n\n"
-            f"Analise o screenshot e responda APENAS com JSON:\n"
+            f"{modo_comparacao}\n\n"
+            f"Responda APENAS com JSON:\n"
             f'{{ "estado_ok": true/false, "confianca": "alta|media|baixa", '
             f'"observacao": "uma frase curta descrevendo o que vê e se bate com o esperado" }}'
         )
+        contents.append(prompt)
 
         resposta = await asyncio.to_thread(
             _gemini.models.generate_content,
             model="gemini-2.5-flash",
-            contents=[
-                gtypes.Part.from_bytes(data=screenshot, mime_type="image/jpeg"),
-                prompt,
-            ],
+            contents=contents,
             config=gtypes.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.05,
@@ -802,7 +826,17 @@ class HitlValidator:
         # ── 🟠 Checkpoint: valida estado após o passo ─────────────────────────
         # Em modo --silent, checkpoints são ignorados
         if CHECKPOINT_HABILITADO and tooltip and not getattr(self, "_silent", False):
-            estado_ok, observacao = await _validar_checkpoint(page, tooltip, ancora)
+            # Fase 3.3: extrai screenshot de referência da última ação do passo
+            screenshot_ref = None
+            for acao_tec in reversed(acoes):
+                ref = (acao_tec.get("elemento_alvo") or {}).get("screenshot_referencia")
+                if ref:
+                    screenshot_ref = ref
+                    break
+
+            estado_ok, observacao = await _validar_checkpoint(
+                page, tooltip, ancora, screenshot_ref_b64=screenshot_ref
+            )
 
             if not estado_ok:
                 print(f"   ⚠️  Checkpoint: {observacao}", flush=True)

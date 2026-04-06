@@ -645,6 +645,20 @@ async def gravar_aula_dual(req: NovaAulaReq):
     )
     return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
 
+@app.post("/api/gravar-hybrid")
+async def gravar_aula_hybrid(req: NovaAulaReq):
+    """
+    Captura no modo híbrido — motor mais avançado.
+    Gera shadow JSONL semântico enriquecido com contexto antes/depois de cada ação.
+    Requer compilação posterior via scripts/compile_hybrid_to_executor.py para execução.
+    """
+    ok = _iniciar_bg(
+        [sys.executable, "capture_variants/capture_hybrid_shadow.py", req.nome_aula, req.objetivo, "--auto"],
+        "🧠 Captura Híbrida ativa — análise semântica antes/depois de cada ação...",
+        "✅ Captura híbrida concluída. Shadow JSONL pronto para compilação."
+    )
+    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+
 # FIX Bug #APP-01: Rota /api/gerar-ia duplicada removida aqui.
 # A implementação correta (com tenant_id e validação) está abaixo (~linha 604).
 

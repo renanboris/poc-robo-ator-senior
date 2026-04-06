@@ -327,10 +327,18 @@
     padding: 1px 5px; border-radius: 4px;
   }
 
+  @media (max-width: 900px) {
+    aside { width: 200px; }
+    .logo-name { font-size: 13px; }
+  }
+
   @media (max-width: 640px) {
     aside { display: none; }
     #chat-container { padding: 20px 16px 0; }
     .input-area { padding: 10px 16px 14px; }
+    .bubble-agent { font-size: 14px; }
+    .bubble-user { font-size: 13px; max-width: 90%; }
+    .chips { padding-left: 0; }
   }
 </style>
 </head>

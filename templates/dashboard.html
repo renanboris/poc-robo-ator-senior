@@ -703,11 +703,33 @@ html.light #sidebar::before {
 
 /* Editor topbar */
 #editor-topbar {
-  height: 56px; flex-shrink: 0;
+  flex-shrink: 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg-2);
-  display: flex; align-items: center;
-  padding: 0 20px; gap: 12px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+/* Linha 1: título + ações de arquivo */
+.topbar-row-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 44px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+
+/* Linha 2: pipeline de geração */
+.topbar-row-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  flex-wrap: wrap;
+  min-height: 44px;
 }
 
 .title-area {
@@ -728,22 +750,25 @@ html.light #sidebar::before {
 
 /* Pipeline buttons */
 .pipeline-group {
-  display: flex; align-items: center; gap: 6px;
+  display: contents; /* os filhos participam diretamente do topbar-row-pipeline */
 }
 .pipeline-sep {
-  width: 1px; height: 24px;
-  background: var(--border-2); margin: 0 4px;
+  width: 1px; height: 20px;
+  background: var(--border-2); margin: 0 2px;
+  flex-shrink: 0;
 }
 
 .pipe-btn {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border-radius: var(--radius-xs);
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: var(--radius-xs);
   border: 1px solid var(--border-2);
   background: var(--surface);
   font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   cursor: pointer; transition: all 0.2s;
   position: relative; letter-spacing: 0.3px;
   color: var(--text-2);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .pipe-btn:hover { border-color: var(--border-2); color: var(--text); background: var(--surface-2); }
 
@@ -752,7 +777,7 @@ html.light #sidebar::before {
 .pipe-btn.scorm   { --clr: var(--violet); }
 .pipe-btn.pdf     { --clr: var(--green); }
 .pipe-btn.simlink { --clr: var(--cyan); }
-.pipe-btn.hitl    { --c: var(--amber); }
+.pipe-btn.hitl    { --clr: var(--amber); }
 .pipe-btn.coach   { --clr: var(--amber); }
 
 .pipe-btn.pulse {
@@ -1602,28 +1627,31 @@ html.light .theme-opt.active {
       <div id="studio-main">
 
         <div id="editor-topbar">
-          <div class="title-area">
-            <span id="editor-title" style="color:var(--text-3);font-style:italic">Selecione um treinamento</span>
-            
-            <div class="title-actions" id="editor-actions">
-              <button onclick="abrirModalRenomear()" class="btn-icon" title="Renomear Treinamento">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          <div class="topbar-row-title">
+            <div class="title-area">
+              <span id="editor-title" style="color:var(--text-3);font-style:italic">Selecione um treinamento</span>
+              
+              <div class="title-actions" id="editor-actions">
+                <button onclick="abrirModalRenomear()" class="btn-icon" title="Renomear Treinamento">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button onclick="duplicarTreinamento(arquivoAtual)" class="btn-icon" title="Duplicar Treinamento">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div id="action-buttons-file" style="display:none; align-items:center; gap:6px; flex-shrink:0">
+              <button class="btn-icon success" onclick="salvarRoteiro(true)" data-tip="Salvar (Ctrl+S)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               </button>
-              <button onclick="duplicarTreinamento(arquivoAtual)" class="btn-icon" title="Duplicar Treinamento">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <button class="btn-icon danger" onclick="confirmarExcluir()" data-tip="Excluir treinamento">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
               </button>
             </div>
           </div>
 
-          <div class="pipeline-group" id="action-buttons" style="display:none">
-            <button class="btn-icon success" onclick="salvarRoteiro(true)" data-tip="Salvar (Ctrl+S)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            </button>
-            <button class="btn-icon danger" onclick="confirmarExcluir()" data-tip="Excluir treinamento">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-            </button>
-            <div class="pipeline-sep"></div>
-
+          <div class="topbar-row-pipeline pipeline-group" id="action-buttons" style="display:none">
             <button id="btn-gen-hitl" class="pipe-btn hitl" onclick="validarHitl()" data-tip="Validar com co-piloto humano">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10z"/><path d="M12 8v4l3 3"/></svg>
               <span class="lbl">HITL</span>
@@ -1664,7 +1692,6 @@ html.light .theme-opt.active {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               Assistir
             </button>
-            <!-- FIX BUG-HTML-10: href="" em vez de "#" — evita navegação acidental antes de arquivo disponível -->
             <a id="btn-baixar-scorm" class="btn-consume" href="" download>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               SCORM
@@ -2434,7 +2461,8 @@ async function carregarRoteiro(arquivo) {
     document.getElementById('empty-state').style.display = 'none';
     document.getElementById('editor-area').classList.add('visible');
     document.getElementById('action-buttons').style.display = 'flex';
-    document.getElementById('editor-actions').style.display = 'flex'; 
+    document.getElementById('action-buttons-file').style.display = 'flex';
+    document.getElementById('editor-actions').style.display = 'flex';
 
     atualizarBotoesPipeline();
     renderizarPassos();
@@ -2470,6 +2498,7 @@ function confirmarExcluir() {
         document.getElementById('editor-area').classList.remove('visible');
         document.getElementById('empty-state').style.display = '';
         document.getElementById('action-buttons').style.display = 'none';
+        document.getElementById('action-buttons-file').style.display = 'none';
         document.getElementById('editor-actions').style.display = 'none';
         document.getElementById('editor-title').textContent  = 'Selecione um treinamento';
         document.getElementById('editor-title').style.color  = 'var(--text-3)';
