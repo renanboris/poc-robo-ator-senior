@@ -5,7 +5,7 @@ from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+gemini_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 def reprocessar_json(caminho_arquivo):
     if not os.path.exists(caminho_arquivo):

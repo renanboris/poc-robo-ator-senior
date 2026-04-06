@@ -33,7 +33,6 @@ import time
 import generator_engine
 import lego_builder
 import dap_engine
-import sim_link_builder
 from utils import limpar_nome, validar_roteiro
 
 # ==============================================================
@@ -46,6 +45,13 @@ async def lifespan(app: FastAPI):
     global main_loop
     main_loop = asyncio.get_running_loop()
     logging.info("WebSocket Event Loop capturado com sucesso.")
+    # Limpa writes atômicos interrompidos (tmp*.json.tmp deixados por kills externos)
+    for _tmp in glob.glob("*.json.tmp"):
+        try:
+            os.remove(_tmp)
+            logging.info(f"Cleanup startup: removido {_tmp}")
+        except Exception:
+            pass
     yield
 
 def _norm(s: str) -> str:
@@ -254,7 +260,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
             # AUTO-REBUILD: se o processo concluído era um mapeamento (capture.py),
             # reconstrói a biblioteca de peças automaticamente.
             # Usa daemon thread para não travar o broadcast do WebSocket.
-            if "capture.py" in " ".join(comando) or "capture_dual_output.py" in " ".join(comando):
+            if "capture.py" in " ".join(comando) or "capture_dual_output.py" in " ".join(comando) or "capture_variants" in " ".join(comando):
                 # Extrai o caminho exato do roteiro emitido pelo capture.py via stdout.
                 # Isso evita o glob+mtime que lia o arquivo errado quando outros
                 # roteiros tinham sido tocados mais recentemente.
@@ -633,7 +639,7 @@ async def gravar_aula(req: NovaAulaReq):
 async def gravar_aula_dual(req: NovaAulaReq):
     """Captura no modo dual: gera roteiro legado + shadow JSONL semântico em paralelo."""
     ok = _iniciar_bg(
-        [sys.executable, "capture_dual_output.py", req.nome_aula, req.objetivo, "--auto"],
+        [sys.executable, "capture_variants/capture_dual_output.py", req.nome_aula, req.objetivo, "--auto"],
         "🔍 Captura Dual ativa — gerando roteiro + shadow semântico...",
         "🎯 Captura dual concluída. Roteiro e shadow prontos."
     )
@@ -675,7 +681,7 @@ async def gerar_simlink(arquivo: str):
     """Gera um SimLink — simulador standalone sem necessidade de LMS."""
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
     ok = _iniciar_bg(
-        [sys.executable, "sim_link_builder.py", caminho],
+        [sys.executable, "scripts/sim_link_builder.py", caminho],
         "🔗 Construindo o SimLink (simulador standalone)...",
         "🎮 SimLink pronto. Compartilhe o link direto, sem LMS."
     )
@@ -807,6 +813,7 @@ async def ingestar_no_dap(arquivo: str):
         dados["metadata"]["ingestado_dap"] = True
         with open(caminho, "w", encoding="utf-8") as f:
             json.dump(dados, f, indent=2, ensure_ascii=False)
+        _set_estado(sucesso="✅ Indexação concluída na base de conhecimento.")
 
         # AUTO-REBUILD: roteiro validado e ingestado = momento ideal para atualizar
         # a biblioteca de peças. Background thread para não travar a resposta HTTP.
@@ -837,6 +844,8 @@ async def ingestar_no_dap(arquivo: str):
 
         import threading
         threading.Thread(target=_rebuild_apos_ingest, daemon=True, name="lego-rebuild-ingest").start()
+    else:
+        _set_estado(erro=res.get("mensagem", "Falha na indexação."))
 
     return res
 
@@ -948,7 +957,13 @@ async def validar_hitl(arquivo: str):
         status_code=400, content={"erro": "Sistema ocupado"}
     )
 
-@app.get("/api/gps-roteiro")
+@app.get("/api/brain-stats")
+async def brain_stats():
+    """Retorna estatísticas do Brain DB: memórias, camadas mais acionadas, etc."""
+    from vision_engine import obter_stats_brain
+    return obter_stats_brain()
+
+
 async def get_gps_roteiro(
     objetivo: str = "",
     tenant_id: str = "senior_default",

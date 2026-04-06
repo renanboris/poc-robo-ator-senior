@@ -415,8 +415,9 @@ let apiOnline    = false;
 let _nomeUsuario = 'Operador';
 
 // ─── WebSocket de status ────────────────────────────────────
-let _ws        = null;
-let _wsResolve = null;
+let _ws                 = null;
+let _wsResolve          = null;
+let _activeRenderStepEl = null;
 
 function conectarWS() {
   const url = API.replace('http', 'ws') + '/api/ws/status';
@@ -428,6 +429,10 @@ function conectarWS() {
         const resolve = _wsResolve;
         _wsResolve = null;
         resolve({ sucesso: !data.erro, mensagem: data.erro || data.sucesso || '' });
+      }
+      if (typeof data.progresso === 'number' && _activeRenderStepEl !== null) {
+        const pctEl = _activeRenderStepEl.querySelector('.step-pct');
+        if (pctEl) pctEl.textContent = data.progresso + '%';
       }
     } catch {}
   };
@@ -802,10 +807,11 @@ async function runStepper(nomeArquivo) {
     container.insertAdjacentHTML('beforeend', `
       <div class="step" id="${stepId}">
         <div class="step-icon spinning"></div>
-        <span>${safe(s.label)}</span>
+        <span>${safe(s.label)}</span>${i === 0 ? ` <span class="step-pct" id="${stepId}-pct"></span>` : ''}
       </div>`);
 
     const el = document.getElementById(stepId);
+    if (i === 0) _activeRenderStepEl = el;
     requestAnimationFrame(() => el.classList.add('visible'));
     scrollBottom();
 
@@ -816,11 +822,14 @@ async function runStepper(nomeArquivo) {
 
       const result = await pollStatus();
       if (!result.sucesso) {
+        if (i === 0) _activeRenderStepEl = null;
         setStepState(el, 'err');
         return { sucesso: false, mensagem: result.mensagem };
       }
+      if (i === 0) _activeRenderStepEl = null;
       setStepState(el, 'ok');
     } catch (e) {
+      if (i === 0) _activeRenderStepEl = null;
       setStepState(el, 'err');
       return { sucesso: false, mensagem: e.message };
     }
@@ -1206,8 +1215,9 @@ const chipHandlers = {
 };
 
 function newSession() {
-  session  = { titulo: '', produto: '', objetivo: '', arquivoJson: '' };
-  appState = 'IDLE';
+  session                = { titulo: '', produto: '', objetivo: '', arquivoJson: '' };
+  appState               = 'IDLE';
+  _activeRenderStepEl    = null;
   document.getElementById('chat-content').innerHTML = '';
   setInputEnabled(true);
   hideSuggestions();

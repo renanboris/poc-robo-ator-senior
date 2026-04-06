@@ -9704,6 +9704,374 @@
     "validacao_esperada": null,
     "_source": "Senior_Flow_-_GED_105.json"
   },
+  "o usuário clicou no item 'senior flow' no menu principal, provavelmente para acessar as funcionalidades ou a seção correspondente a 'senior flow' dentro da plataforma.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário clicou no item 'Senior Flow' no menu principal, provavelmente para acessar as funcionalidades ou a seção correspondente a 'Senior Flow' dentro da plataforma.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu localizado na barra de navegação lateral esquerda. Ele possui um ícone que se assemelha a duas pessoas conectadas ou um símbolo de compartilhamento, seguido pelo texto 'Senior Flow'. O item está destacado com um fundo ligeiramente mais claro e uma linha vermelha na parte inferior, indicando que está ativo ou selecionado.",
+      "contexto_tela": "O usuário está na tela principal da plataforma Senior X, com o menu de navegação lateral expandido, exibindo diversas opções como 'Community', 'GED', 'SIGN', 'Decision Center', entre outras. O item 'Senior Flow' é um dos itens de nível superior neste menu.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Menu principal Senior Flow",
+      "coordenadas_relativas": {
+        "x_pct": 0.0258,
+        "y_pct": 0.6639,
+        "w_pct": 0.05,
+        "h_pct": 0.0677
+      },
+      "seletor_hint": "[id='menu-item-Senior Flow']",
+      "iframe_hint": null,
+      "html_hint": "<span _ngcontent-wmj-c117=\"\" tabindex=\"-1\" class=\"menu-item btn active-menu any-active show-menu\"><span _ngcontent-wmj-c117=\"\" aria-hidden=\"true\" class=\"menu-label pull-right\" id=\"menu-label-Senior Flow\"> Senior Flow </span><span _ngcontent-wmj-c117=\"\" class=\"ui-helper-hidden-accessible\"> Menu princ"
+    },
+    "valor_input": "",
+    "micro_narracao": "Primeiro, o Senior Flow...",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "acessar a seção de documentos do sistema senior flow.": {
+    "acao": "clique",
+    "intencao_semantica": "Acessar a seção de documentos do sistema Senior Flow.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, provavelmente representado por um ícone de maleta (briefcase) e o texto 'Documentos'.",
+      "contexto_tela": "O usuário está na tela principal do sistema Senior X, que exibe uma barra de navegação vertical à esquerda e uma área de conteúdo principal vazia.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Documentos",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Documentos']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-wmj-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-0\" href=\"#/Senior Flow/1/documents?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_ged%2F%23%2Fc\" aria-label=\"Documen"
+    },
+    "valor_input": "",
+    "micro_narracao": "...aqui, a seção de Documentos.",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "navegar para a seção de 'financeiro' do sistema.": {
+    "acao": "duplo_clique",
+    "intencao_semantica": "Navegar para a seção de 'Financeiro' do sistema.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, com o texto 'Financeiro'.",
+      "contexto_tela": "O usuário está na tela principal do sistema, possivelmente na seção de documentos, e interagindo com o menu de navegação global.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Financeiro",
+      "coordenadas_relativas": {
+        "x_pct": 0.1465,
+        "y_pct": 0.4368,
+        "w_pct": 0.0508,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-hyp-c34=\"\" id=\"itemTitle\">Financeiro</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...entramos na pasta Financeiro.",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "acessar um menu de contexto para realizar ações específicas no documento 'contas a receber01.pdf', como abrir, baixar, mover, copiar ou excluir.": {
+    "acao": "clique_direito",
+    "intencao_semantica": "Acessar um menu de contexto para realizar ações específicas no documento 'Contas a receber01.pdf', como abrir, baixar, mover, copiar ou excluir.",
+    "elemento_alvo": {
+      "descricao_visual": "Um texto 'Contas a receber01.pdf' ao lado de um ícone de arquivo PDF, listado em uma tabela de documentos.",
+      "contexto_tela": "O usuário está na seção 'Financeiro' de um sistema de gestão eletrônica de documentos (GED), visualizando uma lista de arquivos e pastas.",
+      "tipo_elemento": "link",
+      "confianca_captura": "alta",
+      "label_curto": "Contas a receber01.pdf",
+      "coordenadas_relativas": {
+        "x_pct": 0.1781,
+        "y_pct": 0.6429,
+        "w_pct": 0.1141,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[id='itemTitle']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-hyp-c34=\"\" id=\"itemTitle\">Contas a receber01.pdf</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "No documento, um clique com o botão direito...",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "o usuário deseja adicionar os documentos selecionados a um envelope para envio ou organização.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário deseja adicionar os documentos selecionados a um envelope para envio ou organização.",
+    "elemento_alvo": {
+      "descricao_visual": "Botão azul com um ícone de envelope e o texto 'Enviar ao envelope'.",
+      "contexto_tela": "O usuário está na seção 'Financeiro' do sistema, visualizando uma lista de documentos e arquivos. Há uma sobreposição de tela (modal) aberta, possivelmente para ações relacionadas ao documento 'CONTAS A RECEBER01.PDF'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Enviar ao envelope",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "text=\"Enviar ao envelope\"",
+      "iframe_hint": "ci",
+      "html_hint": "<div _ngcontent-hyp-c33=\"\">Enviar ao envelope</div>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e a opção 'Enviar ao envelope'.",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "o usuário pretende inserir um nome para o envelope que está sendo criado ou editado.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário pretende inserir um nome para o envelope que está sendo criado ou editado.",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de entrada de texto retangular com borda vermelha, indicando que é um campo obrigatório ou inválido, e com o placeholder 'Nome envelope'.",
+      "contexto_tela": "O usuário está em uma tela de criação ou gerenciamento de envelopes, possivelmente dentro de um modal ou painel lateral, com o título 'CONTAS A RECEBER01.PDF'. Há opções para 'Criar novo envelope' e 'Gestão de Envelopes'.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Nome envelope",
+      "coordenadas_relativas": {
+        "x_pct": 0.448,
+        "y_pct": 0.1459,
+        "w_pct": 0.3117,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[id='envelopeName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-hyp-c25=\"\" formcontrolname=\"name\" id=\"envelopeName\" pinputtext=\"\" type=\"text\" placeholder=\"Nome envelope\" class=\"ui-inputtext ui-corner-all ui-state-default ui-widget ng-untouched ng-pristine ng-invalid\" style=\"\">"
+    },
+    "valor_input": "",
+    "micro_narracao": "No campo 'Nome envelope'...",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "preencher o nome do envelope para o documento 'contas a receber01.pdf'": {
+    "acao": "preencher_campo",
+    "intencao_semantica": "Preencher o nome do envelope para o documento 'CONTAS A RECEBER01.PDF'",
+    "elemento_alvo": {
+      "descricao_visual": "Um campo de texto retangular com borda vermelha, contendo o texto 'Teste 001' e com o placeholder 'Nome envelope'.",
+      "contexto_tela": "O usuário está na seção 'Financeiro', visualizando o documento 'CONTAS A RECEBER01.PDF' e na área de criação de um novo envelope para este documento.",
+      "tipo_elemento": "input",
+      "confianca_captura": "alta",
+      "label_curto": "Teste 001",
+      "coordenadas_relativas": {
+        "x_pct": 0.448,
+        "y_pct": 0.1459,
+        "w_pct": 0.3117,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[id='envelopeName']",
+      "iframe_hint": "ci",
+      "html_hint": "<input _ngcontent-hyp-c25=\"\" formcontrolname=\"name\" id=\"envelopeName\" pinputtext=\"\" type=\"text\" placeholder=\"Nome envelope\" class=\"ui-inputtext ui-corner-all ui-state-default ui-widget ng-untouched ui-state-filled ng-dirty ng-valid\" style=\"\">"
+    },
+    "valor_input": "Teste 001",
+    "micro_narracao": "...o nome 'Teste 001'...",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "criar um novo envelope para o documento 'contas a receber01.pdf'.": {
+    "acao": "clique",
+    "intencao_semantica": "Criar um novo envelope para o documento 'CONTAS A RECEBER01.PDF'.",
+    "elemento_alvo": {
+      "descricao_visual": "Botão azul com texto branco 'Criar novo envelope'.",
+      "contexto_tela": "O usuário está na seção 'Financeiro', visualizando o documento 'CONTAS A RECEBER01.PDF' e interagindo com a área de gerenciamento de envelopes, que atualmente não possui rascunhos.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Criar novo envelope",
+      "coordenadas_relativas": {
+        "x_pct": 0.6809,
+        "y_pct": 0.1459,
+        "w_pct": 0.0977,
+        "h_pct": 0.0241
+      },
+      "seletor_hint": "[id='createNewEnvelope']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-hyp-c5=\"\" class=\"s-button-text ng-star-inserted\">Criar novo envelope</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e pronto, o novo envelope está criado.",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "o usuário quis retornar à tela anterior ou recolher o menu lateral, possivelmente para uma visualização de menu de nível superior.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis retornar à tela anterior ou recolher o menu lateral, possivelmente para uma visualização de menu de nível superior.",
+    "elemento_alvo": {
+      "descricao_visual": "Um ícone de seta apontando para a esquerda, de cor vermelha, localizado à esquerda do texto 'Menu' na barra lateral de navegação escura.",
+      "contexto_tela": "O usuário está na barra lateral de navegação do sistema Senior X, em uma seção que parece ser um sub-menu ou uma visualização detalhada de um item de menu, enquanto a área principal exibe uma interface de gerenciamento de documentos.",
+      "tipo_elemento": "icon",
+      "confianca_captura": "alta",
+      "label_curto": "Voltar",
+      "coordenadas_relativas": {
+        "x_pct": 0.0664,
+        "y_pct": 0.2459,
+        "w_pct": 0.0078,
+        "h_pct": 0.0226
+      },
+      "seletor_hint": "[aria-label='Voltar']",
+      "iframe_hint": null,
+      "html_hint": "<i _ngcontent-wmj-c143=\"\" class=\"fa fa-lg fa-angle-left pull-left\"></i>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...recolhendo o menu...",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "o usuário quis acessar as funcionalidades ou sub-menus relacionados ao módulo 'sign' dentro da plataforma senior x, como a caixa de entrada, contatos externos, ou gestão de envelopes.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis acessar as funcionalidades ou sub-menus relacionados ao módulo 'SIGN' dentro da plataforma Senior X, como a caixa de entrada, contatos externos, ou gestão de envelopes.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu na barra de navegação lateral esquerda, exibido como o texto 'SIGN' em letras maiúsculas, com um ícone de seta apontando para a esquerda ao lado, indicando que pode ser um item de menu expansível ou uma categoria principal.",
+      "contexto_tela": "O usuário está na tela principal da aplicação Senior X, visualizando o menu de navegação lateral esquerdo, dentro da seção 'Senior Flow'.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "SIGN",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Grupo de menus SIGN']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-wmj-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable has-submenus items-list ng-star-inserted\" id=\"apps-menu-item-2\" href=\"#/Senior Flow/1/inbox\" aria-label=\"Grupo de menus SIGN\" style=\"\"><span _ngcontent-wmj-c143=\"\"><em _ngcontent-wmj-c143=\"\" class=\"fa fa-lg pull-right"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e agora, o SIGN.",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "o usuário quis navegar para a seção ou aplicação de 'gestão de envelopes' para gerenciar documentos ou processos relacionados a envelopes.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis navegar para a seção ou aplicação de 'Gestão de Envelopes' para gerenciar documentos ou processos relacionados a envelopes.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um item de menu representado por um ícone de maleta (briefcase). Ele está localizado na barra de navegação vertical à esquerda da tela, como o terceiro ícone funcional (após a foto de perfil e o ícone de linha ondulada). O ícone é de cor escura sobre um fundo cinza claro, parte de uma lista de ícones de navegação.",
+      "contexto_tela": "O usuário está na interface principal do sistema Senior X, provavelmente em um painel de controle ou tela inicial, interagindo com o menu de navegação principal da aplicação.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Gestão de Envelopes",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[aria-label='Gestão de Envelopes']",
+      "iframe_hint": null,
+      "html_hint": "<a _ngcontent-wmj-c143=\"\" role=\"menuitem\" tooltipposition=\"right\" class=\"clickable items-list ng-star-inserted\" id=\"apps-menu-item-3\" href=\"#/Senior Flow/1/envelope_management?category=frame&amp;link=https%3A%2F%2Fplatform-homologx.senior.com.br%2Ftecnologia%2Fplatform%2Fecm_sign%2F%23%2Fenvelope-ma"
+    },
+    "valor_input": "",
+    "micro_narracao": "...na Gestão de Envelopes.",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "o usuário quis interromper ou sair de um 'tour' ou processo guiado que estava em andamento. o sistema, em resposta, exibiu um modal para tentar reter o usuário ou confirmar a desistência.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis interromper ou sair de um 'tour' ou processo guiado que estava em andamento. O sistema, em resposta, exibiu um modal para tentar reter o usuário ou confirmar a desistência.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento 'Desistir do tour' não está visível na tela, pois a imagem mostra o modal que foi acionado após o clique. Pelo HTML fornecido, é um texto ('Desistir do tour') que faz parte de um botão. O modal resultante é uma caixa de diálogo retangular branca, centralizada na tela, com o título 'FIQUE COM A GENTE', um texto explicativo, dois botões de ação ('Fechar tela mesmo assim' e 'Ok, aceito continuar') e um checkbox ('Não mostrar o tour novamente').",
+      "contexto_tela": "O usuário está na tela de 'Gestão de Envelopes', que é a área principal do sistema, e um modal de confirmação/retenção foi exibido sobrepondo o conteúdo da tela.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Desistir do tour",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "[id='s-button-8']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-tcg-c98=\"\" class=\"s-button-text ng-star-inserted\" style=\"\"> Desistir do tour </span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "Desistindo do tour...",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "o usuário quis fechar uma tela ou um modal de confirmação, ignorando possíveis avisos de perda de dados ou outras consequências, para retornar à tela de gestão de envelopes.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis fechar uma tela ou um modal de confirmação, ignorando possíveis avisos de perda de dados ou outras consequências, para retornar à tela de Gestão de Envelopes.",
+    "elemento_alvo": {
+      "descricao_visual": "Um texto que diz 'Fechar tela mesmo assim', geralmente exibido como parte de um botão dentro de um modal de confirmação ou aviso.",
+      "contexto_tela": "O usuário está na tela de 'Gestão de Envelopes', que é o painel principal para gerenciar documentos digitais. Esta tela exibe diferentes categorias de envelopes (Rascunho, Em processo, Finalizado, Expirado, Cancelado) e uma lista dos envelopes correspondentes. A ação de clique provavelmente fechou um modal ou uma tela secundária que estava aberta sobre esta tela principal.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Fechar tela mesmo assim",
+      "coordenadas_relativas": {
+        "x_pct": 0.5391,
+        "y_pct": 0.5466,
+        "w_pct": 0.0906,
+        "h_pct": 0.0195
+      },
+      "seletor_hint": "[id='s-button-10']",
+      "iframe_hint": "ci",
+      "html_hint": "<span _ngcontent-tcg-c98=\"\" class=\"s-button-text ng-star-inserted\"> Fechar tela mesmo assim </span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e fechando a tela.",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "o usuário quis visualizar as opções de ações disponíveis para o envelope 'teste 001', como editar, enviar para assinatura ou excluir.": {
+    "acao": "clique",
+    "intencao_semantica": "O usuário quis visualizar as opções de ações disponíveis para o envelope 'Teste 001', como editar, enviar para assinatura ou excluir.",
+    "elemento_alvo": {
+      "descricao_visual": "O elemento é um botão cinza com o texto 'Ações' e um ícone de seta para baixo, indicando um menu suspenso. Ele está localizado na coluna 'Ações' da tabela, na linha correspondente ao envelope 'Teste 001', e está com um leve destaque vermelho ao redor, indicando que foi clicado ou está ativo.",
+      "contexto_tela": "O usuário está na tela de 'Gestão de Envelopes', visualizando a lista de envelopes na aba 'Rascunho'.",
+      "tipo_elemento": "button",
+      "confianca_captura": "alta",
+      "label_curto": "Ações",
+      "coordenadas_relativas": {
+        "x_pct": 0.8316,
+        "y_pct": 0.6662,
+        "w_pct": 0.0758,
+        "h_pct": 0.0511
+      },
+      "seletor_hint": "[id='actionsMenu']",
+      "iframe_hint": "ci",
+      "html_hint": "<button _ngcontent-tcg-c98=\"\" tooltipposition=\"top\" showdelay=\"500\" id=\"actionsMenu\" type=\"button\" class=\"s-button-auxiliary s-button-empty s-button-size-default s-button-priority-default s-button-multiple s-button-active\"><!----><!----> Ações <!----><span _ngcontent-tcg-c98=\"\" aria-hidden=\"true\" cl"
+    },
+    "valor_input": "",
+    "micro_narracao": "No botão 'Ações' do envelope...",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "excluir o envelope selecionado.": {
+    "acao": "clique",
+    "intencao_semantica": "Excluir o envelope selecionado.",
+    "elemento_alvo": {
+      "descricao_visual": "Um item de menu em um menu suspenso, com o texto 'Excluir' e um ícone de lixeira à esquerda, destacado em vermelho.",
+      "contexto_tela": "O usuário está na tela de 'Gestão de Envelopes', visualizando a aba 'Rascunho', e clicou na opção 'Excluir' para um envelope específico, o que abriu uma caixa de diálogo de confirmação.",
+      "tipo_elemento": "menu_item",
+      "confianca_captura": "alta",
+      "label_curto": "Excluir",
+      "coordenadas_relativas": {
+        "x_pct": 0.7254,
+        "y_pct": 0.8654,
+        "w_pct": 0.0336,
+        "h_pct": 0.0286
+      },
+      "seletor_hint": "[id='DELETE']",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-menuitem-text\">Excluir</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...a opção 'Excluir'...",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
+  "confirmar uma ação previamente iniciada, como a exclusão ou envio de um envelope, ou a aceitação de alguma condição.": {
+    "acao": "clique",
+    "intencao_semantica": "Confirmar uma ação previamente iniciada, como a exclusão ou envio de um envelope, ou a aceitação de alguma condição.",
+    "elemento_alvo": {
+      "descricao_visual": "Um botão com o texto 'Sim'. O elemento não está visível no screenshot fornecido, portanto, detalhes visuais como cor, forma ou posição exata não podem ser determinados.",
+      "contexto_tela": "O usuário estava na tela de 'Gestão de Envelopes'. O botão 'Sim' provavelmente apareceu em uma janela de diálogo ou modal que se sobrepôs à tela principal para solicitar uma confirmação, mas essa janela não está visível no screenshot atual.",
+      "tipo_elemento": "button",
+      "confianca_captura": "baixa",
+      "label_curto": "Sim",
+      "coordenadas_relativas": {
+        "x_pct": 0.0,
+        "y_pct": 0.0,
+        "w_pct": 0.0,
+        "h_pct": 0.0
+      },
+      "seletor_hint": "text=\"Sim\"",
+      "iframe_hint": "ci",
+      "html_hint": "<span class=\"ui-button-text ui-clickable\">Sim</span>"
+    },
+    "valor_input": "",
+    "micro_narracao": "...e confirmamos com 'Sim'.",
+    "_source": "Senior_Flow_-_SIGN_-_Conhecendo_a_caixa.json"
+  },
   "navegar para a seção de gerenciamento eletrônico de documentos (ged) ou expandir o menu relacionado a ged para ver suas sub-opções.": {
     "acao": "clique",
     "intencao_semantica": "Navegar para a seção de Gerenciamento Eletrônico de Documentos (GED) ou expandir o menu relacionado a GED para ver suas sub-opções.",
@@ -10045,29 +10413,6 @@
     },
     "valor_input": "",
     "micro_narracao": "...e o GED, nosso Gestão Eletrônica de Documentos.",
-    "_source": "TESTE_Dual_Output.json"
-  },
-  "navegar para a seção de 'financeiro' do sistema.": {
-    "acao": "duplo_clique",
-    "intencao_semantica": "Navegar para a seção de 'Financeiro' do sistema.",
-    "elemento_alvo": {
-      "descricao_visual": "Um item de menu na barra de navegação lateral esquerda, identificado pelo texto 'Financeiro'.",
-      "contexto_tela": "O usuário está na tela principal do sistema, visualizando a seção de 'Documentos', e interagindo com o menu de navegação lateral.",
-      "tipo_elemento": "menu_item",
-      "confianca_captura": "alta",
-      "label_curto": "Financeiro",
-      "coordenadas_relativas": {
-        "x_pct": 0.1465,
-        "y_pct": 0.3331,
-        "w_pct": 0.0508,
-        "h_pct": 0.0226
-      },
-      "seletor_hint": "[id='itemTitle']",
-      "iframe_hint": "ci",
-      "html_hint": "<span _ngcontent-wjg-c34=\"\" id=\"itemTitle\">Financeiro</span>"
-    },
-    "valor_input": "",
-    "micro_narracao": "...a pasta Financeiro.",
     "_source": "TESTE_Dual_Output.json"
   },
   "o usuário quis acessar um menu de contexto para realizar ações específicas no documento 'contas a receber01.pdf', como abrir, editar, mover, copiar ou excluir.": {

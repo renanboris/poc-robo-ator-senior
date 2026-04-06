@@ -66,7 +66,7 @@ except ImportError:
     logger.warning("google-genai não instalado. Checkpoint Gemini desativado.")
 
 # ── Thresholds ─────────────────────────────────────────────────────────────────
-BRAIN_HITS_ALTA   = 3    # hits no Brain para considerar alta confiança
+BRAIN_HITS_ALTA   = 2    # hits no Brain para considerar alta confiança (baixado de 3 → 2)
 TIMEOUT_HUMANO    = 180  # segundos esperando analista (3 minutos)
 CHECKPOINT_HABILITADO = _gemini is not None
 
@@ -721,19 +721,22 @@ class HitlValidator:
     async def _executar_acao_com_hitl(self, page: Page, acao_tec: dict) -> bool:
         """
         Tenta executar uma ação usando vision_engine.
-        Se confiança baixa → pausa preventiva.
+        Se confiança baixa → pausa preventiva (exceto em modo --silent).
         Se falha total → pausa falha dura.
         Retorna True se a ação foi executada (com ou sem correção humana).
         """
         if acao_tec.get("acao") == "concluir_video":
             return True
 
+        silent = getattr(self, "_silent", False)
+
         confianca = _nivel_confianca(acao_tec)
         alvo      = acao_tec.get("elemento_alvo", {})
         seletor   = alvo.get("seletor_hint", "") or alvo.get("seletor_css", "")
 
         # ── 🟡 Pausa preventiva (baixa confiança antes de tentar) ────────────
-        if confianca == NivelConfianca.BAIXA:
+        # Em modo --silent, pula a pausa preventiva e tenta diretamente
+        if confianca == NivelConfianca.BAIXA and not silent:
             resposta = await self._pausa_preventiva(page, acao_tec, seletor)
 
             if resposta == "pular":
@@ -797,7 +800,8 @@ class HitlValidator:
             await asyncio.sleep(0.6)
 
         # ── 🟠 Checkpoint: valida estado após o passo ─────────────────────────
-        if CHECKPOINT_HABILITADO and tooltip:
+        # Em modo --silent, checkpoints são ignorados
+        if CHECKPOINT_HABILITADO and tooltip and not getattr(self, "_silent", False):
             estado_ok, observacao = await _validar_checkpoint(page, tooltip, ancora)
 
             if not estado_ok:
@@ -847,9 +851,12 @@ class HitlValidator:
         except Exception as e:
             logger.warning(f"Não foi possível reescrever o roteiro: {e}")
 
-    async def executar(self, caminho_json: str) -> None:
+    async def executar(self, caminho_json: str, silent: bool = False) -> None:
+        self._silent = silent
         print(f"\n{'═'*55}", flush=True)
         print(f"  VALIDADOR HITL — {os.path.basename(caminho_json)}", flush=True)
+        if silent:
+            print(f"  MODO SILENCIOSO — só pausa em falha dura", flush=True)
         print(f"{'═'*55}\n", flush=True)
 
         with open(caminho_json, "r", encoding="utf-8") as f:
@@ -945,8 +952,9 @@ class HitlValidator:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Uso: python validator_hitl.py <caminho_do_roteiro.json>")
+        print("Uso: python validator_hitl.py <caminho_do_roteiro.json> [--silent]")
         print("Ex:  python validator_hitl.py roteiros_salvos/GED_M01_A01.json")
+        print("     --silent  Desativa pausas preventivas e checkpoints (só pausa em falha dura)")
         sys.exit(1)
 
     caminho = sys.argv[1]
@@ -954,4 +962,5 @@ if __name__ == "__main__":
         print(f"❌ Arquivo não encontrado: {caminho}")
         sys.exit(1)
 
-    asyncio.run(HitlValidator().executar(caminho))
+    modo_silencioso = "--silent" in sys.argv
+    asyncio.run(HitlValidator().executar(caminho, silent=modo_silencioso))

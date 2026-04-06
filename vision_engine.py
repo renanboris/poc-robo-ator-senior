@@ -88,8 +88,33 @@ def _init_db():
                     iframe TEXT,
                     hits INTEGER DEFAULT 0,
                     falhas_consecutivas INTEGER DEFAULT 0,
+                    hitl_corrigido INTEGER DEFAULT 0,
                     ultima_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+            """)
+            # Migração segura: adiciona colunas novas se não existirem (idempotente)
+            for col_sql in [
+                "ALTER TABLE memoria_semantica ADD COLUMN hitl_corrigido INTEGER DEFAULT 0",
+            ]:
+                try:
+                    conn.execute(col_sql)
+                except Exception:
+                    pass  # coluna já existe
+
+            # Tabela de telemetria de camadas (Fase 2.2)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS telemetria_camadas (
+                    camada TEXT PRIMARY KEY,
+                    acertos INTEGER DEFAULT 0,
+                    falhas INTEGER DEFAULT 0,
+                    ultima_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # TTL: remove memórias não usadas há mais de 90 dias (Fase 2.1)
+            conn.execute("""
+                DELETE FROM memoria_semantica
+                WHERE ultima_atualizacao < datetime('now', '-90 days')
+                  AND hits < 2
             """)
     except Exception as e:
         logger.error(f"Nao foi possivel inicializar Brain DB em '{DB_PATH}': {e}")
@@ -109,6 +134,48 @@ class EntradaCache:
     iframe_src: Optional[str] = None
     hits: int = 0
     falhas_consecutivas: int = 0
+    hitl_corrigido: int = 0
+
+
+def _registrar_telemetria(camada: str, acertou: bool) -> None:
+    """Registra acerto/falha por camada para observabilidade do self-healing."""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("""
+                INSERT INTO telemetria_camadas (camada, acertos, falhas)
+                VALUES (?, ?, ?)
+                ON CONFLICT(camada) DO UPDATE SET
+                    acertos = acertos + ?,
+                    falhas  = falhas  + ?,
+                    ultima_atualizacao = CURRENT_TIMESTAMP
+            """, (
+                camada,
+                1 if acertou else 0,
+                0 if acertou else 1,
+                1 if acertou else 0,
+                0 if acertou else 1,
+            ))
+    except Exception:
+        pass
+
+
+def obter_stats_brain() -> dict:
+    """Retorna estatísticas do Brain para o endpoint /api/brain-stats."""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            total = conn.execute("SELECT COUNT(*) as n FROM memoria_semantica").fetchone()["n"]
+            hitl  = conn.execute("SELECT COUNT(*) as n FROM memoria_semantica WHERE hitl_corrigido = 1").fetchone()["n"]
+            camadas = conn.execute(
+                "SELECT camada, acertos, falhas FROM telemetria_camadas ORDER BY acertos DESC"
+            ).fetchall()
+            return {
+                "total_memorias": total,
+                "memorias_hitl": hitl,
+                "camadas": [dict(r) for r in camadas],
+            }
+    except Exception as e:
+        return {"erro": str(e)}
 
 
 def _consultar_cache(intencao: str) -> Optional[EntradaCache]:
@@ -882,6 +949,54 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
 
 
 # ──────────────────────────────────────────────────────────────
+# DETECÇÃO DE MENU DE CONTEXTO ATIVO (CAMADA 0.5)
+# ──────────────────────────────────────────────────────────────
+async def _detectar_menu_contexto_ativo(page) -> object | None:
+    """
+    Verifica se um menu de contexto está visível como overlay na página.
+    Retorna o Locator do primeiro menu visível encontrado, ou None.
+    Usa timeout=300ms para não penalizar o caminho feliz (sem menu ativo).
+    """
+    seletores_menu = [
+        ".p-contextmenu",
+        "[role='menu']",
+        ".context-menu",
+        "ul[class*='contextmenu']",
+        ".p-menu-list",
+    ]
+    for seletor in seletores_menu:
+        try:
+            locator = page.locator(seletor).first
+            await locator.wait_for(state="visible", timeout=300)
+            return locator
+        except Exception:
+            continue
+    return None
+
+
+async def _buscar_em_escopo_menu(menu_locator, label_curto: str) -> str | None:
+    """
+    Localiza o elemento dentro do container do menu de contexto.
+    Estratégias em ordem de confiança, todas escopadas ao menu_locator.
+    Retorna o seletor usado em caso de sucesso, ou None se não encontrado.
+    """
+    estrategias = [
+        ("role_menuitem", lambda: menu_locator.get_by_role("menuitem", name=label_curto)),
+        ("text_exact",    lambda: menu_locator.get_by_text(label_curto, exact=True)),
+        ("has_text",      lambda: menu_locator.locator(f":has-text('{label_curto}')").last),
+    ]
+    for nome, fn in estrategias:
+        try:
+            el = fn()
+            await el.wait_for(state="visible", timeout=1000)
+            await el.click()
+            return nome
+        except Exception:
+            continue
+    return None
+
+
+# ──────────────────────────────────────────────────────────────
 # ORQUESTRADOR PRINCIPAL (A MAQUINA DE DECISAO)
 # ──────────────────────────────────────────────────────────────
 async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
@@ -911,30 +1026,87 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     cache = _consultar_cache(intencao)
     if cache:
         if cache.seletor:
-            cand_cache = TentativaLocalizacao(
-                seletor=cache.seletor,
-                iframe_hint=cache.iframe_src or iframe_hint,
-                descricao="brain knowledge",
+            # [CTX-MENU] Consciência de overlay: se menu de contexto ativo e seletor
+            # não aponta para dentro de um menu, pular Brain e deixar camada 0.5 tratar.
+            _menu_ativo_check = await _detectar_menu_contexto_ativo(page)
+            _seletor_aponta_menu = any(
+                p in (cache.seletor or "")
+                for p in (".p-contextmenu", "[role='menu']", ".context-menu", "p-menu", "menuitem")
             )
-            if await _tentar_candidato(page, cand_cache, acao, valor):
-                _registrar_sucesso_cache(intencao)
-                return True
+            if _menu_ativo_check is not None and not _seletor_aponta_menu:
+                logger.debug(
+                    f"[BRAIN] Menu de contexto ativo — pulando seletor memorizado "
+                    f"'{cache.seletor}' (não aponta para menu)"
+                )
+                # Não usar o Brain — deixar camada 0.5 tratar
             else:
-                _registrar_falha_cache(intencao)
-                brain_registrou_falha = True
+                cand_cache = TentativaLocalizacao(
+                    seletor=cache.seletor,
+                    iframe_hint=cache.iframe_src or iframe_hint,
+                    descricao="brain knowledge",
+                )
+                if await _tentar_candidato(page, cand_cache, acao, valor):
+                    _registrar_sucesso_cache(intencao)
+                    _registrar_telemetria("0_brain", True)
+                    return True
+                else:
+                    _registrar_falha_cache(intencao)
+                    _registrar_telemetria("0_brain", False)
+                    brain_registrou_falha = True
         elif cache.coords:
             if await _clicar_por_coordenadas(page, cache.coords, acao, valor):
                 _registrar_sucesso_cache(intencao)
+                _registrar_telemetria("0_brain_coords", True)
                 return True
             else:
                 _registrar_falha_cache(intencao)
+                _registrar_telemetria("0_brain_coords", False)
                 brain_registrou_falha = True
+
+    # ── Camada 0.5: Menu de contexto ativo ──────────────────────────────────
+    menu_locator = await _detectar_menu_contexto_ativo(page)
+    if menu_locator is not None:
+        seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto)
+        if seletor_usado:
+            _registrar_sucesso_cache(intencao, seletor_usado)
+            _registrar_telemetria("0.5_menu_ctx", True)
+            logger.info(f"[MENU-CTX] Clicou em '{label_curto}' dentro do menu de contexto via '{seletor_usado}'")
+            return True
+        else:
+            # Elemento não encontrado no menu — escalar direto para Gemini Vision
+            logger.warning(f"[MENU-CTX] Menu ativo mas '{label_curto}' não encontrado no escopo — escalando para Gemini")
+            try:
+                screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
+            except Exception as exc:
+                logger.warning(f"Screenshot falhou antes do Gemini (camada 0.5): {exc}")
+                screenshot_atual = None
+            if screenshot_atual:
+                vp = page.viewport_size or {"width": 1920, "height": 1080}
+                resultado_gemini = await _gemini_localizar_elemento(
+                    screenshot_atual=screenshot_atual,
+                    screenshot_ref_b64=alvo.get("screenshot_referencia"),
+                    descricao_visual=descricao_visual,
+                    intencao=intencao,
+                    contexto_tela=contexto_tela,
+                    viewport=vp,
+                    scroll_y=scroll_y,
+                )
+                if resultado_gemini:
+                    coords_ia = resultado_gemini.get("coordenadas")
+                    if coords_ia and await _clicar_por_coordenadas(page, coords_ia, acao, valor):
+                        logger.info("[MENU-CTX] Gemini Vision resolveu o item de menu.")
+                        _registrar_sucesso_cache(intencao, coords=coords_ia)
+                        _registrar_telemetria("5_gemini_vision", True)
+                        return True
+            _registrar_telemetria("0.5_menu_ctx", False)
+            return False
 
     # ── 1. Foco Nativo (exclusivo para inputs) ────────────────────────────────
     if acao in ("digitar_e_enter", "preencher_campo"):
         logger.info("   [Foco Nativo] Verificando se cursor ja esta posicionado...")
         if await _digitar_no_active_element(page, acao, valor):
             logger.info("   [Foco Nativo] Texto inserido no campo ja focado!")
+            _registrar_telemetria("1_foco_nativo", True)
             return True
 
         logger.info("   [Foco Nativo] Buscando div contenteditable generica...")
@@ -943,6 +1115,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             loc_edit = contexto.locator("[contenteditable='true']")
             if await loc_edit.count() > 0 and await loc_edit.first.is_visible():
                 await _executar_acao(loc_edit.first, page, acao, valor)
+                _registrar_telemetria("1_foco_nativo", True)
                 return True
         except Exception:
             pass
@@ -970,6 +1143,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         await _executar_acao(loc, page, acao, valor)
                         logger.info("   [Heuristica] Icone Home atingido com sucesso.")
                         _registrar_sucesso_cache(intencao, seletor=sel, iframe=iframe_hint)
+                        _registrar_telemetria("1.5_heuristica_seniorx", True)
                         return True
                 except Exception:
                     pass
@@ -989,6 +1163,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     seletor=cand.seletor if cand.seletor else None,
                     iframe=iframe_hint,
                 )
+                _registrar_telemetria("2_sniper", True)
                 return True
 
     # ── 3. Seletor Hint Original ──────────────────────────────────────────────
@@ -1008,6 +1183,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 if await _tentar_candidato(page, cand_hint, acao, valor):
                     logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
                     _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
+                    _registrar_telemetria("3_hint_original", True)
                     return True
         else:
             cand_hint = TentativaLocalizacao(
@@ -1017,6 +1193,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if await _tentar_candidato(page, cand_hint, acao, valor):
                 logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
                 _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
+                _registrar_telemetria("3_hint_original", True)
                 return True
 
     # ── 4. Busca Profunda em Todos os Frames ──────────────────────────────────
@@ -1025,6 +1202,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
         if frame_url:
             _registrar_sucesso_cache(intencao, iframe=frame_url)
+            _registrar_telemetria("4_todos_frames", True)
             return True
 
     # ── 5. Gemini Vision (Self-Healing Supremo) ───────────────────────────────
@@ -1051,7 +1229,30 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if coords_ia:
                 if await _clicar_por_coordenadas(page, coords_ia, acao, valor):
                     logger.info("   [Vision] Clique por coordenadas da IA bem-sucedido.")
-                    _registrar_sucesso_cache(intencao, coords=coords_ia)
+                    # [Fase 2.3] Tenta aprender o seletor DOM após acerto por coordenada
+                    try:
+                        x_ia, y_ia = _parse_coords(coords_ia)
+                        seletor_aprendido = await page.evaluate(
+                            """([x, y]) => {
+                                const el = document.elementFromPoint(x, y);
+                                if (!el) return null;
+                                const tid = el.getAttribute('data-testid');
+                                if (tid) return `[data-testid='${tid}']`;
+                                const aria = el.getAttribute('aria-label');
+                                if (aria) return `[aria-label='${aria}']`;
+                                const name = el.getAttribute('name');
+                                if (name) return `[name='${name}']`;
+                                if (el.id && !el.id.match(/^(ng-|mat-|cdk-|\\d)/)) return `#${el.id}`;
+                                return null;
+                            }""",
+                            [x_ia, y_ia]
+                        )
+                        _registrar_sucesso_cache(intencao, coords=coords_ia, seletor=seletor_aprendido)
+                        if seletor_aprendido:
+                            logger.info(f"   [Vision] Seletor aprendido após coordenada: {seletor_aprendido}")
+                    except Exception:
+                        _registrar_sucesso_cache(intencao, coords=coords_ia)
+                    _registrar_telemetria("5_gemini_vision", True)
                     return True
 
     # ── 6. Fallback Cego (Coordenadas Relativas Originais) ───────────────────
@@ -1063,6 +1264,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             y  = int(coords_relativas["y_pct"] * vp["height"])
             if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
                 logger.info(f"   [Fallback Final] Clique em ({x}, {y}) executado.")
+                _registrar_telemetria("6_coords_originais", True)
                 return True
         except Exception as exc:
             logger.warning(f"Fallback de coordenadas falhou: {exc}")
@@ -1071,5 +1273,6 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # [BUG-3] FIX: registra falha apenas se o Brain nao registrou uma neste ciclo
     if not brain_registrou_falha:
         _registrar_falha_cache(intencao)
+    _registrar_telemetria("falha_total", False)
     logger.error(f"   [FALHA TOTAL] Impossivel executar: '{intencao[:70]}'")
     return False

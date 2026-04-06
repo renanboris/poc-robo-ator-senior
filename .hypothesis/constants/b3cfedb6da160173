@@ -1,0 +1,4 @@
+# file: C:\GenUCS\dap_engine.py
+# hypothesis_version: 6.151.10
+
+[0.0, 0.4, 0.45, 0.8, 3600.0, 3072, 5000, 2592000, '\n\n---\n\n', '\nDICA:', ',', '=', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'INSTRUCAO: ', 'OPENAI_API_KEY', 'PINECONE_API_KEY', 'PINECONE_INDEX_NAME', 'Proximo passo', 'SELETOR_EXATO', 'Tentar novamente', 'Treinamento', 'Utilizador', 'acoes_tecnicas', 'analise_interna', 'ancora', 'application/json', 'aula', 'aura_cache.db', 'aura_engine', 'elemento_alvo', 'elemento_id', 'erro', 'gemini-2.5-flash', 'id', 'id_passo', 'image/jpeg', 'melhor_aula', 'mensagem', 'metadata', 'nome_aula', 'passo', 'passos', 'pedagogia', 'replace', 'score', 'seletor', 'seletor_css', 'seletor_direto', 'seletor_hint', 'senior_default', 'status', 'sucesso', 'sugestoes', 'texto', 'texto_rag', 'tooltip', 'tooltip_dap', 'utf-8', 'values', '👁️ AURA VISION LOG:']
