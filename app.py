@@ -30,10 +30,34 @@ import sqlite3
 import uuid
 import logging
 import time
+import tempfile
 import generator_engine
 import lego_builder
 import dap_engine
-from utils import limpar_nome, validar_roteiro
+import job_registry
+from utils import limpar_nome, validar_roteiro, salvar_versao_roteiro
+
+
+def _atomic_write_json(caminho: str, dados: dict) -> None:
+    """Escreve dados JSON em disco de forma atômica via tempfile + os.replace().
+
+    Garante que o arquivo destino nunca fique em estado parcialmente escrito:
+    o arquivo temporário é criado no mesmo diretório (mesmo filesystem) e
+    substituído atomicamente pelo destino final.
+    """
+    dir_destino = os.path.dirname(os.path.abspath(caminho))
+    fd, tmp_path = tempfile.mkstemp(dir=dir_destino, suffix=".json.tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp_f:
+            json.dump(dados, tmp_f, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, caminho)
+    except Exception:
+        # Remove o temporário se algo falhar antes do replace
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
 # ==============================================================
 # WEBSOCKET MANAGER (Sprint 4) & LIFECYCLE
@@ -208,9 +232,12 @@ def _set_estado(**kwargs):
             logging.error(f"Erro ao disparar broadcast via WebSocket: {e}")
 
 
-def executar_processo_bg(comando, msg_executando, msg_sucesso):
+def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = None):
     global processo_atual
     _set_estado(ocupado=True, mensagem=msg_executando, progresso=None, erro="", sucesso="", shadow_path=None)
+
+    if job_id:
+        job_registry.atualizar_job(job_id, status="executando")
 
     try:
         env_vars = os.environ.copy()
@@ -236,6 +263,8 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
                     try:
                         pct = int(linha_limpa.split("PROGRESSO:")[1].strip())
                         _set_estado(progresso=pct)
+                        if job_id:
+                            job_registry.atualizar_job(job_id, progresso=pct)
                     except Exception:
                         pass
                 if linha_limpa.startswith("SHADOW_GERADO:"):
@@ -243,6 +272,10 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
                     _set_estado(shadow_path=_shadow_path)
 
         proc.wait()
+
+        # Persiste as últimas 100 linhas do log no job_registry (NFR-3.5)
+        if job_id and linhas_log:
+            job_registry.atualizar_job(job_id, log_execucao="\n".join(linhas_log[-100:]))
 
         if proc.returncode != 0:
             erro_real  = "Erro desconhecido."
@@ -252,10 +285,22 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
                     break
             if proc.returncode < 0 or "KeyboardInterrupt" in "\n".join(linhas_log):
                 _set_estado(erro="Execução interrompida pelo utilizador.")
+                if job_id:
+                    job_registry.atualizar_job(job_id, status="cancelado", motivo_falha="Execução interrompida pelo utilizador.")
             else:
+                nome_processo = os.path.basename(comando[1]) if len(comando) > 1 else str(comando)
+                logging.error(
+                    f"Processo '{nome_processo}' falhou (returncode={proc.returncode}). "
+                    f"Comando: {' '.join(str(c) for c in comando)}. "
+                    f"Última linha de saída: {erro_real}"
+                )
                 _set_estado(erro=f"Falha: {erro_real}")
+                if job_id:
+                    job_registry.atualizar_job(job_id, status="falhou", motivo_falha=erro_real)
         else:
             _set_estado(sucesso=msg_sucesso)
+            if job_id:
+                job_registry.atualizar_job(job_id, status="concluido")
 
             # AUTO-REBUILD: se o processo concluído era um mapeamento (capture.py),
             # reconstrói a biblioteca de peças automaticamente.
@@ -329,6 +374,8 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso):
 
     except Exception as e:
         _set_estado(erro=str(e))
+        if job_id:
+            job_registry.atualizar_job(job_id, status="falhou", motivo_falha=str(e))
     finally:
         _set_estado(ocupado=False, progresso=None)
         with _estado_lock:
@@ -481,41 +528,163 @@ async def dashboard_v2(request: Request):
 
 @app.get("/api/metricas")
 async def get_metricas():
+    """Expõe métricas de observabilidade do Vision Engine e do pipeline.
+
+    Requisitos: 1.4.2, NFR-3.2
+
+    Regras:
+    - Retorna `null` para campos sem dados (nunca omite ou retorna zero quando não há dados).
+    - `horas_poupadas` = total_aulas * 2.5 horas por aula.
+    - `economia_estimada` = horas_poupadas * 100 reais.
+    - Se `total_aulas` for null, `horas_poupadas` e `economia_estimada` também são null.
+    - `self_healing_hits` = soma de acertos de todas as camadas em telemetria_camadas.
+    - `camadas_vision` inclui taxa_sucesso por camada: acertos / (acertos + falhas) se total > 0, senão null.
+    """
+    from vision_engine import obter_stats_brain
+
+    # ── total_aulas ──────────────────────────────────────────────────────────
+    total_aulas: Optional[int] = None
     try:
-        total_memorizado = sucesso_recuperacao = 0
-        if os.path.exists("brain.db"):
-            with sqlite3.connect("brain.db") as conn:
-                total_memorizado    = conn.execute("SELECT COUNT(*) FROM memoria_semantica").fetchone()[0]
-                sucesso_recuperacao = conn.execute("SELECT SUM(hits) FROM memoria_semantica").fetchone()[0] or 0
-                
-        dap_respostas_salvas = 0
+        if os.path.isdir(ROTEIROS_DIR):
+            arquivos_json = [f for f in os.listdir(ROTEIROS_DIR) if f.endswith(".json")]
+            total_aulas = len(arquivos_json)
+    except Exception as e:
+        logging.warning(f"[metricas] Não foi possível contar roteiros: {e}")
+
+    # ── horas_poupadas / economia_estimada ───────────────────────────────────
+    horas_poupadas: Optional[float] = None
+    economia_estimada: Optional[float] = None
+    if total_aulas is not None:
+        horas_poupadas = round(total_aulas * 2.5, 2)
+        economia_estimada = round(horas_poupadas * 100, 2)
+
+    # ── Brain stats (total_memorizado, self_healing_hits, camadas_vision) ────
+    total_memorizado: Optional[int] = None
+    self_healing_hits: Optional[int] = None
+    camadas_vision: Optional[list] = None
+
+    try:
+        stats = obter_stats_brain()
+        if "erro" not in stats:
+            total_memorizado = stats.get("total_memorias")
+
+            camadas_raw = stats.get("camadas", [])
+            if camadas_raw:
+                camadas_vision = []
+                hits_total = 0
+                for c in camadas_raw:
+                    acertos = c.get("acertos", 0)
+                    falhas  = c.get("falhas", 0)
+                    total_c = acertos + falhas
+                    taxa    = round(acertos / total_c, 4) if total_c > 0 else None
+                    camadas_vision.append({
+                        "camada":      c.get("camada"),
+                        "acertos":     acertos,
+                        "falhas":      falhas,
+                        "taxa_sucesso": taxa,
+                    })
+                    hits_total += acertos
+                self_healing_hits = hits_total
+            else:
+                # brain.db existe mas sem registros de telemetria — retorna null
+                self_healing_hits = None
+                camadas_vision = None
+    except Exception as e:
+        logging.warning(f"[metricas] Não foi possível obter stats do Brain: {e}")
+
+    # ── tamanho_cache_dap ────────────────────────────────────────────────────
+    tamanho_cache_dap: Optional[int] = None
+    try:
         if os.path.exists("aura_cache.db"):
             with sqlite3.connect("aura_cache.db") as conn:
-                dap_respostas_salvas = conn.execute("SELECT COUNT(*) FROM dap_cache").fetchone()[0]
-
-        qtd_aulas = len([f for f in os.listdir(ROTEIROS_DIR) if f.endswith(".json")])
-
-        # CÁLCULOS DE ROI
-        # Referência: HH Consultor Senior = R$150/h (alinhado com tooltip do dashboard)
-        horas_poupadas_aulas = qtd_aulas * 6
-        economia_aulas_reais = horas_poupadas_aulas * 150
-        economia_tokens_reais = (sucesso_recuperacao + dap_respostas_salvas) * 0.05
-
-        return {
-            "total_aulas":       qtd_aulas,
-            "horas_poupadas":    horas_poupadas_aulas,
-            "dinheiro_poupado":  economia_aulas_reais + economia_tokens_reais,
-            "total_memorizado":  total_memorizado,          
-            "self_healing_hits": sucesso_recuperacao,       
-            "dap_cache_size":    dap_respostas_salvas,      
-            "economia_tokens":   economia_tokens_reais      
-        }
+                row = conn.execute("SELECT COUNT(*) FROM dap_cache").fetchone()
+                if row is not None:
+                    tamanho_cache_dap = row[0]
     except Exception as e:
-        logging.error(f"Erro ao gerar métricas: {e}")
-        return {
-            "total_aulas": 0, "horas_poupadas": 0, "dinheiro_poupado": 0,
-            "total_memorizado": 0, "self_healing_hits": 0, "dap_cache_size": 0, "economia_tokens": 0
-        }
+        logging.warning(f"[metricas] Não foi possível consultar aura_cache.db: {e}")
+
+    # ── Métricas de ROI (Task 23 — Requisitos 3.3.1–3.3.7) ──────────────────
+    roi: dict = {
+        "tempo_medio_criacao_segundos":  None,
+        "taxa_correcao_hitl":            None,
+        "indice_reuso_memoria":          None,
+        "reducao_suporte_estimada":      None,
+        "total_treinamentos_rastreados": None,
+    }
+    try:
+        import roi_tracker as _roi
+        roi = _roi.calcular_metricas_roi()
+    except Exception as e_roi:
+        logging.warning(f"[metricas] Não foi possível calcular métricas de ROI: {e_roi}")
+
+    # ── Scores por ação e por fluxo (Task 25 — Requisito 3.2.4) ────────────────
+    scores_por_acao: Optional[list] = None
+    scores_por_fluxo: Optional[list] = None
+    try:
+        import score_engine as _se
+        todos_scores = _se.obter_todos_scores()
+        if todos_scores:
+            scores_por_acao = [
+                {
+                    "acao_id":            s["acao_id"],
+                    "score":              s["score"],
+                    "requer_revisao":     bool(s["requer_revisao"]),
+                    "total_execucoes":    s["total_execucoes"],
+                    "taxa_sucesso":       round(s["taxa_sucesso"], 4),
+                }
+                for s in todos_scores
+            ]
+
+        # Score por fluxo: média dos scores das ações de cada roteiro
+        if os.path.isdir(ROTEIROS_DIR):
+            fluxos = []
+            for arq in sorted(os.listdir(ROTEIROS_DIR)):
+                if not arq.endswith(".json"):
+                    continue
+                try:
+                    with open(os.path.join(ROTEIROS_DIR, arq), "r", encoding="utf-8") as f_r:
+                        rd = json.load(f_r)
+                    id_trein = rd.get("metadata", {}).get("id_treinamento", arq.replace(".json", ""))
+                    scores_acoes = []
+                    for passo in rd.get("passos", []):
+                        for acao in passo.get("acoes_tecnicas", []):
+                            intencao = acao.get("intencao_semantica", "").strip().lower()
+                            if intencao:
+                                s = _se.obter_score(intencao)
+                                if s is not None:
+                                    scores_acoes.append(s)
+                    score_fluxo = round(sum(scores_acoes) / len(scores_acoes), 4) if scores_acoes else None
+                    fluxos.append({
+                        "fluxo_id":    id_trein,
+                        "nome_aula":   rd.get("metadata", {}).get("nome_aula", id_trein),
+                        "score_fluxo": score_fluxo,
+                        "n_acoes":     len(scores_acoes),
+                    })
+                except Exception:
+                    continue
+            if fluxos:
+                scores_por_fluxo = fluxos
+    except Exception as e_scores:
+        logging.warning(f"[metricas] Não foi possível calcular scores: {e_scores}")
+
+    return {
+        "total_aulas":       total_aulas,
+        "horas_poupadas":    horas_poupadas,
+        "economia_estimada": economia_estimada,
+        "total_memorizado":  total_memorizado,
+        "self_healing_hits": self_healing_hits,
+        "tamanho_cache_dap": tamanho_cache_dap,
+        "camadas_vision":    camadas_vision,
+        # ROI
+        "tempo_medio_criacao_segundos":  roi.get("tempo_medio_criacao_segundos"),
+        "taxa_correcao_hitl":            roi.get("taxa_correcao_hitl"),
+        "indice_reuso_memoria":          roi.get("indice_reuso_memoria"),
+        "reducao_suporte_estimada":      roi.get("reducao_suporte_estimada"),
+        "total_treinamentos_rastreados": roi.get("total_treinamentos_rastreados"),
+        # Scores (Task 25)
+        "scores_por_acao":   scores_por_acao,
+        "scores_por_fluxo":  scores_por_fluxo,
+    }
 
 @app.get("/api/status")
 async def get_status():
@@ -547,9 +716,49 @@ async def limpar_status():
 async def cancelar_processo():
     with _estado_lock:
         proc = processo_atual
+
     if proc:
         proc.terminate()
-        return {"status": "cancelado"}
+
+        # Descobre o job ativo (o mais recente com status 'executando')
+        job_id_ativo = None
+        try:
+            tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+            jobs_ativos = job_registry.listar_jobs_por_tenant(tenant, limit=10)
+            for j in jobs_ativos:
+                if j.get("status") == "executando":
+                    job_id_ativo = j["job_id"]
+                    break
+        except Exception as e:
+            logging.warning(f"[cancelar] Não foi possível localizar job ativo: {e}")
+
+        # Atualiza o job para cancelado no registry
+        if job_id_ativo:
+            job_registry.atualizar_job(
+                job_id_ativo,
+                status="cancelado",
+                motivo_falha="Cancelado pelo utilizador via POST /api/cancelar",
+            )
+            logging.info(f"[cancelar] Job {job_id_ativo} marcado como cancelado. Timestamp: {__import__('datetime').datetime.utcnow().isoformat()}")
+
+        # Limpa arquivos temporários de escritas atômicas interrompidas (Req 2.2.6)
+        removidos = []
+        for tmp_file in glob.glob("*.json.tmp"):
+            try:
+                os.remove(tmp_file)
+                removidos.append(tmp_file)
+                logging.info(f"[cancelar] Temporário removido: {tmp_file}")
+            except Exception as e:
+                logging.warning(f"[cancelar] Não foi possível remover {tmp_file}: {e}")
+
+        if removidos:
+            logging.info(f"[cancelar] {len(removidos)} arquivo(s) temporário(s) removido(s): {removidos}")
+
+        resposta = {"status": "cancelado"}
+        if job_id_ativo:
+            resposta["job_id"] = job_id_ativo
+        return resposta
+
     return {"status": "inativo"}
 
 @app.get("/api/roteiros")
@@ -610,8 +819,13 @@ async def get_roteiro(arquivo: str):
 async def salvar_roteiro(arquivo: str, roteiro: RoteiroBase):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
     dados   = roteiro.model_dump() if hasattr(roteiro, "model_dump") else roteiro.dict()
-    with open(caminho, "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=2, ensure_ascii=False)
+    aprovado, motivo = validar_roteiro(dados)
+    if not aprovado:
+        logging.warning(f"Salvar roteiro bloqueado — '{arquivo}': {motivo}")
+        return JSONResponse(status_code=422, content={"erro": f"Roteiro inválido: {motivo}"})
+    caminho_backup = salvar_versao_roteiro(caminho, dados)
+    if caminho_backup:
+        logging.info(f"[versioning] Versão anterior preservada em '{caminho_backup}'")
     return {"status": "sucesso"}
 
 @app.delete("/api/roteiros/{arquivo}")
@@ -622,28 +836,37 @@ async def excluir_roteiro(arquivo: str):
         return {"status": "sucesso"}
     return JSONResponse(status_code=404, content={"erro": "Arquivo não encontrado"})
 
-def _iniciar_bg(comando, msg_exec, msg_ok):
+def _iniciar_bg(comando, msg_exec, msg_ok, tipo="processo", tenant_id="senior_default"):
     with _estado_lock:
         if estado_servidor["ocupado"]:
-            return False
-    threading.Thread(target=executar_processo_bg, args=(comando, msg_exec, msg_ok), daemon=True).start()
-    return True
+            return None
+    job_id = job_registry.criar_job(tipo, tenant_id)
+    threading.Thread(target=executar_processo_bg, args=(comando, msg_exec, msg_ok, job_id), daemon=True).start()
+    return job_id
 
 @app.post("/api/gravar")
 async def gravar_aula(req: NovaAulaReq):
-    ok = _iniciar_bg([sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"],
-                     "🔍 Vasculhando o DOM (com autorização)...", "🎯 Tela capturada. A IA já pode enxergar.")
-    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg([sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"],
+                     "🔍 Vasculhando o DOM (com autorização)...", "🎯 Tela capturada. A IA já pode enxergar.",
+                     tipo="captura", tenant_id=tenant)
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 @app.post("/api/gravar-dual")
 async def gravar_aula_dual(req: NovaAulaReq):
     """Captura no modo dual: gera roteiro legado + shadow JSONL semântico em paralelo."""
-    ok = _iniciar_bg(
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg(
         [sys.executable, "capture_variants/capture_dual_output.py", req.nome_aula, req.objetivo, "--auto"],
         "🔍 Captura Dual ativa — gerando roteiro + shadow semântico...",
-        "🎯 Captura dual concluída. Roteiro e shadow prontos."
+        "🎯 Captura dual concluída. Roteiro e shadow prontos.",
+        tipo="captura", tenant_id=tenant,
     )
-    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 @app.post("/api/gravar-hybrid")
 async def gravar_aula_hybrid(req: NovaAulaReq):
@@ -652,12 +875,16 @@ async def gravar_aula_hybrid(req: NovaAulaReq):
     Gera shadow JSONL semântico enriquecido com contexto antes/depois de cada ação.
     Requer compilação posterior via scripts/compile_hybrid_to_executor.py para execução.
     """
-    ok = _iniciar_bg(
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg(
         [sys.executable, "capture_variants/capture_hybrid_shadow.py", req.nome_aula, req.objetivo, "--auto"],
         "🧠 Captura Híbrida ativa — análise semântica antes/depois de cada ação...",
-        "✅ Captura híbrida concluída. Shadow JSONL pronto para compilação."
+        "✅ Captura híbrida concluída. Shadow JSONL pronto para compilação.",
+        tipo="captura", tenant_id=tenant,
     )
-    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 # FIX Bug #APP-01: Rota /api/gerar-ia duplicada removida aqui.
 # A implementação correta (com tenant_id e validação) está abaixo (~linha 604).
@@ -665,41 +892,61 @@ async def gravar_aula_hybrid(req: NovaAulaReq):
 @app.post("/api/executar-robo/{arquivo}")
 async def executar_robo(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
-    ok = _iniciar_bg([sys.executable, "main.py", caminho, "--record"],
-                     "🎬 Contratando o locutor da IA...", "🎞️ Cenas gravadas. Ilha de edição, é com vocês!")
-    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg([sys.executable, "main.py", caminho, "--record"],
+                     "🎬 Contratando o locutor da IA...", "🎞️ Cenas gravadas. Ilha de edição, é com vocês!",
+                     tipo="render", tenant_id=tenant)
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 @app.post("/api/renderizar/{arquivo}")
 async def renderizar_video(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
-    ok = _iniciar_bg([sys.executable, "main.py", caminho, "--render"],
-                     "🎬 Equipe de produção na ilha de edição...", "🏆 Vídeo pronto para o Oscar.")
-    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg([sys.executable, "main.py", caminho, "--render"],
+                     "🎬 Equipe de produção na ilha de edição...", "🏆 Vídeo pronto para o Oscar.",
+                     tipo="render", tenant_id=tenant)
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 @app.post("/api/gerar-scorm/{arquivo}")
 async def gerar_scorm(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
-    ok = _iniciar_bg([sys.executable, "scorm_builder.py", caminho],
-                     "📦 Empacotando o conhecimento (Padrão SCORM)...", "✅ Módulo SCORM deployado. Pode subir para o LMS.")
-    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg([sys.executable, "scorm_builder.py", caminho],
+                     "📦 Empacotando o conhecimento (Padrão SCORM)...", "✅ Módulo SCORM deployado. Pode subir para o LMS.",
+                     tipo="scorm", tenant_id=tenant)
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 @app.post("/api/gerar-pdf/{arquivo}")
 async def gerar_pdf(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
-    ok = _iniciar_bg([sys.executable, "pdf_builder.py", caminho],
-                     "📜 Forjando os pergaminhos sagrados (PDF)...", "📖 Playbook gerado. Conhecimento imortalizado.")
-    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg([sys.executable, "pdf_builder.py", caminho],
+                     "📜 Forjando os pergaminhos sagrados (PDF)...", "📖 Playbook gerado. Conhecimento imortalizado.",
+                     tipo="pdf", tenant_id=tenant)
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 @app.post("/api/gerar-simlink/{arquivo}")
 async def gerar_simlink(arquivo: str):
     """Gera um SimLink — simulador standalone sem necessidade de LMS."""
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
-    ok = _iniciar_bg(
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg(
         [sys.executable, "scripts/sim_link_builder.py", caminho],
         "🔗 Construindo o SimLink (simulador standalone)...",
-        "🎮 SimLink pronto. Compartilhe o link direto, sem LMS."
+        "🎮 SimLink pronto. Compartilhe o link direto, sem LMS.",
+        tipo="scorm", tenant_id=tenant,
     )
-    return {"status": "iniciado"} if ok else JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 @app.get("/api/preview-simlink/{nome_base}", response_class=HTMLResponse)
 async def preview_simlink(nome_base: str):
@@ -751,8 +998,7 @@ async def duplicar_roteiro(arquivo: str):
     dados["metadata"]["nome_aula"]      = dados["metadata"].get("nome_aula", "") + " (Cópia)"
     dados["metadata"]["id_treinamento"] = f"treinamento_{novo_id}"
     novo_arquivo = f"roteiro_{novo_id}.json"
-    with open(os.path.join(ROTEIROS_DIR, novo_arquivo), "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=2, ensure_ascii=False)
+    _atomic_write_json(os.path.join(ROTEIROS_DIR, novo_arquivo), dados)
     return {"status": "sucesso", "novo_arquivo": novo_arquivo}
 
 @app.post("/api/renomear/{arquivo}")
@@ -786,8 +1032,7 @@ async def renomear_roteiro(arquivo: str, req: RenomearReq):
             os.rename(old_aud, new_aud)
     except Exception as e:
         return JSONResponse(status_code=500, content={"erro": f"Erro ao renomear dependências: {e}"})
-    with open(caminho_novo, "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=2, ensure_ascii=False)
+    _atomic_write_json(caminho_novo, dados)
     if caminho_novo != caminho_antigo:
         os.remove(caminho_antigo)
     return {"status": "sucesso", "novo_arquivo": novo_arquivo}
@@ -825,8 +1070,7 @@ async def ingestar_no_dap(arquivo: str):
     if res.get("status") == "sucesso":
         dados.setdefault("metadata", {})
         dados["metadata"]["ingestado_dap"] = True
-        with open(caminho, "w", encoding="utf-8") as f:
-            json.dump(dados, f, indent=2, ensure_ascii=False)
+        _atomic_write_json(caminho, dados)
         _set_estado(sucesso="✅ Indexação concluída na base de conhecimento.")
 
         # AUTO-REBUILD: roteiro validado e ingestado = momento ideal para atualizar
@@ -899,8 +1143,7 @@ async def gerar_aula_com_ia(payload: GerarIAPayload):
                 _rd.setdefault("metadata", {})
                 _rd["metadata"]["origem"] = "ia"
                 _rd["metadata"]["hitl_validado"] = False
-                with open(_arq, "w", encoding="utf-8") as _f:
-                    json.dump(_rd, _f, indent=2, ensure_ascii=False)
+                _atomic_write_json(_arq, _rd)
             except Exception: pass
         carregarMetricas_bg()
         return JSONResponse(status_code=200, content=resultado)
@@ -940,20 +1183,182 @@ def carregarMetricas_bg():
 
 @app.post("/api/marcar-hitl-validado/{arquivo}")
 async def marcar_hitl_validado(arquivo: str):
-    """Chamado pelo validator_hitl após concluir — marca o roteiro como validado."""
+    """Chamado pelo validator_hitl após concluir — marca o roteiro como validado.
+
+    Pipeline HITL → Rebuild → Promoção de Memória (Requisitos 1.6.1–1.6.5):
+      1. Valida o roteiro antes de aceitar a promoção (1.6.2).
+      2. Persiste hitl_validado: true via escrita atômica.
+      3. Aciona construir_biblioteca() em background thread (1.6.1).
+      4. Após rebuild bem-sucedido, atualiza estado via _set_estado() (1.6.3).
+      5. Em caso de falha, preserva versão anterior e registra ERROR (1.6.4, 1.6.5).
+    """
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
     if not os.path.exists(caminho):
         return JSONResponse(status_code=404, content={"erro": "Arquivo não encontrado"})
     try:
         with open(caminho, "r", encoding="utf-8") as f:
             dados = json.load(f)
+
+        # Portão de qualidade — bloqueia promoção se roteiro inválido (Req 1.6.2)
+        aprovado, motivo = validar_roteiro(dados)
+        if not aprovado:
+            logging.warning(
+                f"Promoção HITL bloqueada — '{arquivo}': {motivo}"
+            )
+            return JSONResponse(
+                status_code=422,
+                content={"erro": f"Promoção bloqueada: roteiro inválido — {motivo}"},
+            )
+
         dados.setdefault("metadata", {})
         dados["metadata"]["hitl_validado"] = True
-        with open(caminho, "w", encoding="utf-8") as f:
-            json.dump(dados, f, indent=2, ensure_ascii=False)
+        _atomic_write_json(caminho, dados)
+
+        # Auto-rebuild em background — não bloqueia a resposta HTTP (Req 1.6.1)
+        def _rebuild_apos_hitl(nome_arquivo=arquivo):
+            """
+            Reconstrói a Biblioteca_de_Ações após aprovação HITL.
+            - Usa safe_write_json via lego_builder (escrita atômica, Req 1.6.4).
+            - Versão anterior preservada em caso de falha (Req 1.6.5).
+            - Atualiza estado via _set_estado() com contagem de peças (Req 1.6.3).
+            """
+            try:
+                resultado = lego_builder.construir_biblioteca()
+                if resultado.get("status") == "sucesso":
+                    novas = resultado.get("total_acoes_novas", 0)
+                    total = resultado.get("total_acoes_lidas", 0)
+                    msg_rb = (
+                        f"🧩 Biblioteca atualizada após HITL! "
+                        f"{total} peças ({novas} novas)."
+                    )
+                    _set_estado(sucesso=msg_rb)
+                    logging.info(
+                        f"Auto-rebuild HITL ('{nome_arquivo}'): "
+                        f"{total} peças lidas, {novas} novas."
+                    )
+                else:
+                    # Falha no rebuild — versão anterior já preservada pelo safe_write_json
+                    motivo_rb = resultado.get("mensagem", "motivo desconhecido")
+                    logging.error(
+                        f"Auto-rebuild HITL falhou ('{nome_arquivo}'): {motivo_rb}. "
+                        "Versão anterior de biblioteca_acoes.json preservada."
+                    )
+                    _set_estado(
+                        sucesso=f"⚠️ Rebuild falhou após HITL: {motivo_rb}"
+                    )
+            except Exception as e_rb:
+                logging.error(
+                    f"Auto-rebuild HITL — exceção inesperada ('{nome_arquivo}'): {e_rb}. "
+                    "Versão anterior de biblioteca_acoes.json preservada.",
+                    exc_info=True,
+                )
+                _set_estado(
+                    sucesso=f"⚠️ Rebuild falhou após HITL: {e_rb}"
+                )
+
+        threading.Thread(
+            target=_rebuild_apos_hitl, daemon=True, name="lego-rebuild-hitl"
+        ).start()
+
+        # Registra no log quais renderizações existem para o fluxo (Req 3.1.2)
+        try:
+            fluxo_id = dados.get("metadata", {}).get("id_treinamento", "")
+            if fluxo_id:
+                base = limpar_nome(fluxo_id)
+                renders_estado = {
+                    "video":   os.path.exists(os.path.join(VIDEOS_DIR,   f"{base}.mp4")),
+                    "scorm":   os.path.exists(os.path.join(SCORM_DIR,    f"{base}_SCORM.zip")),
+                    "pdf":     os.path.exists(os.path.join(PDF_DIR,      f"{base}_Playbook.pdf")),
+                    "simlink": os.path.exists(os.path.join(SIM_LINKS_DIR, f"{base}_SimLink.html")),
+                    "dap":     dados.get("metadata", {}).get("ingestado_dap", False),
+                }
+                disponiveis = [k for k, v in renders_estado.items() if v]
+                logging.info(
+                    f"HITL validado — fluxo='{fluxo_id}' renderizações disponíveis: {disponiveis or 'nenhuma'}"
+                )
+        except Exception as e_log:
+            logging.warning(f"Não foi possível registrar estado de renderizações pós-HITL: {e_log}")
+
         return {"status": "sucesso"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"erro": str(e)})
+        logging.error(f"Erro ao processar validação HITL para '{arquivo}': {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"erro": "Erro interno ao processar a validação. Consulte os logs do servidor."})
+
+@app.get("/api/renderizacoes/{fluxo_id}")
+async def get_renderizacoes(fluxo_id: str):
+    """Retorna todas as renderizações disponíveis para um fluxo.
+
+    O fluxo_id corresponde ao campo metadata.id_treinamento do roteiro.
+    Usa limpar_nome() para normalizar antes de buscar arquivos.
+
+    Requisitos: 3.1.1, 3.1.4
+    """
+    base = limpar_nome(fluxo_id)
+
+    # Localiza o roteiro correspondente ao fluxo_id
+    roteiro_dados = None
+    for arq in sorted(os.listdir(ROTEIROS_DIR)):
+        if not arq.endswith(".json"):
+            continue
+        try:
+            caminho_r = os.path.join(ROTEIROS_DIR, arq)
+            with open(caminho_r, "r", encoding="utf-8") as f:
+                rd = json.load(f)
+            id_trein = rd.get("metadata", {}).get("id_treinamento", "")
+            if limpar_nome(id_trein) == base:
+                roteiro_dados = rd
+                break
+        except Exception:
+            continue
+
+    if roteiro_dados is None:
+        return JSONResponse(status_code=404, content={"erro": f"Fluxo '{fluxo_id}' não encontrado."})
+
+    meta = roteiro_dados.get("metadata", {})
+    nome_aula = meta.get("nome_aula", fluxo_id)
+    hitl_validado = bool(meta.get("hitl_validado", False))
+    ingestado_dap = bool(meta.get("ingestado_dap", False))
+
+    # Verifica existência de cada artefato
+    tem_video   = os.path.exists(os.path.join(VIDEOS_DIR,    f"{base}.mp4"))
+    tem_scorm   = os.path.exists(os.path.join(SCORM_DIR,     f"{base}_SCORM.zip"))
+    tem_pdf     = os.path.exists(os.path.join(PDF_DIR,       f"{base}_Playbook.pdf"))
+    tem_simlink = os.path.exists(os.path.join(SIM_LINKS_DIR, f"{base}_SimLink.html"))
+
+    renderizacoes = {
+        "video":   {"disponivel": tem_video,   "url": f"/videos/{base}.mp4"          if tem_video   else None},
+        "scorm":   {"disponivel": tem_scorm,   "url": f"/api/download-scorm/{base}"  if tem_scorm   else None},
+        "pdf":     {"disponivel": tem_pdf,     "url": f"/api/download-pdf/{base}"    if tem_pdf     else None},
+        "simlink": {"disponivel": tem_simlink, "url": f"/api/preview-simlink/{base}" if tem_simlink else None},
+        "dap":     {"disponivel": ingestado_dap, "url": None},
+    }
+
+    # Calcula score_fluxo como média dos scores das ações via score_engine
+    score_fluxo = None
+    try:
+        import score_engine as _se
+        scores = []
+        for passo in roteiro_dados.get("passos", []):
+            for acao in passo.get("acoes_tecnicas", []):
+                intencao = acao.get("intencao_semantica", "").strip()
+                if not intencao:
+                    continue
+                s = _se.obter_score(intencao.lower())
+                if s is not None:
+                    scores.append(s)
+        if scores:
+            score_fluxo = round(sum(scores) / len(scores), 4)
+    except Exception as e_score:
+        logging.warning(f"[renderizacoes] Não foi possível calcular score_fluxo para '{fluxo_id}': {e_score}")
+
+    return {
+        "fluxo_id":      fluxo_id,
+        "nome_aula":     nome_aula,
+        "renderizacoes": renderizacoes,
+        "hitl_validado": hitl_validado,
+        "score_fluxo":   score_fluxo,
+    }
+
 
 @app.post("/api/validar-hitl/{arquivo}")
 async def validar_hitl(arquivo: str):
@@ -962,20 +1367,60 @@ async def validar_hitl(arquivo: str):
     O processo roda em janela própria do Chrome.
     """
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
-    ok = _iniciar_bg(
+    tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+    job_id = _iniciar_bg(
         [sys.executable, "validator_hitl.py", caminho],
         "🟡 Validação HITL iniciada — aguarde a janela do Chrome abrir...",
         "✅ Validação HITL concluída. Brain atualizado com as correções.",
+        tipo="rebuild", tenant_id=tenant,
     )
-    return {"status": "iniciado"} if ok else JSONResponse(
-        status_code=400, content={"erro": "Sistema ocupado"}
-    )
+    if job_id is None:
+        return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
+    return {"status": "iniciado", "job_id": job_id}
 
 @app.get("/api/brain-stats")
 async def brain_stats():
     """Retorna estatísticas do Brain DB: memórias, camadas mais acionadas, etc."""
     from vision_engine import obter_stats_brain
     return obter_stats_brain()
+
+
+@app.get("/api/jobs/{job_id}")
+async def consultar_job(job_id: str):
+    """Retorna o estado atual de um job pelo seu job_id.
+
+    Requisitos: 2.1.3, 2.2.3
+    """
+    job = job_registry.consultar_job(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content={"erro": "Job não encontrado"})
+    return job
+
+
+@app.get("/api/jobs/{job_id}/log")
+async def consultar_log_job(job_id: str):
+    """Retorna o log de execução de um job pelo seu job_id.
+
+    O log fica acessível por pelo menos 24 horas após a conclusão do job.
+    Requisitos: 2.2.4, NFR-3.5
+    """
+    job = job_registry.consultar_job(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content={"erro": "Job não encontrado"})
+    return {
+        "job_id": job_id,
+        "status": job.get("status"),
+        "log_execucao": job.get("log_execucao"),
+    }
+
+
+@app.get("/api/jobs")
+async def listar_jobs(tenant_id: str = "senior_default", limit: int = 50):
+    """Lista os jobs do tenant, do mais recente ao mais antigo.
+
+    Requisitos: 2.1.3, 2.2.3
+    """
+    return job_registry.listar_jobs_por_tenant(tenant_id, limit=limit)
 
 
 async def get_gps_roteiro(
@@ -1078,8 +1523,8 @@ async def get_gps_roteiro(
                 continue
 
     except Exception as e:
-        logging.error(f"GPS: Erro ao varrer roteiros: {e}")
-        return {"status": "erro", "mensagem": str(e)}
+        logging.error(f"GPS: Erro ao varrer roteiros: {e}", exc_info=True)
+        return {"status": "erro", "mensagem": "Erro interno ao buscar roteiro GPS. Consulte os logs do servidor."}
 
     if not passos_gps:
         return {"status": "nao_encontrado", "passos": []}

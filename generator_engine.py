@@ -6,7 +6,7 @@ import logging
 from google import genai
 from google.genai import types
 import dap_engine
-from utils import limpar_nome, validar_roteiro, validar_roteiro_ia
+from utils import limpar_nome, validar_roteiro, validar_roteiro_ia, safe_write_json
 
 logger = logging.getLogger("generator_engine")
 
@@ -207,8 +207,7 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
         caminho = os.path.join("roteiros_salvos", nome_arquivo)
         contador += 1
 
-    with open(caminho, "w", encoding="utf-8") as f:
-        json.dump(roteiro_final, f, indent=2, ensure_ascii=False)
+    safe_write_json(caminho, roteiro_final)
 
     logger.info(f"Roteiro '{nome_arquivo}' gerado com {len(roteiro_final['passos'])} passos.")
 

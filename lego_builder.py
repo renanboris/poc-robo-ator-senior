@@ -15,7 +15,10 @@ import os
 import copy     # FIX #1 — necessário para não mutar os dicts originais carregados do JSON
 import json
 import logging
-import tempfile
+from datetime import datetime
+
+from utils import safe_write_json
+import score_engine as _score_engine
 
 logger = logging.getLogger("lego_builder")
 
@@ -33,6 +36,7 @@ def construir_biblioteca(roteiros_dir: str = ROTEIROS_DIR, biblioteca_file: str 
         total_acoes_lidas   : int — total de ações encontradas (com duplicatas)
         total_acoes_novas   : int — peças únicas adicionadas à biblioteca
         arquivo             : str — caminho do arquivo gerado
+        versao_biblioteca   : str — identificador de versão gerado neste rebuild (timestamp ISO)
         mensagem            : str — mensagem de erro (somente se status == "erro")
     """
     _log("=" * 50)
@@ -49,6 +53,9 @@ def construir_biblioteca(roteiros_dir: str = ROTEIROS_DIR, biblioteca_file: str 
     total_acoes_novas = 0
     total_roteiros    = 0
     erros             = []
+
+    # Identificador de versão gerado a cada Rebuild bem-sucedido (Requisito 2.6.3)
+    versao_biblioteca = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
 
     # FIX #2 — sorted() garante ordem determinística entre execuções e SOs.
     # Sem sorted(), os.listdir() tem ordem aleatória: se dois roteiros têm a mesma
@@ -90,6 +97,20 @@ def construir_biblioteca(roteiros_dir: str = ROTEIROS_DIR, biblioteca_file: str 
                         # peças precisam ser revisadas na biblioteca.
                         acao_limpa["_source"] = arquivo
 
+                        # Versão da biblioteca gerada neste Rebuild (Requisito 2.6.3)
+                        acao_limpa["_versao_biblioteca"] = versao_biblioteca
+
+                        # Score de confiabilidade da ação (Requisito 3.2.5)
+                        try:
+                            score_info = _score_engine.obter_score(chave)
+                            requer_revisao = (score_info is not None and score_info < 0.5)
+                        except Exception:
+                            score_info = None
+                            requer_revisao = False
+
+                        acao_limpa["_score_confiabilidade"] = score_info
+                        acao_limpa["_requer_revisao"] = requer_revisao
+
                         biblioteca[chave] = acao_limpa
                         total_acoes_novas += 1
                         _log(f"  + Peça catalogada: '{intencao}' (de {arquivo})")
@@ -115,19 +136,13 @@ def construir_biblioteca(roteiros_dir: str = ROTEIROS_DIR, biblioteca_file: str 
             "total_acoes_novas": 0,
         }
 
-    # FIX #5 — escrita atômica: grava em arquivo temporário e só então renomeia.
+    # FIX #5 — escrita atômica via safe_write_json (canônica em utils.py):
+    # grava em arquivo temporário e só então renomeia atomicamente.
     # Sem isso, uma interrupção no meio da escrita corrompe biblioteca_acoes.json,
     # derrubando toda a geração de IA até o próximo rebuild manual.
-    dir_saida = os.path.dirname(os.path.abspath(biblioteca_file)) or "."
     try:
-        fd, caminho_tmp = tempfile.mkstemp(dir=dir_saida, suffix=".json.tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(biblioteca, f, indent=2, ensure_ascii=False)
-        os.replace(caminho_tmp, biblioteca_file)   # atômico no mesmo filesystem
+        safe_write_json(biblioteca_file, biblioteca)
     except Exception as e:
-        # Limpa arquivo temporário caso o replace falhe
-        if os.path.exists(caminho_tmp):
-            os.remove(caminho_tmp)
         msg = f"Falha ao salvar biblioteca: {e}"
         _log(f"Erro: {msg}")
         return {"status": "erro", "mensagem": msg}
@@ -148,6 +163,7 @@ def construir_biblioteca(roteiros_dir: str = ROTEIROS_DIR, biblioteca_file: str 
         "total_roteiros": total_roteiros,
         "total_acoes_lidas": total_acoes_lidas,
         "total_acoes_novas": total_acoes_novas,
+        "versao_biblioteca": versao_biblioteca,
         "erros": erros,
     }
 

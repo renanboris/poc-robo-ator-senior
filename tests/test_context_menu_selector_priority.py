@@ -186,21 +186,16 @@ def test_estrutural_sem_funcao_detectar_menu_contexto_ativo():
     """
     **Validates: Requirements 1.1**
 
-    Verifica que `vision_engine.py` NÃO contém a função `_detectar_menu_contexto_ativo`.
+    Marcador estrutural: confirma que o fix foi aplicado.
 
-    Esta função é a que o fix irá adicionar. Sua ausência confirma que o código
-    ainda não foi corrigido.
+    O fix adicionou `_detectar_menu_contexto_ativo` ao vision_engine.
+    Este teste verifica que a função EXISTE (fix aplicado).
 
-    RESULTADO ESPERADO: FALHA após o fix ser aplicado (a função existirá).
-    No código não corrigido: PASSA (a função não existe).
-
-    NOTA: Este teste é um marcador estrutural — ele PASSA no código bugado
-    e FALHA após o fix. Isso é intencional para confirmar que o fix foi aplicado.
-    Para confirmar o BUG, veja os testes 1.3 e 1.4.
+    RESULTADO ESPERADO: PASSA após o fix ser aplicado.
     """
-    assert not hasattr(vision_engine, "_detectar_menu_contexto_ativo"), (
-        "FIX DETECTADO: `_detectar_menu_contexto_ativo` foi adicionada ao vision_engine. "
-        "O fix foi aplicado — este teste estrutural agora falha como esperado."
+    assert hasattr(vision_engine, "_detectar_menu_contexto_ativo"), (
+        "FIX NÃO APLICADO: `_detectar_menu_contexto_ativo` não existe no vision_engine. "
+        "O fix ainda não foi aplicado."
     )
 
 
@@ -212,23 +207,19 @@ def test_estrutural_brain_sem_consciencia_de_overlay():
     """
     **Validates: Requirements 1.2**
 
-    Verifica que o código-fonte de `encontrar_e_clicar` em `vision_engine.py`
-    NÃO contém verificação de menu de contexto antes de usar o resultado do Brain.
+    Marcador estrutural: confirma que o fix foi aplicado.
 
-    A ausência desta verificação é a root cause 2 do bug: o Brain usa o seletor
-    memorizado sem checar se um menu de contexto está ativo.
+    O fix adicionou verificação de menu de contexto em `encontrar_e_clicar`
+    antes de usar o resultado do Brain.
 
-    RESULTADO ESPERADO: FALHA após o fix ser aplicado.
-    No código não corrigido: PASSA (a verificação não existe).
+    RESULTADO ESPERADO: PASSA após o fix ser aplicado.
     """
     import inspect
     source = inspect.getsource(vision_engine.encontrar_e_clicar)
 
-    # O fix irá adicionar uma chamada a `_detectar_menu_contexto_ativo` antes
-    # ou dentro da lógica do Brain. No código bugado, isso não existe.
-    assert "_detectar_menu_contexto_ativo" not in source, (
-        "FIX DETECTADO: `encontrar_e_clicar` agora contém verificação de menu de contexto. "
-        "O Brain tem consciência de overlay — fix aplicado."
+    assert "_detectar_menu_contexto_ativo" in source, (
+        "FIX NÃO APLICADO: `encontrar_e_clicar` não contém verificação de menu de contexto. "
+        "O Brain ainda não tem consciência de overlay."
     )
 
 

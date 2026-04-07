@@ -1,0 +1,4 @@
+# file: C:\GenUCS\job_registry.py
+# hypothesis_version: 6.151.10
+
+['brain.db', 'cancelado', 'concluido', 'concluido_em = ?', 'executando', 'falhou', 'log_execucao = ?', 'motivo_falha = ?', 'pendente', 'progresso = ?', 'senior_default', 'status = ?']

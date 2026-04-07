@@ -1,0 +1,4 @@
+# file: C:\GenUCS\contracts\capture_adapter.py
+# hypothesis_version: 6.151.10
+
+['--lang=pt-BR', '--no-first-run', '--no-sandbox', '--start-maximized', 'CAPTURE_ADAPTER', 'Mock ERP', 'SENIOR_PASS', 'SENIOR_URL', 'SENIOR_USER', 'Senior X', 'args', 'botao_proximo', 'campo_senha', 'campo_usuario', 'headless', 'locale', 'mock', 'mock_pass', 'mock_user', 'pt-BR', 'senha', 'senior', 'senior_x', 'seniorx', 'usuario']

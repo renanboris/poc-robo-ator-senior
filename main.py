@@ -30,6 +30,7 @@ from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
 from vision_engine import encontrar_e_clicar
+import score_engine as _score_engine
 from cursor_engine import (
     instalar_cursor,
     garantir_cursor_visivel,
@@ -358,9 +359,9 @@ def _validar_roteiro_gravacao(roteiro: dict) -> list[str]:
             erros.append(f"Passo {pid}: ancora (narracao principal) vazia.")
     return erros
 
-async def clicar_com_animacao(page, acao_tec: dict) -> None:
+async def clicar_com_animacao(page, acao_tec: dict) -> bool:
     await garantir_cursor_visivel(page)
-    await encontrar_e_clicar(page, acao_tec)
+    return await encontrar_e_clicar(page, acao_tec)
 
 # ==============================================================
 # MOTOR DE EXECUCAO PRINCIPAL
@@ -569,10 +570,25 @@ async def executar_roteiro(caminho_json: str) -> None:
                                 "texto":   micro_voz,
                             })
 
-                    await clicar_com_animacao(page, acao_tec)
+                    resultado_clique = await clicar_com_animacao(page, acao_tec)
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
-                    
+
+                    # Registra execução no score_engine (best-effort — nunca interrompe)
+                    try:
+                        intencao = acao_tec.get("intencao_semantica", "").strip()
+                        if intencao:
+                            _mapa_confianca = {"alta": 1.0, "media": 0.7, "baixa": 0.3}
+                            confianca_str = acao_tec.get("elemento_alvo", {}).get("confianca_captura", "alta")
+                            confianca_val = _mapa_confianca.get(confianca_str, 1.0)
+                            _score_engine.registrar_execucao(
+                                intencao,
+                                sucesso=bool(resultado_clique),
+                                confianca_captura=confianca_val,
+                            )
+                    except Exception as _score_err:
+                        logging.debug(f"[score_engine] Falha ao registrar execução (ignorada): {_score_err}")
+
                     pausa_real = min(pausa_inteligente * 0.3, 0.8)
                     await asyncio.sleep(pausa_real)
 

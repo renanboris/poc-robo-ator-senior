@@ -20,7 +20,7 @@ import logging
 import re
 import traceback
 from dotenv import load_dotenv
-from utils import limpar_nome, validar_roteiro
+from utils import limpar_nome, validar_roteiro, safe_write_json
 
 from playwright.async_api import async_playwright, Error as PlaywrightError
 from google import genai
@@ -644,8 +644,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
 
         os.makedirs("roteiros_salvos", exist_ok=True)
         caminho_roteiro = os.path.join("roteiros_salvos", f"{limpar_nome(nome_aula)}.json")
-        with open(caminho_roteiro, "w", encoding="utf-8") as f:
-            json.dump(roteiro_final, f, indent=2, ensure_ascii=False)
+        safe_write_json(caminho_roteiro, roteiro_final)
         logger.info(f"Roteiro salvo em: {caminho_roteiro}")
         # Linha de protocolo lida pelo app.py para identificar o roteiro exato gerado.
         # NÃO altere o prefixo — o app.py depende dele para evitar o glob+mtime.

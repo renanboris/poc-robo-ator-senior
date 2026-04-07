@@ -48,6 +48,10 @@ from google import genai
 from google.genai import types
 from playwright.async_api import async_playwright
 
+# Adiciona o diretório raiz ao path para importar utils.py
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from utils import limpar_nome
+
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="[CAPTURE CIL] %(message)s")
@@ -98,9 +102,6 @@ PATTERNS_SUPORTADOS = [
     "form_fill",
     "unknown",
 ]
-
-def limpar_nome(nome: str) -> str:
-    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:60].strip("_")
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()

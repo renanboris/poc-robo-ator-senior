@@ -138,7 +138,14 @@ class EntradaCache:
 
 
 def _registrar_telemetria(camada: str, acertou: bool) -> None:
-    """Registra acerto/falha por camada para observabilidade do self-healing."""
+    """Registra acerto/falha por camada e emite logs de observabilidade.
+
+    - Emite INFO com estratégia e resultado (Requisito 1.4.1).
+    - Emite WARNING quando taxa de sucesso acumulada cair abaixo de 60% (Requisito 1.4.3).
+    """
+    resultado_str = "sucesso" if acertou else "falha"
+    logger.info(f"   [Telemetria] camada={camada} resultado={resultado_str}")
+
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute("""
@@ -155,6 +162,48 @@ def _registrar_telemetria(camada: str, acertou: bool) -> None:
                 1 if acertou else 0,
                 0 if acertou else 1,
             ))
+
+            # Verifica taxa de sucesso acumulada — alerta se < 60% (Requisito 1.4.3)
+            row = conn.execute(
+                "SELECT acertos, falhas FROM telemetria_camadas WHERE camada = ?", (camada,)
+            ).fetchone()
+            if row:
+                total = row[0] + row[1]
+                if total >= 5:  # mínimo de amostras para evitar falso-positivo no início
+                    taxa = row[0] / total
+                    if taxa < 0.60:
+                        logger.warning(
+                            f"[Telemetria] Taxa de sucesso da camada '{camada}' abaixo de 60%: "
+                            f"{taxa:.1%} ({row[0]} acertos / {total} tentativas)"
+                        )
+    except Exception:
+        pass
+
+
+def _registrar_estrategia_vencedora(intencao: str, camada: str) -> None:
+    """Registra a estratégia vencedora no Brain após localização bem-sucedida (Requisito 1.4.4).
+
+    Atualiza o campo `ultima_estrategia_vencedora` em `memoria_semantica` para que o
+    self-healing futuro saiba qual camada resolveu a intenção mais recentemente.
+    A operação é best-effort — falha silenciosa para não interromper a execução.
+    """
+    chave = _chave_cache(intencao)
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            # Migração segura: garante que a coluna existe antes de usá-la
+            try:
+                conn.execute(
+                    "ALTER TABLE memoria_semantica ADD COLUMN ultima_estrategia_vencedora TEXT"
+                )
+            except Exception:
+                pass  # coluna já existe
+
+            conn.execute("""
+                UPDATE memoria_semantica
+                SET ultima_estrategia_vencedora = ?,
+                    ultima_atualizacao = CURRENT_TIMESTAMP
+                WHERE hash_intencao = ?
+            """, (camada, chave))
     except Exception:
         pass
 
@@ -1048,6 +1097,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 if await _tentar_candidato(page, cand_cache, acao, valor):
                     _registrar_sucesso_cache(intencao)
                     _registrar_telemetria("0_brain", True)
+                    _registrar_estrategia_vencedora(intencao, "0_brain")
                     return True
                 else:
                     _registrar_falha_cache(intencao)
@@ -1057,6 +1107,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if await _clicar_por_coordenadas(page, cache.coords, acao, valor):
                 _registrar_sucesso_cache(intencao)
                 _registrar_telemetria("0_brain_coords", True)
+                _registrar_estrategia_vencedora(intencao, "0_brain_coords")
                 return True
             else:
                 _registrar_falha_cache(intencao)
@@ -1070,6 +1121,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         if seletor_usado:
             _registrar_sucesso_cache(intencao, seletor_usado)
             _registrar_telemetria("0.5_menu_ctx", True)
+            _registrar_estrategia_vencedora(intencao, "0.5_menu_ctx")
             logger.info(f"[MENU-CTX] Clicou em '{label_curto}' dentro do menu de contexto via '{seletor_usado}'")
             return True
         else:
@@ -1097,6 +1149,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         logger.info("[MENU-CTX] Gemini Vision resolveu o item de menu.")
                         _registrar_sucesso_cache(intencao, coords=coords_ia)
                         _registrar_telemetria("5_gemini_vision", True)
+                        _registrar_estrategia_vencedora(intencao, "5_gemini_vision")
                         return True
             _registrar_telemetria("0.5_menu_ctx", False)
             return False
@@ -1107,6 +1160,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         if await _digitar_no_active_element(page, acao, valor):
             logger.info("   [Foco Nativo] Texto inserido no campo ja focado!")
             _registrar_telemetria("1_foco_nativo", True)
+            _registrar_estrategia_vencedora(intencao, "1_foco_nativo")
             return True
 
         logger.info("   [Foco Nativo] Buscando div contenteditable generica...")
@@ -1116,6 +1170,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if await loc_edit.count() > 0 and await loc_edit.first.is_visible():
                 await _executar_acao(loc_edit.first, page, acao, valor)
                 _registrar_telemetria("1_foco_nativo", True)
+                _registrar_estrategia_vencedora(intencao, "1_foco_nativo")
                 return True
         except Exception:
             pass
@@ -1144,6 +1199,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         logger.info("   [Heuristica] Icone Home atingido com sucesso.")
                         _registrar_sucesso_cache(intencao, seletor=sel, iframe=iframe_hint)
                         _registrar_telemetria("1.5_heuristica_seniorx", True)
+                        _registrar_estrategia_vencedora(intencao, "1.5_heuristica_seniorx")
                         return True
                 except Exception:
                     pass
@@ -1164,6 +1220,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     iframe=iframe_hint,
                 )
                 _registrar_telemetria("2_sniper", True)
+                _registrar_estrategia_vencedora(intencao, "2_sniper")
                 return True
 
     # ── 3. Seletor Hint Original ──────────────────────────────────────────────
@@ -1184,6 +1241,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
                     _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
                     _registrar_telemetria("3_hint_original", True)
+                    _registrar_estrategia_vencedora(intencao, "3_hint_original")
                     return True
         else:
             cand_hint = TentativaLocalizacao(
@@ -1194,6 +1252,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
                 _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
                 _registrar_telemetria("3_hint_original", True)
+                _registrar_estrategia_vencedora(intencao, "3_hint_original")
                 return True
 
     # ── 4. Busca Profunda em Todos os Frames ──────────────────────────────────
@@ -1203,6 +1262,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         if frame_url:
             _registrar_sucesso_cache(intencao, iframe=frame_url)
             _registrar_telemetria("4_todos_frames", True)
+            _registrar_estrategia_vencedora(intencao, "4_todos_frames")
             return True
 
     # ── 5. Gemini Vision (Self-Healing Supremo) ───────────────────────────────
@@ -1253,6 +1313,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     except Exception:
                         _registrar_sucesso_cache(intencao, coords=coords_ia)
                     _registrar_telemetria("5_gemini_vision", True)
+                    _registrar_estrategia_vencedora(intencao, "5_gemini_vision")
                     return True
 
     # ── 6. Fallback Cego (Coordenadas Relativas Originais) ───────────────────
@@ -1265,6 +1326,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
                 logger.info(f"   [Fallback Final] Clique em ({x}, {y}) executado.")
                 _registrar_telemetria("6_coords_originais", True)
+                _registrar_estrategia_vencedora(intencao, "6_coords_originais")
                 return True
         except Exception as exc:
             logger.warning(f"Fallback de coordenadas falhou: {exc}")

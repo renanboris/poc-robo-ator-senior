@@ -25,7 +25,7 @@ from openai import OpenAI
 from google import genai
 from google.genai import types
 import sqlite3
-from utils import limpar_nome
+from utils import limpar_nome, com_retry
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aura_engine")
@@ -221,7 +221,7 @@ def ingestar_para_pinecone(roteiro: dict, tenant_id: str = "senior_default") -> 
             })
 
         if vetores:
-            pinecone_index.upsert(vectors=vetores, namespace=tenant_id)
+            com_retry(lambda: pinecone_index.upsert(vectors=vetores, namespace=tenant_id))
 
         return {"status": "sucesso", "mensagem": f"{len(vetores)} passos indexados com sucesso."}
 
