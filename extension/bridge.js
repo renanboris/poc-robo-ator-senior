@@ -27,6 +27,15 @@
             return;
         }
 
+        // 🟢 PONTE PARA ANALYTICS EVENTS
+        if (event.data.type === "AURA_ANALYTICS_EVENT") {
+            chrome.runtime.sendMessage({ action: "analytics_event", payload: event.data.payload }, () => {
+                const err = chrome.runtime.lastError;
+                if (err) console.warn("Aura Bridge: Falha ao enviar analytics_event:", err.message);
+            });
+            return;
+        }
+
         // 🟢 PONTE PARA BUSCAR MISSÕES (Magic Link)
         if (event.data.type === "AURA_FETCH_MISSION") {
             chrome.runtime.sendMessage({ action: "fetch_mission", mission_id: event.data.mission_id }, (response) => {
