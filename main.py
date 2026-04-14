@@ -81,6 +81,7 @@ class CustomRenderLogger(ProgressBarLogger):
 # UTILITARIOS GERAIS
 # ==============================================================
 _audio_manifest: dict[str, str] = {}
+_audio_manifest_lock = asyncio.Lock()
 
 def salvar_manifesto_audio(id_treinamento: str) -> None:
     nome_pasta    = limpar_nome(id_treinamento)
@@ -154,7 +155,8 @@ async def gerar_audio(
         else:
             await edge_tts.Communicate(texto_falado, voz, rate="-12%").save(arquivo_mp3)
 
-    _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"
+    async with _audio_manifest_lock:
+        _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"
     return arquivo_mp3
 
 def iniciar_reproducao_audio(arquivo_mp3: str) -> None:
@@ -503,6 +505,11 @@ async def executar_roteiro(caminho_json: str) -> None:
             await page.keyboard.press("Escape")
 
             tempo_inicio_gravacao = time.time()
+            # INVARIANTE: Este delta captura intencionalmente todo o tempo desde a criação
+            # do contexto Playwright (tempo_inicio_contexto), incluindo o login automático
+            # ou o login manual de até 60 s (fallback humano). O valor é passado para
+            # .subclip(tempo_corte) em renderizar_video_final() para remover o prefixo
+            # do vídeo bruto antes do início real da gravação do roteiro.
             tempo_corte_segundos  = tempo_inicio_gravacao - tempo_inicio_contexto
 
             w = await page.evaluate("() => window.innerWidth")
@@ -623,10 +630,15 @@ async def executar_roteiro(caminho_json: str) -> None:
 
     if caminho_video_webm and tempo_corte_segundos is not None and tempo_corte_segundos > 0:
         caminho_estado = os.path.join("videos_gerados", f"{nome_arquivo_base}_estado.json")
+        caminho_webm_rel = os.path.relpath(caminho_video_webm)
+        timeline_rel = [
+            {**item, "arquivo": os.path.relpath(item["arquivo"])}
+            for item in timeline_audios
+        ]
         with open(caminho_estado, "w", encoding="utf-8") as f:
             json.dump({
-                "caminho_webm": caminho_video_webm,
-                "timeline":     timeline_audios,
+                "caminho_webm": caminho_webm_rel,
+                "timeline":     timeline_rel,
                 "tempo_corte":  tempo_corte_segundos,
             }, f, indent=2)
         print("Gravacao bruta concluida. Estado salvo.", flush=True)
@@ -658,6 +670,11 @@ if __name__ == "__main__":
             sys.exit(1)
         with open(caminho_estado, "r", encoding="utf-8") as f:
             st = json.load(f)
+        st["caminho_webm"] = os.path.abspath(st["caminho_webm"])
+        st["timeline"] = [
+            {**item, "arquivo": os.path.abspath(item["arquivo"])}
+            for item in st["timeline"]
+        ]
         renderizar_video_final(st["caminho_webm"], st["timeline"], nome_base, st["tempo_corte"])
 
     elif "--record" in sys.argv:
@@ -668,4 +685,9 @@ if __name__ == "__main__":
         if os.path.exists(caminho_estado):
             with open(caminho_estado, "r", encoding="utf-8") as f:
                 st = json.load(f)
+            st["caminho_webm"] = os.path.abspath(st["caminho_webm"])
+            st["timeline"] = [
+                {**item, "arquivo": os.path.abspath(item["arquivo"])}
+                for item in st["timeline"]
+            ]
             renderizar_video_final(st["caminho_webm"], st["timeline"], nome_base, st["tempo_corte"])
