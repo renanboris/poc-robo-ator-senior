@@ -34,7 +34,9 @@
             'modules/aura_spotlight.js',
             'modules/aura_gps_engine.js',
             'modules/aura_mission_engine.js',
-            'modules/aura_assist_engine.js'
+            'modules/aura_assist_engine.js',
+            'guided_execution.js',
+            'checklist_widget.js'
         ];
         for (var i = 0; i < modulos.length; i++) {
             await _injectScript(modulos[i]);

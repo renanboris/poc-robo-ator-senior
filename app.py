@@ -38,7 +38,7 @@ import dap_engine
 import job_registry
 import scorm_builder
 from datetime import datetime
-from utils import limpar_nome, validar_roteiro, salvar_versao_roteiro, aplicar_blur_screenshot
+from utils import limpar_nome, validar_roteiro, salvar_versao_roteiro, aplicar_blur_screenshot, VOZES_POR_IDIOMA, obter_voz_idioma
 
 
 def _atomic_write_json(caminho: str, dados: dict) -> None:
@@ -480,6 +480,7 @@ class RoteiroBase(BaseModel):
     metadata:              Dict[str, Any]
     configuracao_gravacao: Optional[ConfiguracaoGravacao] = None
     passos:                List[PassoRoteiro]
+    perfis_alvo:           Optional[List[str]]            = Field(default_factory=list)
 
 class NovaAulaReq(BaseModel):
     nome_aula: str
@@ -502,6 +503,10 @@ class EventoAnalyticsReq(BaseModel):
     passo_id:   Optional[int] = None
     usuario_id: Optional[str] = None
     evento:     str
+
+
+class TraduzirRoteiroReq(BaseModel):
+    idioma_destino: str
 
 
 # ==============================================================
@@ -2231,6 +2236,593 @@ async def progresso_link(token: str):
         "ultimo_acesso": ultimo_acesso,
         "completado": completado,
     }
+
+
+# ==============================================================
+# MAGIC UPDATES — DETECÇÃO DE DIFF (Requisito 4)
+# ==============================================================
+
+class DetectarDiffReq(BaseModel):
+    roteiro_novo_id: str
+
+
+def _screenshot_para_bytes(val: str) -> bytes:
+    """Converte screenshot (path de arquivo ou base64) para bytes.
+
+    Suporta:
+    - Path de arquivo em disco (os.path.exists)
+    - Base64 com prefixo data: (ex: data:image/png;base64,...)
+    - Base64 puro (string longa sem prefixo)
+    """
+    import base64 as _b64
+
+    if os.path.exists(val):
+        with open(val, "rb") as f:
+            return f.read()
+
+    # Remove prefixo data:...;base64, se presente
+    if "," in val and val.startswith("data:"):
+        val = val.split(",", 1)[1]
+
+    return _b64.b64decode(val)
+
+
+@app.post("/api/roteiros/{id}/detectar-diff")
+async def detectar_diff_roteiro(id: str, payload: DetectarDiffReq):
+    """Compara passo a passo dois roteiros usando Template Matching visual.
+
+    Para cada passo do roteiro original, busca o passo correspondente no roteiro
+    novo pelo id_passo e compara os screenshots de referência via template_match.
+    Passos com score < 0.70 são marcados como alterados.
+
+    Requisito: 4.1, 4.2, 4.3
+    """
+    from vision_engine import template_match
+
+    # Validar e carregar roteiro original
+    caminho_original = _validar_caminho(id + ".json", ROTEIROS_DIR)
+    try:
+        with open(caminho_original, "r", encoding="utf-8") as f:
+            roteiro_original = json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Roteiro original '{id}' não encontrado.")
+
+    # Validar e carregar roteiro novo
+    caminho_novo = _validar_caminho(payload.roteiro_novo_id + ".json", ROTEIROS_DIR)
+    try:
+        with open(caminho_novo, "r", encoding="utf-8") as f:
+            roteiro_novo = json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Roteiro novo '{payload.roteiro_novo_id}' não encontrado.")
+
+    # Indexar passos do roteiro novo por id_passo para lookup O(1)
+    passos_novos: dict = {
+        p["id_passo"]: p
+        for p in roteiro_novo.get("passos", [])
+        if "id_passo" in p
+    }
+
+    passos_alterados = []
+    passos_inalterados = 0
+
+    THRESHOLD = 0.70
+    VIEWPORT = {"width": 1920, "height": 1080}
+
+    for passo_orig in roteiro_original.get("passos", []):
+        id_passo = passo_orig.get("id_passo")
+        if id_passo is None:
+            continue
+
+        # Passo removido no roteiro novo
+        if id_passo not in passos_novos:
+            passos_alterados.append({
+                "id_passo": id_passo,
+                "score_matching": 0.0,
+                "motivo": "passo_removido",
+            })
+            continue
+
+        passo_novo = passos_novos[id_passo]
+
+        screenshot_orig = passo_orig.get("screenshot_referencia")
+        screenshot_novo = passo_novo.get("screenshot_referencia")
+
+        # Screenshot ausente em qualquer um dos roteiros
+        if not screenshot_orig or not screenshot_novo:
+            passos_alterados.append({
+                "id_passo": id_passo,
+                "score_matching": 0.0,
+                "motivo": "screenshot_ausente",
+            })
+            continue
+
+        # Converter screenshots para bytes
+        try:
+            bytes_original = _screenshot_para_bytes(screenshot_orig)
+            bytes_novo = _screenshot_para_bytes(screenshot_novo)
+        except Exception as e:
+            logging.warning(f"[detectar-diff] Erro ao converter screenshot do passo {id_passo}: {e}")
+            passos_alterados.append({
+                "id_passo": id_passo,
+                "score_matching": 0.0,
+                "motivo": "screenshot_ausente",
+            })
+            continue
+
+        # Comparar via template_match
+        try:
+            resultado = template_match(
+                referencia=bytes_original,
+                tela_atual=bytes_novo,
+                coords_relativas=None,
+                viewport=VIEWPORT,
+                threshold=THRESHOLD,
+            )
+        except Exception as e:
+            logging.warning(f"[detectar-diff] Erro no template_match do passo {id_passo}: {e}")
+            passos_alterados.append({
+                "id_passo": id_passo,
+                "score_matching": 0.0,
+                "motivo": "erro_matching",
+            })
+            continue
+
+        if resultado is None:
+            # Score abaixo do threshold — passo alterado
+            passos_alterados.append({
+                "id_passo": id_passo,
+                "score_matching": 0.0,
+                "motivo": "screenshot_divergente",
+            })
+        else:
+            passos_inalterados += 1
+
+    return {
+        "passos_alterados": passos_alterados,
+        "passos_inalterados": passos_inalterados,
+    }
+
+
+class RegenarPassosReq(BaseModel):
+    ids_passo: List[int]
+
+
+@app.post("/api/roteiros/{id}/regenerar-passos")
+async def regenerar_passos(id: str, payload: RegenarPassosReq):
+    """Regenera parcialmente passos de um roteiro via IA, preservando os demais.
+
+    Requisitos: 4.4, 4.5, 4.6, 4.7
+    """
+    # Caso ids_passo vazio: retorna imediatamente sem modificar o roteiro
+    if not payload.ids_passo:
+        return {"passos_regenerados": 0, "passos_falhos": 0, "backup_path": ""}
+
+    # Validar e carregar roteiro original
+    caminho = _validar_caminho(id + ".json", ROTEIROS_DIR)
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            roteiro_original = json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Roteiro '{id}' não encontrado.")
+
+    # Criar backup ANTES de qualquer modificação (Requisito 4.5)
+    backup_path = salvar_versao_roteiro(caminho, roteiro_original)
+
+    # Trabalhar sobre uma cópia profunda para não mutar o original em memória
+    import copy
+    roteiro_atualizado = copy.deepcopy(roteiro_original)
+
+    # Indexar passos por id_passo para acesso O(1)
+    indice_passos: dict = {
+        p["id_passo"]: idx
+        for idx, p in enumerate(roteiro_atualizado.get("passos", []))
+        if "id_passo" in p
+    }
+
+    nome_aula = roteiro_atualizado.get("metadata", {}).get("nome_aula", id)
+    ids_para_regenerar = set(payload.ids_passo)
+
+    passos_regenerados = 0
+    passos_falhos = 0
+
+    for id_passo in payload.ids_passo:
+        if id_passo not in indice_passos:
+            logging.warning(f"[regenerar-passos] id_passo={id_passo} não encontrado no roteiro '{id}' — ignorado.")
+            passos_falhos += 1
+            continue
+
+        idx = indice_passos[id_passo]
+        passo_original = roteiro_atualizado["passos"][idx]
+
+        # Extrair âncora como objetivo para regeneração (Requisito 4.6)
+        ancora = passo_original.get("pedagogia", {}).get("ancora", "") or nome_aula
+
+        try:
+            resultado = await asyncio.to_thread(
+                generator_engine.gerar_roteiro_ia_sync,
+                nome_aula,
+                ancora,
+            )
+
+            if resultado.get("status") != "sucesso":
+                raise ValueError(resultado.get("mensagem", "Falha desconhecida na geração."))
+
+            roteiro_gerado = resultado.get("roteiro", {})
+            passos_gerados = roteiro_gerado.get("passos", [])
+
+            # Extrair o passo correspondente: primeiro com mesmo id_passo, ou mesmo índice
+            passo_novo = None
+            for p in passos_gerados:
+                if p.get("id_passo") == id_passo:
+                    passo_novo = p
+                    break
+            if passo_novo is None and len(passos_gerados) > idx:
+                passo_novo = passos_gerados[idx]
+            if passo_novo is None and passos_gerados:
+                passo_novo = passos_gerados[0]
+
+            if passo_novo is None:
+                raise ValueError("Roteiro gerado não contém passos.")
+
+            # Preservar id_passo original (Requisito 4.6)
+            passo_novo["id_passo"] = id_passo
+            roteiro_atualizado["passos"][idx] = passo_novo
+            passos_regenerados += 1
+
+        except Exception as e:
+            logging.warning(
+                f"[regenerar-passos] Falha ao regenerar id_passo={id_passo} do roteiro '{id}': {e}. "
+                "Mantendo passo original."
+            )
+            passos_falhos += 1
+            # Passo original já está em roteiro_atualizado (cópia profunda) — nada a fazer
+
+    # Garantir que passos NÃO incluídos na lista permanecem idênticos ao original (Requisito 4.7)
+    for idx, passo in enumerate(roteiro_atualizado["passos"]):
+        pid = passo.get("id_passo")
+        if pid not in ids_para_regenerar:
+            roteiro_atualizado["passos"][idx] = copy.deepcopy(roteiro_original["passos"][idx])
+
+    # Salvar roteiro atualizado atomicamente
+    _atomic_write_json(caminho, roteiro_atualizado)
+
+    return {
+        "passos_regenerados": passos_regenerados,
+        "passos_falhos": passos_falhos,
+        "backup_path": backup_path,
+    }
+
+
+# ==============================================================
+# MULTI-IDIOMA — TRADUÇÃO DE ROTEIRO (Requisito 5)
+# ==============================================================
+
+@app.post("/api/roteiros/{id}/traduzir")
+async def traduzir_roteiro(id: str, payload: TraduzirRoteiroReq):
+    """Traduz um roteiro para outro idioma usando Gemini em batch.
+
+    Traduz os campos `ancora`, `tooltip_dap`, `micro_narracao` e `alerta_instrutor`
+    de todos os passos em uma única chamada Gemini. Atualiza `voz_ia` para a voz
+    correspondente ao idioma destino e salva como novo arquivo com sufixo _{idioma}.
+
+    Sem autenticação — operação de transformação de conteúdo, não sensível.
+
+    Requisitos: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
+    """
+    # Validar idioma_destino (Requisito 5.6)
+    idioma_destino = payload.idioma_destino.strip()
+    if idioma_destino not in VOZES_POR_IDIOMA:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "erro": f"Idioma '{idioma_destino}' não suportado.",
+                "idiomas_disponiveis": list(VOZES_POR_IDIOMA.keys()),
+            },
+        )
+
+    # Verificar Gemini disponível
+    if not dap_engine.gemini_client:
+        raise HTTPException(status_code=503, detail="Gemini não configurado. Verifique GOOGLE_API_KEY no .env.")
+
+    # Carregar roteiro original
+    caminho = _validar_caminho(id + ".json", ROTEIROS_DIR)
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            roteiro_original = json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Roteiro '{id}' não encontrado.")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"JSON inválido: {e}")
+
+    import copy
+    roteiro_traduzido = copy.deepcopy(roteiro_original)
+    passos = roteiro_traduzido.get("passos", [])
+
+    # Montar batch de textos para tradução em uma única chamada Gemini
+    batch_passos = []
+    for passo in passos:
+        id_passo = passo.get("id_passo")
+        pedagogia = passo.get("pedagogia") or {}
+        ancora = pedagogia.get("ancora") or ""
+        tooltip = pedagogia.get("tooltip_dap") or ""
+        micro_narracoes = [
+            ac.get("micro_narracao") or ""
+            for ac in passo.get("acoes_tecnicas", [])
+        ]
+        alerta = passo.get("alerta_instrutor") or ""
+        batch_passos.append({
+            "id": id_passo,
+            "ancora": ancora,
+            "tooltip": tooltip,
+            "micro_narracoes": micro_narracoes,
+            "alerta": alerta,
+        })
+
+    batch_json = json.dumps({"passos": batch_passos}, ensure_ascii=False)
+    prompt_traducao = (
+        f"Traduza todos os textos abaixo para {idioma_destino}. "
+        "Retorne JSON com a mesma estrutura, apenas com os textos traduzidos. "
+        "Preserve formatação e tom instrucional."
+    )
+
+    # Chamada única ao Gemini com todos os textos em batch
+    try:
+        from google.genai import types as _gtypes
+
+        resposta = await asyncio.to_thread(
+            dap_engine.gemini_client.models.generate_content,
+            dap_engine.GEMINI_LLM_MODEL,
+            [f"{prompt_traducao}\n\n{batch_json}"],
+            _gtypes.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.2,
+            ),
+        )
+        resultado_json = json.loads(resposta.text)
+    except Exception as e:
+        logging.error(f"[traduzir] Falha na chamada Gemini: {e}")
+        raise HTTPException(status_code=500, detail=f"Falha na tradução via Gemini: {e}")
+
+    # Aplicar traduções de volta ao roteiro
+    passos_traduzidos_map: dict = {
+        p["id"]: p for p in resultado_json.get("passos", [])
+        if "id" in p
+    }
+
+    for passo in passos:
+        id_passo = passo.get("id_passo")
+        traduzido = passos_traduzidos_map.get(id_passo)
+        if not traduzido:
+            continue
+
+        # Atualizar campos pedagógicos
+        if "pedagogia" not in passo or passo["pedagogia"] is None:
+            passo["pedagogia"] = {}
+        if traduzido.get("ancora"):
+            passo["pedagogia"]["ancora"] = traduzido["ancora"]
+        if traduzido.get("tooltip"):
+            passo["pedagogia"]["tooltip_dap"] = traduzido["tooltip"]
+
+        # Atualizar micro_narracao de cada ação técnica
+        micro_narracoes_trad = traduzido.get("micro_narracoes", [])
+        for i, acao in enumerate(passo.get("acoes_tecnicas", [])):
+            if i < len(micro_narracoes_trad) and micro_narracoes_trad[i]:
+                acao["micro_narracao"] = micro_narracoes_trad[i]
+
+        # Atualizar alerta_instrutor
+        if traduzido.get("alerta"):
+            passo["alerta_instrutor"] = traduzido["alerta"]
+
+    # Atualizar voz_ia para o idioma destino (Requisito 5.3)
+    voz_destino = obter_voz_idioma(idioma_destino)
+    if "configuracao_gravacao" not in roteiro_traduzido or roteiro_traduzido["configuracao_gravacao"] is None:
+        roteiro_traduzido["configuracao_gravacao"] = {}
+    roteiro_traduzido["configuracao_gravacao"]["voz_ia"] = voz_destino
+
+    # Atualizar metadata com idioma e roteiro_origem_id (Requisito 5.5)
+    roteiro_traduzido.setdefault("metadata", {})
+    roteiro_traduzido["metadata"]["idioma"] = idioma_destino
+    roteiro_traduzido["metadata"]["roteiro_origem_id"] = id
+
+    # Salvar como novo arquivo com sufixo _{idioma_sanitizado} (Requisito 5.4)
+    idioma_sanitizado = idioma_destino.replace("-", "_")
+    novo_arquivo = f"{id}_{idioma_sanitizado}.json"
+    caminho_novo = os.path.join(ROTEIROS_DIR, novo_arquivo)
+    _atomic_write_json(caminho_novo, roteiro_traduzido)
+
+    logging.info(
+        f"[traduzir] Roteiro '{id}' traduzido para '{idioma_destino}' → '{novo_arquivo}' | voz: {voz_destino}"
+    )
+
+    return {
+        "arquivo": novo_arquivo,
+        "idioma": idioma_destino,
+        "voz_ia": voz_destino,
+    }
+
+
+@app.get("/api/roteiros/por-url")
+async def listar_roteiros_por_url(url: str = ""):
+    """Lista roteiros disponíveis para o módulo atual do Senior X baseado na URL.
+
+    Estratégia de busca (em ordem de prioridade):
+    1. Pinecone RAG: se disponível, usa buscar_contexto para identificar a aula mais relevante.
+    2. Fallback textual: busca nos roteiros salvos cujo nome_aula contenha palavras da URL.
+
+    Sem autenticação — usado pela extensão Aura para listar guias disponíveis.
+
+    Requisito: 6.5
+    """
+    if not url:
+        return []
+
+    # Extrai palavras-chave da URL (split por /, ?, =, -, _)
+    palavras_url = [p.lower() for p in re.split(r"[/?=\-_]", url) if len(p) >= 3]
+
+    resultados: list[dict] = []
+
+    # ── 1. Busca via Pinecone (RAG) ──────────────────────────────────────────
+    if dap_engine.pinecone_index and dap_engine.client_openai:
+        try:
+            busca = await asyncio.to_thread(
+                dap_engine.buscar_contexto, url, "senior_default"
+            )
+            melhor_aula = busca.get("melhor_aula") if busca else None
+
+            if melhor_aula:
+                # Procura roteiros cujo nome_aula corresponda à aula encontrada no RAG
+                for arq in os.listdir(ROTEIROS_DIR):
+                    if not arq.endswith(".json"):
+                        continue
+                    try:
+                        caminho = os.path.join(ROTEIROS_DIR, arq)
+                        with open(caminho, "r", encoding="utf-8") as f:
+                            dados = json.load(f)
+                        nome_aula = dados.get("metadata", {}).get("nome_aula", "")
+                        if _norm(melhor_aula) in _norm(nome_aula) or _norm(nome_aula) in _norm(melhor_aula):
+                            roteiro_id = arq.replace(".json", "")
+                            resultados.append({
+                                "roteiro_id": roteiro_id,
+                                "nome_aula": nome_aula,
+                                "total_passos": len(dados.get("passos", [])),
+                            })
+                    except Exception:
+                        continue
+
+        except Exception as e:
+            logging.warning(f"[por-url] Falha na busca Pinecone, usando fallback textual: {e}")
+
+    # ── 2. Fallback textual ───────────────────────────────────────────────────
+    if not resultados and palavras_url:
+        for arq in os.listdir(ROTEIROS_DIR):
+            if not arq.endswith(".json"):
+                continue
+            try:
+                caminho = os.path.join(ROTEIROS_DIR, arq)
+                with open(caminho, "r", encoding="utf-8") as f:
+                    dados = json.load(f)
+                nome_aula = dados.get("metadata", {}).get("nome_aula", "")
+                nome_norm = _norm(nome_aula)
+                if any(p in nome_norm for p in palavras_url):
+                    roteiro_id = arq.replace(".json", "")
+                    resultados.append({
+                        "roteiro_id": roteiro_id,
+                        "nome_aula": nome_aula,
+                        "total_passos": len(dados.get("passos", [])),
+                    })
+            except Exception:
+                continue
+
+    return resultados[:10]
+
+
+# ==============================================================
+# ONBOARDING GAMIFICADO — CHECKLIST + SEGMENTAÇÃO (Requisito 7)
+# ==============================================================
+
+MISSOES_ATIVAS_DIR = "missoes_ativas"
+os.makedirs(MISSOES_ATIVAS_DIR, exist_ok=True)
+
+
+@app.post("/api/roteiros/{id}/gerar-checklist")
+async def gerar_checklist(id: str):
+    """Gera checklist de onboarding a partir dos passos do roteiro.
+
+    Extrai passos onde is_conclusao != True e pedagogia.ancora não vazio.
+    Salva em missoes_ativas/{id}_checklist.json e retorna a lista.
+
+    Sem autenticação — dado de uso, não sensível.
+
+    Requisito: 7.1
+    """
+    caminho = _validar_caminho(id + ".json", ROTEIROS_DIR)
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            roteiro = json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Roteiro '{id}' não encontrado.")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"JSON inválido: {e}")
+
+    checklist = []
+    for passo in roteiro.get("passos", []):
+        if passo.get("is_conclusao") is True:
+            continue
+        ancora = (passo.get("pedagogia") or {}).get("ancora", "").strip()
+        if not ancora:
+            continue
+        checklist.append({
+            "id":         passo["id_passo"],
+            "titulo":     ancora[:80],
+            "completado": False,
+        })
+
+    caminho_checklist = os.path.join(MISSOES_ATIVAS_DIR, f"{id}_checklist.json")
+    _atomic_write_json(caminho_checklist, checklist)
+
+    logging.info(f"[gerar-checklist] Roteiro '{id}' → {len(checklist)} itens salvos em '{caminho_checklist}'")
+    return checklist
+
+
+@app.get("/api/checklists/usuario/{perfil}")
+async def listar_checklists_por_perfil(perfil: str):
+    """Retorna checklists relevantes para o perfil informado.
+
+    Inclui roteiro se perfis_alvo estiver vazio/ausente (= todos) ou se
+    o perfil informado estiver na lista.
+
+    Sem autenticação — dado de uso, não sensível.
+
+    Requisitos: 7.4, 7.5
+    """
+    perfil_norm = perfil.strip().lower()
+    resultado = []
+
+    for arq_checklist in glob.glob(os.path.join(MISSOES_ATIVAS_DIR, "*_checklist.json")):
+        nome_base = os.path.basename(arq_checklist)
+        # Extrai o id do roteiro removendo o sufixo _checklist.json
+        roteiro_id = nome_base[: -len("_checklist.json")]
+
+        # Lê o roteiro correspondente para verificar perfis_alvo
+        caminho_roteiro = os.path.join(ROTEIROS_DIR, f"{roteiro_id}.json")
+        if not os.path.exists(caminho_roteiro):
+            continue
+
+        try:
+            with open(caminho_roteiro, "r", encoding="utf-8") as f:
+                roteiro = json.load(f)
+        except Exception as e:
+            logging.warning(f"[checklists/usuario] Erro ao ler roteiro '{roteiro_id}': {e}")
+            continue
+
+        # Verificar segmentação por perfil
+        # perfis_alvo pode estar em metadata ou na raiz do roteiro (retrocompatibilidade)
+        perfis_alvo = (
+            roteiro.get("perfis_alvo")
+            or roteiro.get("metadata", {}).get("perfis_alvo")
+            or []
+        )
+        if perfis_alvo:
+            perfis_norm = [p.strip().lower() for p in perfis_alvo]
+            if perfil_norm not in perfis_norm:
+                continue  # Perfil não autorizado para este roteiro
+
+        # Lê o checklist salvo
+        try:
+            with open(arq_checklist, "r", encoding="utf-8") as f:
+                checklist = json.load(f)
+        except Exception as e:
+            logging.warning(f"[checklists/usuario] Erro ao ler checklist '{arq_checklist}': {e}")
+            continue
+
+        nome_aula = roteiro.get("metadata", {}).get("nome_aula", roteiro_id)
+        resultado.append({
+            "roteiro_id": roteiro_id,
+            "nome_aula":  nome_aula,
+            "checklist":  checklist,
+        })
+
+    return resultado
 
 
 if __name__ == "__main__":

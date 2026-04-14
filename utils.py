@@ -496,3 +496,44 @@ def _limpar_versoes_antigas(caminho: str, manter: int = 2) -> None:
             logging.debug(f"[versioning] Backup antigo removido: '{antigo}'")
         except Exception as e:
             logging.warning(f"[versioning] Não foi possível remover backup antigo '{antigo}': {e}")
+
+
+# ==============================================================
+# MAPEAMENTO DE VOZES EDGE-TTS POR IDIOMA (Tarefa 15 — Requisito 5.6)
+# ==============================================================
+
+VOZES_POR_IDIOMA: dict[str, str] = {
+    "pt-BR": "pt-BR-FranciscaNeural",
+    "pt-PT": "pt-PT-RaquelNeural",
+    "en-US": "en-US-JennyNeural",
+    "en-GB": "en-GB-SoniaNeural",
+    "es-ES": "es-ES-ElviraNeural",
+    "es-MX": "es-MX-DaliaNeural",
+    "fr-FR": "fr-FR-DeniseNeural",
+    "de-DE": "de-DE-KatjaNeural",
+    "it-IT": "it-IT-ElsaNeural",
+    "ja-JP": "ja-JP-NanamiNeural",
+    "zh-CN": "zh-CN-XiaoxiaoNeural",
+}
+
+
+def obter_voz_idioma(idioma: str) -> str:
+    """Retorna a voz edge-tts para o idioma informado.
+
+    Fallback: tenta match parcial (ex: "en" → "en-US").
+    Se não encontrar, retorna a voz padrão pt-BR.
+
+    Parâmetros:
+        idioma (str): Código de idioma BCP-47 (ex: "en-US", "es-ES", "pt-BR").
+
+    Retorna:
+        str: Nome da voz edge-tts correspondente ao idioma.
+    """
+    if idioma in VOZES_POR_IDIOMA:
+        return VOZES_POR_IDIOMA[idioma]
+    # Tenta match pelo prefixo de idioma (ex: "en" → primeira voz "en-*")
+    prefixo = idioma.split("-")[0].lower()
+    for chave, voz in VOZES_POR_IDIOMA.items():
+        if chave.lower().startswith(prefixo):
+            return voz
+    return VOZES_POR_IDIOMA["pt-BR"]
