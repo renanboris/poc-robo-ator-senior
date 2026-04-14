@@ -100,6 +100,7 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                     "alerta": alerta,
                     "audio_id": f"{id_p}_ancora",
                     "imagem_b64": img_ancora,
+                    "ramificacoes": passo.get("ramificacoes", []),
                 })
 
             for i, acao in enumerate(passo.get("acoes_tecnicas", [])):
@@ -129,6 +130,7 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                     "y_pct": coords.get("y_pct", 0.5),
                     "w_pct": coords.get("w_pct", 0.05),
                     "h_pct": coords.get("h_pct", 0.05),
+                    "ramificacoes": passo.get("ramificacoes", []),
                 })
 
         slides_json = json.dumps(slides, ensure_ascii=False)
@@ -556,6 +558,8 @@ body, html {
   const _ROTEIRO_ID = "__ROTEIRO_ID__";
   let cur = 0, acertos = 0, erros = 0, hintTimer = null;
   let audioAtual = null;
+  let _stepStartTs = 0;
+  const _stepErros = {};
 
   function _emitirEvento(evento, passoId) {
     const payload = {
@@ -682,6 +686,9 @@ body, html {
     const inp = document.getElementById("zone-input");
     btn.style.display = "none"; btn.className = "izone";
     inp.style.display = "none"; inp.className = "izone"; inp.value = "";
+
+    // Registra timestamp de início do passo para avaliação de ramificações
+    _stepStartTs = Date.now();
 
     if (index >= slides.length) {
       document.getElementById("story-panel").style.display = "none";
@@ -867,8 +874,36 @@ body, html {
     el.classList.remove("hint-active");
     el.classList.add("success-glow");
 
+    // Avalia ramificações adaptativas antes de avançar linearmente
+    const slideAtual = slides[cur];
+    let proximoIndex = cur + 1;
+
+    if (slideAtual && slideAtual.ramificacoes && slideAtual.ramificacoes.length > 0) {
+      const tempoDecorrido = (Date.now() - _stepStartTs) / 1000;
+      const sceneId = slideAtual.scene_id;
+      const errosNoPasso = _stepErros[sceneId] || 0;
+
+      for (const ram of slideAtual.ramificacoes) {
+        let condicaoSatisfeita = false;
+        if (ram.condicao === "completou_em_menos_de") {
+          condicaoSatisfeita = tempoDecorrido < ram.valor;
+        } else if (ram.condicao === "errou_mais_de") {
+          condicaoSatisfeita = errosNoPasso > ram.valor;
+        }
+
+        if (condicaoSatisfeita) {
+          // Busca o índice do slide com scene_id == ir_para_passo
+          const idxDestino = slides.findIndex(s => s.scene_id === ram.ir_para_passo);
+          if (idxDestino !== -1) {
+            proximoIndex = idxDestino;
+          }
+          break;
+        }
+      }
+    }
+
     setTimeout(() => {
-      cur++;
+      cur = proximoIndex;
       mostrar(cur);
     }, 420);
   }
@@ -876,6 +911,11 @@ body, html {
   function errouClique() {
     if (slides[cur] && slides[cur].tipo !== "interacao") return;
     erros++;
+    // Contabiliza erros por passo para avaliação de ramificações
+    const sceneId = slides[cur] ? slides[cur].scene_id : null;
+    if (sceneId !== null) {
+      _stepErros[sceneId] = (_stepErros[sceneId] || 0) + 1;
+    }
     const mask = document.getElementById("error-mask");
     const pill = document.getElementById("error-pill");
     mask.classList.add("error-flash");

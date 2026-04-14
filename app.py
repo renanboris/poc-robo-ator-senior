@@ -120,6 +120,22 @@ async def lifespan(app: FastAPI):
             logging.info("Migração sim_links: OK")
     except Exception as _e:
         logging.warning(f"Migração sim_links falhou (startup não bloqueado): {_e}")
+    # Migração idempotente: tabela nps_respostas no brain.db (Requisito 10.2)
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as _conn:
+            _conn.execute("""
+                CREATE TABLE IF NOT EXISTS nps_respostas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    roteiro_id TEXT NOT NULL,
+                    score INTEGER NOT NULL,
+                    comentario TEXT,
+                    ts INTEGER NOT NULL
+                )
+            """)
+            _conn.commit()
+            logging.info("Migração nps_respostas: OK")
+    except Exception as _e:
+        logging.warning(f"Migração nps_respostas falhou (startup não bloqueado): {_e}")
     yield
 
 def _norm(s: str) -> str:
@@ -461,6 +477,12 @@ class Pedagogia(BaseModel):
     ancora:      Optional[str] = ""
     tooltip_dap: Optional[str] = ""
 
+class RamificacaoRoteiro(BaseModel):
+    condicao: str  # "completou_em_menos_de" | "errou_mais_de"
+    valor: int
+    ir_para_passo: int
+
+
 class PassoRoteiro(BaseModel):
     id_passo:         int
     tipo_passo:       Optional[str]               = "operacao"
@@ -470,6 +492,7 @@ class PassoRoteiro(BaseModel):
     alerta_instrutor: Optional[str]               = None
     is_conclusao:     Optional[bool]              = False
     acoes_tecnicas:   Optional[List[AcaoTecnica]] = Field(default_factory=list)
+    ramificacoes:     Optional[List[RamificacaoRoteiro]] = Field(default_factory=list)
 
 class ConfiguracaoGravacao(BaseModel):
     gravar_video:  bool = True
@@ -507,6 +530,12 @@ class EventoAnalyticsReq(BaseModel):
 
 class TraduzirRoteiroReq(BaseModel):
     idioma_destino: str
+
+
+class NpsRespostaReq(BaseModel):
+    roteiro_id: str
+    score: int  # 0-10
+    comentario: Optional[str] = None
 
 
 # ==============================================================
@@ -688,6 +717,129 @@ def relatorio_analytics(roteiro_id: str):
 
     except Exception as e:
         logging.warning(f"[analytics] Erro inesperado no relatório para '{roteiro_id}': {e}")
+        return _null_response
+    finally:
+        conn.close()
+
+
+@app.post("/api/analytics/nps")
+async def registrar_nps(payload: NpsRespostaReq):
+    """Persiste resposta de NPS para um roteiro.
+
+    Sem autenticação — dados de uso, não sensíveis (Requisito 10.2, 10.5).
+    """
+    if payload.score < 0 or payload.score > 10:
+        raise HTTPException(status_code=400, detail="score deve estar entre 0 e 10.")
+
+    roteiro_id = payload.roteiro_id
+    score = payload.score
+    comentario = payload.comentario
+    ts = int(time.time() * 1000)
+
+    if score <= 6:
+        logging.warning(f"[NPS] Score detrator: {score} para roteiro '{roteiro_id}'")
+
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            conn.execute(
+                "INSERT INTO nps_respostas (roteiro_id, score, comentario, ts) VALUES (?, ?, ?, ?)",
+                (roteiro_id, score, comentario, ts),
+            )
+            conn.commit()
+    except Exception as e:
+        logging.warning(f"[NPS] Falha ao persistir resposta NPS: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao persistir resposta NPS.")
+
+    return {"ok": True}
+
+
+@app.get("/api/analytics/{roteiro_id}/nps")
+def relatorio_nps(roteiro_id: str):
+    """Retorna relatório de NPS para um roteiro.
+
+    Sem autenticação — dados de uso, não sensíveis (Requisito 10.3).
+    """
+    _null_response = {
+        "score_medio": None,
+        "total_respostas": 0,
+        "distribuicao": {str(i): 0 for i in range(11)},
+        "comentarios_recentes": [],
+    }
+
+    try:
+        conn = sqlite3.connect("brain.db", timeout=5)
+    except Exception as e:
+        logging.warning(f"[NPS] Não foi possível conectar ao brain.db: {e}")
+        return _null_response
+
+    try:
+        tabela_existe = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='nps_respostas'"
+        ).fetchone()
+        if not tabela_existe:
+            return _null_response
+
+        # ── score_medio e total_respostas ─────────────────────────────────────
+        score_medio = None
+        total_respostas = 0
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*), AVG(score) FROM nps_respostas WHERE roteiro_id = ?",
+                (roteiro_id,),
+            ).fetchone()
+            total_respostas = row[0] or 0
+            if total_respostas > 0 and row[1] is not None:
+                score_medio = round(row[1], 2)
+        except Exception as e:
+            logging.warning(f"[NPS] Erro ao calcular score_medio para '{roteiro_id}': {e}")
+
+        # ── distribuicao ──────────────────────────────────────────────────────
+        distribuicao = {str(i): 0 for i in range(11)}
+        try:
+            rows = conn.execute(
+                "SELECT score, COUNT(*) FROM nps_respostas WHERE roteiro_id = ? GROUP BY score",
+                (roteiro_id,),
+            ).fetchall()
+            for row in rows:
+                s, cnt = row
+                if 0 <= s <= 10:
+                    distribuicao[str(s)] = cnt
+        except Exception as e:
+            logging.warning(f"[NPS] Erro ao calcular distribuicao para '{roteiro_id}': {e}")
+
+        # ── comentarios_recentes ──────────────────────────────────────────────
+        comentarios_recentes = []
+        try:
+            rows = conn.execute(
+                """
+                SELECT score, comentario, ts
+                FROM nps_respostas
+                WHERE roteiro_id = ? AND comentario IS NOT NULL AND comentario != ''
+                ORDER BY ts DESC
+                LIMIT 10
+                """,
+                (roteiro_id,),
+            ).fetchall()
+            comentarios_recentes = [
+                {
+                    "score": row[0],
+                    "comentario": row[1],
+                    "ts": str(row[2]),
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            logging.warning(f"[NPS] Erro ao buscar comentarios_recentes para '{roteiro_id}': {e}")
+
+        return {
+            "score_medio": score_medio,
+            "total_respostas": total_respostas,
+            "distribuicao": distribuicao,
+            "comentarios_recentes": comentarios_recentes,
+        }
+
+    except Exception as e:
+        logging.warning(f"[NPS] Erro inesperado no relatório para '{roteiro_id}': {e}")
         return _null_response
     finally:
         conn.close()
@@ -2045,6 +2197,7 @@ def _montar_slides_roteiro(roteiro: dict) -> str:
                 "alerta": alerta,
                 "audio_id": f"{id_p}_ancora",
                 "imagem_b64": img_ancora,
+                "ramificacoes": passo.get("ramificacoes", []),
             })
 
         for i, acao in enumerate(passo.get("acoes_tecnicas", [])):
@@ -2072,6 +2225,7 @@ def _montar_slides_roteiro(roteiro: dict) -> str:
                 "y_pct": coords.get("y_pct", 0.5),
                 "w_pct": coords.get("w_pct", 0.05),
                 "h_pct": coords.get("h_pct", 0.05),
+                "ramificacoes": passo.get("ramificacoes", []),
             })
     return json.dumps(slides, ensure_ascii=False)
 
@@ -2823,6 +2977,278 @@ async def listar_checklists_por_perfil(perfil: str):
         })
 
     return resultado
+
+
+# ==============================================================
+# SMART TIPS — HINT CONTEXTUAL (Requisito 8)
+# ==============================================================
+
+# Padrões que identificam campos de senha no seletor (case-insensitive)
+_SELETOR_PASSWORD_RE = re.compile(
+    r'type\s*=\s*["\']?password["\']?|input\[type\s*=\s*["\']?password["\']?\]',
+    re.IGNORECASE,
+)
+
+_HINT_SCORE_THRESHOLD = 0.60
+
+
+@app.get("/api/dap/hint")
+async def dap_hint(url: str = "", seletor: str = ""):
+    """Retorna o snippet de treinamento mais relevante para a URL e seletor informados.
+
+    Sem autenticação — usado pela extensão Aura para Smart Tips de hesitação.
+
+    Segurança: nunca retorna hints para campos com type="password" (Requisito 8.7).
+    Retorna null se score < 0.60 ou se Pinecone indisponível (Requisito 8.4).
+
+    Requisitos: 8.2, 8.3, 8.4, 8.7
+    """
+    # Req 8.7 — nunca retornar hints para campos de senha
+    if seletor and _SELETOR_PASSWORD_RE.search(seletor):
+        return None
+
+    # Req 8.3 — combinar url + seletor como texto de busca
+    texto_busca = f"{url} {seletor}".strip()
+    if not texto_busca:
+        return None
+
+    try:
+        busca = await asyncio.to_thread(
+            dap_engine.buscar_contexto, texto_busca, "senior_default"
+        )
+    except Exception as e:
+        logging.warning(f"[dap/hint] Erro ao chamar buscar_contexto: {e}")
+        return None
+
+    # Pinecone indisponível ou sem resultado
+    if not busca:
+        return None
+
+    score = busca.get("score", 0.0)
+
+    # Req 8.4 — retornar null se score < 0.60
+    if score < _HINT_SCORE_THRESHOLD:
+        return None
+
+    melhor_aula = busca.get("melhor_aula", "")
+
+    # Extrair micro_narracao e identificar passo/roteiro
+    passo_id: Optional[int] = None
+    roteiro_id: Optional[str] = None
+    micro_narracao: Optional[str] = None
+
+    # Tentar extrair ancora do texto_rag como fallback imediato
+    texto_rag = busca.get("texto_rag", "")
+    ancora_rag: Optional[str] = None
+    if "INSTRUCAO: " in texto_rag:
+        ancora_rag = texto_rag.split("INSTRUCAO: ")[1].split("\n")[0].strip() or None
+
+    # Localizar roteiro em roteiros_salvos/ cujo metadata.nome_aula corresponda
+    if melhor_aula:
+        alvo_norm = _norm(melhor_aula)
+        try:
+            for arq in sorted(os.listdir(ROTEIROS_DIR)):
+                if not arq.endswith(".json"):
+                    continue
+                caminho = os.path.join(ROTEIROS_DIR, arq)
+                try:
+                    with open(caminho, "r", encoding="utf-8") as f:
+                        roteiro = json.load(f)
+                except Exception:
+                    continue
+
+                nome_aula = roteiro.get("metadata", {}).get("nome_aula", "")
+                id_trein = roteiro.get("metadata", {}).get("id_treinamento", "")
+
+                if not (
+                    _norm(nome_aula) == alvo_norm
+                    or _norm(id_trein) == alvo_norm
+                    or alvo_norm in _norm(nome_aula)
+                    or _norm(nome_aula) in alvo_norm
+                ):
+                    continue
+
+                # Roteiro encontrado — extrair passo com ancora não vazia
+                roteiro_id = arq.replace(".json", "")
+                for passo in roteiro.get("passos", []):
+                    ancora = (passo.get("pedagogia") or {}).get("ancora", "").strip()
+                    if ancora:
+                        passo_id = passo.get("id_passo")
+                        micro_narracao = ancora
+                        break
+                break
+
+        except Exception as e:
+            logging.warning(f"[dap/hint] Erro ao varrer roteiros_salvos: {e}")
+
+    # Fallback: usar ancora extraída do texto_rag se não localizou o passo exato
+    if micro_narracao is None:
+        micro_narracao = ancora_rag
+
+    if micro_narracao is None or passo_id is None or roteiro_id is None:
+        logging.warning(
+            f"[dap/hint] Hint encontrado (score={score:.2f}) mas não foi possível "
+            f"localizar passo/roteiro para aula='{melhor_aula}'. Retornando null."
+        )
+        return None
+
+    return {
+        "passo_id":       passo_id,
+        "roteiro_id":     roteiro_id,
+        "micro_narracao": micro_narracao,
+        "score":          round(score, 4),
+    }
+
+
+# ==============================================================
+# ADAPTIVE LEARNING PATH (Requisito 9)
+# ==============================================================
+
+@app.post("/api/roteiros/{id}/gerar-adaptive")
+async def gerar_roteiro_adaptive(id: str):
+    """Gera ramificações adaptativas para um roteiro existente usando Gemini.
+
+    Analisa os passos do roteiro e sugere ramificações baseadas em peso_narrativo:
+    - peso_narrativo >= 3: ramificação 'errou_mais_de' com valor 2 (aprofundamento)
+    - peso_narrativo == 1: ramificação 'completou_em_menos_de' com valor 5 (skip)
+
+    Sem autenticação. Cria backup via salvar_versao_roteiro antes de modificar.
+
+    Requisitos: 9.3, 9.4, 9.5
+    """
+    # Validar caminho (path traversal protection)
+    caminho = _validar_caminho(id + ".json", ROTEIROS_DIR)
+
+    if not os.path.exists(caminho):
+        raise HTTPException(status_code=404, detail="Roteiro não encontrado.")
+
+    # Verificar Gemini disponível
+    if not dap_engine.gemini_client:
+        raise HTTPException(
+            status_code=503,
+            detail="Gemini não disponível. Verifique GOOGLE_API_KEY no .env.",
+        )
+
+    # Ler roteiro
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            roteiro = json.load(f)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"JSON inválido: {e}")
+
+    passos = roteiro.get("passos", [])
+    if not passos:
+        raise HTTPException(status_code=422, detail="Roteiro sem passos.")
+
+    # Montar prompt para Gemini
+    passos_resumo = []
+    for passo in passos:
+        passos_resumo.append({
+            "id_passo": passo.get("id_passo"),
+            "peso_narrativo": passo.get("peso_narrativo", 2),
+            "ancora": (passo.get("pedagogia") or {}).get("ancora", ""),
+        })
+
+    prompt_adaptive = (
+        "Analise os passos do roteiro abaixo e sugira ramificações adaptativas. "
+        "Para passos com peso_narrativo >= 3, sugira ramificação 'errou_mais_de' com valor 2 "
+        "apontando para um sub-passo de aprofundamento. "
+        "Para passos com peso_narrativo == 1, sugira ramificação 'completou_em_menos_de' com valor 5 "
+        "apontando para o próximo passo. "
+        "Retorne JSON com estrutura: "
+        "{\"passos\": [{\"id_passo\": int, \"ramificacoes\": [{\"condicao\": str, \"valor\": int, \"ir_para_passo\": int}]}]}\n\n"
+        f"Passos do roteiro:\n{json.dumps(passos_resumo, ensure_ascii=False, indent=2)}"
+    )
+
+    # Chamar Gemini de forma assíncrona
+    def _chamar_gemini_adaptive():
+        from google.genai import types as _types
+        resposta = dap_engine.gemini_client.models.generate_content(
+            model=dap_engine.GEMINI_LLM_MODEL,
+            contents=[prompt_adaptive],
+            config=_types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.3,
+            ),
+        )
+        return resposta.text
+
+    try:
+        resposta_texto = await asyncio.to_thread(_chamar_gemini_adaptive)
+        sugestoes_gemini = json.loads(resposta_texto)
+    except json.JSONDecodeError as e:
+        logging.error(f"[gerar-adaptive] Gemini retornou JSON inválido: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="Gemini retornou resposta inválida. Tente novamente.",
+        )
+    except Exception as e:
+        logging.error(f"[gerar-adaptive] Erro ao chamar Gemini: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erro ao comunicar com Gemini: {e}",
+        )
+
+    # Criar backup antes de modificar
+    salvar_versao_roteiro(caminho, roteiro)
+
+    # Aplicar ramificações sugeridas ao roteiro
+    # Indexar passos por id_passo para acesso rápido
+    passos_por_id = {p.get("id_passo"): p for p in passos}
+
+    passos_com_ramificacao = 0
+    for sugestao in sugestoes_gemini.get("passos", []):
+        id_passo = sugestao.get("id_passo")
+        ramificacoes_sugeridas = sugestao.get("ramificacoes", [])
+
+        if id_passo not in passos_por_id:
+            logging.warning(f"[gerar-adaptive] id_passo {id_passo} não encontrado no roteiro — ignorado.")
+            continue
+
+        if not ramificacoes_sugeridas:
+            continue
+
+        # Validar estrutura de cada ramificação antes de aplicar
+        ramificacoes_validas = []
+        for ram in ramificacoes_sugeridas:
+            condicao = ram.get("condicao", "")
+            valor = ram.get("valor")
+            ir_para = ram.get("ir_para_passo")
+
+            if condicao not in ("completou_em_menos_de", "errou_mais_de"):
+                logging.warning(
+                    f"[gerar-adaptive] Condição inválida '{condicao}' para passo {id_passo} — ignorada."
+                )
+                continue
+            if not isinstance(valor, int) or not isinstance(ir_para, int):
+                logging.warning(
+                    f"[gerar-adaptive] Ramificação com valor/ir_para_passo inválido para passo {id_passo} — ignorada."
+                )
+                continue
+
+            ramificacoes_validas.append({
+                "condicao": condicao,
+                "valor": valor,
+                "ir_para_passo": ir_para,
+            })
+
+        if ramificacoes_validas:
+            # Preservar todos os outros campos do passo — apenas atualizar ramificacoes
+            passos_por_id[id_passo]["ramificacoes"] = ramificacoes_validas
+            passos_com_ramificacao += 1
+
+    # Salvar roteiro atualizado de forma atômica
+    _atomic_write_json(caminho, roteiro)
+
+    logging.info(
+        f"[gerar-adaptive] Roteiro '{id}' atualizado com ramificações em "
+        f"{passos_com_ramificacao} passo(s)."
+    )
+
+    return {
+        "passos_com_ramificacao": passos_com_ramificacao,
+        "arquivo": id + ".json",
+    }
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["aura.json", "guided_execution.js"],
+      "resources": ["aura.json", "guided_execution.js", "checklist_widget.js", "hesitation_detector.js", "nps_modal.js"],
       "matches": ["https://*.senior.com.br/*"]
     }
   ]
