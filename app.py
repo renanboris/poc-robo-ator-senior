@@ -31,11 +31,14 @@ import uuid
 import logging
 import time
 import tempfile
+import hashlib
 import generator_engine
 import lego_builder
 import dap_engine
 import job_registry
-from utils import limpar_nome, validar_roteiro, salvar_versao_roteiro
+import scorm_builder
+from datetime import datetime
+from utils import limpar_nome, validar_roteiro, salvar_versao_roteiro, aplicar_blur_screenshot
 
 
 def _atomic_write_json(caminho: str, dados: dict) -> None:
@@ -76,6 +79,47 @@ async def lifespan(app: FastAPI):
             logging.info(f"Cleanup startup: removido {_tmp}")
         except Exception:
             pass
+    # Migração idempotente: tabela analytics_eventos no brain.db (Requisito 2.3)
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as _conn:
+            _conn.execute("""
+                CREATE TABLE IF NOT EXISTS analytics_eventos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    roteiro_id TEXT NOT NULL,
+                    passo_id INTEGER,
+                    usuario_id TEXT,
+                    evento TEXT NOT NULL,
+                    ts INTEGER NOT NULL
+                )
+            """)
+            _conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_analytics_roteiro
+                ON analytics_eventos (roteiro_id, ts)
+            """)
+            _conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_analytics_usuario
+                ON analytics_eventos (usuario_id, ts)
+            """)
+            _conn.commit()
+            logging.info("Migração analytics_eventos: OK")
+    except Exception as _e:
+        logging.warning(f"Migração analytics_eventos falhou (startup não bloqueado): {_e}")
+    # Migração idempotente: tabela sim_links no brain.db (Requisito 3.3)
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as _conn:
+            _conn.execute("""
+                CREATE TABLE IF NOT EXISTS sim_links (
+                    token TEXT PRIMARY KEY,
+                    roteiro_id TEXT NOT NULL,
+                    criado_em INTEGER NOT NULL,
+                    expira_em INTEGER NOT NULL,
+                    total_acessos INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            _conn.commit()
+            logging.info("Migração sim_links: OK")
+    except Exception as _e:
+        logging.warning(f"Migração sim_links falhou (startup não bloqueado): {_e}")
     yield
 
 def _norm(s: str) -> str:
@@ -453,10 +497,196 @@ class DapRequest(BaseModel):
     tenant_id:   Optional[str] = "senior_default"
     historico:   Optional[list] = []
 
+class EventoAnalyticsReq(BaseModel):
+    roteiro_id: str
+    passo_id:   Optional[int] = None
+    usuario_id: Optional[str] = None
+    evento:     str
+
 
 # ==============================================================
 # ROTAS DA API
 # ==============================================================
+
+_EVENTOS_VALIDOS = {"iniciou", "completou_passo", "repetiu_passo", "abandonou", "completou"}
+
+@app.post("/api/analytics/evento")
+async def ingerir_evento_analytics(payload: EventoAnalyticsReq, request: Request):
+    """Recebe eventos de progresso do player SCORM e da extensão Aura.
+
+    Não requer autenticação — dados de uso, não sensíveis (Requisito 2.2, 2.6).
+    """
+    if payload.evento not in _EVENTOS_VALIDOS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Evento inválido: '{payload.evento}'. Valores aceitos: {sorted(_EVENTOS_VALIDOS)}"
+        )
+
+    # Gerar usuario_id anônimo quando não fornecido (Requisito 2.6)
+    usuario_id = payload.usuario_id
+    if not usuario_id:
+        ip = request.client.host if request.client else "unknown"
+        ua = request.headers.get("user-agent", "")
+        usuario_id = hashlib.md5(f"{ip}_{ua}".encode()).hexdigest()[:16]
+
+    ts = int(time.time() * 1000)
+
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            conn.execute(
+                """
+                INSERT INTO analytics_eventos (roteiro_id, passo_id, usuario_id, evento, ts)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (payload.roteiro_id, payload.passo_id, usuario_id, payload.evento, ts),
+            )
+            conn.commit()
+    except Exception as e:
+        logging.error(f"Falha ao persistir evento analytics: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao persistir evento no banco de dados.")
+
+    return {"ok": True, "usuario_id": usuario_id}
+
+
+@app.get("/api/analytics/{roteiro_id}")
+def relatorio_analytics(roteiro_id: str):
+    """Retorna relatório de analytics de engajamento para um roteiro.
+
+    Sem autenticação — dados de uso, não sensíveis (Requisito 2.4).
+
+    Campos retornados:
+    - taxa_conclusao: count(evento="completou") / count(DISTINCT usuario_id)
+      null se menos de 3 usuários distintos.
+    - tempo_medio_por_passo: dict {passo_id: segundos}
+      null se menos de 3 amostras por passo.
+    - passos_mais_repetidos: top 5 passo_id por count(evento="repetiu_passo").
+      Lista vazia se sem dados.
+    - passo_maior_abandono: passo_id com maior count(evento="abandonou").
+      null se sem dados.
+    """
+    _null_response = {
+        "taxa_conclusao": None,
+        "tempo_medio_por_passo": None,
+        "passos_mais_repetidos": [],
+        "passo_maior_abandono": None,
+    }
+
+    try:
+        conn = sqlite3.connect("brain.db", timeout=5)
+    except Exception as e:
+        logging.warning(f"[analytics] Não foi possível conectar ao brain.db: {e}")
+        return _null_response
+
+    try:
+        # Verificar se a tabela existe
+        tabela_existe = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='analytics_eventos'"
+        ).fetchone()
+        if not tabela_existe:
+            return _null_response
+
+        # ── taxa_conclusao ────────────────────────────────────────────────────
+        taxa_conclusao = None
+        try:
+            total_usuarios = conn.execute(
+                "SELECT COUNT(DISTINCT usuario_id) FROM analytics_eventos WHERE roteiro_id = ?",
+                (roteiro_id,),
+            ).fetchone()[0]
+
+            if total_usuarios >= 3:
+                completaram = conn.execute(
+                    "SELECT COUNT(*) FROM analytics_eventos "
+                    "WHERE roteiro_id = ? AND evento = 'completou'",
+                    (roteiro_id,),
+                ).fetchone()[0]
+                taxa_conclusao = round(completaram / total_usuarios, 4) if total_usuarios > 0 else None
+        except Exception as e:
+            logging.warning(f"[analytics] Erro ao calcular taxa_conclusao para '{roteiro_id}': {e}")
+
+        # ── tempo_medio_por_passo ─────────────────────────────────────────────
+        tempo_medio_por_passo = None
+        try:
+            # Para cada (usuario_id, passo_id): diferença entre ts de "iniciou" e "completou_passo"
+            rows = conn.execute(
+                """
+                SELECT
+                    i.passo_id,
+                    AVG((c.ts - i.ts) / 1000.0) AS media_segundos,
+                    COUNT(*) AS amostras
+                FROM analytics_eventos i
+                JOIN analytics_eventos c
+                    ON  i.roteiro_id  = c.roteiro_id
+                    AND i.passo_id    = c.passo_id
+                    AND i.usuario_id  = c.usuario_id
+                    AND i.evento      = 'iniciou'
+                    AND c.evento      = 'completou_passo'
+                    AND c.ts          > i.ts
+                WHERE i.roteiro_id = ?
+                GROUP BY i.passo_id
+                HAVING COUNT(*) >= 3
+                """,
+                (roteiro_id,),
+            ).fetchall()
+
+            if rows:
+                tempo_medio_por_passo = {
+                    str(row[0]): round(row[1], 2) for row in rows
+                }
+        except Exception as e:
+            logging.warning(f"[analytics] Erro ao calcular tempo_medio_por_passo para '{roteiro_id}': {e}")
+
+        # ── passos_mais_repetidos ─────────────────────────────────────────────
+        passos_mais_repetidos = []
+        try:
+            rows = conn.execute(
+                """
+                SELECT passo_id, COUNT(*) AS total_repeticoes
+                FROM analytics_eventos
+                WHERE roteiro_id = ? AND evento = 'repetiu_passo'
+                GROUP BY passo_id
+                ORDER BY total_repeticoes DESC
+                LIMIT 5
+                """,
+                (roteiro_id,),
+            ).fetchall()
+            passos_mais_repetidos = [
+                {"passo_id": row[0], "total_repeticoes": row[1]} for row in rows
+            ]
+        except Exception as e:
+            logging.warning(f"[analytics] Erro ao calcular passos_mais_repetidos para '{roteiro_id}': {e}")
+
+        # ── passo_maior_abandono ──────────────────────────────────────────────
+        passo_maior_abandono = None
+        try:
+            row = conn.execute(
+                """
+                SELECT passo_id
+                FROM analytics_eventos
+                WHERE roteiro_id = ? AND evento = 'abandonou'
+                GROUP BY passo_id
+                ORDER BY COUNT(*) DESC
+                LIMIT 1
+                """,
+                (roteiro_id,),
+            ).fetchone()
+            if row:
+                passo_maior_abandono = row[0]
+        except Exception as e:
+            logging.warning(f"[analytics] Erro ao calcular passo_maior_abandono para '{roteiro_id}': {e}")
+
+        return {
+            "taxa_conclusao": taxa_conclusao,
+            "tempo_medio_por_passo": tempo_medio_por_passo,
+            "passos_mais_repetidos": passos_mais_repetidos,
+            "passo_maior_abandono": passo_maior_abandono,
+        }
+
+    except Exception as e:
+        logging.warning(f"[analytics] Erro inesperado no relatório para '{roteiro_id}': {e}")
+        return _null_response
+    finally:
+        conn.close()
+
 
 @app.get("/api/missoes")
 def listar_missoes_ativas():
@@ -1641,6 +1871,367 @@ async def get_gps_roteiro(
         "score":     round(busca.get("score", 0), 3),
         "passos":    passos_gps,
     }
+
+@app.post("/api/roteiros/{id}/aplicar-blur")
+async def aplicar_blur_roteiro(id: str):
+    """Reprocessa blur em screenshots de um roteiro existente.
+
+    Percorre todos os passos e ações técnicas do roteiro. Para cada ação com
+    `elemento_alvo.dados_blur.blur == True`, aplica retângulo sólido sobre a
+    região marcada no `screenshot_referencia` e persiste o resultado.
+
+    Retorna contagem de ações percorridas e quantas tiveram blur aplicado.
+
+    Requisito: 1.6
+    """
+    caminho = _validar_caminho(id + ".json", ROTEIROS_DIR)
+
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            roteiro = json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Roteiro não encontrado.")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"JSON inválido: {e}")
+
+    passos_processados = 0
+    passos_com_blur = 0
+
+    for passo in roteiro.get("passos", []):
+        for acao in passo.get("acoes_tecnicas", []):
+            passos_processados += 1
+
+            elemento_alvo = acao.get("elemento_alvo") or {}
+            dados_blur = elemento_alvo.get("dados_blur") or {}
+
+            if not dados_blur.get("blur"):
+                continue
+
+            regiao = dados_blur.get("regiao")
+            if not regiao:
+                logging.warning(
+                    f"[aplicar-blur] Ação com blur=True mas sem regiao definida "
+                    f"(passo {passo.get('id_passo')}) — ignorada."
+                )
+                continue
+
+            screenshot = elemento_alvo.get("screenshot_referencia")
+            if not screenshot:
+                logging.warning(
+                    f"[aplicar-blur] Ação com blur=True mas sem screenshot_referencia "
+                    f"(passo {passo.get('id_passo')}) — ignorada."
+                )
+                continue
+
+            # screenshot pode ser path de arquivo em disco ou base64 inline
+            screenshot_b64 = screenshot
+            is_file_path = not screenshot.startswith("data:") and len(screenshot) < 512 and os.path.exists(screenshot)
+
+            if is_file_path:
+                try:
+                    import base64 as _b64
+                    with open(screenshot, "rb") as f_img:
+                        screenshot_b64 = _b64.b64encode(f_img.read()).decode("utf-8")
+                except Exception as e:
+                    logging.warning(f"[aplicar-blur] Não foi possível ler screenshot '{screenshot}': {e}")
+                    continue
+
+            screenshot_borrado = aplicar_blur_screenshot(screenshot_b64, [regiao])
+
+            # Persiste de volta — arquivo em disco ou base64 inline
+            if is_file_path:
+                try:
+                    import base64 as _b64
+                    dados_img = screenshot_borrado
+                    if "," in dados_img:
+                        dados_img = dados_img.split(",", 1)[1]
+                    with open(screenshot, "wb") as f_img:
+                        f_img.write(_b64.b64decode(dados_img))
+                except Exception as e:
+                    logging.warning(f"[aplicar-blur] Não foi possível salvar screenshot borrado '{screenshot}': {e}")
+                    continue
+            else:
+                acao["elemento_alvo"]["screenshot_referencia"] = screenshot_borrado
+
+            passos_com_blur += 1
+            logging.info(
+                f"[aplicar-blur] Blur aplicado — passo {passo.get('id_passo')}, "
+                f"regiao={regiao}"
+            )
+
+    _atomic_write_json(caminho, roteiro)
+
+    return {
+        "passos_processados": passos_processados,
+        "passos_com_blur": passos_com_blur,
+    }
+
+
+# ==============================================================
+# SHAREABLE TRAINING LINK (Requisito 3)
+# ==============================================================
+
+TTL_DIAS = int(os.getenv("LINK_TTL_DIAS", "30"))
+
+_HTML_LINK_EXPIRADO = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Link Expirado</title>
+<style>
+body{font-family:"Segoe UI",system-ui,sans-serif;background:#0f172a;color:#f8fafc;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100vh;margin:0;gap:16px;}
+h1{font-size:2rem;color:#f87171;}
+p{color:#94a3b8;max-width:420px;text-align:center;line-height:1.6;}
+</style></head>
+<body>
+<h1>&#9200; Link Expirado</h1>
+<p>Este link de treinamento expirou e n&#227;o est&#225; mais dispon&#237;vel.<br>
+Solicite um novo link ao respons&#225;vel pelo treinamento.</p>
+</body></html>"""
+
+_HTML_LINK_NAO_ENCONTRADO = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Link Inv&#225;lido</title>
+<style>
+body{font-family:"Segoe UI",system-ui,sans-serif;background:#0f172a;color:#f8fafc;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100vh;margin:0;gap:16px;}
+h1{font-size:2rem;color:#f87171;}
+p{color:#94a3b8;max-width:420px;text-align:center;line-height:1.6;}
+</style></head>
+<body>
+<h1>&#128279; Link Inv&#225;lido</h1>
+<p>Este link de treinamento n&#227;o foi encontrado.<br>
+Verifique se o endere&#231;o est&#225; correto ou solicite um novo link.</p>
+</body></html>"""
+
+
+def _montar_slides_roteiro(roteiro: dict) -> str:
+    """Monta a lista de slides JSON a partir de um roteiro, reutilizando a logica
+    de scorm_builder.criar_pacote_scorm sem zipar."""
+    passos = roteiro.get("passos", [])
+    slides = []
+    for idx, passo in enumerate(passos):
+        id_p = passo.get("id_passo", idx + 1)
+        pedagogia = passo.get("pedagogia", {}) or {}
+        ancora = pedagogia.get("ancora", "")
+        tooltip = pedagogia.get("tooltip_dap", "")
+        alerta = passo.get("alerta_instrutor", "") or ""
+        peso = passo.get("peso_narrativo", 2)
+        tipo_passo = passo.get("tipo_passo", "navigation")
+
+        img_ancora = None
+        if idx > 0:
+            passo_anterior = passos[idx - 1]
+            for acao in passo_anterior.get("acoes_tecnicas", []):
+                ref = acao.get("elemento_alvo", {}).get("screenshot_referencia")
+                if ref:
+                    img_ancora = ref
+                    break
+
+        if ancora:
+            slides.append({
+                "tipo": "ancora",
+                "scene_id": id_p,
+                "scene_kind": tipo_passo,
+                "scene_weight": peso,
+                "texto": ancora,
+                "tooltip": tooltip,
+                "alerta": alerta,
+                "audio_id": f"{id_p}_ancora",
+                "imagem_b64": img_ancora,
+            })
+
+        for i, acao in enumerate(passo.get("acoes_tecnicas", [])):
+            if acao.get("acao") == "concluir_video":
+                continue
+            alvo = acao.get("elemento_alvo", {}) or {}
+            coords = alvo.get("coordenadas_relativas", {}) or {}
+            slides.append({
+                "tipo": "interacao",
+                "scene_id": id_p,
+                "scene_kind": tipo_passo,
+                "scene_weight": peso,
+                "acao": acao.get("acao", "clique"),
+                "valor_input": acao.get("valor_input", ""),
+                "texto": acao.get(
+                    "micro_narracao",
+                    f"Interaja com {alvo.get('label_curto', 'o elemento')}"
+                ),
+                "tooltip": tooltip,
+                "alerta": alerta,
+                "label": alvo.get("label_curto", ""),
+                "audio_id": f"{id_p}_micro_{i}",
+                "imagem_b64": alvo.get("screenshot_referencia", "") or "",
+                "x_pct": coords.get("x_pct", 0.5),
+                "y_pct": coords.get("y_pct", 0.5),
+                "w_pct": coords.get("w_pct", 0.05),
+                "h_pct": coords.get("h_pct", 0.05),
+            })
+    return json.dumps(slides, ensure_ascii=False)
+
+
+@app.post("/api/roteiros/{id}/gerar-link")
+async def gerar_link_roteiro(id: str, request: Request):
+    """Gera URL publica com TTL para acesso ao player SCORM sem autenticacao.
+
+    Requisito: 3.1, 3.3
+    """
+    _validar_caminho(id + ".json", ROTEIROS_DIR)
+
+    caminho = os.path.join(ROTEIROS_DIR, id + ".json")
+    if not os.path.exists(caminho):
+        raise HTTPException(status_code=404, detail="Roteiro nao encontrado.")
+
+    token = str(uuid.uuid4())
+    criado_em = int(time.time())
+    expira_em = criado_em + TTL_DIAS * 86400
+
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            conn.execute(
+                "INSERT INTO sim_links (token, roteiro_id, criado_em, expira_em, total_acessos) "
+                "VALUES (?, ?, ?, ?, 0)",
+                (token, id, criado_em, expira_em),
+            )
+            conn.commit()
+    except Exception as e:
+        logging.error(f"[gerar-link] Falha ao persistir link: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao persistir link no banco de dados.")
+
+    return {
+        "url": f"/play/{token}",
+        "expira_em": datetime.fromtimestamp(expira_em).isoformat(),
+        "token": token,
+    }
+
+
+@app.get("/play/{token}", response_class=HTMLResponse)
+async def acessar_player_via_link(token: str, request: Request):
+    """Serve o player SCORM diretamente via link publico sem autenticacao.
+
+    Requisito: 3.2, 3.4, 3.5
+    """
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            row = conn.execute(
+                "SELECT roteiro_id, expira_em, total_acessos FROM sim_links WHERE token = ?",
+                (token,),
+            ).fetchone()
+    except Exception as e:
+        logging.error(f"[play] Erro ao consultar sim_links: {e}")
+        return HTMLResponse(content=_HTML_LINK_NAO_ENCONTRADO)
+
+    if row is None:
+        return HTMLResponse(content=_HTML_LINK_NAO_ENCONTRADO)
+
+    roteiro_id, expira_em, total_acessos = row
+
+    if expira_em < int(time.time()):
+        return HTMLResponse(content=_HTML_LINK_EXPIRADO)
+
+    # Incrementar total_acessos
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            conn.execute(
+                "UPDATE sim_links SET total_acessos = total_acessos + 1 WHERE token = ?",
+                (token,),
+            )
+            conn.commit()
+    except Exception as e:
+        logging.warning(f"[play] Falha ao incrementar total_acessos: {e}")
+
+    # Registrar evento "iniciou" em analytics_eventos
+    try:
+        ip = request.client.host if request.client else "unknown"
+        ua = request.headers.get("user-agent", "")
+        usuario_id = hashlib.md5(f"{ip}_{ua}".encode()).hexdigest()[:16]
+        ts = int(time.time() * 1000)
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            conn.execute(
+                "INSERT INTO analytics_eventos (roteiro_id, passo_id, usuario_id, evento, ts) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (roteiro_id, None, usuario_id, "iniciou", ts),
+            )
+            conn.commit()
+    except Exception as e:
+        logging.warning(f"[play] Falha ao registrar evento 'iniciou': {e}")
+
+    # Ler roteiro e gerar HTML do player
+    caminho = os.path.join(ROTEIROS_DIR, roteiro_id + ".json")
+    if not os.path.exists(caminho):
+        return HTMLResponse(content=_HTML_LINK_NAO_ENCONTRADO)
+
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            roteiro = json.load(f)
+    except Exception as e:
+        logging.error(f"[play] Erro ao ler roteiro '{roteiro_id}': {e}")
+        return HTMLResponse(content=_HTML_LINK_NAO_ENCONTRADO)
+
+    nome_aula = roteiro.get("metadata", {}).get("nome_aula", "Treinamento")
+    slides_json = _montar_slides_roteiro(roteiro)
+    html_content = scorm_builder._gerar_player_html(nome_aula, slides_json, roteiro_id)
+
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/api/links/{token}/progresso")
+async def progresso_link(token: str):
+    """Retorna metricas de acesso e conclusao de um link de treinamento.
+
+    Requisito: 3.6
+    """
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            row = conn.execute(
+                "SELECT roteiro_id, total_acessos FROM sim_links WHERE token = ?",
+                (token,),
+            ).fetchone()
+    except Exception as e:
+        logging.error(f"[progresso] Erro ao consultar sim_links: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao consultar banco de dados.")
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Link nao encontrado.")
+
+    roteiro_id, total_acessos = row
+
+    try:
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            # Verificar se houve evento "completou"
+            completou_row = conn.execute(
+                "SELECT COUNT(*) FROM analytics_eventos "
+                "WHERE roteiro_id = ? AND evento = 'completou'",
+                (roteiro_id,),
+            ).fetchone()
+            completado = bool(completou_row and completou_row[0] > 0)
+
+            # Ultimo evento "iniciou" para o roteiro_id
+            ultimo_row = conn.execute(
+                "SELECT MAX(ts) FROM analytics_eventos "
+                "WHERE roteiro_id = ? AND evento = 'iniciou'",
+                (roteiro_id,),
+            ).fetchone()
+            ultimo_ts = ultimo_row[0] if ultimo_row and ultimo_row[0] is not None else None
+    except Exception as e:
+        logging.error(f"[progresso] Erro ao consultar analytics_eventos: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao consultar eventos.")
+
+    ultimo_acesso = None
+    if ultimo_ts is not None:
+        try:
+            # ts e armazenado em milissegundos
+            ultimo_acesso = datetime.fromtimestamp(ultimo_ts / 1000).isoformat()
+        except Exception:
+            ultimo_acesso = None
+
+    return {
+        "total_acessos": total_acessos,
+        "ultimo_acesso": ultimo_acesso,
+        "completado": completado,
+    }
+
 
 if __name__ == "__main__":
     print("\n" + "=" * 50)

@@ -47,7 +47,7 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 import moviepy.audio.fx.all as afx
 
-from utils import limpar_nome
+from utils import limpar_nome, aplicar_blur_screenshot
 
 load_dotenv()
 
@@ -247,6 +247,35 @@ async def exibir_legenda_cinema(page, texto: str) -> None:
 
 async def remover_legenda(page) -> None:
     await safe_evaluate(page, "() => { const e = document.getElementById('senior-video-subtitle'); if(e) e.remove(); }")
+
+async def aplicar_blur_video(page, regiao: dict) -> None:
+    """Injeta overlay sólido (#1a1a1a) sobre a região sensível na página gravada.
+
+    O overlay é visível no vídeo gerado pelo Playwright, garantindo que dados
+    sensíveis não apareçam na gravação (Requisito 1.2).
+    """
+    script = """(r) => {
+        let el = document.getElementById('senior-blur-overlay');
+        if (el) el.remove();
+        const div = document.createElement('div');
+        div.id = 'senior-blur-overlay';
+        div.style.cssText = [
+            'position:fixed',
+            'z-index:2147483647',
+            'background:#1a1a1a',
+            'pointer-events:none',
+            'left:' + r.x + 'px',
+            'top:' + r.y + 'px',
+            'width:' + r.w + 'px',
+            'height:' + r.h + 'px',
+        ].join(';');
+        document.documentElement.appendChild(div);
+    }"""
+    await safe_evaluate(page, script, arg=regiao)
+
+async def remover_blur_video(page) -> None:
+    """Remove o overlay de blur injetado por aplicar_blur_video."""
+    await safe_evaluate(page, "() => { const e = document.getElementById('senior-blur-overlay'); if(e) e.remove(); }")
 
 async def exibir_encerramento_cinema(page) -> None:
     script = """() => new Promise((resolve) => {
@@ -581,11 +610,26 @@ async def executar_roteiro(caminho_json: str) -> None:
                                 "texto":   micro_voz,
                             })
 
+                    # Aplicar blur no vídeo se ação tem região sensível (Requisito 1.2)
+                    _dados_blur = acao_tec.get("elemento_alvo", {}).get("dados_blur") or {}
+                    _blur_ativo = bool(_dados_blur.get("blur")) and bool(_dados_blur.get("regiao"))
+                    if _blur_ativo:
+                        try:
+                            await aplicar_blur_video(page, _dados_blur["regiao"])
+                        except Exception as _blur_err:
+                            logging.warning(f"[blur_video] Falha ao aplicar overlay de blur: {_blur_err}")
+                            _blur_ativo = False
+
                     resultado_clique = await clicar_com_animacao(page, acao_tec)
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
 
-                    # Registra execução no score_engine (best-effort — nunca interrompe)
+                    if _blur_ativo:
+                        try:
+                            await remover_blur_video(page)
+                        except Exception as _blur_err:
+                            logging.warning(f"[blur_video] Falha ao remover overlay de blur: {_blur_err}")
+
                     try:
                         intencao = acao_tec.get("intencao_semantica", "").strip()
                         if intencao:

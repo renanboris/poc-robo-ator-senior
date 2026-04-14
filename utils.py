@@ -22,6 +22,64 @@ import tempfile
 import time
 import unicodedata
 
+def aplicar_blur_screenshot(imagem_b64: str, regioes: list) -> str:
+    """
+    Aplica retângulo sólido (#1a1a1a) sobre regiões sensíveis de um screenshot.
+
+    O blur é implementado como retângulo sólido opaco — não gaussiano — para
+    garantir que o dado original não seja recuperável por processamento de imagem
+    (Requisito 1.5).
+
+    Parâmetros:
+        imagem_b64 (str): Imagem codificada em base64. Aceita prefixo data URI
+                          (ex: "data:image/jpeg;base64,...") — removido automaticamente.
+        regioes (list): Lista de regiões a cobrir, cada uma como dict com chaves
+                        "x", "y", "w", "h" (inteiros, em pixels).
+
+    Retorna:
+        str: Imagem resultante codificada em base64 (sem prefixo data URI).
+             Retorna imagem_b64 original em caso de erro ou entrada inválida.
+    """
+    if not imagem_b64:
+        return imagem_b64
+    if not regioes:
+        return imagem_b64
+
+    try:
+        import io
+        import base64
+        from PIL import Image, ImageDraw
+
+        # Remove prefixo data URI se presente
+        dados_b64 = imagem_b64
+        if "," in imagem_b64:
+            dados_b64 = imagem_b64.split(",", 1)[1]
+
+        imagem_bytes = base64.b64decode(dados_b64)
+        img = Image.open(io.BytesIO(imagem_bytes)).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        cor_blur = "#1a1a1a"
+        for regiao in regioes:
+            try:
+                x = int(regiao["x"])
+                y = int(regiao["y"])
+                w = int(regiao["w"])
+                h = int(regiao["h"])
+                draw.rectangle([x, y, x + w, y + h], fill=cor_blur)
+            except (KeyError, ValueError, TypeError) as e:
+                logging.warning(f"[blur] Região inválida ignorada: {regiao} — {e}")
+                continue
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=80)
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    except Exception as e:
+        logging.warning(f"[blur] Falha ao aplicar blur no screenshot: {e}")
+        return imagem_b64
+
+
 def limpar_nome(nome: str) -> str:
     """
     Sanitiza uma string para uso seguro como nome de arquivo/pasta e IDs Vetoriais.
