@@ -90,6 +90,17 @@ def _extrair_coordenadas_relativas(posicao_str: str, viewport_w: int, viewport_h
     except Exception:
         return {"x_pct": 0.5, "y_pct": 0.5, "w_pct": 0.05, "h_pct": 0.05}
 
+def _extrair_coordenadas_absolutas(posicao_str: str) -> dict | None:
+    """Extrai o centro absoluto (x, y) em pixels a partir de posicao_visual.
+    Retorna None se a string estiver ausente ou malformada."""
+    try:
+        partes = dict(p.split(":") for p in posicao_str.split(","))
+        cx = int(partes["x"]) + int(partes["w"]) / 2
+        cy = int(partes["y"]) + int(partes["h"]) / 2
+        return {"x": int(cx), "y": int(cy)}
+    except Exception:
+        return None
+
 async def _analisar_elemento_com_gemini(screenshot_bytes: bytes, html_snapshot: str, label_capturado: str, coords: dict, acao: str) -> dict:
     fallback = {
         "intencao": f"{acao.capitalize()} em '{label_capturado}'",
@@ -357,6 +368,7 @@ async def on_capturar_elemento(source, args):
 
         screenshot_bytes = None
         screenshot_ref   = None   # path relativo em disco ou base64 fallback
+        page_ref         = None   # referência à página, usada também para screenshot_elemento
         vp_w, vp_h = 1920, 1080
 
         try:
@@ -388,10 +400,41 @@ async def on_capturar_elemento(source, args):
         except Exception as e:
             logger.warning(f"Falha ao tirar print: {e}")
 
+        # Captura screenshot do elemento alvo via locator.screenshot() (Req 4.1–4.5)
+        screenshot_elemento_ref = None
+        if page_ref and _nome_aula_sessao and dados.get("seletor"):
+            try:
+                locator_elemento = page_ref.locator(dados["seletor"]).first
+                elem_bytes = await locator_elemento.screenshot(type="jpeg", quality=85)
+                pasta_elem = os.path.join(
+                    "audios_gerados", limpar_nome(_nome_aula_sessao), "screenshots"
+                )
+                os.makedirs(pasta_elem, exist_ok=True)
+                elem_path = os.path.join(pasta_elem, f"elemento_acao_{meu_id_acao}.jpg")
+                with open(elem_path, "wb") as f_elem:
+                    f_elem.write(elem_bytes)
+                screenshot_elemento_ref = elem_path
+            except Exception as e:
+                logger.warning(f"[FOTO {meu_id_acao}] screenshot_elemento falhou: {e}")
+                screenshot_elemento_ref = None
+
         coords  = _extrair_coordenadas_relativas(dados.get("posicao_visual", ""), vp_w, vp_h)
         # Aviso quando coordenadas são zero — indica que getBoundingClientRect retornou vazio
         if coords.get("x_pct", 0) == 0.5 and coords.get("y_pct", 0) == 0.5:
             logger.warning(f"[FOTO {meu_id_acao}] Coordenadas padrão (0.5/0.5) — elemento pode ter sido capturado fora da viewport.")
+
+        # Coordenadas absolutas (centro do elemento em pixels)
+        coords_absolutas = _extrair_coordenadas_absolutas(dados.get("posicao_visual", ""))
+
+        # Coordenadas relativas simplificadas (apenas x_pct / y_pct) para uso no playback
+        if vp_w > 0 and vp_h > 0 and coords_absolutas is not None:
+            coords_relativas_playback = {
+                "x_pct": round(coords_absolutas["x"] / vp_w, 4),
+                "y_pct": round(coords_absolutas["y"] / vp_h, 4),
+            }
+        else:
+            coords_relativas_playback = None
+            logger.warning(f"[FOTO {meu_id_acao}] coordenadas_relativas nao calculadas — viewport indisponivel (vp_w={vp_w}, vp_h={vp_h}).")
         analise = (
             await _analisar_elemento_com_gemini(
                 screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
@@ -413,11 +456,13 @@ async def on_capturar_elemento(source, args):
                 "tipo_elemento":         analise.get("tipo_elemento", "button"),
                 "confianca_captura":     analise.get("confianca", "media"),
                 "label_curto":           label,
-                "coordenadas_relativas": coords,
+                "coordenadas_absolutas": coords_absolutas,
+                "coordenadas_relativas": coords_relativas_playback if coords_relativas_playback is not None else coords,
                 "seletor_hint":          dados["seletor"],
                 "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
                 "html_hint":             dados.get("html_snapshot", "")[:300],
                 "screenshot_referencia": screenshot_ref,
+                "screenshot_elemento":   screenshot_elemento_ref,
             },
             "valor_input": dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else "",
         })

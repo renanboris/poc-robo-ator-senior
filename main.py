@@ -394,7 +394,8 @@ async def executar_roteiro(caminho_json: str) -> None:
     voz_escolhida     = roteiro.get("configuracao_gravacao", {}).get("voz_ia", "pt-BR-FranciscaNeural")
 
     global _audio_manifest
-    _audio_manifest.clear()
+    async with _audio_manifest_lock:
+        _audio_manifest.clear()
 
     pasta_audio_cache = os.path.join("audios_gerados", nome_arquivo_base)
     if os.path.exists(pasta_audio_cache):
@@ -432,7 +433,10 @@ async def executar_roteiro(caminho_json: str) -> None:
                     gerar_audio(micro, f"passo_{id_p}_acao_{i}", nome_arquivo_base, voz_escolhida)
                 )
     if tarefas_audio:
-        await asyncio.gather(*tarefas_audio)
+        resultados = await asyncio.gather(*tarefas_audio, return_exceptions=True)
+        for i, res in enumerate(resultados):
+            if isinstance(res, Exception):
+                logging.error(f"[Audio] Falha na geração de áudio da tarefa {i}: {res}")
     print(f"✅ {len(tarefas_audio)} áudio(s) prontos. Iniciando gravação...", flush=True)
 
     async with async_playwright() as pw:

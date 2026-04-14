@@ -3,6 +3,7 @@ import re
 import json
 import time
 import logging
+from typing import Optional
 from google import genai
 from google.genai import types
 import dap_engine
@@ -15,6 +16,33 @@ _MAX_BIBLIOTECA_CHARS = 300_000
 
 # ─── Número máximo de tentativas na API Gemini ────────────────────────────────
 _MAX_TENTATIVAS = 2
+
+
+def _selecionar_acao_biblioteca(candidatos: list) -> Optional[dict]:
+    """Seleciona a melhor ação de uma lista de candidatos da biblioteca.
+
+    Filtra ações com requer_revisao=True, ordena por _score_confiabilidade
+    decrescente e retorna None se o melhor candidato tiver score < 0.5.
+    Retrocompatível: ações sem _score_confiabilidade recebem score 0.0.
+    """
+    # Separar descartadas para log e válidas para seleção
+    descartadas = [a for a in candidatos if a.get("requer_revisao", False)]
+    for a in descartadas:
+        logger.debug(
+            f"[Biblioteca] Ação descartada por requer_revisao: {a.get('intencao_semantica', '?')}"
+        )
+
+    validos = [a for a in candidatos if not a.get("requer_revisao", False)]
+    if not validos:
+        return None
+
+    validos.sort(key=lambda a: a.get("_score_confiabilidade", 0.0), reverse=True)
+
+    melhor = validos[0]
+    if melhor.get("_score_confiabilidade", 0.0) < 0.5:
+        return None
+
+    return melhor
 
 
 def _validar_estrutura_roteiro(roteiro: dict) -> str | None:
@@ -50,13 +78,27 @@ def gerar_roteiro_ia_sync(nome_aula: str, objetivo: str, tenant_id: str = "senio
         with open(caminho_biblioteca, "r", encoding="utf-8") as f:
             biblioteca = json.load(f)
 
-    logger.info(f"Injetando {len(biblioteca)} peças mapeadas na IA...")
+    # Filtrar ações que requerem revisão antes de injetar no prompt
+    if isinstance(biblioteca, dict):
+        biblioteca_filtrada = {
+            k: v for k, v in biblioteca.items()
+            if _selecionar_acao_biblioteca([v]) is not None
+        }
+        n_descartadas = len(biblioteca) - len(biblioteca_filtrada)
+        if n_descartadas > 0:
+            logger.debug(
+                f"[Biblioteca] {n_descartadas} ação(ões) removida(s) por requer_revisao ou score < 0.5"
+            )
+    else:
+        biblioteca_filtrada = biblioteca
+
+    logger.info(f"Injetando {len(biblioteca_filtrada)} peças mapeadas na IA...")
 
     # Trunca biblioteca se for gigantesca
-    biblioteca_json = json.dumps(biblioteca, ensure_ascii=False)
+    biblioteca_json = json.dumps(biblioteca_filtrada, ensure_ascii=False)
     if len(biblioteca_json) > _MAX_BIBLIOTECA_CHARS:
         logger.warning(f"Biblioteca grande. Truncando para {_MAX_BIBLIOTECA_CHARS} chars.")
-        peças_limitadas = dict(list(biblioteca.items())[:200])
+        peças_limitadas = dict(list(biblioteca_filtrada.items())[:200])
         biblioteca_json = json.dumps(peças_limitadas, ensure_ascii=False)
 
 # 🟢 O PROMPT DE USUÁRIO: Estrutura Profunda com Validação de Estado (Agentic UI)

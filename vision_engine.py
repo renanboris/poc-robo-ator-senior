@@ -5,14 +5,15 @@ Filosofia: cascata de estratégias do mais barato ao mais caro.
 Cada camada só é acionada se a anterior falhar completamente.
 
 Camadas de Resiliência:
-  0  Brain (Memória SQLite Permanente - Auto-Cura e Zero-Touch)
-  1  Foco nativo / active element (campos de digitação inline e novas pastas)
-  1.5 Heurísticas Senior X (Ícones mudos como Home, Lixeira, etc)
-  2  Sniper semântico — 15+ seletores Playwright nativos (getByRole, getByLabel…)
-  3  Seletor hint original (se não for frágil)
-  4  Busca em todos os frames da página (sem depender do hint de iframe)
-  5  Gemini Vision — screenshot atual + referência da gravação
-  6  Coordenadas relativas da gravação (corrigidas por scroll)
+  0    Brain (Memória SQLite Permanente - Auto-Cura e Zero-Touch)
+  0.5  Menu de contexto ativo
+  1    Foco nativo / active element (campos de digitação inline e novas pastas)
+  1.5  Heurísticas Senior X (Ícones mudos como Home, Lixeira, etc)
+  2    Coordenadas capturadas da gravação (corrigidas por scroll) ← MOVIDO
+  2_S  Sniper semântico — 15+ seletores Playwright nativos (getByRole, getByLabel…)
+  3    Seletor hint original (se não for frágil)
+  4    Busca em todos os frames da página (sem depender do hint de iframe)
+  5    Gemini Vision — screenshot atual + referência da gravação
 
 Correcoes aplicadas:
 
@@ -44,13 +45,18 @@ Correcoes aplicadas:
 import asyncio
 import base64
 import hashlib
+import io
 import json
 import logging
 import os
 import re
 import sqlite3
+import time
 from dataclasses import dataclass
 from typing import Optional
+
+import numpy as np
+from PIL import Image as _PILImage
 
 from dotenv import load_dotenv
 from google import genai
@@ -110,6 +116,30 @@ def _init_db():
                     ultima_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            # Migração idempotente: adiciona coluna de timestamp granular (Req 5.1, 5.4)
+            try:
+                conn.execute(
+                    "ALTER TABLE telemetria_camadas ADD COLUMN ultima_atualizacao_ts INTEGER"
+                )
+            except Exception:
+                pass  # coluna já existe
+
+            # Tabela de telemetria granular por execução (Req 5.1, 5.4, 10.4)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS telemetria_execucoes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    camada TEXT NOT NULL,
+                    acertou INTEGER NOT NULL,
+                    intencao_semantica TEXT,
+                    ts INTEGER NOT NULL
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tel_exec_ts ON telemetria_execucoes(ts)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tel_exec_camada ON telemetria_execucoes(camada)"
+            )
             # TTL: remove memórias não usadas há mais de 90 dias (Fase 2.1)
             conn.execute("""
                 DELETE FROM memoria_semantica
@@ -137,33 +167,48 @@ class EntradaCache:
     hitl_corrigido: int = 0
 
 
-def _registrar_telemetria(camada: str, acertou: bool) -> None:
+def _registrar_telemetria(camada: str, acertou: bool, intencao_semantica: str = "") -> None:
     """Registra acerto/falha por camada e emite logs de observabilidade.
 
     - Emite INFO com estratégia e resultado (Requisito 1.4.1).
     - Emite WARNING quando taxa de sucesso acumulada cair abaixo de 60% (Requisito 1.4.3).
+    - Insere registro granular em telemetria_execucoes (Requisitos 5.1, 5.2, 5.3, 9.1).
+    - Usa sqlite3.connect(timeout=5) para lidar com SQLite lock.
+    - Falha de escrita é tratada com logger.warning silencioso — nunca interrompe a execução.
     """
     resultado_str = "sucesso" if acertou else "falha"
     logger.info(f"   [Telemetria] camada={camada} resultado={resultado_str}")
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(DB_PATH, timeout=5) as conn:
+            ts_agora = int(time.time() * 1000)
+
+            # 1. Atualiza contadores agregados na tabela existente (sem breaking changes)
             conn.execute("""
-                INSERT INTO telemetria_camadas (camada, acertos, falhas)
-                VALUES (?, ?, ?)
+                INSERT INTO telemetria_camadas (camada, acertos, falhas, ultima_atualizacao_ts)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT(camada) DO UPDATE SET
                     acertos = acertos + ?,
                     falhas  = falhas  + ?,
-                    ultima_atualizacao = CURRENT_TIMESTAMP
+                    ultima_atualizacao = CURRENT_TIMESTAMP,
+                    ultima_atualizacao_ts = ?
             """, (
                 camada,
                 1 if acertou else 0,
                 0 if acertou else 1,
+                ts_agora,
                 1 if acertou else 0,
                 0 if acertou else 1,
+                ts_agora,
             ))
 
-            # Verifica taxa de sucesso acumulada — alerta se < 60% (Requisito 1.4.3)
+            # 2. Insere registro granular por execução (Requisitos 5.1, 10.4)
+            conn.execute(
+                "INSERT INTO telemetria_execucoes (camada, acertou, intencao_semantica, ts) VALUES (?, ?, ?, ?)",
+                (camada, 1 if acertou else 0, intencao_semantica, ts_agora)
+            )
+
+            # 3. Verifica taxa de sucesso acumulada — alerta se < 60% (Requisito 1.4.3)
             row = conn.execute(
                 "SELECT acertos, falhas FROM telemetria_camadas WHERE camada = ?", (camada,)
             ).fetchone()
@@ -176,8 +221,33 @@ def _registrar_telemetria(camada: str, acertou: bool) -> None:
                             f"[Telemetria] Taxa de sucesso da camada '{camada}' abaixo de 60%: "
                             f"{taxa:.1%} ({row[0]} acertos / {total} tentativas)"
                         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[Telemetria] Falha ao registrar telemetria para camada '{camada}': {e}")
+
+
+def _calcular_taxa_hitl_1h() -> Optional[float]:
+    """Calcula a taxa de HITL (falha_total / total_acoes) na janela deslizante de 1 hora.
+
+    Retorna None se houver menos de 5 ações no período (dados insuficientes).
+    Requisitos: 9.1, 9.2, 9.5
+    """
+    try:
+        ts_1h_atras = int(time.time() * 1000) - 3_600_000
+        with sqlite3.connect(DB_PATH, timeout=5) as conn:
+            total_acoes = conn.execute(
+                "SELECT COUNT(*) FROM telemetria_execucoes WHERE ts >= ?",
+                (ts_1h_atras,)
+            ).fetchone()[0]
+            if total_acoes < 5:
+                return None
+            total_falhas = conn.execute(
+                "SELECT COUNT(*) FROM telemetria_execucoes WHERE ts >= ? AND camada = 'falha_total'",
+                (ts_1h_atras,)
+            ).fetchone()[0]
+            return total_falhas / total_acoes
+    except Exception as e:
+        logger.warning(f"[HITL] Falha ao calcular taxa_hitl_1h: {e}")
+        return None
 
 
 def _registrar_estrategia_vencedora(intencao: str, camada: str) -> None:
@@ -997,6 +1067,152 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
         return False
 
 
+# ── Template Matching Visual ──────────────────────────────────
+# Componente Template_Matcher: matching visual via Pillow + NumPy
+# sem dependência de OpenCV. Usado como Layer 1_T na cascata.
+# ──────────────────────────────────────────────────────────────
+
+
+def _resolver_screenshot_ref_tm(path_ou_b64: str) -> Optional[bytes]:
+    """
+    Resolve um screenshot de referência para bytes, suportando:
+      - Base64 JPEG (começa com '/9j/')
+      - Base64 PNG (começa com 'iVBOR')
+      - Path de arquivo em disco
+
+    Nunca lança exceção — retorna None em caso de falha.
+    """
+    if not path_ou_b64:
+        return None
+    # Detecta base64 JPEG ou PNG pelos magic bytes
+    if path_ou_b64.startswith("/9j/") or path_ou_b64.startswith("iVBOR"):
+        try:
+            return base64.b64decode(path_ou_b64)
+        except Exception as exc:
+            logger.warning(f"[TemplateMatcher] Falha ao decodificar base64: {exc}")
+            return None
+    # Trata como path de arquivo
+    if os.path.exists(path_ou_b64):
+        try:
+            with open(path_ou_b64, "rb") as f:
+                return f.read()
+        except Exception as exc:
+            logger.warning(f"[TemplateMatcher] Falha ao ler arquivo '{path_ou_b64}': {exc}")
+            return None
+    logger.warning(f"[TemplateMatcher] Arquivo não encontrado: '{path_ou_b64}'")
+    return None
+
+
+def _ncc_score(template: np.ndarray, region: np.ndarray) -> float:
+    """Calcula o score NCC (Normalized Cross-Correlation) entre template e região."""
+    t = template.astype(np.float32)
+    r = region.astype(np.float32)
+    t_norm = (t - t.mean()) / (t.std() + 1e-8)
+    r_norm = (r - r.mean()) / (r.std() + 1e-8)
+    return float(np.sum(t_norm * r_norm) / t_norm.size)
+
+
+def _sliding_ncc(template_arr: np.ndarray, tela_arr: np.ndarray):
+    """
+    Sliding window NCC — retorna (best_score, best_y, best_x).
+    Usa step adaptativo para performance sem OpenCV.
+    """
+    th, tw = template_arr.shape[:2]
+    sh, sw = tela_arr.shape[:2]
+    best_score, best_y, best_x = -1.0, 0, 0
+    step = max(1, min(th, tw) // 4)  # step adaptativo
+    for y in range(0, sh - th + 1, step):
+        for x in range(0, sw - tw + 1, step):
+            region = tela_arr[y:y + th, x:x + tw]
+            score = _ncc_score(template_arr, region)
+            if score > best_score:
+                best_score, best_y, best_x = score, y, x
+    return best_score, best_y, best_x
+
+
+def template_match(
+    referencia: bytes,
+    tela_atual: bytes,
+    coords_relativas: Optional[dict],
+    viewport: dict,
+    threshold: float = 0.80,
+) -> Optional[dict]:
+    """
+    Realiza template matching visual entre o screenshot de referência e a tela atual.
+
+    Estratégia:
+      1. Converte referencia e tela_atual para arrays NumPy RGB via Pillow.
+      2. Se coords_relativas fornecido, busca primeiro na janela ±20% do viewport.
+      3. Se score regional >= threshold, retorna coords absolutas do centro do match.
+      4. Caso contrário, busca na tela inteira.
+      5. Retorna None se score < threshold em ambas as buscas.
+
+    Retorna {"x": int, "y": int, "score": float} ou None.
+    """
+    try:
+        # Converte bytes → arrays NumPy RGB
+        ref_img = _PILImage.open(io.BytesIO(referencia)).convert("RGB")
+        tela_img = _PILImage.open(io.BytesIO(tela_atual)).convert("RGB")
+        ref_arr = np.array(ref_img)
+        tela_arr = np.array(tela_img)
+
+        th, tw = ref_arr.shape[:2]
+        sh, sw = tela_arr.shape[:2]
+
+        # Template maior que a tela — impossível fazer match
+        if th > sh or tw > sw:
+            logger.warning(
+                f"[TemplateMatcher] Template ({tw}x{th}) maior que tela ({sw}x{sh}) — pulando"
+            )
+            return None
+
+        vp_w = viewport.get("width", 1920)
+        vp_h = viewport.get("height", 1080)
+
+        # ── Busca regional (±20% do viewport ao redor das coords) ──
+        if coords_relativas and coords_relativas.get("x_pct") is not None:
+            cx = int(coords_relativas["x_pct"] * vp_w)
+            cy = int(coords_relativas["y_pct"] * vp_h)
+            margin_x = int(vp_w * 0.20)
+            margin_y = int(vp_h * 0.20)
+
+            rx1 = max(0, cx - margin_x)
+            ry1 = max(0, cy - margin_y)
+            rx2 = min(sw, cx + margin_x)
+            ry2 = min(sh, cy + margin_y)
+
+            # Região deve ser pelo menos do tamanho do template
+            if (rx2 - rx1) >= tw and (ry2 - ry1) >= th:
+                regiao = tela_arr[ry1:ry2, rx1:rx2]
+                score_r, by_r, bx_r = _sliding_ncc(ref_arr, regiao)
+                if score_r >= threshold:
+                    abs_x = rx1 + bx_r + tw // 2
+                    abs_y = ry1 + by_r + th // 2
+                    logger.info(
+                        f"[TemplateMatcher] Match regional: score={score_r:.3f} "
+                        f"em ({abs_x}, {abs_y})"
+                    )
+                    return {"x": int(abs_x), "y": int(abs_y), "score": float(score_r)}
+
+        # ── Busca na tela inteira ──
+        score_g, by_g, bx_g = _sliding_ncc(ref_arr, tela_arr)
+        if score_g >= threshold:
+            abs_x = bx_g + tw // 2
+            abs_y = by_g + th // 2
+            logger.info(
+                f"[TemplateMatcher] Match global: score={score_g:.3f} "
+                f"em ({abs_x}, {abs_y})"
+            )
+            return {"x": int(abs_x), "y": int(abs_y), "score": float(score_g)}
+
+        logger.debug(f"[TemplateMatcher] Score abaixo do threshold ({score_g:.3f} < {threshold})")
+        return None
+
+    except Exception as exc:
+        logger.warning(f"[TemplateMatcher] Erro no cálculo de matching: {exc}")
+        return None
+
+
 # ──────────────────────────────────────────────────────────────
 # DETECÇÃO DE MENU DE CONTEXTO ATIVO (CAMADA 0.5)
 # ──────────────────────────────────────────────────────────────
@@ -1204,14 +1420,66 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 except Exception:
                     pass
 
+    # Captura screenshot uma vez para Template_Matcher e Gemini Vision
+    screenshot_atual_tm: Optional[bytes] = None
+    try:
+        screenshot_atual_tm = await page.screenshot(type="jpeg", quality=60, full_page=False)
+    except Exception as exc:
+        logger.warning(f"   [Screenshot] Falha ao capturar screenshot para Template_Matcher: {exc}")
+
+    # ── 1_T. Template Matching Visual ────────────────────────────────────────
+    screenshot_elemento_path = alvo.get("screenshot_elemento")
+    if screenshot_elemento_path and screenshot_atual_tm is not None:
+        try:
+            ref_bytes = _resolver_screenshot_ref_tm(screenshot_elemento_path)
+            if ref_bytes:
+                vp = page.viewport_size or {"width": 1920, "height": 1080}
+                resultado_tm = template_match(
+                    referencia=ref_bytes,
+                    tela_atual=screenshot_atual_tm,
+                    coords_relativas=coords_relativas,
+                    viewport=vp,
+                    threshold=0.80,
+                )
+                if resultado_tm:
+                    coords_tm = {"x": resultado_tm["x"], "y": resultado_tm["y"]}
+                    if await _clicar_por_coordenadas(page, coords_tm, acao, valor):
+                        logger.info(f"   [TemplateMatcher] Clique em {coords_tm} bem-sucedido (score={resultado_tm['score']:.3f}).")
+                        _registrar_telemetria("1_template_matching", True)
+                        _registrar_estrategia_vencedora(intencao, "1_template_matching")
+                        return True
+                _registrar_telemetria("1_template_matching", False)
+        except Exception as exc:
+            logger.warning(f"   [TemplateMatcher] Erro na camada 1_T: {exc}")
+
+    # ── 2. Coordenadas Capturadas (gravação original) ────────────────────────
+    if coords_relativas and coords_relativas.get("x_pct"):
+        logger.info("   [Coords Capturadas] Tentando coordenadas relativas da gravação...")
+        try:
+            vp = page.viewport_size or {"width": 1920, "height": 1080}
+            x  = int(coords_relativas["x_pct"] * vp["width"])
+            y  = int(coords_relativas["y_pct"] * vp["height"])
+            if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
+                logger.info(f"   [Coords Capturadas] Clique em ({x}, {y}) bem-sucedido.")
+                _registrar_telemetria("2_coords_capturadas", True)
+                _registrar_estrategia_vencedora(intencao, "2_coords_capturadas")
+                return True
+        except Exception as exc:
+            logger.warning(f"   [Coords Capturadas] Falhou: {exc}")
+        _registrar_telemetria("2_coords_capturadas", False)
+
     # ── Gera candidatos ───────────────────────────────────────────────────────
     candidatos = _gerar_candidatos(seletor_hint, label_curto, iframe_hint, acao, tipo_elemento, html_hint)
 
-    # ── 2. Sniper Semantico ───────────────────────────────────────────────────
+    # ── 2_sniper. Sniper Semantico ────────────────────────────────────────────
     if candidatos:
         logger.info(f"   [Sniper] {len(candidatos)} candidatos para '{label_curto}'...")
         for cand in candidatos:
-            if await _tentar_candidato(page, cand, acao, valor):
+            _t0 = time.monotonic()
+            _acertou = await _tentar_candidato(page, cand, acao, valor, timeout_ms=800)
+            _elapsed_ms = (time.monotonic() - _t0) * 1000
+            logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — {'OK' if _acertou else 'miss'}")
+            if _acertou:
                 logger.info(f"   [Sniper] Acerto: {cand.descricao}")
                 # [BUG-2] FIX: passa apenas cand.seletor (None quando vazio, nao cand.descricao)
                 _registrar_sucesso_cache(
@@ -1223,7 +1491,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 _registrar_estrategia_vencedora(intencao, "2_sniper")
                 return True
 
-    # ── 3. Seletor Hint Original ──────────────────────────────────────────────
+    # ── 3_hint_original. Seletor Hint Original ────────────────────────────────
     if seletor_hint and not _e_seletor_fragil(seletor_hint):
         # Verificação de identidade para seletores posicionais (fix bug item errado)
         if _contem_indice_posicional(seletor_hint) and label_curto and not is_tag_generica:
@@ -1255,7 +1523,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 _registrar_estrategia_vencedora(intencao, "3_hint_original")
                 return True
 
-    # ── 4. Busca Profunda em Todos os Frames ──────────────────────────────────
+    # ── 4_todos_frames. Busca Profunda em Todos os Frames ────────────────────
     if candidatos:
         logger.info("   [Todos os Frames] Procurando o elemento em frames filhos...")
         frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
@@ -1265,13 +1533,16 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             _registrar_estrategia_vencedora(intencao, "4_todos_frames")
             return True
 
-    # ── 5. Gemini Vision (Self-Healing Supremo) ───────────────────────────────
+    # ── 5_gemini_vision. Gemini Vision (Self-Healing Supremo) ────────────────
     logger.info("   [Vision] DOM esgotado. Acionando Gemini Visual...")
-    try:
-        screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
-    except Exception as exc:
-        logger.warning(f"Screenshot falhou antes do Gemini: {exc}")
-        screenshot_atual = None
+    # Reutiliza screenshot já capturado para Template_Matcher (evita captura dupla)
+    screenshot_atual = screenshot_atual_tm
+    if screenshot_atual is None:
+        try:
+            screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
+        except Exception as exc:
+            logger.warning(f"Screenshot falhou antes do Gemini: {exc}")
+            screenshot_atual = None
 
     if screenshot_atual:
         vp       = page.viewport_size or {"width": 1920, "height": 1080}
@@ -1316,25 +1587,17 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     _registrar_estrategia_vencedora(intencao, "5_gemini_vision")
                     return True
 
-    # ── 6. Fallback Cego (Coordenadas Relativas Originais) ───────────────────
-    if coords_relativas and coords_relativas.get("x_pct"):
-        logger.info("   [Fallback Final] Coordenadas da gravacao original...")
-        try:
-            vp = page.viewport_size or {"width": 1920, "height": 1080}
-            x  = int(coords_relativas["x_pct"] * vp["width"])
-            y  = int(coords_relativas["y_pct"] * vp["height"])
-            if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
-                logger.info(f"   [Fallback Final] Clique em ({x}, {y}) executado.")
-                _registrar_telemetria("6_coords_originais", True)
-                _registrar_estrategia_vencedora(intencao, "6_coords_originais")
-                return True
-        except Exception as exc:
-            logger.warning(f"Fallback de coordenadas falhou: {exc}")
-
     # ── Falha Total ───────────────────────────────────────────────────────────
     # [BUG-3] FIX: registra falha apenas se o Brain nao registrou uma neste ciclo
     if not brain_registrou_falha:
         _registrar_falha_cache(intencao)
     _registrar_telemetria("falha_total", False)
+    # Verifica taxa de HITL da última hora e emite alerta se > 20% (Req 9.1, 9.2, 9.5)
+    _taxa_hitl = _calcular_taxa_hitl_1h()
+    if _taxa_hitl is not None and _taxa_hitl > 0.20:
+        logger.warning(
+            f"[HITL] Taxa de intervenção manual elevada na última hora: "
+            f"{_taxa_hitl:.1%} — verifique o Vision Engine."
+        )
     logger.error(f"   [FALHA TOTAL] Impossivel executar: '{intencao[:70]}'")
     return False

@@ -667,6 +667,105 @@ async def get_metricas():
     except Exception as e_scores:
         logging.warning(f"[metricas] Não foi possível calcular scores: {e_scores}")
 
+    # ── vision_layers — 12 camadas com métricas das últimas 24h (Task 11) ───
+    CAMADAS_VISION = [
+        "0_brain", "0_brain_coords", "0.5_menu_ctx", "1_foco_nativo",
+        "1.5_heuristica_seniorx", "1_template_matching", "2_coords_capturadas",
+        "2_sniper", "3_hint_original", "4_todos_frames", "5_gemini_vision", "falha_total",
+    ]
+    vision_layers: list = []
+    taxa_hitl_1h: Optional[float] = None
+    top_falhas: list = []
+    acoes_requer_revisao: Optional[int] = None
+
+    try:
+        _brain_db = "brain.db"
+        if os.path.exists(_brain_db):
+            ts_24h = int(time.time() * 1000) - 86_400_000
+            ts_1h  = int(time.time() * 1000) - 3_600_000
+
+            with sqlite3.connect(_brain_db, timeout=5) as conn:
+                # vision_layers — acertos/falhas por camada nas últimas 24h
+                for camada in CAMADAS_VISION:
+                    row = conn.execute(
+                        "SELECT SUM(acertou), SUM(1 - acertou) FROM telemetria_execucoes "
+                        "WHERE camada = ? AND ts >= ?",
+                        (camada, ts_24h),
+                    ).fetchone()
+                    acertos_c = row[0] if row and row[0] is not None else None
+                    falhas_c  = row[1] if row and row[1] is not None else None
+                    if acertos_c is None and falhas_c is None:
+                        taxa_c = None
+                    else:
+                        total_c = (acertos_c or 0) + (falhas_c or 0)
+                        taxa_c  = round((acertos_c or 0) / total_c, 4) if total_c > 0 else None
+                    vision_layers.append({
+                        "camada":      camada,
+                        "acertos":     acertos_c,
+                        "falhas":      falhas_c,
+                        "taxa_sucesso": taxa_c,
+                    })
+
+                # taxa_hitl_1h
+                total_1h  = conn.execute(
+                    "SELECT COUNT(*) FROM telemetria_execucoes WHERE ts >= ?",
+                    (ts_1h,),
+                ).fetchone()[0]
+                falhas_1h = conn.execute(
+                    "SELECT COUNT(*) FROM telemetria_execucoes WHERE ts >= ? AND camada = 'falha_total'",
+                    (ts_1h,),
+                ).fetchone()[0]
+                taxa_hitl_1h = (falhas_1h / total_1h) if total_1h >= 5 else None
+
+                # top_falhas — top 10 ações com maior falha_total nas últimas 24h
+                rows = conn.execute(
+                    """
+                    SELECT te.intencao_semantica,
+                           COUNT(*) AS total_falhas,
+                           MAX(te.ts) AS ultima_ts,
+                           (SELECT te2.camada FROM telemetria_execucoes te2
+                            WHERE te2.intencao_semantica = te.intencao_semantica
+                            ORDER BY te2.ts DESC LIMIT 1) AS ultima_camada
+                    FROM telemetria_execucoes te
+                    WHERE te.ts >= ? AND te.camada = 'falha_total'
+                    GROUP BY te.intencao_semantica
+                    ORDER BY total_falhas DESC
+                    LIMIT 10
+                    """,
+                    (ts_24h,),
+                ).fetchall()
+                for r in rows:
+                    ultima_ts_ms = r[2]
+                    ultima_falha_em = None
+                    if ultima_ts_ms is not None:
+                        try:
+                            import datetime as _dt
+                            ultima_falha_em = _dt.datetime.utcfromtimestamp(
+                                ultima_ts_ms / 1000
+                            ).strftime("%Y-%m-%dT%H:%M:%S")
+                        except Exception:
+                            ultima_falha_em = None
+                    top_falhas.append({
+                        "intencao_semantica":  r[0],
+                        "total_falhas":        r[1],
+                        "ultima_falha_em":     ultima_falha_em,
+                        "ultima_camada_tentada": r[3],
+                    })
+    except Exception as e_vl:
+        logging.warning(f"[metricas] Não foi possível consultar telemetria_execucoes: {e_vl}")
+
+    # acoes_requer_revisao — contagem de ações com requer_revisao: true
+    try:
+        biblioteca_path = "biblioteca_acoes.json"
+        if os.path.exists(biblioteca_path):
+            with open(biblioteca_path, encoding="utf-8") as _f_bib:
+                _biblioteca = json.load(_f_bib)
+            acoes_requer_revisao = sum(
+                1 for a in _biblioteca if a.get("requer_revisao", False)
+            )
+    except Exception as e_bib:
+        logging.warning(f"[metricas] Não foi possível ler biblioteca_acoes.json: {e_bib}")
+
     return {
         "total_aulas":       total_aulas,
         "horas_poupadas":    horas_poupadas,
@@ -684,6 +783,11 @@ async def get_metricas():
         # Scores (Task 25)
         "scores_por_acao":   scores_por_acao,
         "scores_por_fluxo":  scores_por_fluxo,
+        # Observabilidade Vision Engine (Task 11)
+        "vision_layers":          vision_layers,
+        "taxa_hitl_1h":           taxa_hitl_1h,
+        "top_falhas":             top_falhas,
+        "acoes_requer_revisao":   acoes_requer_revisao,
     }
 
 @app.get("/api/status")
