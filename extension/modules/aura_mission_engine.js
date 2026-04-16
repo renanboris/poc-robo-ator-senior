@@ -29,6 +29,8 @@
   var _currentStepIdx = 0;     // indice do passo atual
   var _hud            = null;  // elemento #aura-mission-hud
   var _active         = false; // motor ativo?
+  var _stepsTotal     = 0;     // total de passos da sessao (propagado pelo AuraGpsEngine.init())
+  var _onOutcomeEvaluated = null; // callback opcional chamado ao concluir missao
 
   // Listeners registrados (para remocao no teardown)
   var _listeners = [];
@@ -48,7 +50,7 @@
 
   // ─── HUD ─────────────────────────────────────────────────────────────────────
 
-  function _criarHud() {
+  function _criarHud(totalPassos) {
     _removerHud();
 
     var hud = document.createElement('div');
@@ -85,7 +87,7 @@
       '</div>',
       '<div id="aura-hud-intent" style="font-size:16px; font-weight:500;">Aguarde...</div>',
       '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">',
-        '<div id="aura-hud-dots" style="display:flex; gap:4px;"></div>',
+        '<div id="aura-hud-dots"' + (totalPassos === 0 ? ' style="display:none"' : ' style="display:flex; gap:4px;"') + '></div>',
         '<button id="aura-hud-btn-ajuda" style="background:rgba(245,158,11,0.2); border:1px solid #f59e0b; color:#fbbf24; border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer; transition:all 0.2s;">',
           'Preciso de Ajuda',
         '</button>',
@@ -100,9 +102,6 @@
     var btnAbandonar = document.getElementById('aura-hud-btn-abandonar');
     if (btnAbandonar) {
       btnAbandonar.addEventListener('click', function () {
-        if (global.AuraGpsEngine && typeof global.AuraGpsEngine.teardown === 'function') {
-          global.AuraGpsEngine.teardown();
-        }
         if (global.AuraState && typeof global.AuraState.setMode === 'function') {
           global.AuraState.setMode('assist');
         }
@@ -191,8 +190,7 @@
     _xp = Math.max(0, _xp - custo);
 
     // Atualiza HUD
-    var totalPassos = global.AuraGpsEngine ? _getTotalPassos() : 0;
-    _atualizarHud(totalPassos);
+    _atualizarHud(_stepsTotal);
 
     // Aplica spotlight no target_selector do passo atual
     if (global.AuraSpotlight && step.target_selector) {
@@ -239,14 +237,31 @@
 
   // ─── HANDLERS DE EVENTOS GPS ─────────────────────────────────────────────────
 
+  function _onStepTimeout(e) {
+    if (!_active) return;
+    var mode = global.AuraState ? global.AuraState.getMode() : 'train';
+
+    if (mode === 'prove') {
+      var penalidade = (_scoringConfig.timeout_penalty !== undefined)
+        ? _scoringConfig.timeout_penalty
+        : 10; // default menor que error_penalty (15)
+      _xp = Math.max(0, _xp - penalidade);
+      _atualizarHud(_stepsTotal);
+    } else {
+      // train: encorajamento sem penalidade
+      if (global.AuraUI && typeof global.AuraUI.exibirBalao === 'function') {
+        global.AuraUI.exibirBalao('Sem pressa! Você consegue. Tente novamente. 💪', []);
+      }
+    }
+  }
+
   function _onStepStarted(e) {
     if (!_active) return;
     var detail = e.detail || {};
     _currentStep    = detail.step    || null;
     _currentStepIdx = detail.stepIndex !== undefined ? detail.stepIndex : 0;
 
-    var totalPassos = _getTotalPassos();
-    _atualizarHud(totalPassos);
+    _atualizarHud(_stepsTotal);
   }
 
   function _onStepValidated(e) {
@@ -262,8 +277,7 @@
     if (detail.step)       _currentStep    = detail.step;
     if (detail.stepIndex !== undefined) _currentStepIdx = detail.stepIndex;
 
-    var totalPassos = _getTotalPassos();
-    _atualizarHud(totalPassos);
+    _atualizarHud(_stepsTotal);
   }
 
   function _onStepFailed(e) {
@@ -278,14 +292,7 @@
     _xp = Math.max(0, _xp - penalidade);
     _errorsCount++;
 
-    var totalPassos = _getTotalPassos();
-    _atualizarHud(totalPassos);
-
-    // Analytics: step_error (emitido pelo GPS, mas registramos aqui tambem para missao)
-    _emitAnalytics('step_error', {
-      step_id:    step ? step.id : null,
-      step_index: detail.stepIndex !== undefined ? detail.stepIndex : _currentStepIdx
-    });
+    _atualizarHud(_stepsTotal);
   }
 
   function _onCompleted(e) {
@@ -316,6 +323,15 @@
         msg = '🏆 Incrível! Você completou o treino com 100% de autonomia e ganhou um bônus! Score final: ' + scoreFinal + ' XP.';
       } else {
         msg = '✅ Treino concluído! Você praticou o fluxo e conquistou ' + scoreFinal + ' XP.';
+      }
+    }
+
+    // Callback externo de resultado (opcional)
+    if (typeof _onOutcomeEvaluated === 'function') {
+      try {
+        _onOutcomeEvaluated({ xp: scoreFinal, hintsUsed: _hintsUsed, errorsCount: _errorsCount }, mode);
+      } catch (err) {
+        console.error('[AuraMissionEngine] onOutcomeEvaluated lançou exceção:', err);
       }
     }
 
@@ -371,13 +387,33 @@
     _currentStepIdx = 0;
     _active         = true;
 
+    // Le steps_total do AuraState.session (propagado pelo AuraGpsEngine.init())
+    _stepsTotal = (global.AuraState && global.AuraState.session && global.AuraState.session.steps_total)
+      ? global.AuraState.session.steps_total
+      : 0;
+
+    // Callback opcional de resultado
+    _onOutcomeEvaluated = (scoringConfig && typeof scoringConfig.onOutcomeEvaluated === 'function')
+      ? scoringConfig.onOutcomeEvaluated
+      : null;
+
     // Cria HUD
-    _criarHud();
+    _criarHud(_stepsTotal);
+
+    // Analytics: mission_start
+    _emitAnalytics('mission_start', {
+      roteiro_id:  (global.AuraState && global.AuraState.session && global.AuraState.session.roteiro_id) || null,
+      mode:        mode,
+      base_xp:     _scoringConfig.base_xp || 0,
+      steps_total: _stepsTotal,
+      timestamp:   new Date().toISOString()
+    });
 
     // Registra listeners de eventos GPS
     _addListener('gps:step_started',   _onStepStarted);
     _addListener('gps:step_validated', _onStepValidated);
     _addListener('gps:step_failed',    _onStepFailed);
+    _addListener('gps:step_timeout',   _onStepTimeout);
     _addListener('gps:completed',      _onCompleted);
   }
 
@@ -402,11 +438,21 @@
     _sessionStart   = null;
     _currentStep    = null;
     _currentStepIdx = 0;
+    _stepsTotal     = 0;
+    _onOutcomeEvaluated = null;
   }
 
   global.AuraMissionEngine = {
     init:     init,
-    teardown: teardown
+    teardown: teardown,
+    getScore: function () {
+      return {
+        xp:          _xp,
+        hintsUsed:   _hintsUsed,
+        errorsCount: _errorsCount,
+        durationSec: _sessionStart ? Math.round((Date.now() - _sessionStart) / 1000) : 0
+      };
+    }
   };
 
 }(window));

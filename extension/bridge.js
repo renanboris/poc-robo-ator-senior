@@ -47,6 +47,30 @@
             return;
         }
 
+        // 🟢 PONTE PARA GPS EXPLÍCITO (Magic Link ?aura_gps=)
+        if (event.data.type === "AURA_FETCH_GPS") {
+            chrome.runtime.sendMessage({
+                action:    "fetch_gps_explicit",
+                objetivo:  event.data.objetivo || "",
+                tenant_id: event.data.tenant_id || "senior_default"
+            }, (response) => {
+                const err = chrome.runtime.lastError;
+                if (err) {
+                    console.warn("Aura Bridge: Falha ao buscar GPS:", err.message);
+                    window.postMessage({
+                        type: "AURA_GPS_EXPLICIT_RESPONSE",
+                        payload: { status: "erro", mensagem: err.message }
+                    }, window.location.origin);
+                    return;
+                }
+                window.postMessage({
+                    type: "AURA_GPS_EXPLICIT_RESPONSE",
+                    payload: response
+                }, window.location.origin);
+            });
+            return;
+        }
+
         if (event.data.type !== "AURA_CAPTURE") return;
 
         try {

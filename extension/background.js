@@ -1,13 +1,56 @@
 console.log("Aura: Service Worker iniciado.");
 
-// Configuração centralizada — nunca hardcode inline
-const AURA_AUTH_TOKEN = 'senior_training_secreto_2026'; // TODO: injetar via build/manifest
-const AURA_ENDPOINTS = {
-  analyze:   'http://localhost:8000/analyze',
-  missions:  'http://localhost:8000/api/missoes',
-  gps:       'http://localhost:8000/api/gps-roteiro',
-  analytics: 'http://localhost:8000/api/analytics/event'
-};
+// Carrega aura_config.js que define AURA_CONFIG com token e endpoints.
+// Em MV3 service workers, importScripts é a forma de carregar scripts adicionais.
+try {
+  importScripts('aura_config.js');
+} catch (e) {
+  console.warn('[Aura BG] aura_config.js não encontrado — usando configuração padrão de localhost.');
+}
+
+// ─── CONFIGURAÇÃO ─────────────────────────────────────────────────────────────
+// Lê AURA_CONFIG definido em aura_config.js (carregado antes via manifest.json).
+// Se não estiver definido, usa fallback para localhost sem token.
+var _cfg = (typeof AURA_CONFIG !== 'undefined') ? AURA_CONFIG : {};
+var _cfgEndpoints = (_cfg && _cfg.endpoints) ? _cfg.endpoints : {};
+
+const AURA_AUTH_TOKEN = (_cfg && _cfg.authToken) ? _cfg.authToken : '';
+
+const AURA_ENDPOINTS = Object.freeze({
+  analyze:   _cfgEndpoints.analyze   || 'http://localhost:8000/analyze',
+  missions:  _cfgEndpoints.missions  || 'http://localhost:8000/api/missoes',
+  gps:       _cfgEndpoints.gps       || 'http://localhost:8000/api/gps-roteiro',
+  analytics: _cfgEndpoints.analytics || 'http://localhost:8000/api/analytics/evento'
+});
+
+// Aviso para endpoints com protocolo não seguro fora de localhost
+Object.values(AURA_ENDPOINTS).forEach(function(url) {
+  if (!url.startsWith('https://') && !url.startsWith('http://localhost')) {
+    console.warn('[Aura BG] Endpoint com protocolo não seguro detectado:', url);
+  }
+});
+
+/**
+ * Retorna a configuração ativa sem expor o token.
+ * Útil para diagnóstico e testes.
+ */
+function getConfig() {
+  return { endpoints: Object.assign({}, AURA_ENDPOINTS) };
+}
+
+// Catálogo canônico de event_types aceitos pela extensão
+const ANALYTICS_EVENT_TYPES = new Set([
+  'assist_prompt_sent',
+  'assist_response_received',
+  'gps_start',
+  'gps_step_started',
+  'step_complete',
+  'step_error',
+  'session_abandoned',
+  'mission_start',
+  'hint_requested',
+  'mission_complete'
+]);
 
 let cachedScreenshot = null;
 
@@ -68,6 +111,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'analytics_event') {
+        var eventType = request.payload && request.payload.event_type;
+        if (!ANALYTICS_EVENT_TYPES.has(eventType)) {
+            sendResponse({ ok: false, reason: 'event_type_unknown' });
+            return true;
+        }
         _analyticsQueue.push({ payload: request.payload, attempts: 0 });
         _flushAnalyticsQueue();
         sendResponse({ ok: true });

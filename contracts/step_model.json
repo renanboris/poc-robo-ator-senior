@@ -95,6 +95,23 @@
       "type": "number",
       "default": 5,
       "description": "Penalidade de XP descontada por cada hint solicitado neste passo"
+    },
+    "scenario_id": {
+      "type": "string",
+      "description": "Reservado para uso futuro em fluxos de roleplay adaptativo. Identifica o cenario ao qual o passo pertence. Ausente em passos de GPS operacional padrao.",
+      "optional": true
+    },
+    "branch_id": {
+      "type": "string",
+      "description": "Reservado para uso futuro em fluxos de roleplay adaptativo. Identifica o ramo de decisao em fluxos com multiplos desfechos. Ausente em passos de GPS operacional padrao.",
+      "optional": true
+    },
+    "timeout_penalty_type": {
+      "type": "string",
+      "enum": ["none", "soft", "hard"],
+      "default": "soft",
+      "description": "Tipo de penalidade aplicada quando o timeout expira no modo prove. 'none': sem penalidade. 'soft': penalidade reduzida (scoringConfig.timeout_penalty). 'hard': penalidade igual a scoringConfig.error_penalty.",
+      "optional": true
     }
   },
   "_defaults": {

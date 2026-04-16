@@ -1914,6 +1914,7 @@ async def listar_jobs(tenant_id: str = "senior_default", limit: int = 50):
     return job_registry.listar_jobs_por_tenant(tenant_id, limit=limit)
 
 
+@app.get("/api/gps-roteiro")
 async def get_gps_roteiro(
     objetivo: str = "",
     tenant_id: str = "senior_default",

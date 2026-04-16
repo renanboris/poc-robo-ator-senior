@@ -34,6 +34,8 @@
   var _stepStartTime = null;   // timestamp de inicio do passo corrente (ms)
   var _timeoutHandle = null;   // handle do setTimeout de timeout do passo
   var _panel         = null;   // elemento #aura-gps-panel
+  var _isActive      = false;  // true enquanto uma sessão GPS está em execução
+  var _options       = {};     // opções passadas ao init() (ex: onBranchDecision)
 
   // Cleanup do validador ativo (listener ou observer)
   var _cleanupValidator = null;
@@ -382,17 +384,27 @@
   }
 
   /**
-   * Validador element_absent: MutationObserver + ausencia de querySelector.
+   * Validador element_absent: MutationObserver + ausencia de querySelector com delay mínimo de 500ms.
    */
   function _validadorElementAbsent(selector, onValidado) {
     var _validado = false;
+    var _delayHandle = null;
 
     function _verificar() {
       if (_validado) return;
       if (selector && !document.querySelector(selector)) {
-        _validado = true;
-        obs.disconnect();
-        onValidado();
+        // Delay mínimo de 500ms para evitar falso positivo em carregamentos lentos
+        if (_delayHandle) return;
+        _delayHandle = setTimeout(function () {
+          _delayHandle = null;
+          // Verifica novamente após o delay
+          if (!document.querySelector(selector)) {
+            _validado = true;
+            obs.disconnect();
+            onValidado();
+          }
+          // Se o elemento apareceu durante o delay, continua observando
+        }, 500);
       }
     }
 
@@ -400,7 +412,13 @@
     obs.observe(document.body, { childList: true, subtree: true });
     _verificar();
 
-    return function () { obs.disconnect(); };
+    return function () {
+      obs.disconnect();
+      if (_delayHandle) {
+        clearTimeout(_delayHandle);
+        _delayHandle = null;
+      }
+    };
   }
 
   // ─── CICLO DE VIDA DOS PASSOS ────────────────────────────────────────────────
@@ -430,6 +448,17 @@
     // Emite evento de inicio do passo (usado pelo AuraMissionEngine)
     _emitCustomEvent('gps:step_started', { step: step, stepIndex: index });
 
+    // Analytics: gps_step_started
+    _emitAnalytics('gps_step_started', {
+      step_id:    step.id || null,
+      step_index: index,
+      roteiro_id: _roteiro ? (_roteiro.id || null) : null,
+      tenant_id:  (global.AuraState && global.AuraState.session && global.AuraState.session.tenant_id)
+                    ? global.AuraState.session.tenant_id
+                    : 'senior_default',
+      timestamp:  new Date().toISOString()
+    });
+
     // Aplica spotlight
     if (global.AuraSpotlight && step.target_selector) {
       global.AuraSpotlight.aplicar(step.target_selector, true);
@@ -441,7 +470,7 @@
     // Timeout do passo
     var timeoutMs = (step.timeout_sec || 30) * 1000;
     _timeoutHandle = setTimeout(function () {
-      _falharPasso(index);
+      _timeoutPasso(index);
     }, timeoutMs);
   }
 
@@ -471,6 +500,32 @@
 
     var proximo = _stepIndex + 1;
 
+    // Verifica branch_id para roleplay futuro
+    if (step && step.branch_id) {
+      _emitCustomEvent('gps:branch_point', {
+        step:        step,
+        stepIndex:   _stepIndex,
+        branch_id:   step.branch_id,
+        scenario_id: step.scenario_id || null
+      });
+      // Aguarda um tick para listeners externos redirecionarem
+      var proximoDefault = proximo;
+      setTimeout(function () {
+        var proximoFinal = proximoDefault;
+        if (typeof _options.onBranchDecision === 'function') {
+          try {
+            var redirect = _options.onBranchDecision(step, proximoDefault);
+            if (typeof redirect === 'number') proximoFinal = redirect;
+          } catch (err) {
+            console.error('[AuraGpsEngine] onBranchDecision lançou exceção, usando fluxo sequencial:', err);
+          }
+        }
+        if (proximoFinal >= _passos.length) { _concluir(); }
+        else { _iniciarPasso(proximoFinal); }
+      }, 0);
+      return;
+    }
+
     if (proximo >= _passos.length) {
       _concluir();
     } else {
@@ -478,16 +533,23 @@
     }
   }
 
-  function _falharPasso(index) {
+  function _timeoutPasso(index) {
     var step = _passos[index];
 
-    // Limpa validador
+    // Limpa validador atual
     if (typeof _cleanupValidator === 'function') {
       _cleanupValidator();
       _cleanupValidator = null;
     }
 
-    // Analytics: step_error
+    // Emite step_timeout ANTES de step_failed
+    _emitCustomEvent('gps:step_timeout', {
+      step:        step,
+      stepIndex:   index,
+      timeout_sec: step ? step.timeout_sec : 30
+    });
+
+    // Analytics: step_error (timeout é um tipo de erro)
     _emitAnalytics('step_error', {
       step_id:         step ? step.id : null,
       step_index:      index,
@@ -495,6 +557,15 @@
     });
 
     _emitCustomEvent('gps:step_failed', { step: step, stepIndex: index });
+
+    // Reinicia o validador para permitir nova tentativa
+    _cleanupValidator = _registrarValidador(step, index);
+
+    // Reinicia o timeout
+    var timeoutMs = (step ? (step.timeout_sec || 30) : 30) * 1000;
+    _timeoutHandle = setTimeout(function () {
+      _timeoutPasso(index);
+    }, timeoutMs);
   }
 
   function _concluir() {
@@ -557,13 +628,21 @@
    *
    * @param {{ id: string, passos: object[] }} roteiro
    */
-  function init(roteiro) {
-    // Teardown de sessao anterior, se houver
-    teardown();
+  function init(roteiro, options) {
+    if (_isActive) {
+      console.warn('[AuraGpsEngine] init() chamado com sessão ativa — executando teardown preventivo.');
+      teardown();
+    }
 
+    _options = options || {};
     _roteiro   = roteiro || {};
     _passos    = (_roteiro.passos || []).map(normalizeStep);
     _stepIndex = 0;
+
+    // Propaga steps_total para AuraState.session (usado pelo AuraMissionEngine para dots de progresso)
+    if (global.AuraState && global.AuraState.session) {
+      global.AuraState.session.steps_total = _passos.length;
+    }
 
     if (_passos.length === 0) {
       console.warn('[AuraGpsEngine] init: roteiro sem passos.');
@@ -577,7 +656,10 @@
     _emitAnalytics('gps_start', {
       roteiro_id: _roteiro.id || null,
       timestamp:  new Date().toISOString(),
-      mode:       global.AuraState ? global.AuraState.getMode() : 'gps'
+      mode:       global.AuraState ? global.AuraState.getMode() : 'gps',
+      tenant_id:  (global.AuraState && global.AuraState.session && global.AuraState.session.tenant_id)
+                    ? global.AuraState.session.tenant_id
+                    : 'senior_default'
     });
 
     // Registra nos modos gps, train e prove
@@ -589,12 +671,15 @@
 
     // Inicia passo 0
     _iniciarPasso(0);
+    _isActive = true;
   }
 
   /**
    * Encerra o motor GPS: remove painel, listeners e observers.
    */
   function teardown() {
+    _isActive = false;
+
     if (_timeoutHandle !== null) {
       clearTimeout(_timeoutHandle);
       _timeoutHandle = null;
@@ -634,12 +719,17 @@
     return _stepIndex;
   }
 
+  function isActive() {
+    return _isActive;
+  }
+
   global.AuraGpsEngine = {
     init:              init,
     teardown:          teardown,
     normalizeStep:     normalizeStep,
     getCurrentStep:    getCurrentStep,
-    getCurrentStepIndex: getCurrentStepIndex
+    getCurrentStepIndex: getCurrentStepIndex,
+    isActive:          isActive
   };
 
   console.log('AuraGpsEngine: módulo carregado.');

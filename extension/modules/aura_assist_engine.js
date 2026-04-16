@@ -168,6 +168,25 @@
             }
 
             const temGPS = payload.gps_passos && Array.isArray(payload.gps_passos) && payload.gps_passos.length > 0;
+            const temSpotlight = !!(payload.seletor_css || payload.elemento_id);
+            const tenantIdResp = (global.AuraState && global.AuraState.session && global.AuraState.session.tenant_id)
+                ? global.AuraState.session.tenant_id
+                : 'senior_default';
+
+            // Analytics: assist_response_received
+            window.postMessage({
+                type: 'AURA_ANALYTICS_EVENT',
+                payload: {
+                    event_type: 'assist_response_received',
+                    timestamp:  new Date().toISOString(),
+                    payload: {
+                        has_gps:      temGPS,
+                        has_spotlight: temSpotlight,
+                        tenant_id:    tenantIdResp,
+                        timestamp:    new Date().toISOString()
+                    }
+                }
+            }, window.location.origin);
 
             if (temGPS) {
                 // ── CTA explícito para GPS — NÃO inicia automaticamente ──────
@@ -271,6 +290,23 @@
 
         const extratoDOM = global.AuraDomMapper ? global.AuraDomMapper.capturar() : '';
         const nomeReal   = _descobrirNomeUsuario();
+        const tenantId   = (global.AuraState && global.AuraState.session && global.AuraState.session.tenant_id)
+            ? global.AuraState.session.tenant_id
+            : 'senior_default';
+
+        // Analytics: assist_prompt_sent
+        window.postMessage({
+            type: 'AURA_ANALYTICS_EVENT',
+            payload: {
+                event_type: 'assist_prompt_sent',
+                timestamp:  new Date().toISOString(),
+                payload: {
+                    prompt_length: prompt.length,
+                    tenant_id:     tenantId,
+                    timestamp:     new Date().toISOString()
+                }
+            }
+        }, window.location.origin);
 
         window.postMessage({
             type:        'AURA_CAPTURE',
