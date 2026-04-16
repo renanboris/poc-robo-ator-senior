@@ -149,6 +149,12 @@
 
         if (event.data.type === 'AURA_RESPONSE') {
             const payload = event.data.payload || {};
+            
+            // Remove Typing Indicator antes de exibir resposta
+            if (global.AuraUI && typeof global.AuraUI.removerTypingIndicator === 'function') {
+                global.AuraUI.removerTypingIndicator();
+            }
+            
             _reativarInputs();
 
             const textoResposta = payload.mensagem || payload.advice || 'Desculpe, não consegui processar a resposta.';
@@ -283,8 +289,19 @@
         if (inputEl)   { inputEl.value = ''; inputEl.disabled = true; }
         if (btnEnviar)   btnEnviar.disabled = true;
 
+        // Adiciona mensagem do usuário ao histórico e exibe Typing Indicator
         if (global.AuraUI) {
-            global.AuraUI.exibirBalao('Já estou analisando... Só um momento! 🔍', []);
+            if (typeof global.AuraUI.adicionarMensagemUsuario === 'function') {
+                global.AuraUI.adicionarMensagemUsuario(prompt);
+            }
+            
+            if (typeof global.AuraUI.exibirTypingIndicator === 'function') {
+                global.AuraUI.exibirTypingIndicator();
+            } else {
+                // Fallback para compatibilidade retroativa
+                global.AuraUI.exibirBalao('Já estou analisando... Só um momento! 🔍', []);
+            }
+            
             global.AuraUI.setLastPrompt(prompt);
         }
 

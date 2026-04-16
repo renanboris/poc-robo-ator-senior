@@ -80,14 +80,19 @@
             '  background="transparent" speed="1">',
             '</dotlottie-player>',
             '<div id="aura-speech-bubble">',
-            '  <button class="aura-btn-close" id="aura-btn-close" aria-label="Fechar">✕</button>',
-            '  <div class="aura-text">Olá, sou a Aura! Como posso te ajudar nesta tela?</div>',
+            '  <div class="aura-panel-header">',
+            '    <span class="aura-panel-title">Aura</span>',
+            '    <button class="aura-btn-close" id="aura-btn-close" aria-label="Fechar">✕</button>',
+            '  </div>',
+            '  <div class="aura-thread-area" id="aura-thread-area"',
+            '       role="log" aria-live="polite" aria-label="Conversa com a Aura">',
+            '  </div>',
+            '  <div class="aura-options"></div>',
             '  <div class="aura-input-wrapper">',
             '    <input type="text" id="aura-prompt-input"',
             '      placeholder="Ex: Como eu crio uma pasta?" autocomplete="off">',
             '    <button class="aura-btn-send" id="aura-btn-ask">➜</button>',
             '  </div>',
-            '  <div class="aura-options"></div>',
             '</div>'
         ].join('\n');
         document.documentElement.appendChild(auraContainer);

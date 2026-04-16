@@ -11,6 +11,12 @@
     let _chatStackTimers = [];
     let _animacaoRodando = false;
     let _ultimoPromptParaFeedback = '';
+    
+    // Estado para histórico de conversa e typing indicator
+    let _historico = [];           // { role: 'aura'|'user', texto: string, timestamp: number }
+    let _typingBubbleEl = null;    // referência ao elemento DOM do Typing_Indicator ativo
+    let _typingTimeout = null;     // timeout de 30s para fallback de erro
+    let _scrollListenerRegistrado = false;  // flag para evitar duplicação de listeners
 
     // ── Referências ao DOM (resolvidas lazily) ────────────────────────────────
     function _getBubble()    { return document.getElementById('aura-speech-bubble'); }
@@ -18,6 +24,39 @@
     function _getStack()     { return document.getElementById('aura-chat-stack'); }
     function _getPlayer()    { return document.getElementById('aura-lottie-player'); }
     function _getContainer() { return document.getElementById('aura-floating-container'); }
+    function _getThreadArea() { return document.getElementById('aura-thread-area'); }
+
+    // ── Helpers de renderização de Message_Bubbles ────────────────────────────
+    
+    /**
+     * Cria e insere uma Message_Bubble na Thread_Area.
+     * @param {'aura'|'user'} role
+     * @param {string} texto
+     * @returns {HTMLElement} o elemento criado
+     */
+    function _appendBubble(role, texto) {
+        const area = _getThreadArea();
+        if (!area) return null;
+        
+        const bubble = document.createElement('div');
+        bubble.className = `aura-msg-bubble aura-msg-${role}`;
+        bubble.textContent = texto;
+        
+        area.appendChild(bubble);
+        _scrollThreadToBottom();
+        
+        return bubble;
+    }
+    
+    /**
+     * Scroll automático para o fundo da Thread_Area.
+     */
+    function _scrollThreadToBottom() {
+        const area = _getThreadArea();
+        if (area) {
+            area.scrollTop = area.scrollHeight;
+        }
+    }
 
     // ── Drag do container ─────────────────────────────────────────────────────
     let _isDragging = false;
@@ -92,6 +131,114 @@
         }
     }
 
+    // ── Trava de engajamento por scroll ───────────────────────────────────────
+    function _initScrollEngajamento() {
+        // Evita duplicação de listeners
+        if (_scrollListenerRegistrado) return;
+        
+        const area = _getThreadArea();
+        if (!area) return;
+        
+        let scrollResetTimer = null;
+        
+        area.addEventListener('scroll', () => {
+            // Ativa Engagement_Lock durante o scroll
+            _bubbleEngajada = true;
+            clearTimeout(_bubbleTimeout);
+            
+            // Reinicia timer de 12s após parar de scrollar
+            clearTimeout(scrollResetTimer);
+            scrollResetTimer = setTimeout(() => {
+                // Após 12s sem scroll, permite auto-hide novamente
+                _bubbleEngajada = false;
+                
+                // Reinicia o timer de auto-hide de 12s
+                const bubble = _getBubble();
+                if (bubble && bubble.classList.contains('active') && !_typingBubbleEl) {
+                    _bubbleTimeout = setTimeout(() => {
+                        if (bubble.classList.contains('active') && !_bubbleEngajada && !_typingBubbleEl) {
+                            bubble.classList.remove('active');
+                            const badge = _getBadge();
+                            if (badge && !window.AuraState?.session?.mode?.startsWith('train') && !window.AuraState?.session?.mode?.startsWith('prove')) {
+                                badge.classList.add('active');
+                            }
+                        }
+                    }, 12000);
+                }
+            }, 12000);
+        });
+        
+        _scrollListenerRegistrado = true;
+    }
+
+    // ── Funções de histórico de conversa ──────────────────────────────────────
+    
+    /**
+     * Adiciona a mensagem do usuário ao _historico e renderiza na Thread_Area.
+     * Chamado por dispararAnalise() antes de exibirTypingIndicator().
+     * @param {string} texto
+     */
+    function adicionarMensagemUsuario(texto) {
+        _historico.push({
+            role: 'user',
+            texto: texto,
+            timestamp: Date.now()
+        });
+        _appendBubble('user', texto);
+    }
+
+    /**
+     * Exibe o Typing_Indicator animado na Thread_Area.
+     * Ativa Engagement_Lock e inicia timeout de 30s para fallback de erro.
+     */
+    function exibirTypingIndicator() {
+        // Remove typing indicator anterior se existir
+        removerTypingIndicator();
+        
+        const area = _getThreadArea();
+        if (!area) return;
+        
+        // Cria o elemento do Typing_Indicator
+        const typingBubble = document.createElement('div');
+        typingBubble.className = 'aura-typing-bubble';
+        typingBubble.setAttribute('aria-label', 'Aura está digitando');
+        
+        const dots = document.createElement('div');
+        dots.className = 'aura-typing-dots';
+        dots.innerHTML = '<span></span><span></span><span></span>';
+        
+        typingBubble.appendChild(dots);
+        area.appendChild(typingBubble);
+        
+        _typingBubbleEl = typingBubble;
+        _scrollThreadToBottom();
+        
+        // Ativa Engagement_Lock
+        _bubbleEngajada = true;
+        clearTimeout(_bubbleTimeout);
+        
+        // Timeout de 30s para fallback de erro
+        _typingTimeout = setTimeout(() => {
+            removerTypingIndicator();
+            exibirBalao('Desculpe, houve um problema ao processar sua solicitação. Tente novamente.', [], false);
+        }, 30000);
+    }
+
+    /**
+     * Remove o Typing_Indicator do DOM e cancela o timeout.
+     */
+    function removerTypingIndicator() {
+        if (_typingBubbleEl) {
+            _typingBubbleEl.remove();
+            _typingBubbleEl = null;
+        }
+        
+        if (_typingTimeout) {
+            clearTimeout(_typingTimeout);
+            _typingTimeout = null;
+        }
+    }
+
     // ── Interface pública ─────────────────────────────────────────────────────
 
     /**
@@ -111,7 +258,13 @@
         _bubbleEngajada = false;
         if (badge) badge.classList.remove('active');
 
-        bubble.querySelector('.aura-text').innerText = texto;
+        // Adiciona mensagem da Aura ao histórico e renderiza na Thread_Area
+        _historico.push({
+            role: 'aura',
+            texto: texto,
+            timestamp: Date.now()
+        });
+        _appendBubble('aura', texto);
 
         const optDiv = bubble.querySelector('.aura-options');
         optDiv.innerHTML = '';
@@ -137,9 +290,9 @@
 
         bubble.classList.add('active');
 
-        // AUTO-HIDE: só fecha se o usuário não interagiu com o balão
+        // AUTO-HIDE: só fecha se o usuário não interagiu com o balão e não há Typing Indicator ativo
         _bubbleTimeout = setTimeout(() => {
-            if (bubble.classList.contains('active') && !_bubbleEngajada) {
+            if (bubble.classList.contains('active') && !_bubbleEngajada && !_typingBubbleEl) {
                 bubble.classList.remove('active');
                 const badge = _getBadge();
                 if (badge && !window.AuraState?.session?.mode?.startsWith('train') && !window.AuraState?.session?.mode?.startsWith('prove')) {
@@ -282,6 +435,7 @@
 
         _initDrag();
         _initEngajamento();
+        _initScrollEngajamento();
     }
 
     // ── Exposição do namespace público ────────────────────────────────────────
@@ -295,7 +449,10 @@
         tocarAnimacao,
         setLastPrompt,
         wasPlayerDragged,
-        resetDragFlag
+        resetDragFlag,
+        adicionarMensagemUsuario,
+        exibirTypingIndicator,
+        removerTypingIndicator
     };
 
     console.log('AuraUI: módulo carregado.');
