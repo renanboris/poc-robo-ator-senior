@@ -15,17 +15,17 @@
 
     // ── Injeção de módulos ────────────────────────────────────────────────────
 
-    function _injectScript(src) {
+    function _injectScript(src, extensionId) {
         return new Promise(function (resolve, reject) {
             var s = document.createElement('script');
-            s.src = chrome.runtime.getURL(src);
+            s.src = 'chrome-extension://' + extensionId + '/' + src;
             s.onload = resolve;
             s.onerror = reject;
             (document.head || document.documentElement).appendChild(s);
         });
     }
 
-    async function _carregarModulos() {
+    async function _carregarModulos(extensionId) {
         var modulos = [
             'modules/aura_state.js',
             'modules/aura_feedback.js',
@@ -41,7 +41,7 @@
             'nps_modal.js'
         ];
         for (var i = 0; i < modulos.length; i++) {
-            await _injectScript(modulos[i]);
+            await _injectScript(modulos[i], extensionId);
         }
     }
 
@@ -332,7 +332,7 @@
                     console.error('[Aura] extensionId não encontrado.');
                     return;
                 }
-                _carregarModulos().then(function () {
+                _carregarModulos(extensionId).then(function () {
                     _inicializarAura(extensionId);
                 }).catch(function (err) {
                     console.error('[Aura] Falha ao carregar módulos.', err);
@@ -373,7 +373,7 @@
             _auraInicializada = true;
             _obterExtensionId().then(function (extensionId) {
                 if (!extensionId) return;
-                _carregarModulos().then(function () {
+                _carregarModulos(extensionId).then(function () {
                     _inicializarAura(extensionId);
                 }).catch(function (err) {
                     console.error('[Aura] Falha ao carregar módulos (timeout).', err);

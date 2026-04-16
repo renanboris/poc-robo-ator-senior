@@ -20,7 +20,7 @@ const AURA_ENDPOINTS = Object.freeze({
   analyze:   _cfgEndpoints.analyze   || 'http://localhost:8000/analyze',
   missions:  _cfgEndpoints.missions  || 'http://localhost:8000/api/missoes',
   gps:       _cfgEndpoints.gps       || 'http://localhost:8000/api/gps-roteiro',
-  analytics: _cfgEndpoints.analytics || 'http://localhost:8000/api/analytics/evento'
+  analytics: _cfgEndpoints.analytics || 'http://localhost:8000/api/analytics/extensao'
 });
 
 // Aviso para endpoints com protocolo não seguro fora de localhost

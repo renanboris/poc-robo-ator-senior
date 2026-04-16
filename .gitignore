@@ -3,6 +3,9 @@ venv/
 env/
 .env
 
+# 🔴 CONFIGURAÇÃO DA EXTENSÃO COM TOKEN (não commitar — use aura_config.example.js)
+extension/aura_config.js
+
 # Arquivos compilados e cache do Python
 __pycache__/
 *.pyc

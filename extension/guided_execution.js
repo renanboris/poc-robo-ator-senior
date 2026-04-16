@@ -327,7 +327,9 @@
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           roteiro_id: roteiroId,
-          passo_id:   passoId !== undefined ? passoId : null,
+          passo_id:   (passoId !== undefined && passoId !== null)
+                        ? (isNaN(parseInt(passoId, 10)) ? String(passoId) : parseInt(passoId, 10))
+                        : null,
           usuario_id: null,
           evento:     evento
         })

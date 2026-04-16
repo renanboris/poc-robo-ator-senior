@@ -13,8 +13,9 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from contextlib import asynccontextmanager
 import unicodedata
 import glob
@@ -144,6 +145,16 @@ def _norm(s: str) -> str:
 
 
 app = FastAPI(title="Senior Training OS", lifespan=lifespan)
+
+@app.exception_handler(RequestValidationError)
+async def _handler_validacao(request: Request, exc: RequestValidationError):
+    """Loga o body bruto e os erros de validação para facilitar diagnóstico de 422."""
+    try:
+        body = await request.body()
+        logging.error(f"[422] {request.method} {request.url.path} — body: {body.decode('utf-8', errors='replace')} — erros: {exc.errors()}")
+    except Exception:
+        logging.error(f"[422] {request.method} {request.url.path} — erros: {exc.errors()}")
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 class ConnectionManager:
     def __init__(self):
@@ -523,7 +534,7 @@ class DapRequest(BaseModel):
 
 class EventoAnalyticsReq(BaseModel):
     roteiro_id: str
-    passo_id:   Optional[int] = None
+    passo_id:   Optional[Union[int, str]] = None  # aceita int ou string (ex: "passo-1")
     usuario_id: Optional[str] = None
     evento:     str
 
@@ -538,15 +549,28 @@ class NpsRespostaReq(BaseModel):
     comentario: Optional[str] = None
 
 
+class ExtensaoEventoReq(BaseModel):
+    """Schema de eventos enviados pelo background.js da extensão Aura."""
+    event_type: str
+    timestamp:  Optional[str] = None
+    payload:    Optional[Dict[str, Any]] = None
+
+
 # ==============================================================
 # ROTAS DA API
 # ==============================================================
 
-_EVENTOS_VALIDOS = {"iniciou", "completou_passo", "repetiu_passo", "abandonou", "completou"}
+_EVENTOS_VALIDOS = {"iniciou", "iniciou_guia", "completou_passo", "repetiu_passo", "abandonou", "completou"}
+
+_EXTENSAO_EVENT_TYPES_VALIDOS = {
+    "assist_prompt_sent", "assist_response_received",
+    "gps_start", "gps_step_started", "step_complete", "step_error",
+    "session_abandoned", "mission_start", "hint_requested", "mission_complete"
+}
 
 @app.post("/api/analytics/evento")
 async def ingerir_evento_analytics(payload: EventoAnalyticsReq, request: Request):
-    """Recebe eventos de progresso do player SCORM e da extensão Aura.
+    """Recebe eventos de progresso do player SCORM e da extensão Aura (guided_execution).
 
     Não requer autenticação — dados de uso, não sensíveis (Requisito 2.2, 2.6).
     """
@@ -580,6 +604,47 @@ async def ingerir_evento_analytics(payload: EventoAnalyticsReq, request: Request
         raise HTTPException(status_code=500, detail="Erro ao persistir evento no banco de dados.")
 
     return {"ok": True, "usuario_id": usuario_id}
+
+
+@app.post("/api/analytics/extensao")
+async def ingerir_evento_extensao(payload: ExtensaoEventoReq, request: Request):
+    """Recebe eventos de telemetria enviados pelo background.js da extensão Aura.
+
+    Schema diferente do endpoint SCORM — usa event_type + payload livre.
+    Não requer autenticação — dados de uso, não sensíveis.
+    """
+    if payload.event_type not in _EXTENSAO_EVENT_TYPES_VALIDOS:
+        # Aceita silenciosamente event_types desconhecidos para não quebrar versões futuras da extensão
+        logging.warning(f"[analytics/extensao] event_type desconhecido ignorado: '{payload.event_type}'")
+        return {"ok": True, "ignorado": True}
+
+    ip = request.client.host if request.client else "unknown"
+    ua = request.headers.get("user-agent", "")
+    usuario_id = hashlib.md5(f"{ip}_{ua}".encode()).hexdigest()[:16]
+    ts = int(time.time() * 1000)
+
+    try:
+        import json as _json
+        with sqlite3.connect("brain.db", timeout=5) as conn:
+            conn.execute(
+                """
+                INSERT INTO analytics_eventos (roteiro_id, passo_id, usuario_id, evento, ts)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    payload.payload.get("tenant_id", "extensao") if payload.payload else "extensao",
+                    None,
+                    usuario_id,
+                    payload.event_type,
+                    ts,
+                ),
+            )
+            conn.commit()
+    except Exception as e:
+        logging.error(f"Falha ao persistir evento extensao analytics: {e}")
+        # Não lança exceção — telemetria não deve quebrar o fluxo do usuário
+
+    return {"ok": True}
 
 
 @app.get("/api/analytics/{roteiro_id}")
