@@ -103,14 +103,14 @@ Cada tarefa referencia o requisito que implementa. Tarefas com `*` são opcionai
 
 ### Bloco 2.A — Magic Updates (Requisito 4)
 
-- [ ] 13. Implementar endpoint de detecção de diff entre roteiros
+- [x] 13. Implementar endpoint de detecção de diff entre roteiros
   - `POST /api/roteiros/{id}/detectar-diff` em `app.py`
   - Recebe `{"roteiro_novo_id": str}` — compara passo a passo usando `Template_Matcher` existente
   - Para cada passo, comparar `screenshot_referencia` do roteiro original vs novo
   - Retornar `{"passos_alterados": [{"id_passo": int, "score_matching": float, "motivo": str}], "passos_inalterados": int}`
   - _Requisito: 4.1, 4.2, 4.3_
 
-- [ ] 14. Implementar regeneração parcial de passos
+- [x] 14. Implementar regeneração parcial de passos
   - `POST /api/roteiros/{id}/regenerar-passos` em `app.py`
   - Recebe `{"ids_passo": [int]}` — regenera apenas os passos listados via `generator_engine`
   - Criar versão do roteiro original via `salvar_versao_roteiro` antes de qualquer mudança
@@ -122,12 +122,12 @@ Cada tarefa referencia o requisito que implementa. Tarefas com `*` são opcionai
 
 ### Bloco 2.B — Multi-idioma (Requisito 5)
 
-- [ ] 15. Mapear vozes edge-tts disponíveis por idioma
+- [x] 15. Mapear vozes edge-tts disponíveis por idioma
   - Criar dict `VOZES_POR_IDIOMA` em `utils.py` com mapeamento `idioma → voz_ia` para pt-BR, en-US, es-ES, fr-FR
   - Incluir fallback para idiomas sem voz mapeada
   - _Requisito: 5.6_
 
-- [ ] 16. Implementar endpoint de tradução de roteiro
+- [x] 16. Implementar endpoint de tradução de roteiro
   - `POST /api/roteiros/{id}/traduzir` em `app.py`
   - Recebe `{"idioma_destino": str}` (ex: `"en-US"`)
   - Usar Gemini para traduzir campos `ancora`, `tooltip_dap`, `micro_narracao`, `alerta_instrutor` de todos os passos
@@ -139,13 +139,13 @@ Cada tarefa referencia o requisito que implementa. Tarefas com `*` são opcionai
 
 ### Bloco 2.C — Guided Execution na Extensão (Requisito 6)
 
-- [ ] 17. Implementar endpoint de listagem de roteiros por URL
+- [x] 17. Implementar endpoint de listagem de roteiros por URL
   - `GET /api/roteiros/por-url?url={url}` em `app.py`
   - Busca no Pinecone roteiros com metadata de URL correspondente (ou busca textual no nome_aula)
   - Retorna lista de `{"roteiro_id": str, "nome_aula": str, "total_passos": int}`
   - _Requisito: 6.5_
 
-- [ ] 18. Implementar modo Guided Execution na extensão
+- [x] 18. Implementar modo Guided Execution na extensão
   - Em `extension/`, criar `guided_execution.js` que lê roteiro JSON e injeta tooltips sequenciais
   - Tooltip deve mostrar `micro_narracao` do passo atual com seta apontando para o elemento alvo
   - Usar `seletor_hint` para localizar o elemento; fallback para `coordenadas_relativas` se seletor falhar
@@ -153,7 +153,7 @@ Cada tarefa referencia o requisito que implementa. Tarefas com `*` são opcionai
   - Emitir `POST /api/analytics/evento` com `"completou_passo"` a cada passo concluído
   - _Requisito: 6.1, 6.2, 6.3, 6.4, 6.6_
 
-- [ ] 19. Implementar cache local do roteiro na extensão
+- [x] 19. Implementar cache local do roteiro na extensão
   - Usar `chrome.storage.local` para cachear o JSON do roteiro após primeiro carregamento
   - TTL de cache: 24h (configurável)
   - _Requisito: 6.7_
@@ -162,19 +162,19 @@ Cada tarefa referencia o requisito que implementa. Tarefas com `*` são opcionai
 
 ### Bloco 2.D — Onboarding Gamificado (Requisito 7)
 
-- [ ] 20. Implementar geração de checklist a partir do roteiro
+- [x] 20. Implementar geração de checklist a partir do roteiro
   - `POST /api/roteiros/{id}/gerar-checklist` em `app.py`
   - Extrair passos com `is_conclusao: false`, retornar `[{"id": int, "titulo": str (ancora), "completado": false}]`
   - Salvar checklist em `missoes_ativas/{id}_checklist.json`
   - _Requisito: 7.1_
 
-- [ ] 21. Implementar widget de checklist na extensão
+- [x] 21. Implementar widget de checklist na extensão
   - Em `extension/`, criar `checklist_widget.js` que renderiza checklist flutuante com barra de progresso
   - Atualizar estado via eventos de analytics recebidos do guided execution
   - Exibir animação de celebração (confetti CSS) quando todos os itens forem completados
   - _Requisito: 7.2, 7.3, 7.6_
 
-- [ ] 22. Implementar segmentação por perfil
+- [x] 22. Implementar segmentação por perfil
   - Adicionar campo `perfis_alvo: list[str]` no schema do roteiro (opcional, default `[]` = todos)
   - `GET /api/checklists/usuario/{perfil}` em `app.py` — filtra roteiros onde `perfis_alvo` contém o perfil ou está vazio
   - _Requisito: 7.4, 7.5_
@@ -185,14 +185,14 @@ Cada tarefa referencia o requisito que implementa. Tarefas com `*` são opcionai
 
 ### Bloco 3.A — Smart Tips de Hesitação (Requisito 8)
 
-- [ ] 23. Implementar endpoint de hint contextual
+- [x] 23. Implementar endpoint de hint contextual
   - `GET /api/dap/hint?url={url}&seletor={seletor}` em `app.py`
   - Busca no Pinecone o passo mais relevante para a URL + seletor informados
   - Retorna `{"passo_id": int, "roteiro_id": str, "micro_narracao": str, "score": float}` ou `null` se score < 0.60
   - Nunca retornar hints para campos com `type="password"` (verificar via seletor)
   - _Requisito: 8.2, 8.3, 8.4, 8.7_
 
-- [ ] 24. Implementar detecção de hesitação na extensão
+- [x] 24. Implementar detecção de hesitação na extensão
   - Em `extension/`, criar `hesitation_detector.js` que monitora eventos `focus` em campos de input
   - Após `HESITATION_THRESHOLD_MS` (padrão 5000ms) sem `keydown`, consultar `/api/dap/hint`
   - Exibir tooltip com `micro_narracao` e botão "Ver passo completo" se hint encontrado
@@ -203,21 +203,21 @@ Cada tarefa referencia o requisito que implementa. Tarefas com `*` são opcionai
 
 ### Bloco 3.B — Adaptive Learning Path (Requisito 9)
 
-- [ ] 25. Adicionar suporte a `ramificacoes` no schema do roteiro
+- [x] 25. Adicionar suporte a `ramificacoes` no schema do roteiro
   - Atualizar `PassoRoteiro` em `app.py` com campo opcional `ramificacoes: Optional[List[RamificacaoRoteiro]]`
   - `RamificacaoRoteiro`: `{"condicao": str, "valor": int, "ir_para_passo": int}`
   - Condições suportadas: `"completou_em_menos_de"` (segundos), `"errou_mais_de"` (tentativas)
   - Garantir retrocompatibilidade: roteiros sem `ramificacoes` continuam lineares
   - _Requisito: 9.1, 9.6_
 
-- [ ] 26. Implementar navegação adaptativa no SCORM player
+- [x] 26. Implementar navegação adaptativa no SCORM player
   - Em `scorm_builder.py`, adicionar lógica de avaliação de `ramificacoes` após cada passo concluído
   - Medir tempo de conclusão do passo (timestamp início → timestamp clique correto)
   - Contar tentativas erradas por passo
   - Navegar para `ir_para_passo` quando condição for satisfeita
   - _Requisito: 9.2_
 
-- [ ] 27. Implementar geração de roteiro adaptativo via IA
+- [x] 27. Implementar geração de roteiro adaptativo via IA
   - `POST /api/roteiros/{id}/gerar-adaptive` em `app.py`
   - Usar Gemini para analisar o roteiro e sugerir ramificações baseadas em `peso_narrativo`
   - Passos com `peso_narrativo >= 3`: criar sub-passo de aprofundamento
@@ -228,17 +228,17 @@ Cada tarefa referencia o requisito que implementa. Tarefas com `*` são opcionai
 
 ### Bloco 3.C — NPS Pós-Treinamento (Requisito 10)
 
-- [ ] 28. Criar tabela `nps_respostas` no `brain.db`
+- [x] 28. Criar tabela `nps_respostas` no `brain.db`
   - Schema: `id INTEGER PRIMARY KEY, roteiro_id TEXT, score INTEGER, comentario TEXT, ts INTEGER`
   - Migração idempotente no startup
   - _Requisito: 10.2_
 
-- [ ] 29. Implementar endpoints de NPS
+- [x] 29. Implementar endpoints de NPS
   - `POST /api/analytics/nps` — persiste resposta, registra alerta em log se score <= 6
   - `GET /api/analytics/{roteiro_id}/nps` — retorna score médio, distribuição e comentários recentes (últimos 10)
   - _Requisito: 10.2, 10.3, 10.5_
 
-- [ ] 30. Implementar modal de NPS na extensão
+- [x] 30. Implementar modal de NPS na extensão
   - Em `extension/`, criar `nps_modal.js` que escuta evento `"completou"` do analytics
   - Exibir modal após 3 segundos com escala 0–10 e campo de comentário opcional
   - Controlar exibição via `chrome.storage.local` — máximo 1x por usuário por roteiro
