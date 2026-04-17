@@ -1,0 +1,101 @@
+# Plano de Implementação
+
+- [x] 1. Escrever teste exploratório de condição de bug (ANTES de implementar a correção)
+  - **Property 1: Bug Condition** - Falso Positivo em Coordenadas Capturadas e Sniper Texto Parcial
+  - **CRÍTICO**: Este teste DEVE FALHAR no código não corrigido — a falha confirma que o bug existe
+  - **NÃO tente corrigir o teste ou o código quando ele falhar**
+  - **NOTA**: O teste codifica o comportamento esperado — ele validará a correção quando passar após a implementação
+  - **OBJETIVO**: Surfaçar contraexemplos que demonstram o bug nos dois vetores simultâneos
+  - **Abordagem PBT Escopada**: Para bugs determinísticos, escopar a propriedade aos casos concretos de falha para garantir reprodutibilidade
+  - Criar arquivo `tests/test_vision_engine_bug_condition.py` com mocks de `page` e `acao_tec`
+  - **Cenário A — Coords deslocadas**: Simular `page` onde `page.evaluate("document.elementFromPoint(x,y)")` retorna texto "Cancelar" quando `label_curto="Salvar"`. Executar camada `2_coords_capturadas`. Assertar que o código não corrigido retorna `True` (demonstra o bug: aceita elemento errado)
+  - **Cenário B — Sniper falso positivo**: Simular página com "Novo Documento de Texto" visível antes de "Novo Documento". `label_curto="Novo Documento"`. Candidato `text=Novo Documento` com `exact=False`. Assertar que o código não corrigido retorna `True` com o elemento errado
+  - **Cenário C — Sniper múltiplos candidatos ambíguos**: Simular página com "Excluir Arquivo" e "Excluir Pasta". `label_curto="Excluir Pasta"`. Assertar que o código não corrigido acerta "Excluir Arquivo" (primeiro visível) e retorna `True`
+  - O teste deve assertar: `resultado_nao_corrigido == True` (confirma que o bug existe — o sistema aceita elemento errado)
+  - Executar o teste no código não corrigido
+  - **RESULTADO ESPERADO**: Teste FALHA (correto — prova que o bug existe)
+  - Documentar os contraexemplos encontrados para entender a causa raiz
+  - Marcar tarefa como concluída quando o teste estiver escrito, executado e a falha documentada
+  - _Bug_Condition: isBugCondition(acao_tec, "2_coords_capturadas") onde coords_rel IS NOT NULL AND elemento_em_coords != elemento_esperado(label_curto)_
+  - _Bug_Condition: isBugCondition(acao_tec, "2_sniper_texto_parcial") onde candidato.exact=False AND seletor STARTS_WITH "text=" AND elemento_encontrado != elemento_esperado(label_curto)_
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+
+- [x] 2. Escrever testes de preservação por propriedade (ANTES de implementar a correção)
+  - **Property 2: Preservation** - Candidatos de Alta Confiança e Camadas Não Modificadas
+  - **IMPORTANTE**: Seguir metodologia observation-first
+  - Criar arquivo `tests/test_vision_engine_preservation.py`
+  - **Observar no código não corrigido** o comportamento para inputs que NÃO satisfazem a condição de bug:
+    - Observar: candidato `[aria-label='Salvar']` → aceito sem verificação adicional → retorna `True`
+    - Observar: candidato `[data-testid='btn-salvar']` → aceito sem verificação adicional → retorna `True`
+    - Observar: candidato com `role="button"` e `label="Salvar"` (get_by_role) → aceito sem verificação → retorna `True`
+    - Observar: `label_curto=""` com coords válidas → aceito (fail-open) → retorna `True`
+    - Observar: `page.evaluate` lança exceção → aceito (fail-open) → retorna `True`
+    - Observar: coords corretas onde `elementFromPoint` retorna texto contendo `label_curto` → retorna `True`
+  - **Escrever testes de propriedade** capturando os padrões observados:
+    - Propriedade: para todo candidato com `seletor` contendo `[aria-label=`, `[data-testid=`, sem `exact=False` — o resultado deve ser idêntico ao código original
+    - Propriedade: para todo `label_curto` vazio, a verificação de identidade deve retornar `True` (fail-open) independentemente do texto do elemento
+    - Propriedade: para toda falha de `page.evaluate`, a camada `2_coords_capturadas` deve retornar `True` (fail-open)
+    - Propriedade: para coords corretas onde texto do elemento contém `label_curto`, a camada deve retornar `True`
+    - Usar `hypothesis` com `@given(st.text(min_size=0, max_size=50))` para gerar `label_curto` variados
+    - Usar `@given(st.floats(min_value=0.0, max_value=1.0), st.floats(min_value=0.0, max_value=1.0))` para gerar `x_pct` e `y_pct`
+  - Executar os testes no código não corrigido
+  - **RESULTADO ESPERADO**: Testes PASSAM (confirma o comportamento baseline a preservar)
+  - Marcar tarefa como concluída quando os testes estiverem escritos, executados e passando no código não corrigido
+  - _Preservation: Candidatos de alta confiança (aria-label exato, data-testid, role+name, placeholder, title) não devem ser afetados pela correção_
+  - _Preservation: Camadas 0_brain, 1_template_matching, 1.5_heuristica_seniorx, 3_hint_original, 4_todos_frames, 5_gemini_vision devem produzir resultado idêntico_
+  - _Preservation: Comportamento fail-open de _verificar_identidade_elemento deve ser preservado_
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+
+- [x] 3. Corrigir cliques incorretos em camadas de fallback (`vision_engine.py`)
+
+  - [x] 3.1 Adicionar verificação de identidade pós-clique na camada `2_coords_capturadas`
+    - Localizar o bloco da camada `2_coords_capturadas` em `encontrar_e_clicar` (linhas ~1390-1402)
+    - Após calcular `x = int(coords_relativas["x_pct"] * vp["width"])` e `y = int(coords_relativas["y_pct"] * vp["height"])` e chamar `_clicar_por_coordenadas`, adicionar verificação de identidade antes de retornar `True`
+    - Usar `page.evaluate("([x,y]) => { const el = document.elementFromPoint(x,y); return el ? (el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || '') : ''; }", [x, y])` para obter o texto do elemento nas coordenadas
+    - Comparar o texto obtido com `label_curto` (case-insensitive, strip): se `label_curto.strip().lower() not in texto_elemento.strip().lower()`, registrar falha na telemetria e **não** retornar `True` — deixar a cascata continuar para `2_sniper`
+    - Aplicar fail-open: se `label_curto` estiver vazio (`not label_curto`) ou se `page.evaluate` lançar exceção, aceitar o clique normalmente
+    - Manter `_registrar_telemetria("2_coords_capturadas", True)` apenas quando a identidade for confirmada
+    - Emitir `logger.warning(f"[Fallback] Ação '{intencao_semantica[:60]}' resolvida por camada '2_coords_capturadas' — verifique se o elemento correto foi atingido.")` após confirmação de identidade
+    - Sem alterações em `_clicar_por_coordenadas`, `_verificar_identidade_elemento` ou qualquer outra função
+    - _Bug_Condition: isBugCondition(acao_tec, "2_coords_capturadas") — coords_rel IS NOT NULL AND elemento_em_coords != elemento_esperado(label_curto)_
+    - _Expected_Behavior: encontrar_e_clicar retorna False (escala para 2_sniper) quando label_curto não está contido no texto do elemento nas coordenadas calculadas_
+    - _Preservation: quando label_curto vazio ou page.evaluate falha → fail-open → retorna True (Req 3.6)_
+    - _Requirements: 2.1, 2.2, 2.4_
+
+  - [x] 3.2 Aplicar `_verificar_identidade_elemento` para candidatos de texto parcial no Sniper (`2_sniper`)
+    - Localizar o loop de candidatos da camada `2_sniper` em `encontrar_e_clicar` (linhas ~1405-1420)
+    - Identificar candidatos de texto parcial: `cand.seletor.startswith("text=") and not cand.exact` OU `cand.via_pierce and "text=" in cand.seletor`
+    - Para candidatos de texto parcial: construir o locator diretamente no contexto resolvido (`ctx.locator(cand.seletor)`) e chamar `await _verificar_identidade_elemento(locator, label_curto)` antes de `_executar_acao`
+    - Se `_verificar_identidade_elemento` retornar `False`: logar rejeição (`logger.debug`) e continuar para o próximo candidato — **não** executar a ação
+    - Se `_verificar_identidade_elemento` retornar `True`: executar a ação normalmente e emitir `logger.warning(f"[Fallback] Ação '{intencao_semantica[:60]}' resolvida por camada '2_sniper' (texto parcial) — verifique se o elemento correto foi atingido.")`
+    - Candidatos de alta confiança (sem `seletor` — usam `role`, `label`, `placeholder`, `title` — e candidatos com `[aria-label=`, `[data-testid=`) devem continuar passando por `_tentar_candidato` sem verificação adicional
+    - Sem alterações na assinatura de `_tentar_candidato`, `_verificar_identidade_elemento` ou `_gerar_candidatos`
+    - _Bug_Condition: isBugCondition(acao_tec, "2_sniper_texto_parcial") — candidato.exact=False AND seletor STARTS_WITH "text=" AND elemento_encontrado != elemento_esperado(label_curto)_
+    - _Expected_Behavior: candidato de texto parcial é rejeitado quando _verificar_identidade_elemento retorna False; Sniper continua tentando próximos candidatos_
+    - _Preservation: candidatos aria-label exato, data-testid, role+name, placeholder, title → sem verificação adicional (Req 3.3)_
+    - _Requirements: 2.3, 2.4, 3.3_
+
+  - [x] 3.3 Verificar que o teste exploratório de condição de bug agora passa
+    - **Property 1: Expected Behavior** - Falso Positivo em Coordenadas Capturadas e Sniper Texto Parcial
+    - **IMPORTANTE**: Re-executar o MESMO teste da tarefa 1 — NÃO escrever um novo teste
+    - O teste da tarefa 1 codifica o comportamento esperado
+    - Quando este teste passar, confirma que o comportamento esperado está satisfeito
+    - Executar `tests/test_vision_engine_bug_condition.py` no código corrigido
+    - **RESULTADO ESPERADO**: Teste PASSA (confirma que o bug foi corrigido)
+    - _Requirements: 2.1, 2.2, 2.3 — Expected Behavior Properties do design_
+
+  - [x] 3.4 Verificar que os testes de preservação ainda passam
+    - **Property 2: Preservation** - Candidatos de Alta Confiança e Camadas Não Modificadas
+    - **IMPORTANTE**: Re-executar os MESMOS testes da tarefa 2 — NÃO escrever novos testes
+    - Executar `tests/test_vision_engine_preservation.py` no código corrigido
+    - **RESULTADO ESPERADO**: Testes PASSAM (confirma que não há regressões)
+    - Confirmar que todos os testes passam após a correção (sem regressões)
+
+- [x] 4. Checkpoint — Garantir que todos os testes passam
+  - Executar a suíte completa de testes: `pytest tests/test_vision_engine_bug_condition.py tests/test_vision_engine_preservation.py -v`
+  - Confirmar que Property 1 (Bug Condition) passa — bug corrigido
+  - Confirmar que Property 2 (Preservation) passa — sem regressões
+  - Verificar nos logs que `logger.warning("[Fallback] ...")` é emitido quando `2_coords_capturadas` ou `2_sniper` (texto parcial) resolvem com sucesso
+  - Verificar que candidatos de alta confiança (`[aria-label=`, `[data-testid=`, `role+name`) não emitem o WARNING de fallback
+  - Verificar que `label_curto` vazio e falha de `page.evaluate` continuam com comportamento fail-open (sem bloqueio)
+  - Perguntar ao usuário se houver dúvidas antes de fechar
