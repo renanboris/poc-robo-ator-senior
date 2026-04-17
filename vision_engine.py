@@ -61,7 +61,7 @@ from PIL import Image as _PILImage
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from playwright.async_api import Page
+from playwright.async_api import Page, Frame
 
 load_dotenv()
 
@@ -598,6 +598,7 @@ async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
     if not iframe_hint or iframe_hint in ("Pagina Principal", "Página Principal", "iframe-cross-origin"):
         return page
 
+    # Try frame_locator approach first to confirm iframe exists
     for seletor_iframe in [
         f"iframe[name='{iframe_hint}']", f"iframe[src*='{iframe_hint}']",
         f"iframe[id='{iframe_hint}']",   f"iframe[title*='{iframe_hint}']",
@@ -605,10 +606,20 @@ async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
         try:
             fl = page.frame_locator(seletor_iframe)
             await fl.locator("body").wait_for(state="attached", timeout=800)
-            return fl
+            
+            # FIX (Task 3.1): After confirming iframe exists, find the actual Frame object
+            # FrameLocator doesn't have .url or .name attributes needed for coordinate adjustment
+            # We need to return the actual Frame object from page.frames
+            for frame in page.frames:
+                try:
+                    if iframe_hint in frame.url or iframe_hint in frame.name:
+                        return frame  # Return Frame, not FrameLocator
+                except Exception:
+                    continue
         except Exception:
             continue
 
+    # Fallback: iterate through frames directly
     try:
         for frame in page.frames:
             try:
@@ -1262,6 +1273,209 @@ async def _buscar_em_escopo_menu(menu_locator, label_curto: str) -> str | None:
 
 
 # ──────────────────────────────────────────────────────────────
+# RESOLUÇÃO DE ELEMENTOS EM IFRAMES (BUGFIX: robot-element-location-failure)
+# ──────────────────────────────────────────────────────────────
+async def _resolver_elemento_em_iframe(
+    page: Page, x: int, y: int, max_depth: int = 5
+) -> tuple[dict, int, int, bool]:
+    """
+    Resolve recursivamente o elemento em coordenadas (x, y), detectando iframes.
+    
+    Quando elementFromPoint retorna um iframe, ajusta as coordenadas para o sistema
+    de coordenadas do iframe e recursivamente busca o elemento interno.
+    
+    Args:
+        page: Página Playwright
+        x: Coordenada X absoluta no viewport
+        y: Coordenada Y absoluta no viewport
+        max_depth: Profundidade máxima de recursão (proteção contra loops infinitos)
+    
+    Returns:
+        tuple[dict, int, int, bool]: (elemento_info, x_ajustado, y_ajustado, is_cross_origin)
+        - elemento_info: Dicionário com informações do elemento (tagName, innerText, etc.)
+        - x_ajustado: Coordenada X ajustada (relativa ao iframe se aplicável)
+        - y_ajustado: Coordenada Y ajustada (relativa ao iframe se aplicável)
+        - is_cross_origin: True se iframe cross-origin foi detectado (fail-open)
+    
+    Requisitos: 2.1, 2.2, 2.3
+    """
+    if max_depth <= 0:
+        logger.warning(f"[iframe] Max depth atingido na resolução de iframes aninhados em ({x}, {y})")
+        try:
+            elemento = await page.evaluate(
+                "([x, y]) => { const el = document.elementFromPoint(x, y); return el ? { tagName: el.tagName, innerText: el.innerText || '' } : null; }",
+                [x, y]
+            )
+            return (elemento or {}, x, y, False)
+        except Exception:
+            return ({}, x, y, False)
+    
+    try:
+        resultado = await page.evaluate("""
+            ([x, y]) => {
+                const el = document.elementFromPoint(x, y);
+                if (!el) return {tipo: 'null'};
+                
+                if (el.tagName === 'IFRAME') {
+                    const bbox = el.getBoundingClientRect();
+                    return {
+                        tipo: 'iframe',
+                        left: bbox.left,
+                        top: bbox.top,
+                        src: el.src || '',
+                        name: el.name || '',
+                        innerText: el.innerText || 'iframe platform'
+                    };
+                }
+                
+                return {
+                    tipo: 'elemento',
+                    tagName: el.tagName,
+                    innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                };
+            }
+        """, [x, y])
+        
+        if resultado['tipo'] == 'iframe':
+            # Ajustar coordenadas para o sistema do iframe
+            x_rel = int(x - resultado['left'])
+            y_rel = int(y - resultado['top'])
+            
+            logger.info(f"[iframe] Detectado em ({x}, {y}), ajustando para ({x_rel}, {y_rel})")
+            
+            # Tentar acessar o iframe
+            iframe_src = resultado.get('src', '')
+            iframe_name = resultado.get('name', '')
+            
+            # Resolver o frame usando Playwright
+            frame = None
+            for f in page.frames:
+                try:
+                    if iframe_src and iframe_src in f.url:
+                        frame = f
+                        break
+                    if iframe_name and iframe_name == f.name:
+                        frame = f
+                        break
+                except Exception:
+                    continue
+            
+            if not frame:
+                # Cross-origin ou frame não encontrado
+                logger.warning(f"[iframe] Cross-origin ou não acessível em ({x}, {y}) - aplicando fail-open")
+                return (resultado, x, y, True)
+            
+            # Recursivamente resolver no contexto do iframe
+            return await _resolver_elemento_em_iframe_frame(frame, x_rel, y_rel, max_depth - 1)
+        
+        else:
+            # Elemento final encontrado (não é iframe)
+            return (resultado, x, y, False)
+    
+    except Exception as exc:
+        logger.warning(f"[iframe] Erro ao resolver elemento em ({x}, {y}): {exc}")
+        return ({}, x, y, False)
+
+
+async def _resolver_elemento_em_iframe_frame(
+    frame, x: int, y: int, max_depth: int
+) -> tuple[dict, int, int, bool]:
+    """
+    Versão da função _resolver_elemento_em_iframe para contexto de Frame.
+    
+    Implementa a mesma lógica de detecção recursiva de iframes, mas usando
+    frame.evaluate em vez de page.evaluate.
+    
+    Args:
+        frame: Frame Playwright
+        x: Coordenada X relativa ao frame
+        y: Coordenada Y relativa ao frame
+        max_depth: Profundidade máxima de recursão
+    
+    Returns:
+        tuple[dict, int, int, bool]: (elemento_info, x_ajustado, y_ajustado, is_cross_origin)
+    
+    Requisitos: 2.2, 2.3
+    """
+    if max_depth <= 0:
+        logger.warning(f"[iframe] Max depth atingido na resolução de iframes aninhados (frame) em ({x}, {y})")
+        try:
+            elemento = await frame.evaluate(
+                "([x, y]) => { const el = document.elementFromPoint(x, y); return el ? { tagName: el.tagName, innerText: el.innerText || '' } : null; }",
+                [x, y]
+            )
+            return (elemento or {}, x, y, False)
+        except Exception:
+            return ({}, x, y, False)
+    
+    try:
+        resultado = await frame.evaluate("""
+            ([x, y]) => {
+                const el = document.elementFromPoint(x, y);
+                if (!el) return {tipo: 'null'};
+                
+                if (el.tagName === 'IFRAME') {
+                    const bbox = el.getBoundingClientRect();
+                    return {
+                        tipo: 'iframe',
+                        left: bbox.left,
+                        top: bbox.top,
+                        src: el.src || '',
+                        name: el.name || '',
+                        innerText: el.innerText || 'iframe platform'
+                    };
+                }
+                
+                return {
+                    tipo: 'elemento',
+                    tagName: el.tagName,
+                    innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                };
+            }
+        """, [x, y])
+        
+        if resultado['tipo'] == 'iframe':
+            # Ajustar coordenadas para o sistema do iframe aninhado
+            x_rel = int(x - resultado['left'])
+            y_rel = int(y - resultado['top'])
+            
+            logger.info(f"[iframe] Iframe aninhado detectado em ({x}, {y}), ajustando para ({x_rel}, {y_rel})")
+            
+            # Tentar acessar o iframe aninhado
+            iframe_src = resultado.get('src', '')
+            iframe_name = resultado.get('name', '')
+            
+            # Buscar frame aninhado
+            nested_frame = None
+            for f in frame.child_frames:
+                try:
+                    if iframe_src and iframe_src in f.url:
+                        nested_frame = f
+                        break
+                    if iframe_name and iframe_name == f.name:
+                        nested_frame = f
+                        break
+                except Exception:
+                    continue
+            
+            if not nested_frame:
+                # Cross-origin ou frame não encontrado
+                logger.warning(f"[iframe] Iframe aninhado cross-origin ou não acessível em ({x}, {y}) - aplicando fail-open")
+                return (resultado, x, y, True)
+            
+            # Recursivamente resolver no contexto do iframe aninhado
+            return await _resolver_elemento_em_iframe_frame(nested_frame, x_rel, y_rel, max_depth - 1)
+        
+        else:
+            # Elemento final encontrado (não é iframe)
+            return (resultado, x, y, False)
+    
+    except Exception as exc:
+        logger.warning(f"[iframe] Erro ao resolver elemento (frame) em ({x}, {y}): {exc}")
+        return ({}, x, y, False)
+
+
+# ──────────────────────────────────────────────────────────────
 # ORQUESTRADOR PRINCIPAL (A MAQUINA DE DECISAO)
 # ──────────────────────────────────────────────────────────────
 async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
@@ -1460,10 +1674,118 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             x  = int(coords_relativas["x_pct"] * vp["width"])
             y  = int(coords_relativas["y_pct"] * vp["height"])
             if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
-                logger.info(f"   [Coords Capturadas] Clique em ({x}, {y}) bem-sucedido.")
-                _registrar_telemetria("2_coords_capturadas", True)
-                _registrar_estrategia_vencedora(intencao, "2_coords_capturadas")
-                return True
+                # [FIX] Verificar identidade do elemento nas coordenadas antes de confirmar sucesso
+                identidade_confirmada = False
+                if label_curto:  # Fail-open: se label_curto vazio, aceitar o clique
+                    try:
+                        # [Task 3.4] Check if iframe_hint is available and not generic
+                        usar_iframe_hint = (
+                            iframe_hint and 
+                            iframe_hint not in ("Pagina Principal", "Página Principal", "iframe-cross-origin")
+                        )
+                        
+                        if usar_iframe_hint:
+                            # Use iframe_hint to resolve context before elementFromPoint
+                            logger.info(f"   [Coords Capturadas] Usando iframe_hint: '{iframe_hint}'")
+                            contexto = await _resolver_contexto(page, iframe_hint)
+                            
+                            # Adjust coordinates if context is a frame
+                            x_ajustado = x
+                            y_ajustado = y
+                            
+                            # FIX (Task 3.2): Use isinstance() instead of hasattr() for robust Frame detection
+                            # hasattr(contexto, 'url') fails for FrameLocator (Bug 1)
+                            # isinstance(contexto, Frame) correctly identifies Frame objects
+                            if isinstance(contexto, Frame):  # It's a Frame
+                                # Get frame bounding box to adjust coordinates
+                                try:
+                                    # FIX (Task 3.3): Find the iframe element in the page to get its bounding box
+                                    iframe_bbox = await page.evaluate(f"""
+                                        () => {{
+                                            const iframes = document.querySelectorAll('iframe');
+                                            for (const iframe of iframes) {{
+                                                if (iframe.name === '{iframe_hint}' || 
+                                                    iframe.src.includes('{iframe_hint}') ||
+                                                    iframe.id === '{iframe_hint}' ||
+                                                    (iframe.title && iframe.title.includes('{iframe_hint}'))) {{
+                                                    const bbox = iframe.getBoundingClientRect();
+                                                    return {{ left: bbox.left, top: bbox.top }};
+                                                }}
+                                            }}
+                                            return null;
+                                        }}
+                                    """)
+                                    
+                                    if iframe_bbox:
+                                        # FIX (Task 3.3): Correctly adjust both X and Y coordinates
+                                        x_ajustado = int(x - iframe_bbox['left'])
+                                        y_ajustado = int(y - iframe_bbox['top'])
+                                        logger.info(f"   [Coords Capturadas] Coordenadas ajustadas para iframe: ({x}, {y}) -> ({x_ajustado}, {y_ajustado})")
+                                    
+                                    # FIX (Task 3.4): Execute elementFromPoint in Frame context with adjusted coordinates
+                                    elemento_info = await contexto.evaluate("""
+                                        ([x, y]) => {
+                                            const el = document.elementFromPoint(x, y);
+                                            if (!el) return null;
+                                            return {
+                                                tagName: el.tagName,
+                                                innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                                            };
+                                        }
+                                    """, [x_ajustado, y_ajustado])
+                                    
+                                    is_cross_origin = False
+                                    x_final = x_ajustado
+                                    y_final = y_ajustado
+                                except Exception as exc_frame:
+                                    logger.warning(f"   [Coords Capturadas] Erro ao usar iframe_hint - fallback para detecção automática: {exc_frame}")
+                                    # Fallback to automatic detection
+                                    elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
+                            else:
+                                # contexto is Page or FrameLocator - use automatic detection
+                                logger.info(f"   [Coords Capturadas] iframe_hint não resolveu para Frame - usando detecção automática")
+                                elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
+                        else:
+                            # No iframe_hint or generic hint - use automatic detection
+                            logger.info(f"   [Coords Capturadas] Detecção automática de iframe ativada")
+                            elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
+                        
+                        if is_cross_origin:
+                            # Fail-open for cross-origin iframes
+                            logger.warning(f"   [Coords Capturadas] Iframe cross-origin detectado - fail-open aplicado")
+                            identidade_confirmada = True
+                        elif elemento_info and elemento_info.get('innerText'):
+                            texto_elemento = elemento_info['innerText']
+                            if label_curto.strip().lower() in texto_elemento.strip().lower():
+                                identidade_confirmada = True
+                            else:
+                                logger.warning(
+                                    f"   [Coords Capturadas] Identidade não confirmada: "
+                                    f"esperado '{label_curto}', encontrado '{texto_elemento[:50]}' em ({x_final}, {y_final})"
+                                )
+                        else:
+                            # Fail-open: element without text
+                            identidade_confirmada = True
+                    except Exception as exc_verify:
+                        # Fail-open: se page.evaluate falhar, aceitar o clique
+                        logger.warning(f"   [Coords Capturadas] Verificação de identidade falhou (fail-open): {exc_verify}")
+                        identidade_confirmada = True
+                else:
+                    # Fail-open: label_curto vazio → aceitar
+                    identidade_confirmada = True
+
+                if identidade_confirmada:
+                    logger.info(f"   [Coords Capturadas] Clique em ({x}, {y}) bem-sucedido.")
+                    logger.warning(
+                        f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' — "
+                        f"verifique se o elemento correto foi atingido."
+                    )
+                    _registrar_telemetria("2_coords_capturadas", True)
+                    _registrar_estrategia_vencedora(intencao, "2_coords_capturadas")
+                    return True
+                else:
+                    # Identidade não confirmada → escalar para próxima camada
+                    logger.info("   [Coords Capturadas] Escalando para próxima camada (identidade não confirmada).")
         except Exception as exc:
             logger.warning(f"   [Coords Capturadas] Falhou: {exc}")
         _registrar_telemetria("2_coords_capturadas", False)
@@ -1476,20 +1798,80 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         logger.info(f"   [Sniper] {len(candidatos)} candidatos para '{label_curto}'...")
         for cand in candidatos:
             _t0 = time.monotonic()
-            _acertou = await _tentar_candidato(page, cand, acao, valor, timeout_ms=800)
-            _elapsed_ms = (time.monotonic() - _t0) * 1000
-            logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — {'OK' if _acertou else 'miss'}")
-            if _acertou:
-                logger.info(f"   [Sniper] Acerto: {cand.descricao}")
-                # [BUG-2] FIX: passa apenas cand.seletor (None quando vazio, nao cand.descricao)
-                _registrar_sucesso_cache(
-                    intencao,
-                    seletor=cand.seletor if cand.seletor else None,
-                    iframe=iframe_hint,
-                )
-                _registrar_telemetria("2_sniper", True)
-                _registrar_estrategia_vencedora(intencao, "2_sniper")
-                return True
+            
+            # [FIX] Identificar candidatos de texto (exato ou parcial) que requerem verificação de identidade
+            is_candidato_texto = (
+                cand.seletor and 
+                (cand.seletor.startswith("text=") or (cand.via_pierce and "text=" in cand.seletor))
+            )
+            
+            if is_candidato_texto and label_curto:
+                # Candidato de texto (exato ou parcial) — aplicar verificação de identidade
+                logger.debug(f"   [Sniper] Candidato texto detectado: {cand.descricao}")
+                try:
+                    ctx = await _resolver_contexto(page, cand.iframe_hint)
+                    # Extrair o texto do seletor "text=..." e usar get_by_text
+                    texto = cand.seletor[5:].strip('"').strip("'")  # Remove "text=" prefix
+                    locator = ctx.get_by_text(texto, exact=cand.exact).first
+                    # Verificar se o elemento está visível antes de verificar identidade
+                    await locator.wait_for(state="visible", timeout=800)
+                    # Verificar identidade: exigir correspondência exata do label_curto
+                    try:
+                        texto_elemento = await locator.inner_text(timeout=1000)
+                        # Normalizar: strip e lowercase
+                        texto_elem_norm = texto_elemento.strip().lower()
+                        label_norm = label_curto.strip().lower()
+                        # Aceitar APENAS se o texto do elemento É exatamente o label_curto (após normalização)
+                        # Não aceitar substring parcial ou word boundary — apenas match exato
+                        identidade_ok = (texto_elem_norm == label_norm)
+                    except Exception as exc_inner:
+                        # Fail-open: se não conseguir ler o texto, aceitar
+                        identidade_ok = True
+                    
+                    if not identidade_ok:
+                        _elapsed_ms = (time.monotonic() - _t0) * 1000
+                        logger.debug(
+                            f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — "
+                            f"miss (identidade não confirmada: '{texto_elemento[:50]}' != '{label_curto}')"
+                        )
+                        continue  # Rejeitar candidato e tentar o próximo
+                    # Identidade confirmada — executar ação
+                    await _executar_acao(locator, page, acao, valor)
+                    _elapsed_ms = (time.monotonic() - _t0) * 1000
+                    logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — OK (identidade confirmada)")
+                    logger.info(f"   [Sniper] Acerto: {cand.descricao}")
+                    logger.warning(
+                        f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_sniper' (texto parcial) — "
+                        f"verifique se o elemento correto foi atingido."
+                    )
+                    _registrar_sucesso_cache(
+                        intencao,
+                        seletor=cand.seletor if cand.seletor else None,
+                        iframe=iframe_hint,
+                    )
+                    _registrar_telemetria("2_sniper", True)
+                    _registrar_estrategia_vencedora(intencao, "2_sniper")
+                    return True
+                except Exception as exc_sniper:
+                    _elapsed_ms = (time.monotonic() - _t0) * 1000
+                    logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — miss ({exc_sniper})")
+                    continue
+            else:
+                # Candidato de alta confiança (aria-label exato, data-testid, role+name, etc.) — sem verificação adicional
+                _acertou = await _tentar_candidato(page, cand, acao, valor, timeout_ms=800)
+                _elapsed_ms = (time.monotonic() - _t0) * 1000
+                logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — {'OK' if _acertou else 'miss'}")
+                if _acertou:
+                    logger.info(f"   [Sniper] Acerto: {cand.descricao}")
+                    # [BUG-2] FIX: passa apenas cand.seletor (None quando vazio, nao cand.descricao)
+                    _registrar_sucesso_cache(
+                        intencao,
+                        seletor=cand.seletor if cand.seletor else None,
+                        iframe=iframe_hint,
+                    )
+                    _registrar_telemetria("2_sniper", True)
+                    _registrar_estrategia_vencedora(intencao, "2_sniper")
+                    return True
 
     # ── 3_hint_original. Seletor Hint Original ────────────────────────────────
     if seletor_hint and not _e_seletor_fragil(seletor_hint):

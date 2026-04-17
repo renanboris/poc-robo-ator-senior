@@ -17,7 +17,12 @@ import sys
 import logging
 import re
 import traceback
+import time
 from dotenv import load_dotenv
+
+# Adiciona o diretório pai ao path para importar módulos da raiz
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils import limpar_nome
 from shadow_builder import (
     utc_now,
@@ -57,6 +62,56 @@ cliques_capturados: list = []
 shadow_capturado: list = []
 _id_acao_global: int    = 0
 _lock_id: asyncio.Lock  = None
+
+
+def _retry_com_backoff(func, max_tentativas=5, delay_inicial=2):
+    """
+    Executa uma função com retry e backoff exponencial.
+    Útil para APIs com rate limit (429) ou indisponibilidade temporária (503).
+    """
+    for tentativa in range(max_tentativas):
+        try:
+            return func()
+        except Exception as e:
+            erro_str = str(e)
+            # Erros recuperáveis: 429 (rate limit), 503 (service unavailable)
+            if "429" in erro_str or "503" in erro_str or "UNAVAILABLE" in erro_str or "Too Many Requests" in erro_str:
+                if tentativa < max_tentativas - 1:
+                    delay = delay_inicial * (2 ** tentativa)  # Backoff exponencial
+                    logger.warning(f"Gemini API indisponível (tentativa {tentativa + 1}/{max_tentativas}). Aguardando {delay}s...")
+                    print(f"⚠️  GEMINI INDISPONÍVEL — Tentativa {tentativa + 1}/{max_tentativas}. Aguardando {delay}s...", flush=True)
+                    time.sleep(delay)
+                    continue
+            # Outros erros ou última tentativa: propaga a exceção
+            raise
+    raise Exception(f"Falha após {max_tentativas} tentativas com backoff exponencial")
+
+
+def _chamar_openai_fallback(prompt_sistema: str, prompt_usuario: str, model="gpt-4o") -> dict:
+    """
+    Fallback para OpenAI quando Gemini falha completamente.
+    Usa o mesmo formato de prompt e retorna JSON estruturado.
+    """
+    if not _openai_client:
+        raise Exception("OpenAI não configurado. Impossível usar fallback.")
+    
+    logger.info(f"🔄 Usando OpenAI ({model}) como fallback...")
+    print(f"🔄 FALLBACK ATIVADO: Usando OpenAI {model} para gerar o roteiro...", flush=True)
+    
+    try:
+        resposta = _openai_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": prompt_usuario}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        return json.loads(resposta.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"OpenAI fallback também falhou: {e}")
+        raise
 
 
 def _gerar_embedding_openai(texto: str) -> list[float]:
@@ -119,18 +174,23 @@ Analise o screenshot e responda com um JSON:
   "confianca": "alta | media | baixa"
 }}"""
     try:
-        resposta = await asyncio.to_thread(
-            gemini_client.models.generate_content,
-            model="gemini-2.5-flash",
-            contents=[types.Part.from_bytes(data=screenshot_bytes, mime_type="image/jpeg"), prompt],
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1),
-        )
+        def _chamar_gemini():
+            return gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[types.Part.from_bytes(data=screenshot_bytes, mime_type="image/jpeg"), prompt],
+                config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1),
+            )
+        
+        resposta = await asyncio.to_thread(_retry_com_backoff, _chamar_gemini, max_tentativas=3, delay_inicial=1)
         resultado = json.loads(resposta.text)
         resultado.setdefault("intencao", fallback["intencao"])
         resultado.setdefault("descricao_visual", fallback["descricao_visual"])
         resultado.setdefault("contexto_tela", "Desconhecido")
         return resultado
-    except Exception:
+    except Exception as e:
+        # Gemini falhou na análise de screenshot — usar fallback básico
+        # Não tentamos OpenAI aqui porque análise de imagem requer vision API (mais cara)
+        logger.warning(f"⚠️  Gemini vision falhou para elemento '{label_capturado}': {str(e)[:80]}")
         return fallback
 
 
@@ -538,21 +598,43 @@ async def capturar_cliques_na_tela():
 
         print("CAPTURA DUAL INICIADA! O roteiro oficial segue igual; o shadow semântico será salvo em paralelo. Feche o navegador ao terminar.", flush=True)
         
+        loop_iterations = 0
+        max_iterations = 1800  # 1 hora máximo (1800 * 2 segundos)
+        
         try:
-            while not page.is_closed():
+            while not page.is_closed() and loop_iterations < max_iterations:
                 await asyncio.sleep(2)
+                loop_iterations += 1
+                
+                # Log de progresso a cada 5 minutos
+                if loop_iterations % 150 == 0:
+                    print(f"[DEBUG] Captura ativa há {loop_iterations * 2 // 60} minutos. {len(cliques_capturados)} ações capturadas.", flush=True)
+                
                 try:
                     if page.is_closed():
+                        print("[DEBUG] Navegador fechado detectado.", flush=True)
                         break
                     if not await page.evaluate("() => !!window.__radarInjetado"):
                         await _injetar_em_contexto(page)
                 except PlaywrightError as e:
                     if "Target closed" in str(e) or "browser has been closed" in str(e):
+                        print("[DEBUG] Playwright detectou fechamento do navegador.", flush=True)
                         break 
-                except Exception:
+                except Exception as ex:
+                    print(f"[DEBUG] Exceção no loop de captura: {ex}", flush=True)
                     break
-        except Exception:
-            pass
+            
+            if loop_iterations >= max_iterations:
+                print("[AVISO] Timeout de 1 hora atingido. Finalizando captura.", flush=True)
+                
+        except Exception as e:
+            print(f"[DEBUG] Exceção externa no loop: {e}", flush=True)
+        finally:
+            print(f"[DEBUG] Finalizando captura. Total de ações: {len(cliques_capturados)}", flush=True)
+            try:
+                await browser.close()
+            except Exception:
+                pass
 
 def _validar_roteiro(roteiro: dict) -> tuple[bool, str]:
     """
@@ -642,14 +724,43 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
     )
 
     try:
-        resposta = gemini_client.models.generate_content(
-            model="gemini-2.5-flash", contents=prompt_usuario,
-            config=types.GenerateContentConfig(
-                system_instruction=prompt_sistema,
-                response_mime_type="application/json", temperature=0.2,
-            ),
-        )
+        def _chamar_aura():
+            return gemini_client.models.generate_content(
+                model="gemini-2.5-flash", contents=prompt_usuario,
+                config=types.GenerateContentConfig(
+                    system_instruction=prompt_sistema,
+                    response_mime_type="application/json", temperature=0.2,
+                ),
+            )
+        
+        logger.info("Chamando Gemini para gerar roteiro (com retry automático se necessário)...")
+        resposta = _retry_com_backoff(_chamar_aura, max_tentativas=5, delay_inicial=3)
         dados_da_ia = json.loads(resposta.text)
+        print("✅ Roteiro gerado com sucesso usando Gemini.", flush=True)
+        print("IA_USADA:gemini", flush=True)  # Marcador para o dashboard
+        
+    except Exception as e_gemini:
+        # Gemini falhou completamente após retries — tentar fallback OpenAI
+        logger.error(f"❌ Gemini falhou após todas as tentativas: {e_gemini}")
+        print(f"\n❌ GEMINI FALHOU: {str(e_gemini)[:100]}", flush=True)
+        print("ALERTA_GEMINI_FALHOU:true", flush=True)  # Marcador para alerta visual
+        
+        if not _openai_client:
+            print("❌ OpenAI não configurado. Impossível gerar roteiro.", flush=True)
+            logger.error("OpenAI não configurado. Impossível usar fallback.")
+            return None
+        
+        try:
+            dados_da_ia = _chamar_openai_fallback(prompt_sistema, prompt_usuario, model="gpt-4o")
+            print("✅ Roteiro gerado com sucesso usando OpenAI (fallback).", flush=True)
+            print("IA_USADA:openai-fallback", flush=True)  # Marcador para o dashboard
+        except Exception as e_openai:
+            logger.error(f"❌ OpenAI fallback também falhou: {e_openai}")
+            print(f"❌ OPENAI FALLBACK FALHOU: {str(e_openai)[:100]}", flush=True)
+            print("\n🚨 FALHA CRÍTICA: Nenhuma IA disponível para gerar o roteiro.", flush=True)
+            return None
+    
+    try:
         metadata = dados_da_ia.get("metadata", {}); metadata["nome_aula"] = nome_aula
         roteiro_final = {
             "metadata": metadata,
@@ -760,7 +871,7 @@ def iniciar_esteira_de_producao():
         if is_auto:
             args_posicionais = [a for a in sys.argv[1:] if not a.startswith("--")]
             if len(args_posicionais) < 2:
-                print("ERRO FATAL: Modo --auto requer: capture.py <nome_aula> <objetivo> --auto", flush=True)
+                print("ERRO FATAL: Modo --auto requer: capture_dual_output.py <nome_aula> <objetivo> --auto", flush=True)
                 sys.exit(1)
             nome_aula = args_posicionais[0]
             objetivo  = args_posicionais[1]
@@ -769,15 +880,20 @@ def iniciar_esteira_de_producao():
             nome_aula = input("Qual e o nome desta aula? (Ex: Criando Pastas e Subpastas)\n> ")
             objetivo  = input("Qual e o objetivo do treinamento?\n> ")
 
+        print("[DEBUG] Iniciando captura de cliques...", flush=True)
         asyncio.run(capturar_cliques_na_tela())
+        print(f"[DEBUG] Captura finalizada. Total de ações: {len(cliques_capturados)}", flush=True)
 
         if not cliques_capturados:
             print("AVISO: Nenhuma acao capturada. O navegador foi fechado sem interacoes.", flush=True)
             sys.exit(1)
 
+        print("[DEBUG] Salvando shadow JSONL...", flush=True)
         _salvar_shadow_jsonl(nome_aula, objetivo, shadow_capturado)
-        logger.info(f"{len(cliques_capturados)} acoes capturadas. Processando Roteiro...")
+        
+        print(f"[DEBUG] {len(cliques_capturados)} acoes capturadas. Processando Roteiro com Aura...", flush=True)
         caminho_roteiro_gerado = asyncio.run(orquestrador_pos_captura(nome_aula, objetivo))
+        print(f"[DEBUG] Roteiro gerado: {caminho_roteiro_gerado}", flush=True)
 
         if caminho_roteiro_gerado:
             if is_auto:
@@ -786,6 +902,9 @@ def iniciar_esteira_de_producao():
                 if input("\nTudo pronto! Iniciar o Motor de Gravacao? (S/N)\n> ").strip().upper() == "S":
                     import subprocess
                     subprocess.run([sys.executable, "main.py", caminho_roteiro_gerado])
+    except KeyboardInterrupt:
+        print("\n[AVISO] Captura interrompida pelo usuário.", flush=True)
+        sys.exit(0)
     except Exception as e:
         print(f"ERRO FATAL DE EXECUCAO: {e}", flush=True)
         traceback.print_exc()

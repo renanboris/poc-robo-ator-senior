@@ -1,0 +1,103 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - Ícones SVG com conflito fill/stroke renderizam incorretamente
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists
+  - **Scoped PBT Approach**: For deterministic bugs, scope the property to the concrete failing case(s) to ensure reproducibility
+  - Test implementation details from Bug Condition in design:
+    - Verify SVG elements have `fill="currentColor"` attribute in JavaScript
+    - Verify computed CSS style shows `fill: none` 
+    - Verify parent element has class `aura-fb-btn`
+    - Verify visual rendering shows distorted/incorrect icon shapes
+  - The test assertions should match the Expected Behavior Properties from design:
+    - Icons should display correct thumbs up/down outline shapes
+    - Icons should use only stroke without fill
+    - Color should be inherited via currentColor from parent button
+  - Run test on UNFIXED code (extension/modules/aura_feedback.js and extension/style.css)
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bug exists)
+  - Document counterexamples found:
+    - Screenshot or describe the visual distortion of icons
+    - Confirm attribute vs CSS conflict in DevTools
+    - Note any cross-browser differences (Chrome vs Edge)
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2_
+
+- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Comportamento de feedback não-visual permanece inalterado
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-buggy inputs (interactions that don't involve SVG rendering):
+    - Click like button → verify localStorage entry with fields `tipo`, `prompt`, `url`, `ts`
+    - Click dislike button → verify localStorage entry with correct fields
+    - Observe fade-out animation timing (350ms fade, 850ms removal)
+    - Observe disabled state applies `opacity: 0.5` and `cursor: not-allowed`
+    - Observe `voted-yes` class applies color `#00ddb3`
+    - Observe `voted-no` class applies color `#ef4444`
+    - Observe aria-label and aria-hidden attributes are present
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements:
+    - For all click interactions on like/dislike, localStorage SHALL contain correct feedback entry
+    - For all feedback registrations, fade-out animation SHALL complete in expected timing
+    - For all voted states, correct CSS classes and colors SHALL be applied
+    - For all disabled states, correct opacity and cursor SHALL be applied
+    - For all feedback bars, accessibility attributes SHALL be present
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+- [ ] 3. Fix for ícones de feedback renderizando incorretamente
+
+  - [ ] 3.1 Implement the fix
+    - Remove `fill="currentColor"` attribute from like icon SVG element (line 23 in aura_feedback.js)
+    - Remove `fill="currentColor"` attribute from dislike icon SVG element (line 31 in aura_feedback.js)
+    - Replace like icon path with outline-optimized SVG path designed for stroke rendering
+    - Replace dislike icon path with outline-optimized SVG path designed for stroke rendering
+    - Verify CSS rules in style.css (lines 418-422) remain unchanged:
+      - `stroke: currentColor !important` - controls icon color
+      - `stroke-width: 2 !important` - controls outline thickness
+      - `fill: none !important` - prevents fill conflicts
+    - Confirm no other CSS changes are needed (color inheritance via currentColor already works)
+    - _Bug_Condition: isBugCondition(svgElement) where svgElement.hasAttribute('fill') AND svgElement.getAttribute('fill') == 'currentColor' AND computedStyle(svgElement).fill == 'none' AND svgElement.parentElement.classList.contains('aura-fb-btn')_
+    - _Expected_Behavior: Icons SHALL display correct thumbs up/down outline using only stroke, color SHALL be inherited via currentColor from parent button_
+    - _Preservation: All non-visual feedback behaviors (localStorage registration, animations, state management, accessibility) SHALL remain unchanged_
+    - _Requirements: 1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+  - [ ] 3.2 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Ícones SVG renderizam corretamente como outline
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - Verify icons display correct thumbs up/down shapes
+    - Verify no `fill` attribute exists on SVG elements
+    - Verify computed style shows `fill: none` and `stroke: currentColor`
+    - Verify visual appearance matches expected outline icons
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - _Requirements: 2.1, 2.2_
+
+  - [ ] 3.3 Verify preservation tests still pass
+    - **Property 2: Preservation** - Comportamento de feedback não-visual preservado
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - Verify localStorage registration still works correctly
+    - Verify fade-out animations still work with correct timing
+    - Verify voted states still apply correct classes and colors
+    - Verify disabled states still apply correct opacity and cursor
+    - Verify accessibility attributes are still present
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm all tests still pass after fix (no regressions)
+
+- [ ] 4. Checkpoint - Ensure all tests pass
+  - Run all tests (bug condition + preservation)
+  - Verify icons render correctly in multiple states:
+    - Default state (color #94a3b8)
+    - Hover state like (color #00ddb3)
+    - Hover state dislike (color #ef4444)
+    - Voted state (voted-yes: #00ddb3, voted-no: #ef4444)
+    - Disabled state (opacity 0.5)
+  - Test in Chrome and Edge for cross-browser compatibility
+  - Verify no visual regressions in other Aura DAP components
+  - Ensure all tests pass, ask the user if questions arise

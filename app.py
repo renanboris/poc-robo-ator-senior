@@ -325,11 +325,16 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = Non
             proc = processo_atual
 
         linhas_log = []
+        ia_usada = None
+        alerta_gemini_falhou = False
+        
         for linha in iter(proc.stdout.readline, ""):
             linha_limpa = linha.strip()
             if linha_limpa:
                 print(f"[ROBÔ BASTIDORES]: {linha_limpa}")
                 linhas_log.append(linha_limpa)
+                
+                # Detecta progresso
                 if "PROGRESSO:" in linha_limpa:
                     try:
                         pct = int(linha_limpa.split("PROGRESSO:")[1].strip())
@@ -338,9 +343,19 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = Non
                             job_registry.atualizar_job(job_id, progresso=pct)
                     except Exception:
                         pass
+                
+                # Detecta shadow JSONL gerado
                 if linha_limpa.startswith("SHADOW_GERADO:"):
                     _shadow_path = linha_limpa.split("SHADOW_GERADO:", 1)[1].strip()
                     _set_estado(shadow_path=_shadow_path)
+                
+                # Detecta qual IA foi usada
+                if linha_limpa.startswith("IA_USADA:"):
+                    ia_usada = linha_limpa.split("IA_USADA:", 1)[1].strip()
+                
+                # Detecta alerta de falha do Gemini
+                if linha_limpa.startswith("ALERTA_GEMINI_FALHOU:"):
+                    alerta_gemini_falhou = True
 
         proc.wait()
 
@@ -369,7 +384,17 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = Non
                 if job_id:
                     job_registry.atualizar_job(job_id, status="falhou", motivo_falha=erro_real)
         else:
-            _set_estado(sucesso=msg_sucesso)
+            # Processo concluído com sucesso
+            mensagem_final = msg_sucesso
+            
+            # Adiciona alerta visual se OpenAI foi usado como fallback
+            if ia_usada == "openai-fallback":
+                mensagem_final = "⚠️ Roteiro gerado com OpenAI (Gemini indisponível). " + msg_sucesso
+                logging.warning("Roteiro gerado usando OpenAI como fallback — Gemini estava indisponível.")
+            elif alerta_gemini_falhou and ia_usada != "gemini":
+                mensagem_final = "⚠️ Gemini falhou. " + msg_sucesso
+            
+            _set_estado(sucesso=mensagem_final)
             if job_id:
                 job_registry.atualizar_job(job_id, status="concluido")
 
@@ -1212,8 +1237,9 @@ async def get_metricas():
         if os.path.exists(biblioteca_path):
             with open(biblioteca_path, encoding="utf-8") as _f_bib:
                 _biblioteca = json.load(_f_bib)
+            # _biblioteca é um dict onde as chaves são intenções e os valores são objetos de ação
             acoes_requer_revisao = sum(
-                1 for a in _biblioteca if a.get("requer_revisao", False)
+                1 for acao in _biblioteca.values() if acao.get("_requer_revisao", False)
             )
     except Exception as e_bib:
         logging.warning(f"[metricas] Não foi possível ler biblioteca_acoes.json: {e_bib}")
@@ -1403,9 +1429,12 @@ def _iniciar_bg(comando, msg_exec, msg_ok, tipo="processo", tenant_id="senior_de
 @app.post("/api/gravar")
 async def gravar_aula(req: NovaAulaReq):
     tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
-    job_id = _iniciar_bg([sys.executable, "capture.py", req.nome_aula, req.objetivo, "--auto"],
-                     "🔍 Vasculhando o DOM (com autorização)...", "🎯 Tela capturada. A IA já pode enxergar.",
-                     tipo="captura", tenant_id=tenant)
+    job_id = _iniciar_bg(
+        [sys.executable, "capture_variants/capture_dual_output.py", req.nome_aula, req.objetivo, "--auto"],
+        "🔍 Captura Dual ativa — gerando roteiro + shadow semântico...",
+        "🎯 Captura dual concluída. Roteiro e shadow JSONL prontos.",
+        tipo="captura", tenant_id=tenant
+    )
     if job_id is None:
         return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
     return {"status": "iniciado", "job_id": job_id}

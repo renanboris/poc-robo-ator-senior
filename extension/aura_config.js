@@ -27,7 +27,7 @@ var AURA_CONFIG = {
    * Deve corresponder ao valor de AURA_API_SECRET no .env do servidor.
    * Deixe vazio para desenvolvimento sem autenticação.
    */
-  authToken: '',
+  authToken: 'senior_training_secreto_2026',
 
   /**
    * Endpoints do backend.
@@ -37,6 +37,6 @@ var AURA_CONFIG = {
     analyze:   'http://localhost:8000/analyze',
     missions:  'http://localhost:8000/api/missoes',
     gps:       'http://localhost:8000/api/gps-roteiro',
-    analytics: 'http://localhost:8000/api/analytics/evento'
+    analytics: 'http://localhost:8000/api/analytics/extensao'
   }
 };

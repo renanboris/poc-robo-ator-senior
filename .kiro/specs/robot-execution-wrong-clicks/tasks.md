@@ -1,101 +1,290 @@
-# Plano de Implementação
+# Implementation Plan
 
-- [x] 1. Escrever teste exploratório de condição de bug (ANTES de implementar a correção)
-  - **Property 1: Bug Condition** - Falso Positivo em Coordenadas Capturadas e Sniper Texto Parcial
-  - **CRÍTICO**: Este teste DEVE FALHAR no código não corrigido — a falha confirma que o bug existe
-  - **NÃO tente corrigir o teste ou o código quando ele falhar**
-  - **NOTA**: O teste codifica o comportamento esperado — ele validará a correção quando passar após a implementação
-  - **OBJETIVO**: Surfaçar contraexemplos que demonstram o bug nos dois vetores simultâneos
-  - **Abordagem PBT Escopada**: Para bugs determinísticos, escopar a propriedade aos casos concretos de falha para garantir reprodutibilidade
-  - Criar arquivo `tests/test_vision_engine_bug_condition.py` com mocks de `page` e `acao_tec`
-  - **Cenário A — Coords deslocadas**: Simular `page` onde `page.evaluate("document.elementFromPoint(x,y)")` retorna texto "Cancelar" quando `label_curto="Salvar"`. Executar camada `2_coords_capturadas`. Assertar que o código não corrigido retorna `True` (demonstra o bug: aceita elemento errado)
-  - **Cenário B — Sniper falso positivo**: Simular página com "Novo Documento de Texto" visível antes de "Novo Documento". `label_curto="Novo Documento"`. Candidato `text=Novo Documento` com `exact=False`. Assertar que o código não corrigido retorna `True` com o elemento errado
-  - **Cenário C — Sniper múltiplos candidatos ambíguos**: Simular página com "Excluir Arquivo" e "Excluir Pasta". `label_curto="Excluir Pasta"`. Assertar que o código não corrigido acerta "Excluir Arquivo" (primeiro visível) e retorna `True`
-  - O teste deve assertar: `resultado_nao_corrigido == True` (confirma que o bug existe — o sistema aceita elemento errado)
-  - Executar o teste no código não corrigido
-  - **RESULTADO ESPERADO**: Teste FALHA (correto — prova que o bug existe)
-  - Documentar os contraexemplos encontrados para entender a causa raiz
-  - Marcar tarefa como concluída quando o teste estiver escrito, executado e a falha documentada
-  - _Bug_Condition: isBugCondition(acao_tec, "2_coords_capturadas") onde coords_rel IS NOT NULL AND elemento_em_coords != elemento_esperado(label_curto)_
-  - _Bug_Condition: isBugCondition(acao_tec, "2_sniper_texto_parcial") onde candidato.exact=False AND seletor STARTS_WITH "text=" AND elemento_encontrado != elemento_esperado(label_curto)_
-  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+## Overview
 
-- [x] 2. Escrever testes de preservação por propriedade (ANTES de implementar a correção)
-  - **Property 2: Preservation** - Candidatos de Alta Confiança e Camadas Não Modificadas
-  - **IMPORTANTE**: Seguir metodologia observation-first
-  - Criar arquivo `tests/test_vision_engine_preservation.py`
-  - **Observar no código não corrigido** o comportamento para inputs que NÃO satisfazem a condição de bug:
-    - Observar: candidato `[aria-label='Salvar']` → aceito sem verificação adicional → retorna `True`
-    - Observar: candidato `[data-testid='btn-salvar']` → aceito sem verificação adicional → retorna `True`
-    - Observar: candidato com `role="button"` e `label="Salvar"` (get_by_role) → aceito sem verificação → retorna `True`
-    - Observar: `label_curto=""` com coords válidas → aceito (fail-open) → retorna `True`
-    - Observar: `page.evaluate` lança exceção → aceito (fail-open) → retorna `True`
-    - Observar: coords corretas onde `elementFromPoint` retorna texto contendo `label_curto` → retorna `True`
-  - **Escrever testes de propriedade** capturando os padrões observados:
-    - Propriedade: para todo candidato com `seletor` contendo `[aria-label=`, `[data-testid=`, sem `exact=False` — o resultado deve ser idêntico ao código original
-    - Propriedade: para todo `label_curto` vazio, a verificação de identidade deve retornar `True` (fail-open) independentemente do texto do elemento
-    - Propriedade: para toda falha de `page.evaluate`, a camada `2_coords_capturadas` deve retornar `True` (fail-open)
-    - Propriedade: para coords corretas onde texto do elemento contém `label_curto`, a camada deve retornar `True`
-    - Usar `hypothesis` com `@given(st.text(min_size=0, max_size=50))` para gerar `label_curto` variados
-    - Usar `@given(st.floats(min_value=0.0, max_value=1.0), st.floats(min_value=0.0, max_value=1.0))` para gerar `x_pct` e `y_pct`
-  - Executar os testes no código não corrigido
-  - **RESULTADO ESPERADO**: Testes PASSAM (confirma o comportamento baseline a preservar)
-  - Marcar tarefa como concluída quando os testes estiverem escritos, executados e passando no código não corrigido
-  - _Preservation: Candidatos de alta confiança (aria-label exato, data-testid, role+name, placeholder, title) não devem ser afetados pela correção_
-  - _Preservation: Camadas 0_brain, 1_template_matching, 1.5_heuristica_seniorx, 3_hint_original, 4_todos_frames, 5_gemini_vision devem produzir resultado idêntico_
-  - _Preservation: Comportamento fail-open de _verificar_identidade_elemento deve ser preservado_
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+This task list implements the fix for three critical bugs in iframe detection and resolution logic that cause the robot to click on wrong elements inside iframes. The bugs are: (1) `_resolver_contexto()` returns `FrameLocator` instead of `Frame`, (2) coordinates not adjusted correctly for iframe context, and (3) wrong element found (parent container instead of target button).
 
-- [x] 3. Corrigir cliques incorretos em camadas de fallback (`vision_engine.py`)
+The implementation follows the bug condition methodology with exploratory testing BEFORE the fix, preservation testing BEFORE the fix, then implementation with verification.
 
-  - [x] 3.1 Adicionar verificação de identidade pós-clique na camada `2_coords_capturadas`
-    - Localizar o bloco da camada `2_coords_capturadas` em `encontrar_e_clicar` (linhas ~1390-1402)
-    - Após calcular `x = int(coords_relativas["x_pct"] * vp["width"])` e `y = int(coords_relativas["y_pct"] * vp["height"])` e chamar `_clicar_por_coordenadas`, adicionar verificação de identidade antes de retornar `True`
-    - Usar `page.evaluate("([x,y]) => { const el = document.elementFromPoint(x,y); return el ? (el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || '') : ''; }", [x, y])` para obter o texto do elemento nas coordenadas
-    - Comparar o texto obtido com `label_curto` (case-insensitive, strip): se `label_curto.strip().lower() not in texto_elemento.strip().lower()`, registrar falha na telemetria e **não** retornar `True` — deixar a cascata continuar para `2_sniper`
-    - Aplicar fail-open: se `label_curto` estiver vazio (`not label_curto`) ou se `page.evaluate` lançar exceção, aceitar o clique normalmente
-    - Manter `_registrar_telemetria("2_coords_capturadas", True)` apenas quando a identidade for confirmada
-    - Emitir `logger.warning(f"[Fallback] Ação '{intencao_semantica[:60]}' resolvida por camada '2_coords_capturadas' — verifique se o elemento correto foi atingido.")` após confirmação de identidade
-    - Sem alterações em `_clicar_por_coordenadas`, `_verificar_identidade_elemento` ou qualquer outra função
-    - _Bug_Condition: isBugCondition(acao_tec, "2_coords_capturadas") — coords_rel IS NOT NULL AND elemento_em_coords != elemento_esperado(label_curto)_
-    - _Expected_Behavior: encontrar_e_clicar retorna False (escala para 2_sniper) quando label_curto não está contido no texto do elemento nas coordenadas calculadas_
-    - _Preservation: quando label_curto vazio ou page.evaluate falha → fail-open → retorna True (Req 3.6)_
-    - _Requirements: 2.1, 2.2, 2.4_
+---
 
-  - [x] 3.2 Aplicar `_verificar_identidade_elemento` para candidatos de texto parcial no Sniper (`2_sniper`)
-    - Localizar o loop de candidatos da camada `2_sniper` em `encontrar_e_clicar` (linhas ~1405-1420)
-    - Identificar candidatos de texto parcial: `cand.seletor.startswith("text=") and not cand.exact` OU `cand.via_pierce and "text=" in cand.seletor`
-    - Para candidatos de texto parcial: construir o locator diretamente no contexto resolvido (`ctx.locator(cand.seletor)`) e chamar `await _verificar_identidade_elemento(locator, label_curto)` antes de `_executar_acao`
-    - Se `_verificar_identidade_elemento` retornar `False`: logar rejeição (`logger.debug`) e continuar para o próximo candidato — **não** executar a ação
-    - Se `_verificar_identidade_elemento` retornar `True`: executar a ação normalmente e emitir `logger.warning(f"[Fallback] Ação '{intencao_semantica[:60]}' resolvida por camada '2_sniper' (texto parcial) — verifique se o elemento correto foi atingido.")`
-    - Candidatos de alta confiança (sem `seletor` — usam `role`, `label`, `placeholder`, `title` — e candidatos com `[aria-label=`, `[data-testid=`) devem continuar passando por `_tentar_candidato` sem verificação adicional
-    - Sem alterações na assinatura de `_tentar_candidato`, `_verificar_identidade_elemento` ou `_gerar_candidatos`
-    - _Bug_Condition: isBugCondition(acao_tec, "2_sniper_texto_parcial") — candidato.exact=False AND seletor STARTS_WITH "text=" AND elemento_encontrado != elemento_esperado(label_curto)_
-    - _Expected_Behavior: candidato de texto parcial é rejeitado quando _verificar_identidade_elemento retorna False; Sniper continua tentando próximos candidatos_
-    - _Preservation: candidatos aria-label exato, data-testid, role+name, placeholder, title → sem verificação adicional (Req 3.3)_
-    - _Requirements: 2.3, 2.4, 3.3_
+## Phase 1: Exploratory Bug Condition Testing (BEFORE Fix)
 
-  - [x] 3.3 Verificar que o teste exploratório de condição de bug agora passa
-    - **Property 1: Expected Behavior** - Falso Positivo em Coordenadas Capturadas e Sniper Texto Parcial
-    - **IMPORTANTE**: Re-executar o MESMO teste da tarefa 1 — NÃO escrever um novo teste
-    - O teste da tarefa 1 codifica o comportamento esperado
-    - Quando este teste passar, confirma que o comportamento esperado está satisfeito
-    - Executar `tests/test_vision_engine_bug_condition.py` no código corrigido
-    - **RESULTADO ESPERADO**: Teste PASSA (confirma que o bug foi corrigido)
-    - _Requirements: 2.1, 2.2, 2.3 — Expected Behavior Properties do design_
+- [ ] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - iframe_hint Resolution and Element Identification
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the three bugs exist
+  - **Scoped PBT Approach**: Scope the property to concrete failing cases from Senior X "ci" iframe clicks
+  - Test implementation details from Bug Condition in design:
+    - Call `_resolver_contexto(page, "ci")` and verify return type is `Frame` (not `FrameLocator`)
+    - Simulate click at coordinates (1633, 732) with iframe_hint="ci"
+    - Verify coordinates are adjusted correctly (e.g., X: 1633 → 1568, Y should also adjust if iframe.top ≠ 0)
+    - Verify `elementFromPoint` is executed in Frame context with adjusted coordinates
+    - Verify element found has innerText matching target label (e.g., "Acompanhar assinaturas"), not parent container text
+  - The test assertions should match the Expected Behavior Properties from design (Requirements 2.1-2.10)
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS with counterexamples showing:
+    - `_resolver_contexto()` returns `FrameLocator` object (not `Frame`)
+    - `hasattr(contexto, 'url')` returns False
+    - System logs "iframe_hint não resolveu para Frame - usando detecção automática"
+    - Coordinates remain unchanged or incorrectly adjusted (e.g., Y: 732 → 732)
+    - `elementFromPoint` returns parent container with text like "SIGN\nCaixa de Entrada\nFILTRAR DADOS\n..."
+    - Identity verification fails, system escalates to Gemini Vision
+  - Document counterexamples found to understand root cause
+  - Mark task complete when test is written, run, and failures are documented
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10_
 
-  - [x] 3.4 Verificar que os testes de preservação ainda passam
-    - **Property 2: Preservation** - Candidatos de Alta Confiança e Camadas Não Modificadas
-    - **IMPORTANTE**: Re-executar os MESMOS testes da tarefa 2 — NÃO escrever novos testes
-    - Executar `tests/test_vision_engine_preservation.py` no código corrigido
-    - **RESULTADO ESPERADO**: Testes PASSAM (confirma que não há regressões)
-    - Confirmar que todos os testes passam após a correção (sem regressões)
+---
 
-- [x] 4. Checkpoint — Garantir que todos os testes passam
-  - Executar a suíte completa de testes: `pytest tests/test_vision_engine_bug_condition.py tests/test_vision_engine_preservation.py -v`
-  - Confirmar que Property 1 (Bug Condition) passa — bug corrigido
-  - Confirmar que Property 2 (Preservation) passa — sem regressões
-  - Verificar nos logs que `logger.warning("[Fallback] ...")` é emitido quando `2_coords_capturadas` ou `2_sniper` (texto parcial) resolvem com sucesso
-  - Verificar que candidatos de alta confiança (`[aria-label=`, `[data-testid=`, `role+name`) não emitem o WARNING de fallback
-  - Verificar que `label_curto` vazio e falha de `page.evaluate` continuam com comportamento fail-open (sem bloqueio)
-  - Perguntar ao usuário se houver dúvidas antes de fechar
+## Phase 2: Preservation Property Testing (BEFORE Fix)
+
+- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Non-iframe_hint Behavior Unchanged
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-buggy inputs (cases where isBugCondition returns false):
+    - Clicks without iframe_hint (should use automatic detection)
+    - Clicks with generic iframe_hint values ("Pagina Principal", "Página Principal", "iframe-cross-origin")
+    - Clicks in main page context (no iframe involved)
+    - Cross-origin iframe clicks (should trigger fail-open behavior)
+    - Automatic detection fallback when iframe_hint resolution fails
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements:
+    - Test that clicks without iframe_hint continue to use automatic detection
+    - Test that generic iframe_hint values return Page context
+    - Test that main page clicks work without coordinate adjustment
+    - Test that cross-origin iframes trigger fail-open (accept click without verification)
+    - Test that automatic detection fallback works correctly
+    - Test that label_curto empty/missing skips identity verification
+    - Test that nested iframe resolution continues to work up to max_depth
+    - Test that error handling and logging for iframe failures continue to work
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+---
+
+## Phase 3: Implementation
+
+- [ ] 3. Fix iframe resolution, coordinate adjustment, and element identification bugs
+
+  - [ ] 3.1 Fix `_resolver_contexto()` to return Frame objects (Bug 1)
+    - **File**: `vision_engine.py` (lines 597-625)
+    - **Change**: Modify function to return actual `Frame` objects instead of `FrameLocator` objects
+    - After successfully waiting for iframe with `frame_locator().locator("body").wait_for()`, iterate through `page.frames` to find matching Frame
+    - Match Frame by checking if `iframe_hint` appears in `frame.url` or `frame.name`
+    - Return the matched `Frame` object instead of the `FrameLocator`
+    - Preserve existing fallback logic that iterates through `page.frames` when frame_locator fails
+    - Preserve early return of `page` when iframe_hint is None or generic
+    - Implementation pseudocode from design:
+      ```python
+      async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
+          if not iframe_hint or iframe_hint in ("Pagina Principal", "Página Principal", "iframe-cross-origin"):
+              return page
+          
+          # Try frame_locator approach first
+          for seletor_iframe in [
+              f"iframe[name='{iframe_hint}']", f"iframe[src*='{iframe_hint}']",
+              f"iframe[id='{iframe_hint}']", f"iframe[title*='{iframe_hint}']",
+          ]:
+              try:
+                  fl = page.frame_locator(seletor_iframe)
+                  await fl.locator("body").wait_for(state="attached", timeout=800)
+                  
+                  # FIX: After confirming iframe exists, find the actual Frame object
+                  for frame in page.frames:
+                      try:
+                          if iframe_hint in frame.url or iframe_hint in frame.name:
+                              return frame  # Return Frame, not FrameLocator
+                      except Exception:
+                          continue
+              except Exception:
+                  continue
+          
+          # Fallback: iterate through frames directly
+          try:
+              for frame in page.frames:
+                  try:
+                      if iframe_hint in frame.url or iframe_hint in frame.name:
+                          return frame
+                  except Exception:
+                      continue
+          except Exception:
+              pass
+          
+          return page
+      ```
+    - _Bug_Condition: isBugCondition(input) where input.iframe_hint is not None and not generic_
+    - _Expected_Behavior: _resolver_contexto returns Frame object with .url and .name attributes_
+    - _Preservation: Preserve fallback logic, preserve generic iframe_hint handling_
+    - _Requirements: 2.1, 2.2, 2.3_
+
+  - [ ] 3.2 Fix Frame detection check in coordinate adjustment logic (Bug 2 - Part 1)
+    - **File**: `vision_engine.py` (lines 1658-1750, layer 2 coordinate capture logic)
+    - **Change**: Replace `hasattr(contexto, 'url')` with robust type check
+    - Import `Frame` from `playwright.async_api`
+    - Use `isinstance(contexto, Frame)` to detect when contexto is a Frame
+    - This ensures correct identification of Frame vs Page vs FrameLocator
+    - Implementation pseudocode from design:
+      ```python
+      from playwright.async_api import Frame
+      
+      if isinstance(contexto, Frame):
+          # Frame context - need coordinate adjustment
+      ```
+    - _Bug_Condition: isBugCondition(input) where contexto is Frame but hasattr check fails_
+    - _Expected_Behavior: isinstance(contexto, Frame) correctly identifies Frame objects_
+    - _Preservation: Preserve Page context handling, preserve FrameLocator fallback_
+    - _Requirements: 2.2, 2.4_
+
+  - [ ] 3.3 Fix coordinate adjustment for Frame context (Bug 2 - Part 2)
+    - **File**: `vision_engine.py` (lines 1658-1750, layer 2 coordinate capture logic)
+    - **Change**: Correctly obtain iframe bounding box and adjust coordinates
+    - Execute JavaScript in main page context to find iframe element and get its bounding box
+    - Match iframe by checking name, src, id, or title attributes against iframe_hint
+    - Subtract iframe's left and top offsets from original coordinates
+    - Log the coordinate transformation for debugging
+    - Implementation pseudocode from design:
+      ```python
+      if isinstance(contexto, Frame):
+          # Get iframe bounding box from main page
+          iframe_bbox = await page.evaluate(f"""
+              () => {{
+                  const iframes = document.querySelectorAll('iframe');
+                  for (const iframe of iframes) {{
+                      if (iframe.name === '{iframe_hint}' || 
+                          iframe.src.includes('{iframe_hint}') ||
+                          iframe.id === '{iframe_hint}' ||
+                          (iframe.title && iframe.title.includes('{iframe_hint}'))) {{
+                          const bbox = iframe.getBoundingClientRect();
+                          return {{ left: bbox.left, top: bbox.top }};
+                      }}
+                  }}
+                  return null;
+              }}
+          """)
+          
+          if iframe_bbox:
+              x_ajustado = int(x - iframe_bbox['left'])
+              y_ajustado = int(y - iframe_bbox['top'])
+              logger.info(f"   [Coords Capturadas] Coordenadas ajustadas: ({x}, {y}) -> ({x_ajustado}, {y_ajustado})")
+      ```
+    - _Bug_Condition: isBugCondition(input) where coordinates need adjustment for iframe_
+    - _Expected_Behavior: Both X and Y coordinates correctly adjusted relative to iframe position_
+    - _Preservation: Preserve main page coordinate handling (no adjustment)_
+    - _Requirements: 2.4, 2.5_
+
+  - [ ] 3.4 Execute elementFromPoint in correct Frame context (Bug 3)
+    - **File**: `vision_engine.py` (lines 1658-1750, layer 2 coordinate capture logic)
+    - **Change**: Execute elementFromPoint in Frame context with adjusted coordinates
+    - Use `contexto.evaluate()` instead of `page.evaluate()` when contexto is Frame
+    - Pass adjusted coordinates to Frame's elementFromPoint
+    - Set is_cross_origin = False for successful Frame execution
+    - Add fallback to automatic detection if iframe bbox not found
+    - Implementation pseudocode from design:
+      ```python
+      if iframe_bbox:
+          # Execute elementFromPoint in Frame context with adjusted coordinates
+          elemento_info = await contexto.evaluate("""
+              ([x, y]) => {
+                  const el = document.elementFromPoint(x, y);
+                  if (!el) return null;
+                  return {
+                      tagName: el.tagName,
+                      innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                  };
+              }
+          """, [x_ajustado, y_ajustado])
+          
+          is_cross_origin = False
+          x_final = x_ajustado
+          y_final = y_ajustado
+      else:
+          # Fallback if iframe bbox not found
+          logger.warning(f"   [Coords Capturadas] Iframe bbox não encontrado - fallback")
+          elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
+      ```
+    - _Bug_Condition: isBugCondition(input) where elementFromPoint must execute in Frame_
+    - _Expected_Behavior: elementFromPoint returns target element, not parent container_
+    - _Preservation: Preserve automatic detection fallback, preserve Page context execution_
+    - _Requirements: 2.6, 2.7, 2.8, 2.9, 2.10_
+
+  - [ ] 3.5 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - iframe_hint Resolution and Element Identification
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - **EXPECTED OUTCOME**: Test PASSES with results showing:
+      - `_resolver_contexto()` returns `Frame` object (not `FrameLocator`)
+      - `isinstance(contexto, Frame)` returns True
+      - Coordinates correctly adjusted (e.g., X: 1633 → 1568, Y adjusted if iframe.top ≠ 0)
+      - `elementFromPoint` executed in Frame context with adjusted coordinates
+      - Element found has innerText matching target label (e.g., "Acompanhar assinaturas")
+      - Identity verification succeeds without escalating to Gemini Vision
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10_
+
+  - [ ] 3.6 Verify preservation tests still pass
+    - **Property 2: Preservation** - Non-iframe_hint Behavior Unchanged
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm all preservation tests still pass after fix:
+      - Clicks without iframe_hint continue to use automatic detection
+      - Generic iframe_hint values continue to return Page context
+      - Main page clicks continue to work without coordinate adjustment
+      - Cross-origin iframes continue to trigger fail-open behavior
+      - Automatic detection fallback continues to work
+      - Empty label_curto continues to skip identity verification
+      - Nested iframe resolution continues to work
+      - Error handling continues to work
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+---
+
+## Phase 4: Integration Testing and Validation
+
+- [ ] 4. Integration testing with real Senior X workflows
+  - Test full robot execution flow with iframe_hint="ci" in Senior X
+  - Test clicking "Acompanhar assinaturas" button inside "ci" iframe
+  - Test clicking multiple buttons inside the same iframe in sequence
+  - Test switching between main page clicks and iframe clicks in the same workflow
+  - Verify success rate improves from 4.2% (1/24) to >90%
+  - Verify Gemini Vision escalation rate decreases significantly
+  - Verify no regressions in non-iframe click scenarios
+  - Test nested iframe scenarios if applicable
+  - Test cross-origin iframe scenarios with fail-open behavior
+  - Document any edge cases or unexpected behaviors found
+  - _Requirements: All requirements (1.1-3.8)_
+
+- [ ] 5. Checkpoint - Ensure all tests pass
+  - Ensure bug condition exploration test passes (task 3.5)
+  - Ensure preservation property tests pass (task 3.6)
+  - Ensure integration tests pass (task 4)
+  - Review logs for any warnings or unexpected fallback behavior
+  - Confirm identity verification succeeds for iframe clicks with iframe_hint
+  - Confirm no escalation to Gemini Vision for correctly resolved iframe clicks
+  - Ask the user if questions arise or if additional testing is needed
+
+---
+
+## Notes
+
+**Testing Framework**: Use pytest with Hypothesis for property-based testing. The test file should be created in a tests directory (e.g., `tests/test_iframe_resolution.py`).
+
+**Test Execution Order**: 
+1. Run exploration test on UNFIXED code (expect failures)
+2. Run preservation tests on UNFIXED code (expect passes)
+3. Implement fixes (tasks 3.1-3.4)
+4. Re-run exploration test on FIXED code (expect passes)
+5. Re-run preservation tests on FIXED code (expect passes)
+6. Run integration tests on FIXED code (expect passes)
+
+**Success Criteria**:
+- Bug condition exploration test transitions from FAIL (unfixed) to PASS (fixed)
+- Preservation tests remain PASS on both unfixed and fixed code
+- Integration tests show >90% success rate for iframe clicks with iframe_hint
+- Gemini Vision escalation rate decreases significantly
+- No regressions in non-iframe click scenarios

@@ -6,6 +6,7 @@
     "test": "jest --testEnvironment jsdom --runInBand"
   },
   "devDependencies": {
+    "fast-check": "^3.0.0",
     "jest": "^29.0.0",
     "jest-environment-jsdom": "^29.0.0"
   },

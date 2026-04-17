@@ -7,11 +7,16 @@ import json
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
+
+# Adiciona o diretório pai ao path para importar módulos da raiz
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils import limpar_nome
 from shadow_builder import utc_now
 
