@@ -1327,9 +1327,14 @@ def template_match(
 # ──────────────────────────────────────────────────────────────
 async def _detectar_menu_contexto_ativo(page) -> object | None:
     """
-    Verifica se um menu de contexto está visível como overlay na página.
+    Verifica se um menu de contexto está visível como overlay na página ou em qualquer iframe.
     Retorna o Locator do primeiro menu visível encontrado, ou None.
     Usa timeout=300ms para não penalizar o caminho feliz (sem menu ativo).
+
+    Busca em dois escopos:
+    1. DOM principal da página
+    2. Todos os frames filhos (iframes) — necessário para menus de contexto
+       que são renderizados dentro do iframe principal do Senior X (GED, etc.)
     """
     seletores_menu = [
         ".p-contextmenu",
@@ -1337,7 +1342,14 @@ async def _detectar_menu_contexto_ativo(page) -> object | None:
         ".context-menu",
         "ul[class*='contextmenu']",
         ".p-menu-list",
+        # Menus de contexto do GED/Senior X dentro de iframes
+        ".ui-contextmenu",
+        "ul.ui-menu-list",
+        "[class*='context-menu']",
+        "ul[class*='ui-menu']",
     ]
+
+    # 1. Busca no DOM principal
     for seletor in seletores_menu:
         try:
             locator = page.locator(seletor).first
@@ -1345,6 +1357,20 @@ async def _detectar_menu_contexto_ativo(page) -> object | None:
             return locator
         except Exception:
             continue
+
+    # 2. Busca em todos os frames filhos (iframes)
+    for frame in page.frames:
+        if frame == page.main_frame:
+            continue
+        for seletor in seletores_menu:
+            try:
+                locator = frame.locator(seletor).first
+                await locator.wait_for(state="visible", timeout=300)
+                logger.debug(f"[MENU-CTX] Menu de contexto detectado em frame: {frame.url[:60]}")
+                return locator
+            except Exception:
+                continue
+
     return None
 
 

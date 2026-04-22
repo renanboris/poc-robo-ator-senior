@@ -595,6 +595,12 @@ async def executar_roteiro(caminho_json: str) -> None:
                     break
                 await asyncio.sleep(0.5)
 
+            # ── Maximiza a janela via F11 após confirmação ───────────────────
+            # --start-maximized não funciona de forma confiável com --window-position
+            # em monitores não-primários no Windows. F11 via Playwright é mais robusto.
+            await page.keyboard.press("F11")
+            await asyncio.sleep(0.5)
+
             # ── Gap de 2s após confirmação: dá tempo para o sistema carregar ─
             # O vídeo já está gravando, mas as narrações só começam após este gap.
             await asyncio.sleep(2.0)
