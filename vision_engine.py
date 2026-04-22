@@ -1355,6 +1355,13 @@ async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None) ->
         ".ui-menu.ui-widget",
         "ul.ui-menu",
         ".p-menu",
+        # ngx-contextmenu via Angular CDK Overlay (Senior X / GED)
+        # Renderizado no body da página principal via CDK, independente de iframe
+        ".ngx-contextmenu",
+        ".cdk-overlay-pane.ngx-contextmenu",
+        "[class*='ngx-contextmenu']",
+        "div[class*='cdk-overlay-pane'] ul",
+        "div[class*='cdk-overlay-pane'] .dropdown-menu",
     ]
 
     async def _buscar_em_frame(frame_or_page) -> object | None:
@@ -1367,7 +1374,14 @@ async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None) ->
                 continue
         return None
 
-    # 1. Prioridade: iframe_hint específico (onde o clique_direito ocorreu)
+    # 1. DOM principal SEMPRE primeiro — CDK Overlay (ngx-contextmenu, cdk-overlay-pane)
+    # é sempre renderizado no body da página raiz, independente de qual iframe
+    # gerou o clique direito. Esta é a prioridade máxima.
+    resultado = await _buscar_em_frame(page)
+    if resultado:
+        return resultado
+
+    # 2. iframe_hint específico (fallback para menus renderizados dentro do frame)
     if iframe_hint and iframe_hint not in ("Pagina Principal", "Página Principal"):
         for frame in page.frames:
             if (frame.name == iframe_hint or
@@ -1378,12 +1392,7 @@ async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None) ->
                     logger.debug(f"[MENU-CTX] Menu detectado no iframe_hint '{iframe_hint}'")
                     return resultado
 
-    # 2. DOM principal
-    resultado = await _buscar_em_frame(page)
-    if resultado:
-        return resultado
-
-    # 3. Todos os frames filhos
+    # 3. Todos os frames filhos (último recurso)
     for frame in page.frames:
         if frame == page.main_frame:
             continue
