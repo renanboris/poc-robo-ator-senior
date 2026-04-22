@@ -146,6 +146,21 @@ def _init_db():
                 WHERE ultima_atualizacao < datetime('now', '-90 days')
                   AND hits < 2
             """)
+            # View unificada de telemetria — idempotente (CREATE VIEW IF NOT EXISTS)
+            conn.execute("""
+                CREATE VIEW IF NOT EXISTS v_telemetria_unificada AS
+                SELECT
+                    tc.camada,
+                    tc.acertos                                                    AS acertos_total,
+                    tc.falhas                                                     AS falhas_total,
+                    CASE
+                        WHEN (tc.acertos + tc.falhas) > 0
+                        THEN CAST(tc.acertos AS REAL) / (tc.acertos + tc.falhas)
+                        ELSE NULL
+                    END                                                           AS taxa_sucesso,
+                    tc.ultima_atualizacao_ts                                      AS ultima_execucao_ts
+                FROM telemetria_camadas tc
+            """)
     except Exception as e:
         logger.error(f"Nao foi possivel inicializar Brain DB em '{DB_PATH}': {e}")
 
@@ -297,6 +312,37 @@ def obter_stats_brain() -> dict:
         return {"erro": str(e)}
 
 
+def obter_relatorio_telemetria() -> dict:
+    """
+    Consulta v_telemetria_unificada e retorna métricas consolidadas da cascata.
+
+    Retorno em caso de sucesso:
+    {
+        "camadas": [
+            {"camada": "0_brain", "acertos_total": 42, "falhas_total": 3,
+             "taxa_sucesso": 0.933, "ultima_execucao_ts": 1718000000000},
+            ...
+        ],
+        "taxa_hitl_1h": 0.05  # ou None se dados insuficientes
+    }
+
+    Retorno em caso de erro:
+    {"camadas": [], "erro": "<mensagem>"}
+    """
+    try:
+        with sqlite3.connect(DB_PATH, timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM v_telemetria_unificada ORDER BY camada"
+            ).fetchall()
+            camadas = [dict(r) for r in rows]
+        taxa_hitl = _calcular_taxa_hitl_1h()
+        return {"camadas": camadas, "taxa_hitl_1h": taxa_hitl}
+    except Exception as e:
+        logger.warning(f"[Telemetria] obter_relatorio_telemetria falhou: {e}")
+        return {"camadas": [], "erro": str(e)}
+
+
 def _consultar_cache(intencao: str) -> Optional[EntradaCache]:
     chave = _chave_cache(intencao)
     try:
@@ -426,8 +472,15 @@ def _contem_indice_posicional(seletor: str) -> bool:
     ATENÇÃO: [data-testid='item-102'] NÃO é posicional — o número está dentro
     de aspas como valor de atributo. O lookahead (?![^'\"]*['\"]) garante que
     o padrão #\\w*\\d+ não dispare dentro de valores de atributos.
+
+    EXCEÇÃO: seletores compostos com .ui-chkbox (checkboxes PrimeNG) como
+    item#file_8 .ui-chkbox .ui-chkbox-box NÃO são posicionais — o ID é do
+    arquivo/item real, não uma posição de lista.
     """
     if not seletor:
+        return False
+    # Seletores de checkbox PrimeNG com ID de arquivo são legítimos — não posicionais
+    if ".ui-chkbox" in seletor or "p-checkbox" in seletor:
         return False
     padroes = [
         r"#\w*\d+(?![^'\"]*['\"])",   # #file_1, #row3 — mas não dentro de ['...']
@@ -497,6 +550,51 @@ def _gerar_candidatos(
     candidatos: list[TentativaLocalizacao] = []
     eh_digitacao    = acao in ("digitar_e_enter", "preencher_campo")
     is_tag_generica = label_curto.lower() in _TAGS_FRAGEIS
+
+    # ── Candidato especial: checkbox PrimeNG/Angular ──────────────────────────
+    # O seletor capturado pelo JS do capture para checkboxes tem o formato:
+    #   item:has-text("Nome") .ui-chkbox .ui-chkbox-box   (ideal — com texto)
+    #   item#file_8 .ui-chkbox .ui-chkbox-box             (fallback — com ID)
+    # Ambos são seletores compostos legítimos e devem ser tentados primeiro.
+    if seletor_hint and (".ui-chkbox" in seletor_hint or "p-checkbox" in seletor_hint):
+        candidatos.append(TentativaLocalizacao(
+            seletor=seletor_hint, iframe_hint=iframe_hint,
+            descricao=f"checkbox PrimeNG hint '{seletor_hint[:60]}'",
+        ))
+        # Se o seletor usa ID (fallback), também tenta a variante :has-text com label
+        if label_curto and "#file_" in seletor_hint:
+            # Extrai a parte do seletor após o ID para reusar (ex: .ui-chkbox .ui-chkbox-box)
+            partes = seletor_hint.split(" ", 1)
+            sufixo = partes[1] if len(partes) > 1 else ".ui-chkbox .ui-chkbox-box"
+            # Tenta com o label da pasta como :has-text
+            label_clean = label_curto.replace("'", "").replace('"', "")[:40]
+            candidatos.append(TentativaLocalizacao(
+                seletor=f'item:has-text("{label_clean}") {sufixo}',
+                iframe_hint=iframe_hint,
+                descricao=f"checkbox has-text '{label_clean}'",
+            ))
+
+    # ── Candidato especial: botão em dialog de confirmação PrimeNG ────────────
+    # Botões "Sim", "Confirmar", "Não", "Cancelar" dentro de p-confirmDialog
+    # têm IDs dinâmicos (s-button-5, etc.) que mudam a cada renderização.
+    # O Sniper deve buscar dentro do escopo do dialog antes de tentar o DOM geral.
+    _LABELS_CONFIRMACAO = {"sim", "não", "nao", "confirmar", "cancelar", "ok", "yes", "no", "cancel"}
+    if label_curto and label_curto.strip().lower() in _LABELS_CONFIRMACAO:
+        _SELETORES_DIALOG = [
+            "p-confirmdialog", "p-dialog", ".p-dialog", ".ui-dialog",
+            "[role='dialog']", ".p-confirm-dialog",
+        ]
+        for _sel_dialog in _SELETORES_DIALOG:
+            candidatos.append(TentativaLocalizacao(
+                seletor=f"{_sel_dialog} button:has-text('{label_curto}')",
+                iframe_hint=iframe_hint,
+                descricao=f"dialog button '{label_curto}' em {_sel_dialog}",
+            ))
+            candidatos.append(TentativaLocalizacao(
+                seletor=f"{_sel_dialog} span:has-text('{label_curto}')",
+                iframe_hint=iframe_hint,
+                descricao=f"dialog span '{label_curto}' em {_sel_dialog}",
+            ))
 
     if label_curto and not is_tag_generica:
         if not eh_digitacao:
@@ -1496,13 +1594,30 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     html_hint:       str           = alvo.get("html_hint", "")
     coords_relativas: Optional[dict] = alvo.get("coordenadas_relativas")
 
+    # ── Guard: intenção vazia desativa o Brain ────────────────────────────────
+    # Se intencao_semantica não foi preenchida (roteiro gerado sem enriquecimento
+    # Gemini), o hash de "" seria compartilhado por TODAS as ações, fazendo o
+    # Brain retornar o seletor errado para qualquer elemento. Nesse caso, usa
+    # label_curto como fallback de identidade e pula a camada 0.
+    _intencao_valida = bool(intencao and intencao.strip())
+    if not _intencao_valida:
+        # Usa label_curto como proxy de intenção para logging, mas não consulta Brain
+        intencao = f"clique em '{label_curto}'" if label_curto else "Acao na interface"
+        logger.debug(
+            f"   [Brain] intencao_semantica vazia — Brain desativado para esta ação. "
+            f"Usando label_curto como proxy: '{label_curto}'"
+        )
+
     logger.info(f"\n   Executando: {intencao[:80]}")
     scroll_y = await _scroll_para_area_esperada(page, coords_relativas)
 
-    # ── 0. BRAIN (Memoria SQLite de longo prazo) ──────────────────────────────
+    # ── Camada 0: Brain (Memória SQLite permanente) ──────────────────────────
+    # Ativada apenas quando intencao_semantica está preenchida. Consulta memória
+    # de longo prazo para reutilizar seletores ou coordenadas que funcionaram em
+    # execuções anteriores (zero-touch).
     # [BUG-3] FIX: flag impede double-registration de falha
     brain_registrou_falha = False
-    cache = _consultar_cache(intencao)
+    cache = _consultar_cache(intencao) if _intencao_valida else None
     if cache:
         if cache.seletor:
             # [CTX-MENU] Consciência de overlay: se menu de contexto ativo e seletor
@@ -1544,7 +1659,9 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 _registrar_telemetria("0_brain_coords", False)
                 brain_registrou_falha = True
 
-    # ── Camada 0.5: Menu de contexto ativo ──────────────────────────────────
+    # ── Camada 0.5: Menu de contexto ativo ───────────────────────────────────
+    # Ativada quando um overlay de menu de contexto está visível na página.
+    # Escopa a busca dentro do menu para evitar cliques fora do overlay.
     menu_locator = await _detectar_menu_contexto_ativo(page)
     if menu_locator is not None:
         seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto)
@@ -1584,7 +1701,9 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             _registrar_telemetria("0.5_menu_ctx", False)
             return False
 
-    # ── 1. Foco Nativo (exclusivo para inputs) ────────────────────────────────
+    # ── Camada 1: Foco nativo / active element ───────────────────────────────
+    # Ativada para ações de digitação. Verifica se o cursor já está posicionado
+    # em um campo editável (inline edit, nova pasta, etc.) sem precisar localizar.
     if acao in ("digitar_e_enter", "preencher_campo"):
         logger.info("   [Foco Nativo] Verificando se cursor ja esta posicionado...")
         if await _digitar_no_active_element(page, acao, valor):
@@ -1605,7 +1724,9 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         except Exception:
             pass
 
-    # ── 1.5. HEURISTICAS SENIOR X (icones mudos) ─────────────────────────────
+    # ── Camada 1.5: Heurísticas Senior X ─────────────────────────────────────
+    # Ativada para ícones mudos (Home, Lixeira, etc.) sem label semântico.
+    # Usa seletores específicos do Senior X para ícones conhecidos.
     is_tag_generica = label_curto.lower() in _TAGS_FRAGEIS
     if is_tag_generica or not label_curto:
         intencao_low          = intencao.lower()
@@ -1641,7 +1762,10 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     except Exception as exc:
         logger.warning(f"   [Screenshot] Falha ao capturar screenshot para Template_Matcher: {exc}")
 
-    # ── 1_T. Template Matching Visual ────────────────────────────────────────
+    # ── Camada 1_T: Template Matching visual ─────────────────────────────────
+    # Ativada quando screenshot_elemento está disponível no roteiro.
+    # Compara imagem de referência com tela atual via NCC (sem OpenCV).
+    # Acionada ANTES do Sniper e das Coordenadas — mais confiável que posição absoluta.
     screenshot_elemento_path = alvo.get("screenshot_elemento")
     if screenshot_elemento_path and screenshot_atual_tm is not None:
         try:
@@ -1659,140 +1783,21 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     coords_tm = {"x": resultado_tm["x"], "y": resultado_tm["y"]}
                     if await _clicar_por_coordenadas(page, coords_tm, acao, valor):
                         logger.info(f"   [TemplateMatcher] Clique em {coords_tm} bem-sucedido (score={resultado_tm['score']:.3f}).")
-                        _registrar_telemetria("1_template_matching", True)
+                        _registrar_telemetria("1_template_matching", True, intencao)
                         _registrar_estrategia_vencedora(intencao, "1_template_matching")
                         return True
-                _registrar_telemetria("1_template_matching", False)
+                _registrar_telemetria("1_template_matching", False, intencao)
         except Exception as exc:
             logger.warning(f"   [TemplateMatcher] Erro na camada 1_T: {exc}")
-
-    # ── 2. Coordenadas Capturadas (gravação original) ────────────────────────
-    if coords_relativas and coords_relativas.get("x_pct"):
-        logger.info("   [Coords Capturadas] Tentando coordenadas relativas da gravação...")
-        try:
-            vp = page.viewport_size or {"width": 1920, "height": 1080}
-            x  = int(coords_relativas["x_pct"] * vp["width"])
-            y  = int(coords_relativas["y_pct"] * vp["height"])
-            if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
-                # [FIX] Verificar identidade do elemento nas coordenadas antes de confirmar sucesso
-                identidade_confirmada = False
-                if label_curto:  # Fail-open: se label_curto vazio, aceitar o clique
-                    try:
-                        # [Task 3.4] Check if iframe_hint is available and not generic
-                        usar_iframe_hint = (
-                            iframe_hint and 
-                            iframe_hint not in ("Pagina Principal", "Página Principal", "iframe-cross-origin")
-                        )
-                        
-                        if usar_iframe_hint:
-                            # Use iframe_hint to resolve context before elementFromPoint
-                            logger.info(f"   [Coords Capturadas] Usando iframe_hint: '{iframe_hint}'")
-                            contexto = await _resolver_contexto(page, iframe_hint)
-                            
-                            # Adjust coordinates if context is a frame
-                            x_ajustado = x
-                            y_ajustado = y
-                            
-                            # FIX (Task 3.2): Use isinstance() instead of hasattr() for robust Frame detection
-                            # hasattr(contexto, 'url') fails for FrameLocator (Bug 1)
-                            # isinstance(contexto, Frame) correctly identifies Frame objects
-                            if isinstance(contexto, Frame):  # It's a Frame
-                                # Get frame bounding box to adjust coordinates
-                                try:
-                                    # FIX (Task 3.3): Find the iframe element in the page to get its bounding box
-                                    iframe_bbox = await page.evaluate(f"""
-                                        () => {{
-                                            const iframes = document.querySelectorAll('iframe');
-                                            for (const iframe of iframes) {{
-                                                if (iframe.name === '{iframe_hint}' || 
-                                                    iframe.src.includes('{iframe_hint}') ||
-                                                    iframe.id === '{iframe_hint}' ||
-                                                    (iframe.title && iframe.title.includes('{iframe_hint}'))) {{
-                                                    const bbox = iframe.getBoundingClientRect();
-                                                    return {{ left: bbox.left, top: bbox.top }};
-                                                }}
-                                            }}
-                                            return null;
-                                        }}
-                                    """)
-                                    
-                                    if iframe_bbox:
-                                        # FIX (Task 3.3): Correctly adjust both X and Y coordinates
-                                        x_ajustado = int(x - iframe_bbox['left'])
-                                        y_ajustado = int(y - iframe_bbox['top'])
-                                        logger.info(f"   [Coords Capturadas] Coordenadas ajustadas para iframe: ({x}, {y}) -> ({x_ajustado}, {y_ajustado})")
-                                    
-                                    # FIX (Task 3.4): Execute elementFromPoint in Frame context with adjusted coordinates
-                                    elemento_info = await contexto.evaluate("""
-                                        ([x, y]) => {
-                                            const el = document.elementFromPoint(x, y);
-                                            if (!el) return null;
-                                            return {
-                                                tagName: el.tagName,
-                                                innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
-                                            };
-                                        }
-                                    """, [x_ajustado, y_ajustado])
-                                    
-                                    is_cross_origin = False
-                                    x_final = x_ajustado
-                                    y_final = y_ajustado
-                                except Exception as exc_frame:
-                                    logger.warning(f"   [Coords Capturadas] Erro ao usar iframe_hint - fallback para detecção automática: {exc_frame}")
-                                    # Fallback to automatic detection
-                                    elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
-                            else:
-                                # contexto is Page or FrameLocator - use automatic detection
-                                logger.info(f"   [Coords Capturadas] iframe_hint não resolveu para Frame - usando detecção automática")
-                                elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
-                        else:
-                            # No iframe_hint or generic hint - use automatic detection
-                            logger.info(f"   [Coords Capturadas] Detecção automática de iframe ativada")
-                            elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
-                        
-                        if is_cross_origin:
-                            # Fail-open for cross-origin iframes
-                            logger.warning(f"   [Coords Capturadas] Iframe cross-origin detectado - fail-open aplicado")
-                            identidade_confirmada = True
-                        elif elemento_info and elemento_info.get('innerText'):
-                            texto_elemento = elemento_info['innerText']
-                            if label_curto.strip().lower() in texto_elemento.strip().lower():
-                                identidade_confirmada = True
-                            else:
-                                logger.warning(
-                                    f"   [Coords Capturadas] Identidade não confirmada: "
-                                    f"esperado '{label_curto}', encontrado '{texto_elemento[:50]}' em ({x_final}, {y_final})"
-                                )
-                        else:
-                            # Fail-open: element without text
-                            identidade_confirmada = True
-                    except Exception as exc_verify:
-                        # Fail-open: se page.evaluate falhar, aceitar o clique
-                        logger.warning(f"   [Coords Capturadas] Verificação de identidade falhou (fail-open): {exc_verify}")
-                        identidade_confirmada = True
-                else:
-                    # Fail-open: label_curto vazio → aceitar
-                    identidade_confirmada = True
-
-                if identidade_confirmada:
-                    logger.info(f"   [Coords Capturadas] Clique em ({x}, {y}) bem-sucedido.")
-                    logger.warning(
-                        f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' — "
-                        f"verifique se o elemento correto foi atingido."
-                    )
-                    _registrar_telemetria("2_coords_capturadas", True)
-                    _registrar_estrategia_vencedora(intencao, "2_coords_capturadas")
-                    return True
-                else:
-                    # Identidade não confirmada → escalar para próxima camada
-                    logger.info("   [Coords Capturadas] Escalando para próxima camada (identidade não confirmada).")
-        except Exception as exc:
-            logger.warning(f"   [Coords Capturadas] Falhou: {exc}")
-        _registrar_telemetria("2_coords_capturadas", False)
 
     # ── Gera candidatos ───────────────────────────────────────────────────────
     candidatos = _gerar_candidatos(seletor_hint, label_curto, iframe_hint, acao, tipo_elemento, html_hint)
 
+    # ── Camada 2_S: Sniper Semântico ─────────────────────────────────────────
+    # Ativada sempre. Tenta 15+ seletores Playwright nativos (getByRole, getByLabel,
+    # getByPlaceholder, getByTitle, text=, aria-label, data-testid, etc.).
+    # Acionada ANTES das Coordenadas — seletores semânticos são mais resilientes
+    # a mudanças de layout do que posições absolutas.
     # ── 2_sniper. Sniper Semantico ────────────────────────────────────────────
     if candidatos:
         logger.info(f"   [Sniper] {len(candidatos)} candidatos para '{label_curto}'...")
@@ -1858,7 +1863,13 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     continue
             else:
                 # Candidato de alta confiança (aria-label exato, data-testid, role+name, etc.) — sem verificação adicional
-                _acertou = await _tentar_candidato(page, cand, acao, valor, timeout_ms=800)
+                # Candidatos aria-label e data-testid recebem timeout maior (2000ms) pois são seletores
+                # semânticos confiáveis que podem precisar de mais tempo em SPAs com renderização assíncrona.
+                _is_alta_confianca = cand.seletor and any(
+                    p in cand.seletor for p in ("[aria-label=", "[data-testid=", "[id=", "[name=")
+                )
+                _timeout_cand = 2000 if _is_alta_confianca else 800
+                _acertou = await _tentar_candidato(page, cand, acao, valor, timeout_ms=_timeout_cand)
                 _elapsed_ms = (time.monotonic() - _t0) * 1000
                 logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — {'OK' if _acertou else 'miss'}")
                 if _acertou:
@@ -1873,7 +1884,114 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     _registrar_estrategia_vencedora(intencao, "2_sniper")
                     return True
 
-    # ── 3_hint_original. Seletor Hint Original ────────────────────────────────
+    # ── 2. Coordenadas Capturadas (gravação original) ────────────────────────
+    # Acionada APÓS o Sniper Semântico — coordenadas são menos confiáveis que
+    # seletores semânticos pois dependem de layout estável. Usada como fallback
+    # quando nenhum seletor semântico funcionou.
+    if coords_relativas and coords_relativas.get("x_pct"):
+        logger.info("   [Coords Capturadas] Tentando coordenadas relativas da gravação...")
+        try:
+            vp = page.viewport_size or {"width": 1920, "height": 1080}
+            x  = int(coords_relativas["x_pct"] * vp["width"])
+            y  = int(coords_relativas["y_pct"] * vp["height"])
+            if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
+                # [FIX] Verificar identidade do elemento nas coordenadas antes de confirmar sucesso
+                identidade_confirmada = False
+                if label_curto:  # Fail-open: se label_curto vazio, aceitar o clique
+                    try:
+                        # [Task 3.4] Check if iframe_hint is available and not generic
+                        usar_iframe_hint = (
+                            iframe_hint and
+                            iframe_hint not in ("Pagina Principal", "Página Principal", "iframe-cross-origin")
+                        )
+
+                        if usar_iframe_hint:
+                            logger.info(f"   [Coords Capturadas] Usando iframe_hint: '{iframe_hint}'")
+                            contexto = await _resolver_contexto(page, iframe_hint)
+                            x_ajustado = x
+                            y_ajustado = y
+                            if isinstance(contexto, Frame):
+                                try:
+                                    iframe_bbox = await page.evaluate(f"""
+                                        () => {{
+                                            const iframes = document.querySelectorAll('iframe');
+                                            for (const iframe of iframes) {{
+                                                if (iframe.name === '{iframe_hint}' ||
+                                                    iframe.src.includes('{iframe_hint}') ||
+                                                    iframe.id === '{iframe_hint}' ||
+                                                    (iframe.title && iframe.title.includes('{iframe_hint}'))) {{
+                                                    const bbox = iframe.getBoundingClientRect();
+                                                    return {{ left: bbox.left, top: bbox.top }};
+                                                }}
+                                            }}
+                                            return null;
+                                        }}
+                                    """)
+                                    if iframe_bbox:
+                                        x_ajustado = int(x - iframe_bbox['left'])
+                                        y_ajustado = int(y - iframe_bbox['top'])
+                                        logger.info(f"   [Coords Capturadas] Coordenadas ajustadas para iframe: ({x}, {y}) -> ({x_ajustado}, {y_ajustado})")
+                                    elemento_info = await contexto.evaluate("""
+                                        ([x, y]) => {
+                                            const el = document.elementFromPoint(x, y);
+                                            if (!el) return null;
+                                            return {
+                                                tagName: el.tagName,
+                                                innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                                            };
+                                        }
+                                    """, [x_ajustado, y_ajustado])
+                                    is_cross_origin = False
+                                    x_final = x_ajustado
+                                    y_final = y_ajustado
+                                except Exception as exc_frame:
+                                    logger.warning(f"   [Coords Capturadas] Erro ao usar iframe_hint - fallback para detecção automática: {exc_frame}")
+                                    elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
+                            else:
+                                logger.info(f"   [Coords Capturadas] iframe_hint não resolveu para Frame - usando detecção automática")
+                                elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
+                        else:
+                            logger.info(f"   [Coords Capturadas] Detecção automática de iframe ativada")
+                            elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
+
+                        if is_cross_origin:
+                            logger.warning(f"   [Coords Capturadas] Iframe cross-origin detectado - fail-open aplicado")
+                            identidade_confirmada = True
+                        elif elemento_info and elemento_info.get('innerText'):
+                            texto_elemento = elemento_info['innerText']
+                            if label_curto.strip().lower() in texto_elemento.strip().lower():
+                                identidade_confirmada = True
+                            else:
+                                logger.warning(
+                                    f"   [Coords Capturadas] Identidade não confirmada: "
+                                    f"esperado '{label_curto}', encontrado '{texto_elemento[:50]}' em ({x_final}, {y_final})"
+                                )
+                        else:
+                            identidade_confirmada = True
+                    except Exception as exc_verify:
+                        logger.warning(f"   [Coords Capturadas] Verificação de identidade falhou (fail-open): {exc_verify}")
+                        identidade_confirmada = True
+                else:
+                    identidade_confirmada = True
+
+                if identidade_confirmada:
+                    logger.info(f"   [Coords Capturadas] Clique em ({x}, {y}) bem-sucedido.")
+                    logger.warning(
+                        f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' — "
+                        f"verifique se o elemento correto foi atingido."
+                    )
+                    _registrar_telemetria("2_coords_capturadas", True)
+                    _registrar_estrategia_vencedora(intencao, "2_coords_capturadas")
+                    return True
+                else:
+                    logger.info("   [Coords Capturadas] Escalando para próxima camada (identidade não confirmada).")
+        except Exception as exc:
+            logger.warning(f"   [Coords Capturadas] Falhou: {exc}")
+        _registrar_telemetria("2_coords_capturadas", False)
+
+    # ── Camada 3: Seletor hint original ──────────────────────────────────────
+    # Ativada quando o seletor hint não é frágil (não é tag genérica, não é posicional).
+    # Usa o seletor CSS capturado na gravação original como última tentativa semântica.
     if seletor_hint and not _e_seletor_fragil(seletor_hint):
         # Verificação de identidade para seletores posicionais (fix bug item errado)
         if _contem_indice_posicional(seletor_hint) and label_curto and not is_tag_generica:
@@ -1905,7 +2023,9 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 _registrar_estrategia_vencedora(intencao, "3_hint_original")
                 return True
 
-    # ── 4_todos_frames. Busca Profunda em Todos os Frames ────────────────────
+    # ── Camada 4: Busca em todos os frames ───────────────────────────────────
+    # Ativada quando o elemento pode estar em um iframe não identificado pelo hint.
+    # Itera por todos os frames filhos da página sem depender do iframe_hint.
     if candidatos:
         logger.info("   [Todos os Frames] Procurando o elemento em frames filhos...")
         frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
@@ -1915,7 +2035,10 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             _registrar_estrategia_vencedora(intencao, "4_todos_frames")
             return True
 
-    # ── 5_gemini_vision. Gemini Vision (Self-Healing Supremo) ────────────────
+    # ── Camada 5: Gemini Vision (Self-Healing supremo) ───────────────────────
+    # Ativada como último recurso quando todas as camadas anteriores falharam.
+    # Envia screenshot atual + referência da gravação para o Gemini localizar o elemento.
+    # Custo: latência + tokens de API. Reutiliza screenshot já capturado para 1_T.
     logger.info("   [Vision] DOM esgotado. Acionando Gemini Visual...")
     # Reutiliza screenshot já capturado para Template_Matcher (evita captura dupla)
     screenshot_atual = screenshot_atual_tm

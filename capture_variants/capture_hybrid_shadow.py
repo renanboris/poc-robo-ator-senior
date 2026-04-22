@@ -18,7 +18,29 @@ from playwright.async_api import async_playwright
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils import limpar_nome
-from shadow_builder import utc_now
+from shadow_builder import (
+    utc_now,
+    inferir_acao_semantica,
+    inferir_entidade_negocio,
+    inferir_padrao_interacao,
+    classificar_ruido,
+)
+
+# Aliases de compatibilidade — mantidos para testes e código externo que
+# importa pelo nome legado. Internamente delegam para as funções unificadas
+# do shadow_builder, que agora suportam os casos específicos do hybrid
+# (tecla, selecionar_opcao, aria_hint, title_hint, modal_action, etc.)
+def infer_semantic_action_from_hints(payload: dict) -> str:
+    return inferir_acao_semantica("", "", "", "", hints=payload)
+
+def infer_pattern_from_hints(payload: dict) -> str:
+    return inferir_padrao_interacao("", "", "", "", "", hints=payload)
+
+def is_noise_event(payload: dict) -> bool:
+    return classificar_ruido("", "", "", "", "", hints=payload)
+
+def infer_business_entity_from_hints(payload: dict) -> str:
+    return inferir_entidade_negocio("", "", "", hints=payload)
 
 try:
     from google import genai
@@ -320,187 +342,13 @@ async def descrever_tela_bytes(screenshot_bytes, contexto=""):
         logger.error(f"Gemini tela falhou: {e}")
         return {"onde_estou": "", "tela_id": "", "sidebar_estado": "", "sidebar_item_ativo": "", "conteudo_central": ""}
 
-def infer_semantic_action_from_hints(payload: dict) -> str:
-    """
-    Heurística local de semantic_action — sem Gemini.
-    Regras ordenadas por especificidade: mais específico primeiro.
-    """
-    acao_raw = payload.get("acao", "")
-    text = (payload.get("text_hint", "") or "").strip().lower()
-    aria  = (payload.get("aria_hint", "") or "").lower()
-    title = (payload.get("title_hint", "") or "").lower()
-    sel   = (payload.get("seletor_css", "") or "").lower()
-    tag   = (payload.get("tag", "") or "").lower()
-    blob  = f"{acao_raw} {text} {aria} {title} {payload.get('page_title','')}"
-
-    if acao_raw == "selecionar_opcao":
-        return "select"
-
-    if acao_raw == "tecla":
-        tecla = (payload.get("tecla", "") or "").lower()
-        if "ctrl+s" in tecla:
-            return "save"
-        if "escape" in tecla:
-            return "close"
-        if "delete" in tecla:
-            return "delete"
-        # Enter em campo editável = fill/confirm de edição
-        if tecla == "enter":
-            if tag in ("input", "textarea") or payload.get("role_hint", "") in ("textbox", "searchbox"):
-                return "fill"
-            return "confirm"
-        return "confirm"
-
-    # Confirmação explícita — palavras de botão de modal
-    if text in ("sim", "yes", "ok", "confirmar", "confirm", "aplicar", "apply", "aceitar"):
-        return "confirm"
-
-    # Criação / abertura
-    if any(k in blob for k in ["nova pasta", "novo", "criar", "new folder", "adicionar", "add"]):
-        return "open"
-
-    # Exclusão
-    if any(k in blob for k in ["excluir", "remover", "apagar", "deletar", "delete", "remove"]):
-        return "delete"
-
-    # Salvar
-    if any(k in blob for k in ["salvar", "gravar", "save"]):
-        return "save"
-
-    # Busca / filtro
-    if any(k in blob for k in ["pesquisar", "buscar", "filtrar", "filtro", "search"]):
-        return "search"
-
-    # Fechar / cancelar
-    if any(k in blob for k in ["cancelar", "fechar", "cancel", "close", "voltar"]):
-        return "close"
-
-    # Visualizar / abrir
-    if any(k in blob for k in ["abrir", "visualizar", "detalhar", "open", "ver"]):
-        return "open"
-
-    # Navegação de menu/aba
-    if any(k in blob for k in ["menu", "aba", "navegar", "navigate"]):
-        return "navigate"
-
-    # Seletor indica toolbar/modal button
-    if any(k in sel for k in ["button", "btn", "toolbar", "action"]):
-        return "open"
-
-    return "navigate"
-
-
-def infer_pattern_from_hints(payload: dict) -> str:
-    """
-    Heurística local de pattern_detectado — sem Gemini.
-    Usa seletor CSS, texto e contexto para classificar o padrão de interação.
-    """
-    sel  = (payload.get("seletor_css", "") or "").lower()
-    text = (payload.get("text_hint", "") or "").strip().lower()
-    tag  = (payload.get("tag", "") or "").lower()
-    acao = payload.get("acao", "")
-    scope = payload.get("capture_scope", "")
-
-    # Modal buttons: #s-button-*, [id*="button"], botões de confirmação
-    if re.search(r"#s-button|#btn-|\.modal.*button|\.dialog.*button", sel):
-        return "modal_action"
-    if text in ("sim", "não", "ok", "confirmar", "cancelar", "yes", "no"):
-        return "modal_action"
-
-    # Toolbar actions: #newFolderButton, #uploadButton, botões de barra
-    if re.search(r"#new|#upload|#download|#delete|toolbar|action-bar", sel):
-        return "toolbar_action"
-
-    # Breadcrumb navigation
-    if re.search(r"breadcrumb|ui-breadcrumb|\.bc-|home.*icon|fa-home", sel):
-        return "breadcrumb_navigation"
-
-    # Tree / list item (GED folders, tabelas)
-    if re.search(r"#itemtitle|\.tree-node|\.folder-item|\.list-item|ui-treenode", sel):
-        return "tree_item_open" if acao == "duplo_clique" else "table_selection"
-
-    # Menu navigation (shell sidebar)
-    if scope == "shell" or re.search(r"#menu-item|#apps-menu|sidebar|nav-item", sel):
-        return "menu_navigation"
-
-    # Search / filter fields
-    if tag in ("input", "textarea") or re.search(r"search|filter|busca|pesquisa", sel):
-        return "search_debounce" if tag in ("input", "textarea") else "form_fill"
-
-    # Select / dropdown
-    if acao == "selecionar_opcao" or tag == "select":
-        return "form_fill"
-
-    # Tecla funcional
-    if acao == "tecla":
-        return "form_fill"
-
-    # Clique genérico em botão
-    if tag in ("button", "a") or re.search(r"button|btn", sel):
-        return "button_click"
-
-    return "unknown"
-
-
-def is_noise_event(payload: dict) -> bool:
-    """
-    Retorna True para eventos que provavelmente não devem virar passo de treinamento.
-    Marcados como is_noise=True no evento — o gerador decide se descarta ou não.
-    Critérios:
-      - Clique em breadcrumb/home (navegação utilitária)
-      - Enter isolado sem valor de input (sem edição prévia)
-      - Clique em ícone utilitário sem label semântico
-    """
-    sel  = (payload.get("seletor_css", "") or "").lower()
-    text = (payload.get("text_hint", "") or "").strip().lower()
-    acao = payload.get("acao", "")
-    tag  = payload.get("tag", "")
-
-    # Breadcrumb / home
-    if re.search(r"breadcrumb|fa-home|home.*icon", sel):
-        return True
-
-    # Enter sem valor de input (tecla solta)
-    if acao == "tecla":
-        tecla = (payload.get("tecla", "") or "").lower()
-        valor = (payload.get("valor_input", "") or "").strip()
-        if tecla == "enter" and not valor:
-            return True
-
-    # Ícone sem label semântico (tag i/svg sem texto resolvido)
-    if tag in ("i", "svg", "path") and text in ("", "ícone de ação", "i", "svg"):
-        return True
-
-    return False
-
-def infer_business_entity_from_hints(payload):
-    blob = " ".join([
-        str(payload.get("text_hint", "")),
-        str(payload.get("aria_hint", "")),
-        str(payload.get("title_hint", "")),
-        str(payload.get("page_title", "")),
-    ]).lower()
-    if "pasta" in blob:
-        return "pasta"
-    if "documento" in blob or "ged" in blob:
-        return "documento"
-    if "cliente" in blob:
-        return "cliente"
-    if "pedido" in blob:
-        return "pedido"
-    if "menu" in blob:
-        return "menu"
-    if "campo" in blob or payload.get("tag") in ("input", "textarea", "select"):
-        return "campo"
-    return "elemento"
-
 async def analisar_semantica_hibrida(b64_img, payload, contexto_fluxo=None):
     contexto_fluxo = contexto_fluxo or {}
     fallback = {
-        "semantic_action": infer_semantic_action_from_hints(payload),
-        "business_entity": infer_business_entity_from_hints(payload),
+        "semantic_action": inferir_acao_semantica("", "", "", "", hints=payload),
+        "business_entity": inferir_entidade_negocio("", "", "", hints=payload),
         "business_target": payload.get("text_hint", ""),
-        "pattern_detected": infer_pattern_from_hints(payload),
+        "pattern_detected": inferir_padrao_interacao("", "", "", "", "", hints=payload),
         "confidence": 0.25,
         "expected_effect": "A tela mudou conforme esperado",
         "intent_description": f"{payload.get('acao','clique')} em {payload.get('text_hint') or 'elemento'}",
@@ -689,10 +537,10 @@ async def processar_evento_hibrido(item):
     # Se Gemini retornou unknown, aplica heurística local como fallback
     pattern_final = sem["pattern_detected"]
     if pattern_final == "unknown":
-        pattern_final = infer_pattern_from_hints(payload)
+        pattern_final = inferir_padrao_interacao("", "", "", "", "", hints=payload)
 
     # Marca eventos de ruído — o gerador decide se descarta
-    noise = is_noise_event(payload)
+    noise = classificar_ruido("", "", "", "", "", hints=payload)
 
     acao = {
         "id_acao": id_acao,

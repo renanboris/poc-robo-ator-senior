@@ -8,22 +8,29 @@ Pode ser importado e testado isoladamente.
 
 Consumidores:
   - capture_dual_output.py  (importa todas as funções)
-  - capture_hybrid_shadow.py (importa utc_now)
+  - capture_hybrid_shadow.py (importa funções unificadas públicas)
 
-Funções exportadas:
+Funções exportadas (API pública unificada — use estas):
   - utc_now
+  - inferir_acao_semantica          ← substitui _infer_semantic_action_from_capture
+  - inferir_entidade_negocio        ← substitui _infer_business_entity_from_capture
+  - inferir_padrao_interacao        ← substitui _infer_pattern_from_capture
+  - classificar_ruido               ← substitui _is_noise_event
+  - _montar_evento_shadow
+  - _salvar_shadow_jsonl
+
+Funções privadas (mantidas para retrocompatibilidade interna):
   - _infer_capture_scope
   - _infer_semantic_action_from_capture
   - _infer_business_entity_from_capture
   - _infer_pattern_from_capture
   - _is_noise_event
-  - _montar_evento_shadow
-  - _salvar_shadow_jsonl
 """
 
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 
 from utils import limpar_nome
@@ -131,6 +138,217 @@ def _is_noise_event(
     if tag in {"i", "svg", "path"} and label_l in {"", "i", "svg", "path", "span", "div", "a"}:
         return True
     return False
+
+
+# ──────────────────────────────────────────────────────────────
+# API PÚBLICA UNIFICADA — use estas funções em código novo
+# As funções privadas abaixo são mantidas para retrocompatibilidade
+# ──────────────────────────────────────────────────────────────
+
+def inferir_acao_semantica(
+    acao: str,
+    label: str,
+    seletor: str,
+    tag: str,
+    valor_input: str = "",
+    hints: dict | None = None,
+) -> str:
+    """
+    Função unificada de inferência de ação semântica.
+
+    Substitui _infer_semantic_action_from_capture() e infer_semantic_action_from_hints()
+    do capture_hybrid_shadow.py. Aceita tanto a assinatura posicional original quanto
+    um dict `hints` com o formato de payload do capture_hybrid_shadow.
+
+    Retorna sempre um valor do vocabulário controlado:
+      fill | search | confirm | delete | save | open | navigate | select | close
+
+    Parâmetros:
+        acao: ação bruta capturada (ex: "clique", "preencher_campo")
+        label: texto do elemento (ex: "Salvar", "Pesquisar")
+        seletor: seletor CSS capturado
+        tag: tag HTML do elemento (ex: "button", "input")
+        valor_input: valor digitado (para ações de preenchimento)
+        hints: dict opcional com campos do payload do capture_hybrid_shadow
+               (text_hint, acao, seletor_css, tag, valor_input, tecla,
+               aria_hint, title_hint). Campos posicionais têm precedência
+               sobre hints quando não-vazios.
+    """
+    if hints:
+        acao = acao or hints.get("acao", "")
+        label = label or hints.get("text_hint", "")
+        seletor = seletor or hints.get("seletor_css", "")
+        tag = tag or hints.get("tag", "")
+        valor_input = valor_input or hints.get("valor_input", "")
+
+        # ── Casos específicos do capture_hybrid_shadow ──────────────────────
+        # acao == "selecionar_opcao" é exclusivo do hybrid (evento <select>)
+        if acao == "selecionar_opcao":
+            return "select"
+
+        # acao == "tecla" captura atalhos de teclado funcionais (Ctrl+S, Escape, etc.)
+        if acao == "tecla":
+            tecla = hints.get("tecla", "").strip()
+            tecla_lower = tecla.lower()
+            if tecla_lower in {"ctrl+s", "meta+s"}:
+                return "save"
+            if tecla_lower in {"escape", "esc"}:
+                return "close"
+            if tecla_lower in {"delete", "del"}:
+                return "delete"
+            if tecla_lower in {"f2"}:
+                return "open"
+            if tecla_lower in {"enter"}:
+                return "confirm"
+            # Atalho genérico de teclado — trata como confirm
+            return "confirm"
+
+        # Enriquece label com aria_hint e title_hint quando text_hint está vazio
+        aria_hint  = hints.get("aria_hint", "")
+        title_hint = hints.get("title_hint", "")
+        label = label or aria_hint or title_hint
+
+    return _infer_semantic_action_from_capture(acao, label, seletor, tag, valor_input)
+
+
+def inferir_entidade_negocio(
+    label: str,
+    seletor: str,
+    tag: str,
+    contexto_tela: str = "",
+    hints: dict | None = None,
+) -> str:
+    """
+    Função unificada de inferência de entidade de negócio.
+
+    Substitui _infer_business_entity_from_capture() e infer_business_entity_from_hints()
+    do capture_hybrid_shadow.py.
+
+    Retorna o tipo de entidade:
+      pasta | documento | cliente | pedido | menu | campo | selecao | elemento
+
+    Parâmetros:
+        label: texto do elemento
+        seletor: seletor CSS capturado
+        tag: tag HTML do elemento
+        contexto_tela: contexto da tela (ex: título da página)
+        hints: dict opcional com campos do payload (text_hint, seletor_css, tag,
+               page_title, aria_hint, title_hint)
+    """
+    if hints:
+        label = label or hints.get("text_hint", "")
+        seletor = seletor or hints.get("seletor_css", "")
+        tag = tag or hints.get("tag", "")
+        contexto_tela = contexto_tela or hints.get("page_title", "")
+        # Enriquece label com aria_hint e title_hint (exclusivos do hybrid)
+        aria_hint  = hints.get("aria_hint", "")
+        title_hint = hints.get("title_hint", "")
+        label = label or aria_hint or title_hint
+
+        # Entidades de negócio específicas do domínio Senior X (hybrid)
+        blob_hints = f"{label} {seletor} {contexto_tela} {aria_hint} {title_hint}".lower()
+        if any(k in blob_hints for k in ["cliente", "customer", "fornecedor"]):
+            return "cliente"
+        if any(k in blob_hints for k in ["pedido", "order", "nota fiscal", "nf-e"]):
+            return "pedido"
+
+    return _infer_business_entity_from_capture(label, seletor, tag, contexto_tela)
+
+
+def inferir_padrao_interacao(
+    acao: str,
+    label: str,
+    seletor: str,
+    tag: str,
+    capture_scope: str,
+    hints: dict | None = None,
+) -> str:
+    """
+    Função unificada de inferência de padrão de interação.
+
+    Substitui _infer_pattern_from_capture() e infer_pattern_from_hints()
+    do capture_hybrid_shadow.py.
+
+    Retorna o padrão:
+      breadcrumb_navigation | menu_navigation | toolbar_action | table_selection |
+      form_fill | button_click | modal_action | tree_item_open | search_debounce |
+      unknown
+
+    Parâmetros:
+        acao: ação bruta capturada
+        label: texto do elemento
+        seletor: seletor CSS capturado
+        tag: tag HTML do elemento
+        capture_scope: escopo da captura ("shell" ou "module_iframe")
+        hints: dict opcional com campos do payload (acao, text_hint, seletor_css,
+               tag, capture_scope, aria_hint, title_hint)
+    """
+    if hints:
+        acao = acao or hints.get("acao", "")
+        label = label or hints.get("text_hint", "")
+        seletor = seletor or hints.get("seletor_css", "")
+        tag = tag or hints.get("tag", "")
+        capture_scope = capture_scope or hints.get("capture_scope", "shell")
+
+        # ── Padrões exclusivos do capture_hybrid_shadow ─────────────────────
+        blob_hints = f"{label} {seletor} {tag}".lower()
+        aria_hint  = hints.get("aria_hint", "").lower()
+
+        # modal_action: botões dentro de dialogs/modais
+        if re.search(r"modal|dialog|p-dialog|overlay|confirmDialog", seletor, re.IGNORECASE):
+            return "modal_action"
+
+        # tree_item_open: duplo clique em nó de árvore ou item de lista hierárquica
+        if acao == "duplo_clique" and re.search(
+            r"tree|treenode|p-tree|folder|itemtitle", seletor, re.IGNORECASE
+        ):
+            return "tree_item_open"
+
+        # search_debounce: input de busca com debounce (campo de filtro/pesquisa)
+        if tag in {"input", "textarea"} and any(
+            k in blob_hints or k in aria_hint
+            for k in ["search", "filter", "pesquisa", "busca", "filtro"]
+        ):
+            return "search_debounce"
+
+    return _infer_pattern_from_capture(acao, label, seletor, tag, capture_scope)
+
+
+def classificar_ruido(
+    label: str,
+    seletor: str,
+    acao: str,
+    tag: str,
+    capture_scope: str,
+    valor_input: str = "",
+    hints: dict | None = None,
+) -> bool:
+    """
+    Função unificada de classificação de eventos de ruído.
+
+    Substitui _is_noise_event() e is_noise_event() do capture_hybrid_shadow.py.
+
+    Retorna True para eventos que provavelmente não devem virar passo de treinamento:
+      - Clique em breadcrumb/home (navegação utilitária)
+      - Enter isolado sem valor de input
+      - Clique em ícone utilitário sem label semântico
+
+    Parâmetros:
+        label: texto do elemento
+        seletor: seletor CSS capturado
+        acao: ação bruta capturada
+        tag: tag HTML do elemento
+        capture_scope: escopo da captura
+        valor_input: valor digitado (para ações de preenchimento)
+        hints: dict opcional com campos do payload (text_hint, seletor_css, acao, tag, valor_input)
+    """
+    if hints:
+        label = label or hints.get("text_hint", "")
+        seletor = seletor or hints.get("seletor_css", "")
+        acao = acao or hints.get("acao", "")
+        tag = tag or hints.get("tag", "")
+        valor_input = valor_input or hints.get("valor_input", "")
+    return _is_noise_event(label, seletor, acao, tag, capture_scope, valor_input)
 
 
 def _montar_evento_shadow(

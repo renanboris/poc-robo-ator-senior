@@ -33,6 +33,7 @@ from shadow_builder import (
     _is_noise_event,
     _montar_evento_shadow,
     _salvar_shadow_jsonl,
+    inferir_acao_semantica,
 )
 
 from playwright.async_api import async_playwright, Error as PlaywrightError
@@ -237,10 +238,26 @@ async def _injetar_em_contexto(contexto):
             const text = el.innerText?.trim().replace(/\\n/g, ' ') || '';
             if (text && text.length > 0 && text.length < 100 && text !== 'undefined') return text;
             let cur = el;
-            for (let i = 0; i < 4; i++) {
+            for (let i = 0; i < 6; i++) {
                 if (!cur) break;
                 if (cur.getAttribute('aria-label')) return cur.getAttribute('aria-label');
                 if (cur.getAttribute('title')) return cur.getAttribute('title');
+                // Tenta o id como label legível quando contém texto descritivo (ex: menu-item-Senior Flow)
+                const elId = cur.getAttribute('id') || '';
+                if (elId && !elId.match(/^(ng-|mat-|cdk-|\d)/) && elId.includes('-') && elId.length < 60) {
+                    // Extrai a parte descritiva do id (ex: "menu-item-Senior Flow" → "Senior Flow")
+                    const partes = elId.split('-');
+                    const descritivo = partes.slice(2).join(' ').trim();
+                    if (descritivo && descritivo.length > 2) return descritivo;
+                }
+                // Tenta texto de filhos diretos (irmãos do ícone dentro do mesmo pai)
+                if (i === 0) {
+                    const irmaoTexto = Array.from(cur.parentElement?.children || [])
+                        .filter(c => c !== cur && c.tagName !== 'I' && c.tagName !== 'SVG')
+                        .map(c => (c.innerText || c.textContent || '').trim())
+                        .find(t => t && t.length > 1 && t.length < 80);
+                    if (irmaoTexto) return irmaoTexto;
+                }
                 cur = cur.parentElement;
             }
             return tag;
@@ -442,27 +459,23 @@ async def on_capturar_elemento(source, args):
         # Aviso quando coordenadas ainda são padrão após fallback no JS
         if coords.get("x_pct") == 0.5 and coords.get("y_pct") == 0.5:
             logger.warning(f"[FOTO {meu_id_acao}] Coordenadas padrão (0.5/0.5) — fallback de viewport usado para '{label}'.")
-        analise = (
-            await _analisar_elemento_com_gemini(
-                screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
-            ) if screenshot_bytes else {
-                "intencao": f"{acao.capitalize()} em '{label}'",
-                "descricao_visual": f"Elemento '{label}'",
-                "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa",
-            }
-        )
 
+        # ── Evento_Bruto: apenas dados mecânicos, sem chamada Gemini ─────────
+        # O enriquecimento semântico (Gemini Vision) ocorre APÓS o encerramento
+        # da sessão, via enriquecer_eventos_com_gemini(). Isso garante que a
+        # captura não seja bloqueada por latência ou falha da API.
         iframe_id = dados.get("iframe", "Pagina Principal")
         valor_input = dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else ""
         evento_base = {
             "id_acao":            meu_id_acao,
             "acao":               acao,
-            "intencao_semantica": analise["intencao"],
+            "intencao_semantica": "",          # preenchido em enriquecer_eventos_com_gemini()
+            "semantic_action":    "",          # preenchido em enriquecer_eventos_com_gemini()
             "elemento_alvo": {
-                "descricao_visual":      analise["descricao_visual"],
-                "contexto_tela":         analise["contexto_tela"],
-                "tipo_elemento":         analise.get("tipo_elemento", "button"),
-                "confianca_captura":     analise.get("confianca", "media"),
+                "descricao_visual":      "",   # preenchido em enriquecer_eventos_com_gemini()
+                "contexto_tela":         "",   # preenchido em enriquecer_eventos_com_gemini()
+                "tipo_elemento":         dados.get("tag", "button"),
+                "confianca_captura":     "media",  # padrão antes do enriquecimento
                 "label_curto":           label,
                 "coordenadas_relativas": coords,
                 "seletor_hint":          dados["seletor"],
@@ -471,27 +484,96 @@ async def on_capturar_elemento(source, args):
                 "screenshot_referencia": screenshot_b64,
             },
             "valor_input": valor_input,
+            # Metadados de contexto para enriquecimento posterior
+            "_page_title":  page_title,
+            "_page_url":    page_url,
+            "_vp_w":        vp_w,
+            "_vp_h":        vp_h,
+            "_dados_brutos": dados,
         }
         cliques_capturados.append(evento_base)
-        shadow_capturado.append(
-            _montar_evento_shadow(
-                id_acao=meu_id_acao,
-                acao=acao,
-                label=label,
-                dados=dados,
-                analise=analise,
-                iframe_id=iframe_id,
-                coords=coords,
-                screenshot_b64=screenshot_b64,
-                page_title=page_title,
-                page_url=page_url,
-                vp_w=vp_w,
-                vp_h=vp_h,
-                valor_input=valor_input,
-            )
-        )
     except Exception as e:
         logger.error(f"Erro ao processar captura: {e}")
+
+async def enriquecer_eventos_com_gemini(eventos_brutos: list[dict]) -> list[dict]:
+    """
+    Recebe lista de Evento_Bruto e retorna lista de Evento_Enriquecido.
+
+    Chamada APÓS o encerramento da sessão de captura, nunca durante.
+    Isso garante que a captura não seja bloqueada por latência ou falha da API.
+
+    Comportamento:
+      - Se gemini_client for None: usa fallback heurístico para todos os eventos.
+      - Se Gemini falhar para evento específico: registra logger.warning com id_acao
+        e usa fallback heurístico para aquele evento. Continua processando os demais.
+      - Se screenshot ausente no evento: usa fallback heurístico diretamente.
+      - Nunca lança exceção.
+      - Emite CAPTURA_SEM_GEMINI:N no stdout quando Gemini não disponível.
+    """
+    if not eventos_brutos:
+        return []
+
+    eventos_enriquecidos = []
+    gemini_falhou_count = 0
+
+    for evento in eventos_brutos:
+        alvo        = evento.get("elemento_alvo", {})
+        label       = alvo.get("label_curto", "")
+        acao        = evento.get("acao", "clique")
+        id_acao     = evento.get("id_acao", "?")
+        valor_input = evento.get("valor_input", "")
+
+        screenshot_b64   = alvo.get("screenshot_referencia")
+        screenshot_bytes = base64.b64decode(screenshot_b64) if screenshot_b64 else None
+
+        analise = None
+
+        if gemini_client and screenshot_bytes:
+            try:
+                analise = await _analisar_elemento_com_gemini(
+                    screenshot_bytes,
+                    alvo.get("html_hint", ""),
+                    label,
+                    alvo.get("coordenadas_relativas", {}),
+                    acao,
+                )
+            except Exception as e:
+                logger.warning(f"[Enriquecimento] Gemini falhou para id_acao={id_acao}: {str(e)[:80]}")
+                gemini_falhou_count += 1
+
+        if analise is None:
+            # Fallback heurístico via shadow_builder (sem Gemini)
+            gemini_falhou_count += 1
+            acao_sem = inferir_acao_semantica(
+                acao, label,
+                alvo.get("seletor_hint", ""),
+                alvo.get("tipo_elemento", ""),
+                valor_input,
+            )
+            analise = {
+                "intencao":         f"{acao_sem.capitalize()} em '{label}'",
+                "descricao_visual": f"Elemento '{label}'",
+                "contexto_tela":    evento.get("_page_title", "Desconhecido") or "Desconhecido",
+                "tipo_elemento":    alvo.get("tipo_elemento", "button"),
+                "confianca":        "baixa",
+            }
+
+        # Monta Evento_Enriquecido preservando todos os campos mecânicos
+        evento_enriquecido = dict(evento)
+        evento_enriquecido["intencao_semantica"] = analise["intencao"]
+        evento_enriquecido["elemento_alvo"] = dict(alvo)
+        evento_enriquecido["elemento_alvo"]["descricao_visual"]  = analise["descricao_visual"]
+        evento_enriquecido["elemento_alvo"]["contexto_tela"]     = analise["contexto_tela"]
+        evento_enriquecido["elemento_alvo"]["tipo_elemento"]     = analise.get("tipo_elemento", "button")
+        evento_enriquecido["elemento_alvo"]["confianca_captura"] = analise.get("confianca", "media")
+        eventos_enriquecidos.append(evento_enriquecido)
+
+    # Emite sinal de observabilidade quando Gemini não estava disponível
+    if not gemini_client or gemini_falhou_count == len(eventos_brutos):
+        print(f"CAPTURA_SEM_GEMINI:{len(eventos_brutos)}", flush=True)
+
+    return eventos_enriquecidos
+
 
 async def capturar_cliques_na_tela():
     global _lock_id, _id_acao_global
@@ -889,8 +971,55 @@ def iniciar_esteira_de_producao():
             sys.exit(1)
 
         print("[DEBUG] Salvando shadow JSONL...", flush=True)
-        _salvar_shadow_jsonl(nome_aula, objetivo, shadow_capturado)
-        
+
+        # ── Enriquecimento pós-captura: Gemini Vision roda aqui, não durante a captura ──
+        # Isso garante que a sessão de captura não foi bloqueada por latência da API.
+        print(f"[DEBUG] Enriquecendo {len(cliques_capturados)} eventos com Gemini Vision...", flush=True)
+        eventos_enriquecidos = asyncio.run(enriquecer_eventos_com_gemini(cliques_capturados))
+
+        # Monta shadow a partir dos eventos enriquecidos
+        shadow_final = []
+        for e in eventos_enriquecidos:
+            alvo    = e.get("elemento_alvo", {})
+            dados_b = e.get("_dados_brutos", {})
+            analise = {
+                "intencao":         e.get("intencao_semantica", ""),
+                "descricao_visual": alvo.get("descricao_visual", ""),
+                "contexto_tela":    alvo.get("contexto_tela", ""),
+                "tipo_elemento":    alvo.get("tipo_elemento", "button"),
+                "confianca":        alvo.get("confianca_captura", "media"),
+            }
+            shadow_final.append(
+                _montar_evento_shadow(
+                    id_acao=e["id_acao"],
+                    acao=e["acao"],
+                    label=alvo.get("label_curto", ""),
+                    dados=dados_b if dados_b else {
+                        "seletor": alvo.get("seletor_hint", ""),
+                        "tag":     alvo.get("tipo_elemento", "button"),
+                        "html_snapshot": alvo.get("html_hint", ""),
+                    },
+                    analise=analise,
+                    iframe_id=alvo.get("iframe_hint"),
+                    coords=alvo.get("coordenadas_relativas", {}),
+                    screenshot_b64=alvo.get("screenshot_referencia"),
+                    page_title=e.get("_page_title", ""),
+                    page_url=e.get("_page_url", ""),
+                    vp_w=e.get("_vp_w", 1920),
+                    vp_h=e.get("_vp_h", 1080),
+                    valor_input=e.get("valor_input", ""),
+                )
+            )
+
+        _salvar_shadow_jsonl(nome_aula, objetivo, shadow_final)
+
+        # ── Atualiza cliques_capturados com os eventos enriquecidos ──────────
+        # CRÍTICO: orquestrador_pos_captura usa cliques_capturados para montar
+        # o prompt da Aura. Sem esta atualização, intencao_semantica, descricao_visual
+        # e contexto_tela chegam vazios ao roteiro, quebrando o Brain na execução.
+        cliques_capturados.clear()
+        cliques_capturados.extend(eventos_enriquecidos)
+
         print(f"[DEBUG] {len(cliques_capturados)} acoes capturadas. Processando Roteiro com Aura...", flush=True)
         caminho_roteiro_gerado = asyncio.run(orquestrador_pos_captura(nome_aula, objetivo))
         print(f"[DEBUG] Roteiro gerado: {caminho_roteiro_gerado}", flush=True)
