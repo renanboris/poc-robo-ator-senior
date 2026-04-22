@@ -481,15 +481,14 @@ async def executar_roteiro(caminho_json: str) -> None:
             if monitor_aux:
                 _window_x = monitor_aux.x
                 _window_y = monitor_aux.y
-                logger.info(f"[Monitor] Usando monitor auxiliar: {monitor_aux.name} {monitor_aux.width}x{monitor_aux.height} pos=({_window_x},{_window_y})")
+                print(f"[Monitor] Usando monitor auxiliar: {monitor_aux.name} {monitor_aux.width}x{monitor_aux.height} pos=({_window_x},{_window_y})", flush=True)
             else:
-                logger.info("[Monitor] Monitor auxiliar não encontrado — usando monitor primário.")
+                print("[Monitor] Monitor auxiliar não encontrado — usando monitor primário.", flush=True)
         except Exception as e:
-            logger.warning(f"[Monitor] screeninfo falhou ({e}) — usando posição padrão.")
+            print(f"[Monitor] screeninfo falhou ({e}) — usando posição padrão.", flush=True)
 
-        # 🟢 A MÁGICA 1: TELA MAXIMIZADA NO MONITOR AUXILIAR
+        # 🟢 TELA MAXIMIZADA NO MONITOR AUXILIAR
         # --window-position posiciona a janela no monitor correto antes de maximizar.
-        # Alterado de --start-fullscreen para --start-maximized para melhor compatibilidade com o SO
         browser = await pw.chromium.launch(headless=False, args=[
             "--start-maximized",
             f"--window-position={_window_x},{_window_y}",
@@ -557,6 +556,49 @@ async def executar_roteiro(caminho_json: str) -> None:
             await asyncio.sleep(0.3)
             await page.keyboard.press("Escape")
 
+            # ── Botão PLAY: aguarda o usuário confirmar que está pronto ───────
+            # Exibe overlay com botão "▶ Iniciar Gravação" na tela.
+            # O usuário pode verificar se está na tela certa, pressionar F11
+            # para fullscreen manualmente, e só então clicar para iniciar.
+            await page.evaluate("""() => {
+                if (document.getElementById('_aura_play_overlay')) return;
+                const style = document.createElement('style');
+                style.innerHTML = `
+                    @keyframes _aura_pulse { 0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(34,197,94,.5)} 50%{transform:scale(1.04);box-shadow:0 0 0 12px rgba(34,197,94,0)} }
+                    @keyframes _aura_fade_in { from{opacity:0;transform:translate(-50%,-50%) scale(.92)} to{opacity:1;transform:translate(-50%,-50%) scale(1)} }
+                `;
+                document.head.appendChild(style);
+                const overlay = document.createElement('div');
+                overlay.id = '_aura_play_overlay';
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);z-index:2147483647;display:flex;align-items:center;justify-content:center;';
+                overlay.innerHTML = `
+                    <div style="background:rgba(15,23,42,.95);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:40px 56px;text-align:center;font-family:'Segoe UI',sans-serif;animation:_aura_fade_in .35s ease both;">
+                        <div style="font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#64748b;margin-bottom:8px;">Senior Training OS</div>
+                        <div style="font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:6px;">Pronto para gravar?</div>
+                        <div style="font-size:13px;color:#94a3b8;margin-bottom:32px;">Verifique se está na tela correta.<br>Pressione <kbd style="background:#1e293b;border:1px solid #334155;border-radius:4px;padding:2px 7px;font-size:12px;color:#e2e8f0;">F11</kbd> para fullscreen se desejar.</div>
+                        <button id="_aura_play_btn" style="background:#22c55e;color:#fff;border:none;border-radius:100px;padding:14px 40px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:.5px;animation:_aura_pulse 2s ease infinite;">▶ Iniciar Gravação</button>
+                    </div>`;
+                document.documentElement.appendChild(overlay);
+                document.getElementById('_aura_play_btn').onclick = () => {
+                    overlay.style.transition = 'opacity .3s';
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 300);
+                    window._aura_play_confirmado = true;
+                };
+            }""")
+
+            # Aguarda o usuário clicar em "Iniciar Gravação" (polling a cada 500ms, timeout 5min)
+            print("⏸  Aguardando confirmação do usuário para iniciar gravação...", flush=True)
+            for _ in range(600):  # 600 * 0.5s = 5 minutos máximo
+                confirmado = await page.evaluate("() => !!window._aura_play_confirmado")
+                if confirmado:
+                    break
+                await asyncio.sleep(0.5)
+
+            # ── Gap de 2s após confirmação: dá tempo para o sistema carregar ─
+            # O vídeo já está gravando, mas as narrações só começam após este gap.
+            await asyncio.sleep(2.0)
+
             tempo_inicio_gravacao = time.time()
             # INVARIANTE: Este delta captura intencionalmente todo o tempo desde a criação
             # do contexto Playwright (tempo_inicio_contexto), incluindo o login automático
@@ -570,11 +612,6 @@ async def executar_roteiro(caminho_json: str) -> None:
             await page.mouse.move(w / 2, h / 2)
 
             print("\nGRAVANDO VIDEO E AUDIOS\n", flush=True)
-
-            # ── Gap inicial: aguarda 2s antes de começar narrações ───────────
-            # Dá tempo para o sistema carregar após o login antes de iniciar
-            # as legendas e narrações do primeiro passo.
-            await asyncio.sleep(2.0)
 
             for idx, passo in enumerate(passos_lista):
                 id_p              = passo.get("id_passo", idx + 1)
