@@ -356,8 +356,9 @@ def renderizar_video_final(
             mp4_path,
             codec="libx264",
             audio_codec="aac",
-            fps=24,
-            preset="ultrafast",
+            fps=30,
+            preset="medium",
+            ffmpeg_params=["-crf", "18", "-pix_fmt", "yuv420p"],
             logger=CustomRenderLogger(),
         )
         gerar_arquivo_srt(timeline, srt_path)
@@ -469,10 +470,29 @@ async def executar_roteiro(caminho_json: str) -> None:
     print(f"✅ {len(tarefas_audio)} áudio(s) prontos. Iniciando gravação...", flush=True)
 
     async with async_playwright() as pw:
-        # 🟢 A MÁGICA 1: TELA MAXIMIZADA
+        # ── Detecta monitor auxiliar para gravar em fullHD ───────────────────
+        # Usa screeninfo para encontrar o monitor não-primário (monitor externo).
+        # Se não encontrar, usa o monitor primário como fallback.
+        _window_x, _window_y = 0, 0
+        try:
+            from screeninfo import get_monitors
+            monitores = get_monitors()
+            monitor_aux = next((m for m in monitores if not m.is_primary), None)
+            if monitor_aux:
+                _window_x = monitor_aux.x
+                _window_y = monitor_aux.y
+                logger.info(f"[Monitor] Usando monitor auxiliar: {monitor_aux.name} {monitor_aux.width}x{monitor_aux.height} pos=({_window_x},{_window_y})")
+            else:
+                logger.info("[Monitor] Monitor auxiliar não encontrado — usando monitor primário.")
+        except Exception as e:
+            logger.warning(f"[Monitor] screeninfo falhou ({e}) — usando posição padrão.")
+
+        # 🟢 A MÁGICA 1: TELA MAXIMIZADA NO MONITOR AUXILIAR
+        # --window-position posiciona a janela no monitor correto antes de maximizar.
         # Alterado de --start-fullscreen para --start-maximized para melhor compatibilidade com o SO
         browser = await pw.chromium.launch(headless=False, args=[
             "--start-maximized",
+            f"--window-position={_window_x},{_window_y}",
             "--disable-infobars",
             "--disable-features=Translate",
             "--lang=pt-BR",
@@ -550,6 +570,11 @@ async def executar_roteiro(caminho_json: str) -> None:
             await page.mouse.move(w / 2, h / 2)
 
             print("\nGRAVANDO VIDEO E AUDIOS\n", flush=True)
+
+            # ── Gap inicial: aguarda 2s antes de começar narrações ───────────
+            # Dá tempo para o sistema carregar após o login antes de iniciar
+            # as legendas e narrações do primeiro passo.
+            await asyncio.sleep(2.0)
 
             for idx, passo in enumerate(passos_lista):
                 id_p              = passo.get("id_passo", idx + 1)

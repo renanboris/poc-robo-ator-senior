@@ -591,7 +591,21 @@ async def capturar_cliques_na_tela():
         return
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False, args=["--start-maximized"])
+        # ── Detecta monitor auxiliar para abrir captura em fullHD ────────────
+        _window_x, _window_y = 0, 0
+        try:
+            from screeninfo import get_monitors
+            monitor_aux = next((m for m in get_monitors() if not m.is_primary), None)
+            if monitor_aux:
+                _window_x = monitor_aux.x
+                _window_y = monitor_aux.y
+        except Exception:
+            pass
+
+        browser = await p.chromium.launch(headless=False, args=[
+            "--start-maximized",
+            f"--window-position={_window_x},{_window_y}",
+        ])
         context = await browser.new_context(no_viewport=True)
         page    = await context.new_page()
 
