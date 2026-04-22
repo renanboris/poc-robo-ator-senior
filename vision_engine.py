@@ -583,6 +583,9 @@ def _gerar_candidatos(
         _SELETORES_DIALOG = [
             "p-confirmdialog", "p-dialog", ".p-dialog", ".ui-dialog",
             "[role='dialog']", ".p-confirm-dialog",
+            # Senior X / GED usa s-dialog e ui-confirmdialog
+            "s-dialog", ".ui-confirmdialog", ".ui-dialog-content",
+            ".p-dialog-content",
         ]
         for _sel_dialog in _SELETORES_DIALOG:
             candidatos.append(TentativaLocalizacao(
@@ -1325,51 +1328,69 @@ def template_match(
 # ──────────────────────────────────────────────────────────────
 # DETECÇÃO DE MENU DE CONTEXTO ATIVO (CAMADA 0.5)
 # ──────────────────────────────────────────────────────────────
-async def _detectar_menu_contexto_ativo(page) -> object | None:
+async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None) -> object | None:
     """
     Verifica se um menu de contexto está visível como overlay na página ou em qualquer iframe.
     Retorna o Locator do primeiro menu visível encontrado, ou None.
     Usa timeout=300ms para não penalizar o caminho feliz (sem menu ativo).
 
-    Busca em dois escopos:
-    1. DOM principal da página
-    2. Todos os frames filhos (iframes) — necessário para menus de contexto
-       que são renderizados dentro do iframe principal do Senior X (GED, etc.)
+    Busca em três escopos:
+    1. iframe_hint específico (quando fornecido) — prioridade máxima
+    2. DOM principal da página
+    3. Todos os frames filhos (iframes)
     """
     seletores_menu = [
+        # PrimeNG padrão
         ".p-contextmenu",
         "[role='menu']",
         ".context-menu",
         "ul[class*='contextmenu']",
         ".p-menu-list",
-        # Menus de contexto do GED/Senior X dentro de iframes
+        # Menus de contexto do GED/Senior X (PrimeNG dentro de iframes)
         ".ui-contextmenu",
         "ul.ui-menu-list",
         "[class*='context-menu']",
         "ul[class*='ui-menu']",
+        # Menu de contexto Angular genérico (div container com itens div)
+        ".ui-menu.ui-widget",
+        "ul.ui-menu",
+        ".p-menu",
     ]
 
-    # 1. Busca no DOM principal
-    for seletor in seletores_menu:
-        try:
-            locator = page.locator(seletor).first
-            await locator.wait_for(state="visible", timeout=300)
-            return locator
-        except Exception:
-            continue
-
-    # 2. Busca em todos os frames filhos (iframes)
-    for frame in page.frames:
-        if frame == page.main_frame:
-            continue
+    async def _buscar_em_frame(frame_or_page) -> object | None:
         for seletor in seletores_menu:
             try:
-                locator = frame.locator(seletor).first
+                locator = frame_or_page.locator(seletor).first
                 await locator.wait_for(state="visible", timeout=300)
-                logger.debug(f"[MENU-CTX] Menu de contexto detectado em frame: {frame.url[:60]}")
                 return locator
             except Exception:
                 continue
+        return None
+
+    # 1. Prioridade: iframe_hint específico (onde o clique_direito ocorreu)
+    if iframe_hint and iframe_hint not in ("Pagina Principal", "Página Principal"):
+        for frame in page.frames:
+            if (frame.name == iframe_hint or
+                    iframe_hint in (frame.url or "") or
+                    iframe_hint in (frame.name or "")):
+                resultado = await _buscar_em_frame(frame)
+                if resultado:
+                    logger.debug(f"[MENU-CTX] Menu detectado no iframe_hint '{iframe_hint}'")
+                    return resultado
+
+    # 2. DOM principal
+    resultado = await _buscar_em_frame(page)
+    if resultado:
+        return resultado
+
+    # 3. Todos os frames filhos
+    for frame in page.frames:
+        if frame == page.main_frame:
+            continue
+        resultado = await _buscar_em_frame(frame)
+        if resultado:
+            logger.debug(f"[MENU-CTX] Menu detectado em frame: {frame.url[:60]}")
+            return resultado
 
     return None
 
@@ -1648,7 +1669,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         if cache.seletor:
             # [CTX-MENU] Consciência de overlay: se menu de contexto ativo e seletor
             # não aponta para dentro de um menu, pular Brain e deixar camada 0.5 tratar.
-            _menu_ativo_check = await _detectar_menu_contexto_ativo(page)
+            _menu_ativo_check = await _detectar_menu_contexto_ativo(page, iframe_hint)
             _seletor_aponta_menu = any(
                 p in (cache.seletor or "")
                 for p in (".p-contextmenu", "[role='menu']", ".context-menu", "p-menu", "menuitem")
@@ -1688,7 +1709,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # ── Camada 0.5: Menu de contexto ativo ───────────────────────────────────
     # Ativada quando um overlay de menu de contexto está visível na página.
     # Escopa a busca dentro do menu para evitar cliques fora do overlay.
-    menu_locator = await _detectar_menu_contexto_ativo(page)
+    menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint)
     if menu_locator is not None:
         seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto)
         if seletor_usado:
