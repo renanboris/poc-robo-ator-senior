@@ -1605,14 +1605,31 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     html_hint:       str           = alvo.get("html_hint", "")
     coords_relativas: Optional[dict] = alvo.get("coordenadas_relativas")
 
+    # ── Atalho: item de menu de contexto ─────────────────────────────────────
+    # Quando is_context_menu_item=True, a ação é um item do menu de contexto
+    # que foi aberto por um clique_direito anterior. Vai direto para o menu
+    # sem passar pelas camadas normais (Brain, Sniper, Coords, etc.).
+    if acao_tec.get("is_context_menu_item"):
+        logger.info(f"\n   Executando (menu de contexto): {intencao[:80]}")
+        menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint)
+        if menu_locator is not None:
+            seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto)
+            if seletor_usado:
+                _registrar_sucesso_cache(intencao, seletor=seletor_usado, iframe=iframe_hint)
+                _registrar_telemetria("0.5_menu_ctx", True)
+                _registrar_estrategia_vencedora(intencao, "0.5_menu_ctx")
+                logger.info(f"   [Menu-CTX] Clicou em '{label_curto}' via '{seletor_usado}'")
+                return True
+            else:
+                logger.warning(f"   [Menu-CTX] Menu ativo mas '{label_curto}' não encontrado — escalando para Sniper")
+                _registrar_telemetria("0.5_menu_ctx", False)
+        else:
+            logger.warning(f"   [Menu-CTX] is_context_menu_item=True mas menu não detectado — escalando para Sniper")
+        # Fallthrough para o Sniper se o menu não foi encontrado
+
     # ── Guard: intenção vazia desativa o Brain ────────────────────────────────
-    # Se intencao_semantica não foi preenchida (roteiro gerado sem enriquecimento
-    # Gemini), o hash de "" seria compartilhado por TODAS as ações, fazendo o
-    # Brain retornar o seletor errado para qualquer elemento. Nesse caso, usa
-    # label_curto como fallback de identidade e pula a camada 0.
     _intencao_valida = bool(intencao and intencao.strip())
     if not _intencao_valida:
-        # Usa label_curto como proxy de intenção para logging, mas não consulta Brain
         intencao = f"clique em '{label_curto}'" if label_curto else "Acao na interface"
         logger.debug(
             f"   [Brain] intencao_semantica vazia — Brain desativado para esta ação. "

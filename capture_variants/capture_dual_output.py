@@ -481,11 +481,20 @@ async def on_capturar_elemento(source, args):
         # captura não seja bloqueada por latência ou falha da API.
         iframe_id = dados.get("iframe", "Pagina Principal")
         valor_input = dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else ""
+
+        # ── Flag de item de menu de contexto ─────────────────────────────────
+        # Se a ação anterior foi clique_direito, este clique é um item do menu
+        # de contexto que foi aberto. Marca para que o executor saiba buscar
+        # dentro do overlay do menu em vez de varrer o DOM geral.
+        _ultima_acao = cliques_capturados[-1].get("acao", "") if cliques_capturados else ""
+        _is_context_menu_item = (acao == "clique" and _ultima_acao == "clique_direito")
+
         evento_base = {
             "id_acao":            meu_id_acao,
             "acao":               acao,
             "intencao_semantica": "",          # preenchido em enriquecer_eventos_com_gemini()
             "semantic_action":    "",          # preenchido em enriquecer_eventos_com_gemini()
+            "is_context_menu_item": _is_context_menu_item,  # flag para o executor
             "elemento_alvo": {
                 "descricao_visual":      "",   # preenchido em enriquecer_eventos_com_gemini()
                 "contexto_tela":         "",   # preenchido em enriquecer_eventos_com_gemini()
@@ -906,6 +915,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
                         "acao": acao_bruta["acao"], "intencao_semantica": acao_bruta["intencao_semantica"],
                         "elemento_alvo": acao_bruta["elemento_alvo"], "valor_input": acao_bruta["valor_input"],
                         "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
+                        "is_context_menu_item": acao_bruta.get("is_context_menu_item", False),
                         "_capture_meta": capture_meta,
                     })
             if passo_mesclado["is_conclusao"]:
