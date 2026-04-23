@@ -1328,13 +1328,13 @@ def template_match(
 # ──────────────────────────────────────────────────────────────
 # DETECÇÃO DE MENU DE CONTEXTO ATIVO (CAMADA 0.5)
 # ──────────────────────────────────────────────────────────────
-async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None) -> object | None:
+async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None, timeout_ms: int = 150) -> object | None:
     """
     Verifica se um menu de contexto está visível como overlay na página.
     Retorna o Locator do primeiro menu visível encontrado, ou None.
 
-    PERFORMANCE: usa um único seletor CSS combinado com timeout de 150ms.
-    O caminho feliz (sem menu ativo) deve retornar em <200ms.
+    timeout_ms=150 para o caminho feliz (sem menu ativo) — retorna rápido.
+    timeout_ms=2000 quando chamado após clique_direito — aguarda animação de entrada.
 
     O menu de contexto do Senior X / GED usa ngx-contextmenu via Angular CDK Overlay,
     sempre renderizado no body da página principal (nunca dentro de iframes).
@@ -1351,7 +1351,7 @@ async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None) ->
     # Busca no DOM principal (onde CDK overlay sempre renderiza)
     try:
         locator = page.locator(SELETOR_MENU).first
-        await locator.wait_for(state="visible", timeout=150)
+        await locator.wait_for(state="visible", timeout=timeout_ms)
         return locator
     except Exception:
         pass
@@ -1623,7 +1623,9 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # sem passar pelas camadas normais (Brain, Sniper, Coords, etc.).
     if acao_tec.get("is_context_menu_item"):
         logger.info(f"\n   Executando (menu de contexto): {intencao[:80]}")
-        menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint)
+        # Aguarda a animação de entrada do ngx-contextmenu (CDK overlay tem fade-in)
+        await asyncio.sleep(0.3)
+        menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint, timeout_ms=2000)
         if menu_locator is not None:
             seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto)
             if seletor_usado:
