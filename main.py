@@ -659,7 +659,12 @@ async def executar_roteiro(caminho_json: str) -> None:
                         continue
 
                     micro_voz = acao_tec.get("micro_narracao", "")
-                    if micro_voz:
+                    # ── Clique direito: pula narração para não fechar o menu de contexto ──
+                    # O menu de contexto fecha sozinho após alguns segundos. Se houver
+                    # narração entre o clique_direito e o item do menu, o menu fecha antes
+                    # de a próxima ação ser executada. A narração é adiada para depois.
+                    _is_clique_direito = acao_tec.get("acao") == "clique_direito"
+                    if micro_voz and not _is_clique_direito:
                         await exibir_legenda_cinema(page, micro_voz)
                         id_acao = f"passo_{id_p}_acao_{i}"
                         mp3     = await gerar_audio(micro_voz, id_acao, nome_arquivo_base, voz_escolhida)
@@ -689,8 +694,12 @@ async def executar_roteiro(caminho_json: str) -> None:
                             _blur_ativo = False
 
                     resultado_clique = await clicar_com_animacao(page, acao_tec)
-                    await aguardar_audio_terminar()
-                    await remover_legenda(page)
+
+                    # Após clique_direito: não aguarda áudio nem pausa — o menu de contexto
+                    # precisa ser clicado imediatamente antes de fechar sozinho.
+                    if not _is_clique_direito:
+                        await aguardar_audio_terminar()
+                        await remover_legenda(page)
 
                     if _blur_ativo:
                         try:
@@ -713,7 +722,8 @@ async def executar_roteiro(caminho_json: str) -> None:
                         logging.debug(f"[score_engine] Falha ao registrar execução (ignorada): {_score_err}")
 
                     pausa_real = min(pausa_inteligente * 0.3, 0.8)
-                    await asyncio.sleep(pausa_real)
+                    if not _is_clique_direito:
+                        await asyncio.sleep(pausa_real)
 
         except Exception as e:
             pygame.mixer.stop()

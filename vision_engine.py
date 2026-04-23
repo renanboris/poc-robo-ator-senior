@@ -1361,14 +1361,26 @@ async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None) ->
 
 async def _buscar_em_escopo_menu(menu_locator, label_curto: str) -> str | None:
     """
-    Localiza o elemento dentro do container do menu de contexto.
-    Estratégias em ordem de confiança, todas escopadas ao menu_locator.
-    Retorna o seletor usado em caso de sucesso, ou None se não encontrado.
+    Localiza e clica em um item dentro do container do menu de contexto ngx-contextmenu.
+
+    O ngx-contextmenu (Angular CDK Overlay) renderiza itens como:
+      <ul class="ngx-menu-content">
+        <li><a><em class="fa ..."></em> Excluir</a></li>
+      </ul>
+
+    Os itens NÃO têm role="menuitem" — são <li>/<a> simples com texto misto
+    (ícone + texto). Por isso usamos :has-text() escopado ao container.
     """
+    label_safe = label_curto.replace("'", "\\'")
+
     estrategias = [
-        ("role_menuitem", lambda: menu_locator.get_by_role("menuitem", name=label_curto)),
-        ("text_exact",    lambda: menu_locator.get_by_text(label_curto, exact=True)),
-        ("has_text",      lambda: menu_locator.locator(f":has-text('{label_curto}')").last),
+        # ngx-contextmenu: item <li> ou <a> com o texto (ignora ícones internos)
+        ("li_has_text",   lambda: menu_locator.locator(f"li:has-text('{label_safe}')").first),
+        ("a_has_text",    lambda: menu_locator.locator(f"a:has-text('{label_safe}')").first),
+        # Fallback genérico: qualquer elemento visível com o texto exato
+        ("text_exact",    lambda: menu_locator.get_by_text(label_curto, exact=True).first),
+        # Último recurso: texto parcial
+        ("has_text",      lambda: menu_locator.locator(f":has-text('{label_safe}')").last),
     ]
     for nome, fn in estrategias:
         try:
@@ -1621,11 +1633,17 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 logger.info(f"   [Menu-CTX] Clicou em '{label_curto}' via '{seletor_usado}'")
                 return True
             else:
-                logger.warning(f"   [Menu-CTX] Menu ativo mas '{label_curto}' não encontrado — escalando para Sniper")
+                logger.warning(f"   [Menu-CTX] Menu ativo mas '{label_curto}' não encontrado no escopo")
                 _registrar_telemetria("0.5_menu_ctx", False)
         else:
-            logger.warning(f"   [Menu-CTX] is_context_menu_item=True mas menu não detectado — escalando para Sniper")
-        # Fallthrough para o Sniper se o menu não foi encontrado
+            logger.warning(f"   [Menu-CTX] is_context_menu_item=True mas menu não detectado")
+            _registrar_telemetria("0.5_menu_ctx", False)
+        # IMPORTANTE: não escala para Sniper/Coords — qualquer clique fora do menu
+        # fecha o overlay CDK. Retorna falha para que o executor possa reportar.
+        _registrar_falha_cache(intencao)
+        _registrar_telemetria("falha_total", False)
+        logger.error(f"   [FALHA TOTAL] Menu de contexto não encontrado para: '{label_curto}'")
+        return False
 
     # ── Guard: intenção vazia desativa o Brain ────────────────────────────────
     _intencao_valida = bool(intencao and intencao.strip())
