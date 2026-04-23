@@ -228,6 +228,21 @@ async def _injetar_em_contexto(contexto):
                 return 'Caixa de selecao Angular';
             }
 
+            // Itens de menu de contexto (ngx-contextmenu, CDK overlay)
+            // O clique pode cair no <em> (ícone) dentro do <a> ou <li> do menu.
+            // Sobe para o item do menu e pega o texto visível.
+            const menuItem = el.closest('.ngx-contextmenu li, [class*="contextmenu"] li, .cdk-overlay-pane li, .dropdown-menu li');
+            if (menuItem) {
+                // Pega apenas o texto, ignorando ícones (<em>, <i>, <svg>)
+                const textoMenu = Array.from(menuItem.childNodes)
+                    .filter(n => n.nodeType === Node.TEXT_NODE || (n.nodeType === Node.ELEMENT_NODE && !['EM','I','SVG','SPAN'].includes(n.tagName)))
+                    .map(n => (n.textContent || '').trim())
+                    .join(' ').replace(/\\s+/g, ' ').trim();
+                if (textoMenu && textoMenu.length > 1) return textoMenu;
+                // Fallback: innerText do item inteiro sem ícones
+                const textoFull = (menuItem.innerText || menuItem.textContent || '').replace(/\\s+/g, ' ').trim();
+                if (textoFull && textoFull.length > 1 && textoFull.length < 60) return textoFull;
+            }
             const tag = el.tagName.toLowerCase();
             const isEditable = tag === 'input' || tag === 'textarea' || el.getAttribute('contenteditable') === 'true';
             if (isEditable) {
@@ -244,7 +259,7 @@ async def _injetar_em_contexto(contexto):
                 if (cur.getAttribute('title')) return cur.getAttribute('title');
                 // Tenta o id como label legível quando contém texto descritivo (ex: menu-item-Senior Flow)
                 const elId = cur.getAttribute('id') || '';
-                if (elId && !elId.match(/^(ng-|mat-|cdk-|\d)/) && elId.includes('-') && elId.length < 60) {
+                if (elId && !elId.match(/^(ng-|mat-|cdk-|\\d)/) && elId.includes('-') && elId.length < 60) {
                     // Extrai a parte descritiva do id (ex: "menu-item-Senior Flow" → "Senior Flow")
                     const partes = elId.split('-');
                     const descritivo = partes.slice(2).join(' ').trim();
