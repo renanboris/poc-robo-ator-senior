@@ -1330,16 +1330,13 @@ def template_match(
 # ──────────────────────────────────────────────────────────────
 async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None, timeout_ms: int = 150) -> object | None:
     """
-    Verifica se um menu de contexto está visível como overlay na página.
+    Verifica se um menu de contexto está visível como overlay na página ou em frames.
     Retorna o Locator do primeiro menu visível encontrado, ou None.
 
     timeout_ms=150 para o caminho feliz (sem menu ativo) — retorna rápido.
-    timeout_ms=2000 quando chamado após clique_direito — aguarda animação de entrada.
-
-    O menu de contexto do Senior X / GED usa ngx-contextmenu via Angular CDK Overlay,
-    sempre renderizado no body da página principal (nunca dentro de iframes).
+    timeout_ms=2000 quando chamado após clique_direito — aguarda animação de entrada
+                    e busca em todos os frames.
     """
-    # Seletor único combinado — CSS OR é muito mais rápido que N chamadas sequenciais
     SELETOR_MENU = (
         ".ngx-contextmenu, "
         ".cdk-overlay-pane.ngx-contextmenu, "
@@ -1348,13 +1345,26 @@ async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None, ti
         "[role='menu']"
     )
 
-    # Busca no DOM principal (onde CDK overlay sempre renderiza)
+    # 1. Busca no DOM principal
     try:
         locator = page.locator(SELETOR_MENU).first
         await locator.wait_for(state="visible", timeout=timeout_ms)
         return locator
     except Exception:
         pass
+
+    # 2. Quando timeout maior (após clique_direito), busca em todos os frames
+    if timeout_ms > 150:
+        for frame in page.frames:
+            if frame == page.main_frame:
+                continue
+            try:
+                locator = frame.locator(SELETOR_MENU).first
+                await locator.wait_for(state="visible", timeout=timeout_ms)
+                logger.debug(f"[MENU-CTX] Menu encontrado em frame: {frame.name or frame.url[:40]}")
+                return locator
+            except Exception:
+                continue
 
     return None
 
@@ -1627,24 +1637,25 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         await asyncio.sleep(0.3)
         menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint, timeout_ms=2000)
         if menu_locator is None:
-            # ── Diagnóstico: inspeciona o DOM para encontrar o seletor real ──
+            # ── Diagnóstico: inspeciona o DOM de todos os frames ──────────────
             try:
-                overlays = await page.evaluate("""() => {
-                    const els = document.querySelectorAll('[class*="overlay"], [class*="context"], [class*="menu"], [class*="cdk"]');
-                    return Array.from(els)
-                        .filter(el => {
-                            const r = el.getBoundingClientRect();
-                            return r.width > 0 && r.height > 0;
-                        })
-                        .slice(0, 10)
-                        .map(el => ({
-                            tag: el.tagName,
-                            cls: el.className.substring(0, 100),
-                            id: el.id,
-                            visible: window.getComputedStyle(el).display !== 'none'
-                        }));
-                }""")
-                logger.warning(f"   [Menu-CTX] DOM overlays visíveis: {overlays}")
+                for frame in page.frames:
+                    overlays = await frame.evaluate("""() => {
+                        const els = document.querySelectorAll('[class*="overlay"], [class*="context"], [class*="menu"], [class*="cdk"], [class*="ngx"]');
+                        return Array.from(els)
+                            .filter(el => {
+                                const r = el.getBoundingClientRect();
+                                return r.width > 0 && r.height > 0;
+                            })
+                            .slice(0, 5)
+                            .map(el => ({
+                                tag: el.tagName,
+                                cls: el.className.substring(0, 120),
+                                id: el.id,
+                            }));
+                    }""")
+                    if overlays:
+                        logger.warning(f"   [Menu-CTX] Frame '{frame.name or frame.url[:40]}' overlays: {overlays}")
             except Exception as diag_err:
                 logger.warning(f"   [Menu-CTX] Diagnóstico falhou: {diag_err}")
         if menu_locator is not None:
