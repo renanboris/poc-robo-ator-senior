@@ -1330,76 +1330,31 @@ def template_match(
 # ──────────────────────────────────────────────────────────────
 async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None) -> object | None:
     """
-    Verifica se um menu de contexto está visível como overlay na página ou em qualquer iframe.
+    Verifica se um menu de contexto está visível como overlay na página.
     Retorna o Locator do primeiro menu visível encontrado, ou None.
-    Usa timeout=300ms para não penalizar o caminho feliz (sem menu ativo).
 
-    Busca em três escopos:
-    1. iframe_hint específico (quando fornecido) — prioridade máxima
-    2. DOM principal da página
-    3. Todos os frames filhos (iframes)
+    PERFORMANCE: usa um único seletor CSS combinado com timeout de 150ms.
+    O caminho feliz (sem menu ativo) deve retornar em <200ms.
+
+    O menu de contexto do Senior X / GED usa ngx-contextmenu via Angular CDK Overlay,
+    sempre renderizado no body da página principal (nunca dentro de iframes).
     """
-    seletores_menu = [
-        # PrimeNG padrão
-        ".p-contextmenu",
-        "[role='menu']",
-        ".context-menu",
-        "ul[class*='contextmenu']",
-        ".p-menu-list",
-        # Menus de contexto do GED/Senior X (PrimeNG dentro de iframes)
-        ".ui-contextmenu",
-        "ul.ui-menu-list",
-        "[class*='context-menu']",
-        "ul[class*='ui-menu']",
-        # Menu de contexto Angular genérico (div container com itens div)
-        ".ui-menu.ui-widget",
-        "ul.ui-menu",
-        ".p-menu",
-        # ngx-contextmenu via Angular CDK Overlay (Senior X / GED)
-        # Renderizado no body da página principal via CDK, independente de iframe
-        ".ngx-contextmenu",
-        ".cdk-overlay-pane.ngx-contextmenu",
-        "[class*='ngx-contextmenu']",
-        "div[class*='cdk-overlay-pane'] ul",
-        "div[class*='cdk-overlay-pane'] .dropdown-menu",
-    ]
+    # Seletor único combinado — CSS OR é muito mais rápido que N chamadas sequenciais
+    SELETOR_MENU = (
+        ".ngx-contextmenu, "
+        ".cdk-overlay-pane.ngx-contextmenu, "
+        "[class*='ngx-contextmenu'], "
+        ".p-contextmenu, "
+        "[role='menu']"
+    )
 
-    async def _buscar_em_frame(frame_or_page) -> object | None:
-        for seletor in seletores_menu:
-            try:
-                locator = frame_or_page.locator(seletor).first
-                await locator.wait_for(state="visible", timeout=300)
-                return locator
-            except Exception:
-                continue
-        return None
-
-    # 1. DOM principal SEMPRE primeiro — CDK Overlay (ngx-contextmenu, cdk-overlay-pane)
-    # é sempre renderizado no body da página raiz, independente de qual iframe
-    # gerou o clique direito. Esta é a prioridade máxima.
-    resultado = await _buscar_em_frame(page)
-    if resultado:
-        return resultado
-
-    # 2. iframe_hint específico (fallback para menus renderizados dentro do frame)
-    if iframe_hint and iframe_hint not in ("Pagina Principal", "Página Principal"):
-        for frame in page.frames:
-            if (frame.name == iframe_hint or
-                    iframe_hint in (frame.url or "") or
-                    iframe_hint in (frame.name or "")):
-                resultado = await _buscar_em_frame(frame)
-                if resultado:
-                    logger.debug(f"[MENU-CTX] Menu detectado no iframe_hint '{iframe_hint}'")
-                    return resultado
-
-    # 3. Todos os frames filhos (último recurso)
-    for frame in page.frames:
-        if frame == page.main_frame:
-            continue
-        resultado = await _buscar_em_frame(frame)
-        if resultado:
-            logger.debug(f"[MENU-CTX] Menu detectado em frame: {frame.url[:60]}")
-            return resultado
+    # Busca no DOM principal (onde CDK overlay sempre renderiza)
+    try:
+        locator = page.locator(SELETOR_MENU).first
+        await locator.wait_for(state="visible", timeout=150)
+        return locator
+    except Exception:
+        pass
 
     return None
 
