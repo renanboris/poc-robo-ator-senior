@@ -1369,7 +1369,7 @@ async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None, ti
     return None
 
 
-async def _buscar_em_escopo_menu(menu_locator, label_curto: str) -> str | None:
+async def _buscar_em_escopo_menu(menu_locator, label_curto: str, page=None) -> str | None:
     """
     Localiza e clica em um item dentro do container do menu de contexto ngx-contextmenu.
 
@@ -1396,6 +1396,17 @@ async def _buscar_em_escopo_menu(menu_locator, label_curto: str) -> str | None:
         try:
             el = fn()
             await el.wait_for(state="visible", timeout=1000)
+            # Anima o cursor até o item do menu antes de clicar
+            if page is not None:
+                try:
+                    box = await el.bounding_box(timeout=500)
+                    if box:
+                        cx = box["x"] + box["width"] / 2
+                        cy = box["y"] + box["height"] / 2
+                        from cursor_engine import mover_cursor_humanizado
+                        await mover_cursor_humanizado(page, cx, cy)
+                except Exception:
+                    pass
             await el.click()
             return nome
         except Exception:
@@ -1659,7 +1670,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             except Exception as diag_err:
                 logger.warning(f"   [Menu-CTX] Diagnóstico falhou: {diag_err}")
         if menu_locator is not None:
-            seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto)
+            seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page)
             if seletor_usado:
                 _registrar_sucesso_cache(intencao, seletor=seletor_usado, iframe=iframe_hint)
                 _registrar_telemetria("0.5_menu_ctx", True)
@@ -1744,7 +1755,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # Escopa a busca dentro do menu para evitar cliques fora do overlay.
     menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint)
     if menu_locator is not None:
-        seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto)
+        seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page)
         if seletor_usado:
             _registrar_sucesso_cache(intencao, seletor_usado)
             _registrar_telemetria("0.5_menu_ctx", True)
