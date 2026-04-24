@@ -1647,28 +1647,6 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         # Aguarda a animação de entrada do ngx-contextmenu (CDK overlay tem fade-in)
         await asyncio.sleep(0.3)
         menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint, timeout_ms=2000)
-        if menu_locator is None:
-            # ── Diagnóstico: inspeciona o DOM de todos os frames ──────────────
-            try:
-                for frame in page.frames:
-                    overlays = await frame.evaluate("""() => {
-                        const els = document.querySelectorAll('[class*="overlay"], [class*="context"], [class*="menu"], [class*="cdk"], [class*="ngx"]');
-                        return Array.from(els)
-                            .filter(el => {
-                                const r = el.getBoundingClientRect();
-                                return r.width > 0 && r.height > 0;
-                            })
-                            .slice(0, 5)
-                            .map(el => ({
-                                tag: el.tagName,
-                                cls: el.className.substring(0, 120),
-                                id: el.id,
-                            }));
-                    }""")
-                    if overlays:
-                        logger.warning(f"   [Menu-CTX] Frame '{frame.name or frame.url[:40]}' overlays: {overlays}")
-            except Exception as diag_err:
-                logger.warning(f"   [Menu-CTX] Diagnóstico falhou: {diag_err}")
         if menu_locator is not None:
             seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page)
             if seletor_usado:

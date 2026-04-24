@@ -556,26 +556,28 @@ async def executar_roteiro(caminho_json: str) -> None:
             await asyncio.sleep(0.3)
             await page.keyboard.press("Escape")
 
+            # ── Maximiza antes de exibir o overlay PLAY ──────────────────────
+            # Garante que a janela está em fullscreen no monitor correto antes
+            # do usuário ver o botão de iniciar gravação.
+            await page.keyboard.press("F11")
+            await asyncio.sleep(0.8)
+
             # ── Botão PLAY: aguarda o usuário confirmar que está pronto ───────
-            # Exibe overlay com botão "▶ Iniciar Gravação" na tela.
-            # O usuário pode verificar se está na tela certa, pressionar F11
-            # para fullscreen manualmente, e só então clicar para iniciar.
             await page.evaluate("""() => {
                 if (document.getElementById('_aura_play_overlay')) return;
                 const style = document.createElement('style');
                 style.innerHTML = `
                     @keyframes _aura_pulse { 0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(34,197,94,.5)} 50%{transform:scale(1.04);box-shadow:0 0 0 12px rgba(34,197,94,0)} }
-                    @keyframes _aura_fade_in { from{opacity:0;transform:translate(-50%,-50%) scale(.92)} to{opacity:1;transform:translate(-50%,-50%) scale(1)} }
                 `;
                 document.head.appendChild(style);
                 const overlay = document.createElement('div');
                 overlay.id = '_aura_play_overlay';
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);z-index:2147483647;display:flex;align-items:center;justify-content:center;';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);z-index:2147483647;display:flex;align-items:center;justify-content:center;';
                 overlay.innerHTML = `
-                    <div style="background:rgba(15,23,42,.95);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:40px 56px;text-align:center;font-family:'Segoe UI',sans-serif;animation:_aura_fade_in .35s ease both;">
+                    <div style="background:rgba(15,23,42,.95);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:40px 56px;text-align:center;font-family:'Segoe UI',sans-serif;max-width:420px;">
                         <div style="font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#64748b;margin-bottom:8px;">Senior Training OS</div>
                         <div style="font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:6px;">Pronto para gravar?</div>
-                        <div style="font-size:13px;color:#94a3b8;margin-bottom:32px;">Verifique se está na tela correta.<br>Pressione <kbd style="background:#1e293b;border:1px solid #334155;border-radius:4px;padding:2px 7px;font-size:12px;color:#e2e8f0;">F11</kbd> para fullscreen se desejar.</div>
+                        <div style="font-size:13px;color:#94a3b8;margin-bottom:32px;">Verifique se está na tela correta antes de iniciar.</div>
                         <button id="_aura_play_btn" style="background:#22c55e;color:#fff;border:none;border-radius:100px;padding:14px 40px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:.5px;animation:_aura_pulse 2s ease infinite;">▶ Iniciar Gravação</button>
                     </div>`;
                 document.documentElement.appendChild(overlay);
@@ -595,14 +597,7 @@ async def executar_roteiro(caminho_json: str) -> None:
                     break
                 await asyncio.sleep(0.5)
 
-            # ── Maximiza a janela via F11 após confirmação ───────────────────
-            # --start-maximized não funciona de forma confiável com --window-position
-            # em monitores não-primários no Windows. F11 via Playwright é mais robusto.
-            await page.keyboard.press("F11")
-            await asyncio.sleep(0.5)
-
             # ── Gap de 2s após confirmação: dá tempo para o sistema carregar ─
-            # O vídeo já está gravando, mas as narrações só começam após este gap.
             await asyncio.sleep(2.0)
 
             tempo_inicio_gravacao = time.time()
@@ -657,6 +652,17 @@ async def executar_roteiro(caminho_json: str) -> None:
                 for i, acao_tec in enumerate(passo.get("acoes_tecnicas", [])):
                     if acao_tec.get("acao") == "concluir_video":
                         continue
+
+                    # ── Injeta is_context_menu_item em tempo de execução ─────────────
+                    # Compatibilidade com roteiros gerados antes da flag existir.
+                    # Se a ação anterior foi clique_direito, esta é item de menu de contexto.
+                    acoes_tecnicas = passo.get("acoes_tecnicas", [])
+                    _acao_anterior = acoes_tecnicas[i - 1].get("acao", "") if i > 0 else ""
+                    if (acao_tec.get("acao") == "clique" and
+                            _acao_anterior == "clique_direito" and
+                            not acao_tec.get("is_context_menu_item")):
+                        acao_tec = dict(acao_tec)  # cópia para não mutar o roteiro
+                        acao_tec["is_context_menu_item"] = True
 
                     micro_voz = acao_tec.get("micro_narracao", "")
                     # ── Clique direito: pula narração para não fechar o menu de contexto ──
