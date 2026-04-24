@@ -182,6 +182,7 @@ HTML_PAGE_WITH_CI_IFRAME = """
 # Bug Condition Exploration Tests
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_bug1_resolver_contexto_returns_framelocator_not_frame():
     """
@@ -275,6 +276,7 @@ async def test_bug1_resolver_contexto_returns_framelocator_not_frame():
             await browser.close()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_bug2_coordinates_not_adjusted_correctly():
     """
@@ -387,6 +389,7 @@ async def test_bug2_coordinates_not_adjusted_correctly():
             await browser.close()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_bug3_wrong_element_found_parent_container():
     """

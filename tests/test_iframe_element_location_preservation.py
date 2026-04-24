@@ -131,6 +131,7 @@ def _make_acao_tec_empty_label(x_pct: float, y_pct: float) -> dict:
 # Preservation Test 1: Non-Iframe Element Behavior
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_non_iframe_element_identity_verification():
     """
@@ -252,6 +253,7 @@ async def test_preservation_non_iframe_element_identity_verification():
 # Preservation Test 2: Fail-Open Behavior - Empty Label
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_fail_open_empty_label():
     """
@@ -342,6 +344,7 @@ async def test_preservation_fail_open_empty_label():
 # Preservation Test 3: Fail-Open Behavior - Exception Handling
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_fail_open_exception():
     """
@@ -445,6 +448,7 @@ async def test_preservation_fail_open_exception():
 # Property-Based Test: Non-Iframe Elements at Various Coordinates
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @given(
     x_offset=st.integers(min_value=50, max_value=200),
     y_offset=st.integers(min_value=50, max_value=150),
@@ -544,6 +548,7 @@ async def test_preservation_property_non_iframe_coordinates(x_offset, y_offset):
 # Preservation Test 4: Fail-Open Behavior - Invalid Coordinates
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_fail_open_invalid_coordinates():
     """
@@ -628,6 +633,7 @@ async def test_preservation_fail_open_invalid_coordinates():
 # Preservation Test 5: Fallback Layers Triggered When Coords Fail
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_fallback_layers_when_coords_unavailable():
     """

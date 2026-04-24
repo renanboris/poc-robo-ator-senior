@@ -145,6 +145,7 @@ def _make_acao_tec_iframe(label_curto: str, x_pct: float, y_pct: float) -> dict:
 # Bug Condition Exploration Test
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_iframe_element_location_bug_condition():
     """
@@ -279,6 +280,7 @@ async def test_iframe_element_location_bug_condition():
             await browser.close()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_iframe_element_location_identity_verification_failure():
     """

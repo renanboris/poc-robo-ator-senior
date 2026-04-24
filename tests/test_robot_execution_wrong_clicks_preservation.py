@@ -86,6 +86,7 @@ HTML_PAGE_WITH_CROSS_ORIGIN_IFRAME = """
 # Preservation Property Tests
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_no_iframe_hint_uses_automatic_detection():
     """
@@ -129,6 +130,7 @@ async def test_preservation_no_iframe_hint_uses_automatic_detection():
             await browser.close()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_generic_iframe_hint_returns_page():
     """
@@ -170,6 +172,7 @@ async def test_preservation_generic_iframe_hint_returns_page():
             await browser.close()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_main_page_clicks_work_without_adjustment():
     """
@@ -233,6 +236,7 @@ async def test_preservation_main_page_clicks_work_without_adjustment():
             await browser.close()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_empty_label_curto_skips_verification():
     """
@@ -265,6 +269,7 @@ async def test_preservation_empty_label_curto_skips_verification():
     assert True, "Preservation requirement documented: empty label_curto skips verification"
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_resolver_contexto_fallback_to_page():
     """
@@ -304,6 +309,7 @@ async def test_preservation_resolver_contexto_fallback_to_page():
             await browser.close()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_preservation_clicks_outside_iframes_work_correctly():
     """
@@ -349,6 +355,7 @@ async def test_preservation_clicks_outside_iframes_work_correctly():
 # Property-Based Tests for Stronger Guarantees
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
 @given(
     iframe_hint=st.one_of(
         st.none(),
@@ -398,6 +405,7 @@ async def test_property_generic_hints_always_return_page(iframe_hint):
             await browser.close()
 
 
+@pytest.mark.integration
 @given(
     x=st.integers(min_value=100, max_value=800),
     y=st.integers(min_value=100, max_value=600)
