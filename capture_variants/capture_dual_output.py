@@ -523,36 +523,91 @@ async def enriquecer_eventos_com_gemini(eventos_brutos: list[dict]) -> list[dict
     """
     Recebe lista de Evento_Bruto e retorna lista de Evento_Enriquecido.
 
-    Chamada APÓS o encerramento da sessão de captura, nunca durante.
-    Isso garante que a captura não seja bloqueada por latência ou falha da API.
+    Opção C: enriquecimento seletivo + paralelização em lotes.
 
-    Comportamento:
-      - Se gemini_client for None: usa fallback heurístico para todos os eventos.
-      - Se Gemini falhar para evento específico: registra logger.warning com id_acao
-        e usa fallback heurístico para aquele evento. Continua processando os demais.
-      - Se screenshot ausente no evento: usa fallback heurístico diretamente.
-      - Nunca lança exceção.
-      - Emite CAPTURA_SEM_GEMINI:N no stdout quando Gemini não disponível.
+    - Eventos com label descritivo suficiente usam fallback heurístico direto
+      (sem chamar Gemini) — economiza chamadas para eventos óbvios.
+    - Eventos com label genérico ou ambíguo são enviados ao Gemini em lotes
+      paralelos de até LOTE_GEMINI eventos simultâneos.
+    - Nunca lança exceção.
     """
     if not eventos_brutos:
         return []
 
-    eventos_enriquecidos = []
-    gemini_falhou_count = 0
+    # Labels que dispensam Gemini — o fallback heurístico já produz boa qualidade
+    _LABELS_DESCRITIVOS_SUFICIENTES = {
+        "nova pasta", "novo envelope", "excluir", "confirmar", "cancelar",
+        "salvar", "enviar", "fechar", "abrir", "selecionar", "incluir",
+        "upload", "download", "pesquisar", "buscar", "filtrar", "exportar",
+        "importar", "editar", "renomear", "mover", "copiar", "compartilhar",
+        "favoritar", "permissões", "assinar", "tirar foto", "reconhecimento facial",
+        "novo", "criar", "adicionar", "remover", "atualizar", "voltar",
+        "próximo", "anterior", "sim", "não", "ok", "aplicar",
+    }
 
-    for evento in eventos_brutos:
+    # Tags que sempre precisam de Gemini — sem label semântico próprio
+    _TAGS_PRECISAM_GEMINI = {"span", "i", "a", "div", "em", "svg", "path", "button"}
+
+    LOTE_GEMINI = 8  # máximo de chamadas paralelas (dentro do rate limit da API)
+
+    def _precisa_gemini(evento: dict) -> bool:
+        """Decide se o evento precisa de análise Gemini ou se o fallback é suficiente."""
+        if not gemini_client:
+            return False
+        alvo  = evento.get("elemento_alvo", {})
+        label = (alvo.get("label_curto", "") or "").strip().lower()
+        tag   = (alvo.get("tipo_elemento", "") or "").strip().lower()
+        acao  = evento.get("acao", "")
+
+        # Sem screenshot — Gemini não consegue analisar de qualquer forma
+        if not alvo.get("screenshot_referencia"):
+            return False
+        # Label genérico (tag HTML) — Gemini é necessário para entender o contexto
+        if label in _TAGS_PRECISAM_GEMINI or not label or len(label) <= 1:
+            return True
+        # Label começa com "checkbox de:" — já tem contexto suficiente
+        if label.startswith("checkbox de:"):
+            return False
+        # Label descritivo conhecido — fallback heurístico é suficiente
+        if any(label.startswith(d) or label == d for d in _LABELS_DESCRITIVOS_SUFICIENTES):
+            return False
+        # Ações de digitação com valor — fallback é suficiente
+        if acao in ("preencher_campo", "digitar_e_enter") and evento.get("valor_input"):
+            return False
+        # Default: usa Gemini para labels desconhecidos
+        return True
+
+    def _fallback_heuristico(evento: dict) -> dict:
+        """Gera análise heurística sem chamar Gemini."""
         alvo        = evento.get("elemento_alvo", {})
         label       = alvo.get("label_curto", "")
         acao        = evento.get("acao", "clique")
-        id_acao     = evento.get("id_acao", "?")
         valor_input = evento.get("valor_input", "")
+        acao_sem = inferir_acao_semantica(
+            acao, label,
+            alvo.get("seletor_hint", ""),
+            alvo.get("tipo_elemento", ""),
+            valor_input,
+        )
+        return {
+            "intencao":         f"{acao_sem.capitalize()} em '{label}'",
+            "descricao_visual": f"Elemento '{label}'",
+            "contexto_tela":    evento.get("_page_title", "Desconhecido") or "Desconhecido",
+            "tipo_elemento":    alvo.get("tipo_elemento", "button"),
+            "confianca":        "media",
+        }
 
-        screenshot_b64   = alvo.get("screenshot_referencia")
-        screenshot_bytes = base64.b64decode(screenshot_b64) if screenshot_b64 else None
+    async def _enriquecer_um(evento: dict) -> dict:
+        """Enriquece um único evento — Gemini ou fallback conforme critério."""
+        alvo    = evento.get("elemento_alvo", {})
+        label   = alvo.get("label_curto", "")
+        acao    = evento.get("acao", "clique")
+        id_acao = evento.get("id_acao", "?")
 
         analise = None
-
-        if gemini_client and screenshot_bytes:
+        if _precisa_gemini(evento):
+            screenshot_b64   = alvo.get("screenshot_referencia")
+            screenshot_bytes = base64.b64decode(screenshot_b64) if screenshot_b64 else None
             try:
                 analise = await _analisar_elemento_com_gemini(
                     screenshot_bytes,
@@ -563,26 +618,10 @@ async def enriquecer_eventos_com_gemini(eventos_brutos: list[dict]) -> list[dict
                 )
             except Exception as e:
                 logger.warning(f"[Enriquecimento] Gemini falhou para id_acao={id_acao}: {str(e)[:80]}")
-                gemini_falhou_count += 1
 
         if analise is None:
-            # Fallback heurístico via shadow_builder (sem Gemini)
-            gemini_falhou_count += 1
-            acao_sem = inferir_acao_semantica(
-                acao, label,
-                alvo.get("seletor_hint", ""),
-                alvo.get("tipo_elemento", ""),
-                valor_input,
-            )
-            analise = {
-                "intencao":         f"{acao_sem.capitalize()} em '{label}'",
-                "descricao_visual": f"Elemento '{label}'",
-                "contexto_tela":    evento.get("_page_title", "Desconhecido") or "Desconhecido",
-                "tipo_elemento":    alvo.get("tipo_elemento", "button"),
-                "confianca":        "baixa",
-            }
+            analise = _fallback_heuristico(evento)
 
-        # Monta Evento_Enriquecido preservando todos os campos mecânicos
         evento_enriquecido = dict(evento)
         evento_enriquecido["intencao_semantica"] = analise["intencao"]
         evento_enriquecido["elemento_alvo"] = dict(alvo)
@@ -590,13 +629,25 @@ async def enriquecer_eventos_com_gemini(eventos_brutos: list[dict]) -> list[dict
         evento_enriquecido["elemento_alvo"]["contexto_tela"]     = analise["contexto_tela"]
         evento_enriquecido["elemento_alvo"]["tipo_elemento"]     = analise.get("tipo_elemento", "button")
         evento_enriquecido["elemento_alvo"]["confianca_captura"] = analise.get("confianca", "media")
-        eventos_enriquecidos.append(evento_enriquecido)
+        return evento_enriquecido
 
-    # Emite sinal de observabilidade quando Gemini não estava disponível
-    if not gemini_client or gemini_falhou_count == len(eventos_brutos):
+    # Processa em lotes paralelos preservando a ordem original
+    eventos_enriquecidos = [None] * len(eventos_brutos)
+    gemini_count = sum(1 for e in eventos_brutos if _precisa_gemini(e))
+    fallback_count = len(eventos_brutos) - gemini_count
+    print(f"[Enriquecimento] {len(eventos_brutos)} eventos: {gemini_count} via Gemini, {fallback_count} via fallback heurístico", flush=True)
+
+    for inicio in range(0, len(eventos_brutos), LOTE_GEMINI):
+        lote = eventos_brutos[inicio:inicio + LOTE_GEMINI]
+        resultados = await asyncio.gather(*[_enriquecer_um(e) for e in lote])
+        for j, resultado in enumerate(resultados):
+            eventos_enriquecidos[inicio + j] = resultado
+
+    if not gemini_client or gemini_count == 0:
         print(f"CAPTURA_SEM_GEMINI:{len(eventos_brutos)}", flush=True)
 
     return eventos_enriquecidos
+
 
 
 async def capturar_cliques_na_tela():
