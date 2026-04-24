@@ -33,6 +33,28 @@ logger = logging.getLogger(__name__)
 
 MAX_PASSOS = 15  # segurança: não fica preso em loop infinito
 
+# ── Skill enrichment (optional) ───────────────────────────────
+# Import SkillMemory lazily to avoid hard dependency when running
+# without the Next integration layer.
+try:
+    import sys as _sys
+    import os as _os
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), "..", ".."))
+    from skill_memory import SkillMemory as _SkillMemory
+    from skill_models import KnownSkill as _KnownSkill
+    _SKILL_MEMORY_AVAILABLE = True
+except ImportError:
+    _SKILL_MEMORY_AVAILABLE = False
+
+# Shared SkillMemory instance (can be replaced by caller)
+_default_skill_memory: "Optional[_SkillMemory]" = None
+
+
+def set_skill_memory(memory) -> None:
+    """Inject a SkillMemory instance for the planner to consult."""
+    global _default_skill_memory
+    _default_skill_memory = memory
+
 
 @dataclass
 class ProximaAcao:
@@ -63,6 +85,67 @@ class EntradaHistorico:
     acao_descricao: str
     resultado: str                      # "sucesso" | "falhou" | "parcial"
     tela_resultante_id: str = ""
+
+
+def _build_skill_hints(objetivo: str) -> str:
+    """
+    Build a skill hints block for the planner prompt.
+
+    Queries the shared SkillMemory for promoted skills whose semantic_action
+    or pattern matches the objective keywords.  Returns an empty string when
+    no skills are available.
+
+    Requirements: 12.1, 12.2, 12.3
+    """
+    if not _SKILL_MEMORY_AVAILABLE or _default_skill_memory is None:
+        return ""
+
+    # Simple keyword extraction from objective
+    keywords = objetivo.lower().split()
+    candidates: list = []
+
+    for kw in keywords:
+        # Try pattern-mode retrieval for each keyword
+        try:
+            hits = _default_skill_memory.retrieve(
+                mode="pattern",
+                semantic_action=kw,
+                pattern="",
+            )
+            candidates.extend(hits)
+        except Exception:
+            pass
+
+    if not candidates:
+        return ""
+
+    # Deduplicate by skill_id, keep top 3
+    seen: set = set()
+    unique: list = []
+    for skill in candidates:
+        if skill.skill_id not in seen:
+            seen.add(skill.skill_id)
+            unique.append(skill)
+        if len(unique) >= 3:
+            break
+
+    lines = ["\nSKILLS CONHECIDAS RELEVANTES:"]
+    for skill in unique:
+        logger.debug(
+            "[Planner] Consulting skill",
+            extra={
+                "skill_id": skill.skill_id,
+                "source_stage": skill.source_stage,
+                "promotion_state": skill.promotion_state,
+            },
+        )
+        lines.append(
+            f"  - {skill.skill_name} | ação={skill.semantic_action} "
+            f"| tela={skill.screen_family} | efeito_esperado={skill.expected_effect} "
+            f"| origem={skill.source_stage} | nível={skill.promotion_state}"
+        )
+    lines.append("")
+    return "\n".join(lines)
 
 
 async def planejar_proximo_passo(
@@ -127,7 +210,7 @@ ESTADO ATUAL DA TELA:
 - Sugestão do screen_reader: {estado_atual.proximo_passo_sugerido}
 {elementos_texto}
 {historico_texto}
-
+{_build_skill_hints(objetivo)}
 REGRAS DE RACIOCÍNIO:
 1. Se o elemento alvo está no SUBMENU da sidebar: hover no ícone pai PRIMEIRO para expandir
 2. Se o elemento está no IFRAME: procure dentro do iframe, não na sidebar

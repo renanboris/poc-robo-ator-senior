@@ -400,6 +400,9 @@ def _montar_evento_shadow(
     }
     validacao_alvo = _validacoes.get(semantic_action, "A tela mudou conforme esperado")
 
+    # expected_effect: top-level field for the Next integration (Requirement 8.1)
+    expected_effect = validacao_alvo
+
     return {
         "id_acao":            id_acao,
         "captured_at":        utc_now(),
@@ -424,6 +427,7 @@ def _montar_evento_shadow(
         "validacao_esperada": {
             "alvo": validacao_alvo
         },
+        "expected_effect":    expected_effect,
         "elemento_alvo": {
             "descricao_visual":      analise.get("descricao_visual", f"Elemento '{label}'"),
             "contexto_tela":         analise.get("contexto_tela", page_title or "Desconhecido"),
