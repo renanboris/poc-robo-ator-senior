@@ -658,11 +658,11 @@ async def capturar_cliques_na_tela():
     shadow_capturado.clear()
 
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario    = os.getenv("SENIOR_USER")
-    senha      = os.getenv("SENIOR_PASS")
+    usuario    = os.getenv("SENIOR_USER_CAPTURE")
+    senha      = os.getenv("SENIOR_PASS_CAPTURE")
 
     if not usuario or not senha:
-        print("ERRO FATAL: Credenciais ausentes no .env (SENIOR_USER / SENIOR_PASS).", flush=True)
+        print("ERRO FATAL: Credenciais de captura ausentes no .env (SENIOR_USER_CAPTURE / SENIOR_PASS_CAPTURE).", flush=True)
         return
 
     async with async_playwright() as p:

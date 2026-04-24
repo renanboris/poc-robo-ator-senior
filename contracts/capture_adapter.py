@@ -96,8 +96,8 @@ class SeniorXAdapter:
 
     def obter_credenciais(self) -> dict:
         return {
-            "usuario": os.getenv("SENIOR_USER", ""),
-            "senha":   os.getenv("SENIOR_PASS", ""),
+            "usuario": os.getenv("SENIOR_USER_CAPTURE", ""),
+            "senha":   os.getenv("SENIOR_PASS_CAPTURE", ""),
         }
 
     def obter_seletores_login(self) -> dict:

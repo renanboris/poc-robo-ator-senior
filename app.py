@@ -1278,6 +1278,7 @@ async def get_status():
 # 🟢 SPRINT 4: A Nova Rota WebSocket (Substitui o Status-Stream antigo)
 @app.websocket("/api/ws/status")
 async def websocket_status(websocket: WebSocket):
+    global processo_atual
     await ws_manager.connect(websocket)
     try:
         while True:
@@ -1285,9 +1286,27 @@ async def websocket_status(websocket: WebSocket):
             data = await websocket.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
+        if not ws_manager.active_connections:
+            with _estado_lock:
+                proc = processo_atual
+            if proc:
+                logging.info("[ws-disconnect] Último cliente desconectou com processo ativo — cancelando.")
+                proc.terminate()
+                _set_estado(ocupado=False, progresso=None, erro="Execução interrompida: navegador fechado.")
+                with _estado_lock:
+                    processo_atual = None
     except Exception as e:
         logging.error(f"Erro na ligação WebSocket: {e}")
         ws_manager.disconnect(websocket)
+        if not ws_manager.active_connections:
+            with _estado_lock:
+                proc = processo_atual
+            if proc:
+                logging.info("[ws-disconnect] Último cliente desconectou com processo ativo (via Exception) — cancelando.")
+                proc.terminate()
+                _set_estado(ocupado=False, progresso=None, erro="Execução interrompida: navegador fechado.")
+                with _estado_lock:
+                    processo_atual = None
 
 @app.post("/api/limpar-status")
 async def limpar_status():

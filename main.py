@@ -400,11 +400,11 @@ async def clicar_com_animacao(page, acao_tec: dict) -> bool:
 # ==============================================================
 async def executar_roteiro(caminho_json: str) -> None:
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario    = os.getenv("SENIOR_USER")
-    senha      = os.getenv("SENIOR_PASS")
+    usuario    = os.getenv("SENIOR_USER_EXECUTE")
+    senha      = os.getenv("SENIOR_PASS_EXECUTE")
 
     if not usuario or not senha:
-        print("ERRO: Credenciais ausentes no .env (SENIOR_USER / SENIOR_PASS)")
+        print("ERRO: Credenciais de execução ausentes no .env (SENIOR_USER_EXECUTE / SENIOR_PASS_EXECUTE)")
         sys.exit(1)
 
     with open(caminho_json, "r", encoding="utf-8") as f:

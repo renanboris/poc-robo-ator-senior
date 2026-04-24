@@ -154,8 +154,11 @@ async def dry_run_validador(caminho_json: str, dry_run: bool = False) -> None:
         roteiro = json.load(f)
 
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario    = os.getenv("SENIOR_USER")
-    senha      = os.getenv("SENIOR_PASS")
+    usuario    = os.getenv("SENIOR_USER_EXECUTE")
+    senha      = os.getenv("SENIOR_PASS_EXECUTE")
+    if not usuario or not senha:
+        print("ERRO: Credenciais de execução ausentes no .env (SENIOR_USER_EXECUTE / SENIOR_PASS_EXECUTE)", flush=True)
+        return
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
