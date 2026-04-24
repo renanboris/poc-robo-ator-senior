@@ -510,6 +510,26 @@ async def executar_roteiro(caminho_json: str) -> None:
         page = await context.new_page()
         await instalar_cursor(page)
 
+        # ── Maximiza via CDP após criar a página ─────────────────────────────
+        # --start-maximized falha com --window-position em monitores não-primários
+        # no Windows. CDP Browser.setWindowBounds é a forma confiável.
+        try:
+            cdp = await context.new_cdp_session(page)
+            wid_resp = await cdp.send("Browser.getWindowForTarget")
+            window_id = wid_resp["windowId"]
+            await cdp.send("Browser.setWindowBounds", {
+                "windowId": window_id,
+                "bounds": {
+                    "left":        _window_x,
+                    "top":         _window_y,
+                    "windowState": "maximized",
+                },
+            })
+            await cdp.detach()
+            print("[Monitor] Janela maximizada via CDP.", flush=True)
+        except Exception as e:
+            print(f"[Monitor] CDP maximize falhou ({e}) — continuando.", flush=True)
+
         print("A iniciar o robô e a tentar login no Senior X...", flush=True)
         try:
             await page.goto(SENIOR_URL)
@@ -555,12 +575,6 @@ async def executar_roteiro(caminho_json: str) -> None:
             await page.keyboard.press("Escape")
             await asyncio.sleep(0.3)
             await page.keyboard.press("Escape")
-
-            # ── Maximiza antes de exibir o overlay PLAY ──────────────────────
-            # Garante que a janela está em fullscreen no monitor correto antes
-            # do usuário ver o botão de iniciar gravação.
-            await page.keyboard.press("F11")
-            await asyncio.sleep(0.8)
 
             # ── Botão PLAY: aguarda o usuário confirmar que está pronto ───────
             await page.evaluate("""() => {
