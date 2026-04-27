@@ -1617,6 +1617,133 @@ async def _resolver_elemento_em_iframe_frame(
         return ({}, x, y, False)
 
 
+async def _verificar_identidade_por_coordenadas(
+    page: Page,
+    x: int,
+    y: int,
+    label_curto: str,
+    iframe_hint: Optional[str] = None
+) -> tuple[bool, bool]:
+    """
+    Verifica identidade do elemento nas coordenadas (x, y) ANTES de executar o clique.
+    
+    Esta função implementa o fix para o bug de timing onde cliques eram executados
+    ANTES da verificação de identidade. Agora a verificação acontece PRIMEIRO, e o
+    clique só é executado se a identidade for confirmada.
+    
+    Args:
+        page: Página Playwright
+        x: Coordenada X absoluta no viewport
+        y: Coordenada Y absoluta no viewport
+        label_curto: Texto esperado para verificação de identidade
+        iframe_hint: Hint opcional sobre qual iframe contém o elemento
+    
+    Returns:
+        tuple[bool, bool]: (identidade_confirmada, is_cross_origin)
+        - identidade_confirmada: True se identidade verificada OU fail-open aplicado
+        - is_cross_origin: True se iframe cross-origin detectado (para logging)
+    
+    Fail-open cases (retorna True sem verificação):
+        - label_curto vazio/None → retorna (True, False)
+        - Exceção durante verificação → retorna (True, False)
+        - Iframe cross-origin → retorna (True, True)
+    
+    Bug Fix: Requirements 2.2, 2.3, 2.4
+    Preservation: Requirements 3.1, 3.2, 3.3
+    """
+    # Fail-open: se label_curto vazio, aceitar sem verificação
+    if not label_curto:
+        return (True, False)
+    
+    try:
+        # Determinar se deve usar iframe_hint ou detecção automática
+        usar_iframe_hint = (
+            iframe_hint and
+            iframe_hint not in ("Pagina Principal", "Página Principal", "iframe-cross-origin")
+        )
+        
+        if usar_iframe_hint:
+            logger.info(f"   [Coords Capturadas] Usando iframe_hint: '{iframe_hint}'")
+            contexto = await _resolver_contexto(page, iframe_hint)
+            x_ajustado, y_ajustado = x, y
+            is_cross_origin = False
+            
+            if isinstance(contexto, Frame):
+                try:
+                    # Ajustar coordenadas para iframe offset
+                    iframe_bbox = await page.evaluate(f"""
+                        () => {{
+                            const iframes = document.querySelectorAll('iframe');
+                            for (const iframe of iframes) {{
+                                if (iframe.name === '{iframe_hint}' ||
+                                    iframe.src.includes('{iframe_hint}') ||
+                                    iframe.id === '{iframe_hint}' ||
+                                    (iframe.title && iframe.title.includes('{iframe_hint}'))) {{
+                                    const bbox = iframe.getBoundingClientRect();
+                                    return {{ left: bbox.left, top: bbox.top }};
+                                }}
+                            }}
+                            return null;
+                        }}
+                    """)
+                    if iframe_bbox:
+                        x_ajustado = int(x - iframe_bbox['left'])
+                        y_ajustado = int(y - iframe_bbox['top'])
+                        logger.info(f"   [Coords Capturadas] Coordenadas ajustadas para iframe: ({x}, {y}) -> ({x_ajustado}, {y_ajustado})")
+                    
+                    # Obter elemento no iframe
+                    elemento_info = await contexto.evaluate("""
+                        ([x, y]) => {
+                            const el = document.elementFromPoint(x, y);
+                            if (!el) return null;
+                            return {
+                                tagName: el.tagName,
+                                innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                            };
+                        }
+                    """, [x_ajustado, y_ajustado])
+                except Exception as exc_frame:
+                    logger.warning(f"   [Coords Capturadas] Erro ao usar iframe_hint - fallback para detecção automática: {exc_frame}")
+                    # Fallback para detecção automática
+                    elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
+                        await _resolver_elemento_em_iframe(page, x, y)
+            else:
+                logger.info(f"   [Coords Capturadas] iframe_hint não resolveu para Frame - usando detecção automática")
+                # Fallback para detecção automática
+                elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
+                    await _resolver_elemento_em_iframe(page, x, y)
+        else:
+            logger.info(f"   [Coords Capturadas] Detecção automática de iframe ativada")
+            # Detecção automática de iframe
+            elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
+                await _resolver_elemento_em_iframe(page, x, y)
+        
+        # Fail-open: iframe cross-origin
+        if is_cross_origin:
+            logger.warning(f"   [Coords Capturadas] Iframe cross-origin detectado - fail-open aplicado")
+            return (True, True)
+        
+        # Verificar identidade
+        if elemento_info and elemento_info.get('innerText'):
+            texto_elemento = elemento_info['innerText']
+            if label_curto.strip().lower() in texto_elemento.strip().lower():
+                return (True, False)  # Identidade confirmada
+            else:
+                logger.warning(
+                    f"   [Coords Capturadas] Identidade não confirmada: "
+                    f"esperado '{label_curto}', encontrado '{texto_elemento[:50]}' em ({x_ajustado}, {y_ajustado})"
+                )
+                return (False, False)  # Identidade NÃO confirmada
+        else:
+            # Fail-open: elemento sem texto
+            return (True, False)
+    
+    except Exception as exc_verify:
+        # Fail-open: exceção durante verificação
+        logger.warning(f"   [Coords Capturadas] Verificação de identidade falhou (fail-open): {exc_verify}")
+        return (True, False)
+
+
 # ──────────────────────────────────────────────────────────────
 # ORQUESTRADOR PRINCIPAL (A MAQUINA DE DECISAO)
 # ──────────────────────────────────────────────────────────────
@@ -1957,105 +2084,49 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # Acionada APÓS o Sniper Semântico — coordenadas são menos confiáveis que
     # seletores semânticos pois dependem de layout estável. Usada como fallback
     # quando nenhum seletor semântico funcionou.
+    #
+    # [FIX] Bug de timing corrigido: Agora verifica identidade ANTES de clicar.
+    # Ordem correta: (1) calcular coords → (2) verificar identidade → (3) clicar se OK
     if coords_relativas and coords_relativas.get("x_pct"):
         logger.info("   [Coords Capturadas] Tentando coordenadas relativas da gravação...")
         try:
+            # Calcular coordenadas absolutas
             vp = page.viewport_size or {"width": 1920, "height": 1080}
-            x  = int(coords_relativas["x_pct"] * vp["width"])
-            y  = int(coords_relativas["y_pct"] * vp["height"])
-            if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
-                # [FIX] Verificar identidade do elemento nas coordenadas antes de confirmar sucesso
-                identidade_confirmada = False
-                if label_curto:  # Fail-open: se label_curto vazio, aceitar o clique
-                    try:
-                        # [Task 3.4] Check if iframe_hint is available and not generic
-                        usar_iframe_hint = (
-                            iframe_hint and
-                            iframe_hint not in ("Pagina Principal", "Página Principal", "iframe-cross-origin")
-                        )
-
-                        if usar_iframe_hint:
-                            logger.info(f"   [Coords Capturadas] Usando iframe_hint: '{iframe_hint}'")
-                            contexto = await _resolver_contexto(page, iframe_hint)
-                            x_ajustado = x
-                            y_ajustado = y
-                            if isinstance(contexto, Frame):
-                                try:
-                                    iframe_bbox = await page.evaluate(f"""
-                                        () => {{
-                                            const iframes = document.querySelectorAll('iframe');
-                                            for (const iframe of iframes) {{
-                                                if (iframe.name === '{iframe_hint}' ||
-                                                    iframe.src.includes('{iframe_hint}') ||
-                                                    iframe.id === '{iframe_hint}' ||
-                                                    (iframe.title && iframe.title.includes('{iframe_hint}'))) {{
-                                                    const bbox = iframe.getBoundingClientRect();
-                                                    return {{ left: bbox.left, top: bbox.top }};
-                                                }}
-                                            }}
-                                            return null;
-                                        }}
-                                    """)
-                                    if iframe_bbox:
-                                        x_ajustado = int(x - iframe_bbox['left'])
-                                        y_ajustado = int(y - iframe_bbox['top'])
-                                        logger.info(f"   [Coords Capturadas] Coordenadas ajustadas para iframe: ({x}, {y}) -> ({x_ajustado}, {y_ajustado})")
-                                    elemento_info = await contexto.evaluate("""
-                                        ([x, y]) => {
-                                            const el = document.elementFromPoint(x, y);
-                                            if (!el) return null;
-                                            return {
-                                                tagName: el.tagName,
-                                                innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
-                                            };
-                                        }
-                                    """, [x_ajustado, y_ajustado])
-                                    is_cross_origin = False
-                                    x_final = x_ajustado
-                                    y_final = y_ajustado
-                                except Exception as exc_frame:
-                                    logger.warning(f"   [Coords Capturadas] Erro ao usar iframe_hint - fallback para detecção automática: {exc_frame}")
-                                    elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
-                            else:
-                                logger.info(f"   [Coords Capturadas] iframe_hint não resolveu para Frame - usando detecção automática")
-                                elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
-                        else:
-                            logger.info(f"   [Coords Capturadas] Detecção automática de iframe ativada")
-                            elemento_info, x_final, y_final, is_cross_origin = await _resolver_elemento_em_iframe(page, x, y)
-
-                        if is_cross_origin:
-                            logger.warning(f"   [Coords Capturadas] Iframe cross-origin detectado - fail-open aplicado")
-                            identidade_confirmada = True
-                        elif elemento_info and elemento_info.get('innerText'):
-                            texto_elemento = elemento_info['innerText']
-                            if label_curto.strip().lower() in texto_elemento.strip().lower():
-                                identidade_confirmada = True
-                            else:
-                                logger.warning(
-                                    f"   [Coords Capturadas] Identidade não confirmada: "
-                                    f"esperado '{label_curto}', encontrado '{texto_elemento[:50]}' em ({x_final}, {y_final})"
-                                )
-                        else:
-                            identidade_confirmada = True
-                    except Exception as exc_verify:
-                        logger.warning(f"   [Coords Capturadas] Verificação de identidade falhou (fail-open): {exc_verify}")
-                        identidade_confirmada = True
-                else:
-                    identidade_confirmada = True
-
-                if identidade_confirmada:
+            x = int(coords_relativas["x_pct"] * vp["width"])
+            y = int(coords_relativas["y_pct"] * vp["height"])
+            
+            # [FIX] Verificar identidade ANTES de executar o clique
+            identidade_confirmada, is_cross_origin = await _verificar_identidade_por_coordenadas(
+                page, x, y, label_curto, iframe_hint
+            )
+            
+            if identidade_confirmada:
+                # Identidade confirmada (ou fail-open aplicado) - executar clique
+                if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
                     logger.info(f"   [Coords Capturadas] Clique em ({x}, {y}) bem-sucedido.")
-                    logger.warning(
-                        f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' — "
-                        f"verifique se o elemento correto foi atingido."
-                    )
+                    if is_cross_origin:
+                        logger.warning(
+                            f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' "
+                            f"(iframe cross-origin - fail-open aplicado)"
+                        )
+                    else:
+                        logger.warning(
+                            f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' — "
+                            f"verifique se o elemento correto foi atingido."
+                        )
                     _registrar_telemetria("2_coords_capturadas", True)
                     _registrar_estrategia_vencedora(intencao, "2_coords_capturadas")
                     return True
                 else:
-                    logger.info("   [Coords Capturadas] Escalando para próxima camada (identidade não confirmada).")
+                    # Clique falhou
+                    logger.warning(f"   [Coords Capturadas] Clique falhou em ({x}, {y})")
+            else:
+                # Identidade NÃO confirmada - escalar para próxima camada
+                logger.info("   [Coords Capturadas] Escalando para próxima camada (identidade não confirmada).")
+        
         except Exception as exc:
             logger.warning(f"   [Coords Capturadas] Falhou: {exc}")
+        
         _registrar_telemetria("2_coords_capturadas", False)
 
     # ── Camada 3: Seletor hint original ──────────────────────────────────────
