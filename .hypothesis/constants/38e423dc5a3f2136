@@ -1,0 +1,4 @@
+# file: C:\GenUCS\promotion_models.py
+# hypothesis_version: 6.151.10
+
+[0.2, 0.6, 0.7, 0.8, 'add', 'close', 'closed', 'contributing_events', 'create', 'delete', 'disable', 'enable', 'expected_effect', 'hidden', 'hide', 'hitl_corrected', 'hitl_reviewed', 'min_effect_coherence', 'min_success_rate', 'observed_effect', 'open', 'pattern_detectado', 'remove', 'show']

@@ -59,17 +59,83 @@ Contratos Pydantic Estritos: Cada passo, intenção e coordenada é rigorosament
 
 Higiene de Dados: Nenhuma credencial ou base local é commitada no repositório. O conhecimento vetorial fica segregado e seguro no Pinecone corporativo.
 
-🛠️ Como Iniciar
-Instalação das Dependências:
+## 🌐 Web Knowledge Ingestion Pipeline (RAG)
 
-Bash
+O **Web Knowledge Ingestion Pipeline** é um sistema ETL automatizado que extrai, transforma e injeta conteúdo de documentação web no Pinecone, alimentando o sistema Aura DAP com conhecimento estruturado e pesquisável.
+
+### Funcionalidades Principais
+
+- **Descoberta Automática**: Extrai URLs de documentação a partir de sitemap.xml
+- **Extração Semântica**: Converte páginas HTML em Markdown limpo, preservando estrutura
+- **Segregação por Namespace**: Organiza vetores por módulo (HCM, Financeiro, etc.) para recuperação com escopo
+- **Modo Incremental**: Pula URLs com conteúdo inalterado usando cache local
+- **Resiliência**: Retry com backoff exponencial, continua processamento mesmo com falhas individuais
+
+### Pipeline de 5 Estágios
+
+1. **Discovery**: Busca e analisa sitemap.xml, filtra URLs de documentação
+2. **Extraction**: Extrai conteúdo semântico limpo como Markdown
+3. **Validation**: Valida qualidade do conteúdo (comprimento, cabeçalhos, densidade de links)
+4. **Chunking**: Divide conteúdo em chunks semânticos (~800 tokens, 100 tokens de sobreposição)
+5. **Embedding**: Gera embeddings usando OpenAI text-embedding-3-large (3072 dims)
+6. **Injection**: Faz upsert de vetores no Pinecone com segregação por namespace
+
+### Integração com Aura DAP
+
+O pipeline integra-se perfeitamente com o motor Aura DAP existente:
+
+```python
+from dap_engine import buscar_contexto
+
+# Buscar em namespace específico (módulo HCM)
+resultado = buscar_contexto(
+    prompt_usuario="Como admitir um colaborador?",
+    tenant_id="senior_default",
+    namespace="hcm"  # Novo parâmetro opcional
+)
+```
+
+### Uso Rápido
+
+```bash
+# Processar sitemap completo
+python -m ingestion_pipeline https://docs.senior.com.br/sitemap.xml
+
+# Modo incremental (pula URLs inalteradas)
+python -m ingestion_pipeline https://docs.senior.com.br/sitemap.xml --incremental
+
+# Listar namespaces
+python -m ingestion_pipeline --list-namespaces
+
+# Deletar namespace
+python -m ingestion_pipeline --delete-namespace hcm
+```
+
+### Documentação Completa
+
+Para detalhes completos sobre instalação, configuração, arquitetura e uso avançado, consulte:
+
+- **[ingestion_pipeline/README.md](ingestion_pipeline/README.md)**: Guia de instalação e uso
+- **[ingestion_pipeline/ARCHITECTURE.md](ingestion_pipeline/ARCHITECTURE.md)**: Arquitetura e design técnico
+
+---
+
+## 🛠️ Como Iniciar
+
+### Instalação das Dependências:
+
+```bash
 pip install -r requirements.txt
 playwright install
-Configuração de Variáveis (.env):
-Configure as chaves da API (Gemini, Pinecone) e credenciais de acesso padrão no ficheiro .env.
+```
 
-Iniciar o Training OS:
+### Configuração de Variáveis (.env):
+Configure as chaves da API (Gemini, Pinecone, OpenAI) e credenciais de acesso padrão no ficheiro .env.
 
-Bash
+### Iniciar o Training OS:
+
+```bash
 python app.py
+```
+
 Acesse o Dashboard interativo em http://localhost:8000.

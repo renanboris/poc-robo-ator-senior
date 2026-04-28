@@ -230,46 +230,97 @@ def ingestar_para_pinecone(roteiro: dict, tenant_id: str = "senior_default") -> 
         return {"status": "erro", "mensagem": str(e)}
 
 
-def buscar_contexto(prompt_usuario: str, tenant_id: str = "senior_default") -> dict | None:
+def buscar_contexto(
+    prompt_usuario: str, 
+    tenant_id: str = "senior_default",
+    namespace: str = None
+) -> dict | None:
+    """Busca contexto relevante no Pinecone usando RAG.
+    
+    Args:
+        prompt_usuario: Pergunta ou prompt do utilizador
+        tenant_id: ID do tenant (usado como namespace se namespace não for fornecido)
+        namespace: Namespace específico para busca (opcional). Se fornecido, sobrepõe tenant_id.
+                   Útil para buscar documentação web por módulo (ex: "hcm", "financeiro")
+    
+    Returns:
+        Dicionário com texto_rag, seletor_direto, score, melhor_aula, e source_url (se disponível)
+        ou None se não encontrar contexto relevante
+    """
     if not pinecone_index or not client_openai:
         return None
     try:
+        # Usa namespace se fornecido, caso contrário usa tenant_id
+        # Se namespace for None, usa "senior_default"
+        query_namespace = namespace if namespace is not None else tenant_id
+        if not query_namespace:
+            query_namespace = "senior_default"
+        
         query_embedding = gerar_embedding(prompt_usuario)
         resultados      = pinecone_index.query(
-            vector=query_embedding, top_k=TOP_K, namespace=tenant_id, include_metadata=True
+            vector=query_embedding, top_k=TOP_K, namespace=query_namespace, include_metadata=True
         )
 
         contextos      = []
         melhor_seletor = None
         melhor_score   = 0.0
         melhor_aula    = None  # GPS: rastreia o nome da aula com maior score
+        source_url     = None  # URL da fonte (para documentação web)
 
         for match in resultados.matches:
             if match.score < SCORE_THRESHOLD:
                 continue
             md      = match.metadata
-            contexto = (
-                f"MANUAL: {md.get('aula')}\n"
-                f"INSTRUCAO: {md.get('texto')}\n"
-                f"DICA: {md.get('tooltip')}"
-            )
+            
+            # Suporta tanto formato roteiro (aula/passo) quanto formato web (url/titulo)
+            if md.get('aula'):
+                # Formato roteiro
+                contexto = (
+                    f"MANUAL: {md.get('aula')}\n"
+                    f"INSTRUCAO: {md.get('texto')}\n"
+                    f"DICA: {md.get('tooltip')}"
+                )
+            elif md.get('url'):
+                # Formato web (documentação)
+                contexto = (
+                    f"DOCUMENTACAO: {md.get('titulo', 'Sem título')}\n"
+                    f"CONTEUDO: {md.get('text', '')}\n"
+                    f"FONTE: {md.get('url', '')}"
+                )
+                # Captura a URL da fonte com maior score
+                if match.score > melhor_score and md.get('url'):
+                    source_url = md.get('url')
+            else:
+                # Formato genérico
+                contexto = f"CONTEUDO: {md.get('text', md.get('texto', ''))}"
+            
             if md.get("seletor"):
                 contexto += f"\nSELETOR_EXATO: {md.get('seletor')}"
                 if match.score > melhor_score:
                     melhor_score   = match.score
                     melhor_seletor = md.get("seletor")
                     melhor_aula    = md.get("aula")
+            elif match.score > melhor_score:
+                melhor_score = match.score
+                melhor_aula  = md.get("aula") or md.get("titulo")
+            
             contextos.append(contexto)
 
         if not contextos:
             return None
 
-        return {
+        resultado = {
             "texto_rag":      "\n\n---\n\n".join(contextos),
             "seletor_direto": melhor_seletor,
             "score":          melhor_score,
             "melhor_aula":    melhor_aula,  # GPS: nome da aula com maior score
         }
+        
+        # Adiciona source_url se disponível (documentação web)
+        if source_url:
+            resultado["source_url"] = source_url
+        
+        return resultado
 
     except Exception as e:
         logger.error(f"Erro RAG: {e}")

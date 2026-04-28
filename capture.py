@@ -119,7 +119,7 @@ Analise o screenshot e responda com um JSON:
   "descricao_visual": "COMO o elemento aparece na tela",
   "contexto_tela": "Em qual parte do sistema o usuario esta",
   "tipo_elemento": "button | input | menu_item | link | icon | checkbox | tab | folder",
-  "confianca": "alta | media | baixa"
+  "confianca": "alta (elemento tem data-testid, aria-label ou id semantico unico e estavel) | media (elemento identificavel por texto visivel, name ou placeholder) | baixa (elemento identificado apenas por posicao, indice numerico ou tag generica sem atributo identificador)"
 }}"""
     try:
         resposta = await asyncio.to_thread(
