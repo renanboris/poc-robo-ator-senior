@@ -120,6 +120,24 @@ Para detalhes completos sobre instalação, configuração, arquitetura e uso av
 
 ---
 
+## 📦 Releases e Changelog
+
+### Versão Atual: v1.0.0-consolidation (2026-04-29)
+
+Esta release marca um milestone importante na evolução do Training OS, consolidando múltiplas features críticas:
+
+- ✅ **Repo Security Hardening & CI Setup**
+- ✅ **Web Knowledge Ingestion Pipeline (RAG)** completo
+- ✅ **Aura DAP Redesign** com chat panel v2
+- ✅ **Consolidação de Captura Cognitiva**
+- ✅ **25+ Specs Documentados** em `.kiro/specs/`
+- ✅ **50+ Novos Testes** implementados
+- ✅ **Roadmaps Completos**: Training OS, Market-Driven, Playback Resilience
+
+Para detalhes completos sobre mudanças, correções e melhorias, consulte o **[CHANGELOG.md](CHANGELOG.md)**.
+
+---
+
 ## 🛠️ Como Iniciar
 
 ### Instalação das Dependências:
