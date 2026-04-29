@@ -797,9 +797,9 @@ async def _aguardar_estabilidade(page: Page, timeout_ms: int = 2000) -> None:
 
 async def _digitar_humanizado(page: Page, valor: str) -> None:
     """
-    Digita um valor caractere por caractere com delay variável,
-    simulando ritmo humano real. Usa press_sequentially (keydown/keyup
-    por char) em vez de keyboard.type, que é mais mecânico.
+    Digita um valor com delay variável, simulando ritmo humano real.
+    Usa keyboard.type com delay para suportar caracteres acentuados
+    corretamente (como ã, ç, é, etc.).
 
     Delay base: 65ms por caractere.
     Variação aleatória: ±30ms por caractere (ruído natural).
@@ -807,12 +807,16 @@ async def _digitar_humanizado(page: Page, valor: str) -> None:
     (simula hesitação humana ao digitar).
     """
     import random
-    for char in valor:
-        delay = random.randint(45, 95)  # 45–95ms por caractere
-        await page.keyboard.press(char, delay=delay)
-        # micro-pausa ocasional (~10% dos caracteres)
-        if random.random() < 0.10:
-            await asyncio.sleep(random.uniform(0.12, 0.25))
+    
+    # Calcula delay médio com variação aleatória
+    delay = random.randint(45, 95)  # 45–95ms por caractere
+    
+    # Usa keyboard.type que suporta caracteres Unicode/acentuados
+    await page.keyboard.type(valor, delay=delay)
+    
+    # micro-pausa ocasional para simular hesitação humana
+    if random.random() < 0.10:
+        await asyncio.sleep(random.uniform(0.12, 0.25))
 
 
 async def _executar_acao(locator, page, acao: str, valor: str) -> None:
