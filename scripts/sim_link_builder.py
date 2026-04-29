@@ -17,11 +17,12 @@ import json
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 
-
-def limpar_nome(nome: str) -> str:
-    return re.sub(r'[\\/*?:"<>|]', "", nome).replace(" ", "_")[:40].strip("_")
+# Adiciona o diretório raiz ao path para importar utils.py
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from utils import limpar_nome
 
 
 def criar_sim_link(caminho_json: str, pasta_destino: str = "sim_links") -> str:

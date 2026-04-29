@@ -1,0 +1,4 @@
+# file: C:\GenUCS\validator.py
+# hypothesis_version: 6.151.10
+
+[1.0, 5000, 8000, 15000, '(via vision_engine)', '--dry-run', '?', 'Enter', 'SENIOR_PASS_EXECUTE', 'SENIOR_URL', 'SENIOR_USER_EXECUTE', '__main__', 'acao', 'acoes_tecnicas', 'apps-menu', 'breadcrumb', 'capture_scope', 'clique', 'concluir_video', 'elemento_alvo', 'erro', 'fa-home', 'falhas', 'form_fill', 'home', 'id_passo', 'inicio', 'label', 'label_curto', 'load', 'menu', 'menu-item', 'menu_navigation', 'módulo', 'nav-item', 'navegacoes', 'networkidle', 'passos', 'pattern_detectado', 'r', 'search_debounce', 'seletor', 'seletor_css', 'seletor_hint', 'shell', 'sidebar', 'upload', 'utf-8', 'validados']

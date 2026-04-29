@@ -1,0 +1,4 @@
+# file: C:\GenUCS\promotion_engine.py
+# hypothesis_version: 6.151.10
+
+['alta', 'business_entity', 'business_target', 'component_family', 'confianca_captura', 'criterion', 'event_id', 'failing_criteria', 'failing_criterion', 'gate_failure_reason', 'id_acao', 'intencao_semantica', 'is_noise', 'level', 'matching_count', 'media', 'navigate', 'pattern_detectado', 'pattern_frequency', 'promoted_skill', 'promotion_state', 'raw_shadow', 'reviewed_shadow', 'screen_family', 'semantic_action', 'skill_id', 'target_level', 'unknown']

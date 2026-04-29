@@ -20,7 +20,7 @@ import logging
 import re
 import traceback
 from dotenv import load_dotenv
-from utils import limpar_nome, validar_roteiro
+from utils import limpar_nome, validar_roteiro, safe_write_json, aplicar_blur_screenshot
 
 from playwright.async_api import async_playwright, Error as PlaywrightError
 from google import genai
@@ -90,6 +90,17 @@ def _extrair_coordenadas_relativas(posicao_str: str, viewport_w: int, viewport_h
     except Exception:
         return {"x_pct": 0.5, "y_pct": 0.5, "w_pct": 0.05, "h_pct": 0.05}
 
+def _extrair_coordenadas_absolutas(posicao_str: str) -> dict | None:
+    """Extrai o centro absoluto (x, y) em pixels a partir de posicao_visual.
+    Retorna None se a string estiver ausente ou malformada."""
+    try:
+        partes = dict(p.split(":") for p in posicao_str.split(","))
+        cx = int(partes["x"]) + int(partes["w"]) / 2
+        cy = int(partes["y"]) + int(partes["h"]) / 2
+        return {"x": int(cx), "y": int(cy)}
+    except Exception:
+        return None
+
 async def _analisar_elemento_com_gemini(screenshot_bytes: bytes, html_snapshot: str, label_capturado: str, coords: dict, acao: str) -> dict:
     fallback = {
         "intencao": f"{acao.capitalize()} em '{label_capturado}'",
@@ -108,7 +119,7 @@ Analise o screenshot e responda com um JSON:
   "descricao_visual": "COMO o elemento aparece na tela",
   "contexto_tela": "Em qual parte do sistema o usuario esta",
   "tipo_elemento": "button | input | menu_item | link | icon | checkbox | tab | folder",
-  "confianca": "alta | media | baixa"
+  "confianca": "alta (elemento tem data-testid, aria-label ou id semantico unico e estavel) | media (elemento identificavel por texto visivel, name ou placeholder) | baixa (elemento identificado apenas por posicao, indice numerico ou tag generica sem atributo identificador)"
 }}"""
     try:
         resposta = await asyncio.to_thread(
@@ -342,6 +353,81 @@ async def injetar_radar_event_driven(page):
     page.on("frameattached",  lambda frame: asyncio.create_task(injetar_com_delay(frame)))
     page.on("framenavigated", lambda frame: asyncio.create_task(injetar_com_delay(frame)))
 
+async def _detectar_campo_sensivel(page_ref, seletor: str, id_acao: int) -> dict | None:
+    """Detecta se o elemento alvo é um campo sensível (password ou BLUR_SELECTORS).
+
+    Retorna dict com dados_blur se sensível, ou None caso contrário.
+    Nunca lança exceção — falhas são silenciosas (Req 1.1, 1.4).
+    """
+    if not page_ref or not seletor:
+        return None
+
+    try:
+        element_handle = await page_ref.locator(seletor).first.element_handle(timeout=1000)
+    except Exception:
+        return None
+
+    if element_handle is None:
+        return None
+
+    tipo_campo = None
+
+    # Verificar type="password" (Req 1.1)
+    try:
+        attr_type = await element_handle.get_attribute("type")
+        if attr_type and attr_type.lower() == "password":
+            tipo_campo = "password"
+    except Exception:
+        pass
+
+    # Verificar seletores adicionais de BLUR_SELECTORS (Req 1.3)
+    if tipo_campo is None:
+        blur_selectors_raw = os.getenv("BLUR_SELECTORS", "")
+        if blur_selectors_raw:
+            for sel_extra in (s.strip() for s in blur_selectors_raw.split(",") if s.strip()):
+                try:
+                    count = await page_ref.locator(sel_extra).count()
+                    if count > 0:
+                        # Verificar se o elemento alvo corresponde a este seletor
+                        matched = await page_ref.evaluate(
+                            """([seletor, seletorExtra]) => {
+                                const el = document.querySelector(seletor);
+                                if (!el) return false;
+                                return el.matches(seletorExtra);
+                            }""",
+                            [seletor, sel_extra],
+                        )
+                        if matched:
+                            tipo_campo = sel_extra
+                            break
+                except Exception:
+                    continue
+
+    if tipo_campo is None:
+        return None
+
+    # Obter bounding box do elemento no viewport (Req 1.1)
+    try:
+        bbox = await element_handle.bounding_box()
+    except Exception:
+        bbox = None
+
+    if bbox is None:
+        logger.info(f"[BLUR {id_acao}] Campo sensível detectado (tipo={tipo_campo}) mas bounding_box indisponível — blur ignorado.")
+        return None
+
+    regiao = {
+        "x": int(bbox["x"]),
+        "y": int(bbox["y"]),
+        "w": int(bbox["width"]),
+        "h": int(bbox["height"]),
+    }
+
+    logger.info(f"[BLUR {id_acao}] Campo sensível detectado — tipo={tipo_campo} | regiao={regiao}")
+
+    return {"blur": True, "regiao": regiao}
+
+
 async def on_capturar_elemento(source, args):
     global _id_acao_global, _lock_id
     async with _lock_id:
@@ -357,6 +443,7 @@ async def on_capturar_elemento(source, args):
 
         screenshot_bytes = None
         screenshot_ref   = None   # path relativo em disco ou base64 fallback
+        page_ref         = None   # referência à página, usada também para screenshot_elemento
         vp_w, vp_h = 1920, 1080
 
         try:
@@ -388,10 +475,73 @@ async def on_capturar_elemento(source, args):
         except Exception as e:
             logger.warning(f"Falha ao tirar print: {e}")
 
+        # Captura screenshot do elemento alvo via locator.screenshot() (Req 4.1–4.5)
+        screenshot_elemento_ref = None
+        if page_ref and _nome_aula_sessao and dados.get("seletor"):
+            try:
+                locator_elemento = page_ref.locator(dados["seletor"]).first
+                elem_bytes = await locator_elemento.screenshot(type="jpeg", quality=85)
+                pasta_elem = os.path.join(
+                    "audios_gerados", limpar_nome(_nome_aula_sessao), "screenshots"
+                )
+                os.makedirs(pasta_elem, exist_ok=True)
+                elem_path = os.path.join(pasta_elem, f"elemento_acao_{meu_id_acao}.jpg")
+                with open(elem_path, "wb") as f_elem:
+                    f_elem.write(elem_bytes)
+                screenshot_elemento_ref = elem_path
+            except Exception as e:
+                logger.warning(f"[FOTO {meu_id_acao}] screenshot_elemento falhou: {e}")
+                screenshot_elemento_ref = None
+
+        # Detecção de campos sensíveis — Requisito 1.1 e 1.4
+        dados_blur = await _detectar_campo_sensivel(
+            page_ref, dados.get("seletor", ""), meu_id_acao
+        )
+
+        # Aplicar blur no screenshot_referencia se campo sensível detectado (Req 1.1, 1.5)
+        if dados_blur and dados_blur.get("blur") and screenshot_ref:
+            regiao_blur = dados_blur["regiao"]
+            try:
+                # Obter base64 do screenshot (seja de arquivo ou já em base64)
+                if os.path.isfile(screenshot_ref):
+                    with open(screenshot_ref, "rb") as _f:
+                        _b64_original = base64.b64encode(_f.read()).decode("utf-8")
+                else:
+                    _b64_original = screenshot_ref
+
+                _b64_borrado = aplicar_blur_screenshot(_b64_original, [regiao_blur])
+
+                # Persistir de volta no mesmo formato (arquivo ou base64)
+                if os.path.isfile(screenshot_ref):
+                    import io as _io
+                    _img_bytes = base64.b64decode(_b64_borrado)
+                    with open(screenshot_ref, "wb") as _f:
+                        _f.write(_img_bytes)
+                    # screenshot_ref permanece o mesmo caminho de arquivo
+                else:
+                    screenshot_ref = _b64_borrado
+
+                logger.info(f"[BLUR {meu_id_acao}] Blur aplicado no screenshot_referencia — regiao={regiao_blur}")
+            except Exception as _e:
+                logger.warning(f"[BLUR {meu_id_acao}] Falha ao aplicar blur no screenshot_referencia: {_e}")
+
         coords  = _extrair_coordenadas_relativas(dados.get("posicao_visual", ""), vp_w, vp_h)
         # Aviso quando coordenadas são zero — indica que getBoundingClientRect retornou vazio
         if coords.get("x_pct", 0) == 0.5 and coords.get("y_pct", 0) == 0.5:
             logger.warning(f"[FOTO {meu_id_acao}] Coordenadas padrão (0.5/0.5) — elemento pode ter sido capturado fora da viewport.")
+
+        # Coordenadas absolutas (centro do elemento em pixels)
+        coords_absolutas = _extrair_coordenadas_absolutas(dados.get("posicao_visual", ""))
+
+        # Coordenadas relativas simplificadas (apenas x_pct / y_pct) para uso no playback
+        if vp_w > 0 and vp_h > 0 and coords_absolutas is not None:
+            coords_relativas_playback = {
+                "x_pct": round(coords_absolutas["x"] / vp_w, 4),
+                "y_pct": round(coords_absolutas["y"] / vp_h, 4),
+            }
+        else:
+            coords_relativas_playback = None
+            logger.warning(f"[FOTO {meu_id_acao}] coordenadas_relativas nao calculadas — viewport indisponivel (vp_w={vp_w}, vp_h={vp_h}).")
         analise = (
             await _analisar_elemento_com_gemini(
                 screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
@@ -413,11 +563,14 @@ async def on_capturar_elemento(source, args):
                 "tipo_elemento":         analise.get("tipo_elemento", "button"),
                 "confianca_captura":     analise.get("confianca", "media"),
                 "label_curto":           label,
-                "coordenadas_relativas": coords,
+                "coordenadas_absolutas": coords_absolutas,
+                "coordenadas_relativas": coords_relativas_playback if coords_relativas_playback is not None else coords,
                 "seletor_hint":          dados["seletor"],
                 "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
                 "html_hint":             dados.get("html_snapshot", "")[:300],
                 "screenshot_referencia": screenshot_ref,
+                "screenshot_elemento":   screenshot_elemento_ref,
+                "dados_blur":            dados_blur,
             },
             "valor_input": dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else "",
         })
@@ -438,11 +591,11 @@ async def capturar_cliques_na_tela():
     _pending_tasks = set()  # reset stale state from any previous run
 
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario    = os.getenv("SENIOR_USER")
-    senha      = os.getenv("SENIOR_PASS")
+    usuario    = os.getenv("SENIOR_USER_CAPTURE")
+    senha      = os.getenv("SENIOR_PASS_CAPTURE")
 
     if not usuario or not senha:
-        print("ERRO FATAL: Credenciais ausentes no .env (SENIOR_USER / SENIOR_PASS).", flush=True)
+        print("ERRO FATAL: Credenciais de captura ausentes no .env (SENIOR_USER_CAPTURE / SENIOR_PASS_CAPTURE).", flush=True)
         return
 
     async with async_playwright() as p:
@@ -644,8 +797,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
 
         os.makedirs("roteiros_salvos", exist_ok=True)
         caminho_roteiro = os.path.join("roteiros_salvos", f"{limpar_nome(nome_aula)}.json")
-        with open(caminho_roteiro, "w", encoding="utf-8") as f:
-            json.dump(roteiro_final, f, indent=2, ensure_ascii=False)
+        safe_write_json(caminho_roteiro, roteiro_final)
         logger.info(f"Roteiro salvo em: {caminho_roteiro}")
         # Linha de protocolo lida pelo app.py para identificar o roteiro exato gerado.
         # NÃO altere o prefixo — o app.py depende dele para evitar o glob+mtime.

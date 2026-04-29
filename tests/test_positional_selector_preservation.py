@@ -104,6 +104,9 @@ def _patches_isolamento_nao_posicional():
     Retorna lista de patches que desativam Brain, Sniper semântico e Gemini Vision,
     forçando o orquestrador a chegar na camada 3 (Hint).
     Para seletores NÃO-posicionais, a camada Hint deve executar normalmente.
+
+    Inclui patch de _detectar_menu_contexto_ativo retornando None (sem menu ativo),
+    para que o orquestrador não entre no fluxo de menu de contexto.
     """
     return [
         patch.object(vision_engine, "_consultar_cache", return_value=None),
@@ -112,6 +115,7 @@ def _patches_isolamento_nao_posicional():
         patch.object(vision_engine, "_tentar_candidato", new=_sniper_falha_hint_sucesso_nao_posicional),
         patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)),
         patch.object(vision_engine, "_scroll_para_area_esperada", new=AsyncMock(return_value=0)),
+        patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)),
     ]
 
 

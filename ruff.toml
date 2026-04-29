@@ -1,0 +1,32 @@
+# ruff.toml — Configuração do linter para Senior Training OS
+
+[lint]
+# Categorias obrigatórias:
+#   E — erros de estilo PEP8 (pycodestyle)
+#   F — erros lógicos Pyflakes
+# Categorias adicionais recomendadas para o projeto:
+#   I — ordenação de imports (isort)
+#   W — avisos de estilo PEP8
+select = ["E", "F", "I", "W"]
+
+# Regras ignoradas intencionalmente:
+#   E501 — linha muito longa (o projeto tem linhas longas em templates e prompts)
+#   E402 — module level import not at top (sys.path.insert nos testes)
+ignore = ["E501", "E402"]
+
+[lint.per-file-ignores]
+# Arquivos de teste: permitir imports não utilizados e assert statements
+"tests/**/*.py" = ["F401", "F811"]
+# Arquivos legados: ignorar todos os erros
+"old_but_gold/**/*.py" = ["E", "F", "W"]
+
+[exclude]
+# Diretórios excluídos da verificação
+paths = [
+    "venv/",
+    "old_but_gold/",
+    ".hypothesis/",
+    ".git/",
+    "__pycache__/",
+    ".pytest_cache/",
+]

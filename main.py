@@ -30,6 +30,7 @@ from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
 from vision_engine import encontrar_e_clicar
+import score_engine as _score_engine
 from cursor_engine import (
     instalar_cursor,
     garantir_cursor_visivel,
@@ -46,7 +47,7 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 import moviepy.audio.fx.all as afx
 
-from utils import limpar_nome
+from utils import limpar_nome, aplicar_blur_screenshot
 
 load_dotenv()
 
@@ -80,6 +81,7 @@ class CustomRenderLogger(ProgressBarLogger):
 # UTILITARIOS GERAIS
 # ==============================================================
 _audio_manifest: dict[str, str] = {}
+_audio_manifest_lock = asyncio.Lock()
 
 def salvar_manifesto_audio(id_treinamento: str) -> None:
     nome_pasta    = limpar_nome(id_treinamento)
@@ -153,7 +155,8 @@ async def gerar_audio(
         else:
             await edge_tts.Communicate(texto_falado, voz, rate="-12%").save(arquivo_mp3)
 
-    _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"
+    async with _audio_manifest_lock:
+        _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"
     return arquivo_mp3
 
 def iniciar_reproducao_audio(arquivo_mp3: str) -> None:
@@ -245,6 +248,35 @@ async def exibir_legenda_cinema(page, texto: str) -> None:
 async def remover_legenda(page) -> None:
     await safe_evaluate(page, "() => { const e = document.getElementById('senior-video-subtitle'); if(e) e.remove(); }")
 
+async def aplicar_blur_video(page, regiao: dict) -> None:
+    """Injeta overlay sólido (#1a1a1a) sobre a região sensível na página gravada.
+
+    O overlay é visível no vídeo gerado pelo Playwright, garantindo que dados
+    sensíveis não apareçam na gravação (Requisito 1.2).
+    """
+    script = """(r) => {
+        let el = document.getElementById('senior-blur-overlay');
+        if (el) el.remove();
+        const div = document.createElement('div');
+        div.id = 'senior-blur-overlay';
+        div.style.cssText = [
+            'position:fixed',
+            'z-index:2147483647',
+            'background:#1a1a1a',
+            'pointer-events:none',
+            'left:' + r.x + 'px',
+            'top:' + r.y + 'px',
+            'width:' + r.w + 'px',
+            'height:' + r.h + 'px',
+        ].join(';');
+        document.documentElement.appendChild(div);
+    }"""
+    await safe_evaluate(page, script, arg=regiao)
+
+async def remover_blur_video(page) -> None:
+    """Remove o overlay de blur injetado por aplicar_blur_video."""
+    await safe_evaluate(page, "() => { const e = document.getElementById('senior-blur-overlay'); if(e) e.remove(); }")
+
 async def exibir_encerramento_cinema(page) -> None:
     script = """() => new Promise((resolve) => {
         const renderUI = () => {
@@ -324,8 +356,9 @@ def renderizar_video_final(
             mp4_path,
             codec="libx264",
             audio_codec="aac",
-            fps=24,
-            preset="ultrafast",
+            fps=30,
+            preset="medium",
+            ffmpeg_params=["-crf", "18", "-pix_fmt", "yuv420p"],
             logger=CustomRenderLogger(),
         )
         gerar_arquivo_srt(timeline, srt_path)
@@ -358,20 +391,20 @@ def _validar_roteiro_gravacao(roteiro: dict) -> list[str]:
             erros.append(f"Passo {pid}: ancora (narracao principal) vazia.")
     return erros
 
-async def clicar_com_animacao(page, acao_tec: dict) -> None:
+async def clicar_com_animacao(page, acao_tec: dict) -> bool:
     await garantir_cursor_visivel(page)
-    await encontrar_e_clicar(page, acao_tec)
+    return await encontrar_e_clicar(page, acao_tec)
 
 # ==============================================================
 # MOTOR DE EXECUCAO PRINCIPAL
 # ==============================================================
 async def executar_roteiro(caminho_json: str) -> None:
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario    = os.getenv("SENIOR_USER")
-    senha      = os.getenv("SENIOR_PASS")
+    usuario    = os.getenv("SENIOR_USER_EXECUTE")
+    senha      = os.getenv("SENIOR_PASS_EXECUTE")
 
     if not usuario or not senha:
-        print("ERRO: Credenciais ausentes no .env (SENIOR_USER / SENIOR_PASS)")
+        print("ERRO: Credenciais de execução ausentes no .env (SENIOR_USER_EXECUTE / SENIOR_PASS_EXECUTE)")
         sys.exit(1)
 
     with open(caminho_json, "r", encoding="utf-8") as f:
@@ -391,7 +424,8 @@ async def executar_roteiro(caminho_json: str) -> None:
     voz_escolhida     = roteiro.get("configuracao_gravacao", {}).get("voz_ia", "pt-BR-FranciscaNeural")
 
     global _audio_manifest
-    _audio_manifest.clear()
+    async with _audio_manifest_lock:
+        _audio_manifest.clear()
 
     pasta_audio_cache = os.path.join("audios_gerados", nome_arquivo_base)
     if os.path.exists(pasta_audio_cache):
@@ -429,14 +463,35 @@ async def executar_roteiro(caminho_json: str) -> None:
                     gerar_audio(micro, f"passo_{id_p}_acao_{i}", nome_arquivo_base, voz_escolhida)
                 )
     if tarefas_audio:
-        await asyncio.gather(*tarefas_audio)
+        resultados = await asyncio.gather(*tarefas_audio, return_exceptions=True)
+        for i, res in enumerate(resultados):
+            if isinstance(res, Exception):
+                logging.error(f"[Audio] Falha na geração de áudio da tarefa {i}: {res}")
     print(f"✅ {len(tarefas_audio)} áudio(s) prontos. Iniciando gravação...", flush=True)
 
     async with async_playwright() as pw:
-        # 🟢 A MÁGICA 1: TELA MAXIMIZADA
-        # Alterado de --start-fullscreen para --start-maximized para melhor compatibilidade com o SO
+        # ── Detecta monitor auxiliar para gravar em fullHD ───────────────────
+        # Usa screeninfo para encontrar o monitor não-primário (monitor externo).
+        # Se não encontrar, usa o monitor primário como fallback.
+        _window_x, _window_y = 0, 0
+        try:
+            from screeninfo import get_monitors
+            monitores = get_monitors()
+            monitor_aux = next((m for m in monitores if not m.is_primary), None)
+            if monitor_aux:
+                _window_x = monitor_aux.x
+                _window_y = monitor_aux.y
+                print(f"[Monitor] Usando monitor auxiliar: {monitor_aux.name} {monitor_aux.width}x{monitor_aux.height} pos=({_window_x},{_window_y})", flush=True)
+            else:
+                print("[Monitor] Monitor auxiliar não encontrado — usando monitor primário.", flush=True)
+        except Exception as e:
+            print(f"[Monitor] screeninfo falhou ({e}) — usando posição padrão.", flush=True)
+
+        # 🟢 TELA MAXIMIZADA NO MONITOR AUXILIAR
+        # --window-position posiciona a janela no monitor correto antes de maximizar.
         browser = await pw.chromium.launch(headless=False, args=[
             "--start-maximized",
+            f"--window-position={_window_x},{_window_y}",
             "--disable-infobars",
             "--disable-features=Translate",
             "--lang=pt-BR",
@@ -454,6 +509,26 @@ async def executar_roteiro(caminho_json: str) -> None:
         )
         page = await context.new_page()
         await instalar_cursor(page)
+
+        # ── Maximiza via CDP após criar a página ─────────────────────────────
+        # --start-maximized falha com --window-position em monitores não-primários
+        # no Windows. CDP Browser.setWindowBounds é a forma confiável.
+        try:
+            cdp = await context.new_cdp_session(page)
+            wid_resp = await cdp.send("Browser.getWindowForTarget")
+            window_id = wid_resp["windowId"]
+            await cdp.send("Browser.setWindowBounds", {
+                "windowId": window_id,
+                "bounds": {
+                    "left":        _window_x,
+                    "top":         _window_y,
+                    "windowState": "maximized",
+                },
+            })
+            await cdp.detach()
+            print("[Monitor] Janela maximizada via CDP.", flush=True)
+        except Exception as e:
+            print(f"[Monitor] CDP maximize falhou ({e}) — continuando.", flush=True)
 
         print("A iniciar o robô e a tentar login no Senior X...", flush=True)
         try:
@@ -501,7 +576,50 @@ async def executar_roteiro(caminho_json: str) -> None:
             await asyncio.sleep(0.3)
             await page.keyboard.press("Escape")
 
+            # ── Botão PLAY: aguarda o usuário confirmar que está pronto ───────
+            await page.evaluate("""() => {
+                if (document.getElementById('_aura_play_overlay')) return;
+                const style = document.createElement('style');
+                style.innerHTML = `
+                    @keyframes _aura_pulse { 0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(34,197,94,.5)} 50%{transform:scale(1.04);box-shadow:0 0 0 12px rgba(34,197,94,0)} }
+                `;
+                document.head.appendChild(style);
+                const overlay = document.createElement('div');
+                overlay.id = '_aura_play_overlay';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);z-index:2147483647;display:flex;align-items:center;justify-content:center;';
+                overlay.innerHTML = `
+                    <div style="background:rgba(15,23,42,.95);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:40px 56px;text-align:center;font-family:'Segoe UI',sans-serif;max-width:420px;">
+                        <div style="font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#64748b;margin-bottom:8px;">Senior Training OS</div>
+                        <div style="font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:6px;">Pronto para gravar?</div>
+                        <div style="font-size:13px;color:#94a3b8;margin-bottom:32px;">Verifique se está na tela correta antes de iniciar.</div>
+                        <button id="_aura_play_btn" style="background:#22c55e;color:#fff;border:none;border-radius:100px;padding:14px 40px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:.5px;animation:_aura_pulse 2s ease infinite;">▶ Iniciar Gravação</button>
+                    </div>`;
+                document.documentElement.appendChild(overlay);
+                document.getElementById('_aura_play_btn').onclick = () => {
+                    overlay.style.transition = 'opacity .3s';
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 300);
+                    window._aura_play_confirmado = true;
+                };
+            }""")
+
+            # Aguarda o usuário clicar em "Iniciar Gravação" (polling a cada 500ms, timeout 5min)
+            print("⏸  Aguardando confirmação do usuário para iniciar gravação...", flush=True)
+            for _ in range(600):  # 600 * 0.5s = 5 minutos máximo
+                confirmado = await page.evaluate("() => !!window._aura_play_confirmado")
+                if confirmado:
+                    break
+                await asyncio.sleep(0.5)
+
+            # ── Gap de 2s após confirmação: dá tempo para o sistema carregar ─
+            await asyncio.sleep(2.0)
+
             tempo_inicio_gravacao = time.time()
+            # INVARIANTE: Este delta captura intencionalmente todo o tempo desde a criação
+            # do contexto Playwright (tempo_inicio_contexto), incluindo o login automático
+            # ou o login manual de até 60 s (fallback humano). O valor é passado para
+            # .subclip(tempo_corte) em renderizar_video_final() para remover o prefixo
+            # do vídeo bruto antes do início real da gravação do roteiro.
             tempo_corte_segundos  = tempo_inicio_gravacao - tempo_inicio_contexto
 
             w = await page.evaluate("() => window.innerWidth")
@@ -549,8 +667,24 @@ async def executar_roteiro(caminho_json: str) -> None:
                     if acao_tec.get("acao") == "concluir_video":
                         continue
 
+                    # ── Injeta is_context_menu_item em tempo de execução ─────────────
+                    # Compatibilidade com roteiros gerados antes da flag existir.
+                    # Se a ação anterior foi clique_direito, esta é item de menu de contexto.
+                    acoes_tecnicas = passo.get("acoes_tecnicas", [])
+                    _acao_anterior = acoes_tecnicas[i - 1].get("acao", "") if i > 0 else ""
+                    if (acao_tec.get("acao") == "clique" and
+                            _acao_anterior == "clique_direito" and
+                            not acao_tec.get("is_context_menu_item")):
+                        acao_tec = dict(acao_tec)  # cópia para não mutar o roteiro
+                        acao_tec["is_context_menu_item"] = True
+
                     micro_voz = acao_tec.get("micro_narracao", "")
-                    if micro_voz:
+                    # ── Clique direito: pula narração para não fechar o menu de contexto ──
+                    # O menu de contexto fecha sozinho após alguns segundos. Se houver
+                    # narração entre o clique_direito e o item do menu, o menu fecha antes
+                    # de a próxima ação ser executada. A narração é adiada para depois.
+                    _is_clique_direito = acao_tec.get("acao") == "clique_direito"
+                    if micro_voz and not _is_clique_direito:
                         await exibir_legenda_cinema(page, micro_voz)
                         id_acao = f"passo_{id_p}_acao_{i}"
                         mp3     = await gerar_audio(micro_voz, id_acao, nome_arquivo_base, voz_escolhida)
@@ -569,12 +703,47 @@ async def executar_roteiro(caminho_json: str) -> None:
                                 "texto":   micro_voz,
                             })
 
-                    await clicar_com_animacao(page, acao_tec)
-                    await aguardar_audio_terminar()
-                    await remover_legenda(page)
-                    
+                    # Aplicar blur no vídeo se ação tem região sensível (Requisito 1.2)
+                    _dados_blur = acao_tec.get("elemento_alvo", {}).get("dados_blur") or {}
+                    _blur_ativo = bool(_dados_blur.get("blur")) and bool(_dados_blur.get("regiao"))
+                    if _blur_ativo:
+                        try:
+                            await aplicar_blur_video(page, _dados_blur["regiao"])
+                        except Exception as _blur_err:
+                            logging.warning(f"[blur_video] Falha ao aplicar overlay de blur: {_blur_err}")
+                            _blur_ativo = False
+
+                    resultado_clique = await clicar_com_animacao(page, acao_tec)
+
+                    # Após clique_direito: não aguarda áudio nem pausa — o menu de contexto
+                    # precisa ser clicado imediatamente antes de fechar sozinho.
+                    if not _is_clique_direito:
+                        await aguardar_audio_terminar()
+                        await remover_legenda(page)
+
+                    if _blur_ativo:
+                        try:
+                            await remover_blur_video(page)
+                        except Exception as _blur_err:
+                            logging.warning(f"[blur_video] Falha ao remover overlay de blur: {_blur_err}")
+
+                    try:
+                        intencao = acao_tec.get("intencao_semantica", "").strip()
+                        if intencao:
+                            _mapa_confianca = {"alta": 1.0, "media": 0.7, "baixa": 0.3}
+                            confianca_str = acao_tec.get("elemento_alvo", {}).get("confianca_captura", "alta")
+                            confianca_val = _mapa_confianca.get(confianca_str, 1.0)
+                            _score_engine.registrar_execucao(
+                                intencao,
+                                sucesso=bool(resultado_clique),
+                                confianca_captura=confianca_val,
+                            )
+                    except Exception as _score_err:
+                        logging.debug(f"[score_engine] Falha ao registrar execução (ignorada): {_score_err}")
+
                     pausa_real = min(pausa_inteligente * 0.3, 0.8)
-                    await asyncio.sleep(pausa_real)
+                    if not _is_clique_direito:
+                        await asyncio.sleep(pausa_real)
 
         except Exception as e:
             pygame.mixer.stop()
@@ -607,10 +776,15 @@ async def executar_roteiro(caminho_json: str) -> None:
 
     if caminho_video_webm and tempo_corte_segundos is not None and tempo_corte_segundos > 0:
         caminho_estado = os.path.join("videos_gerados", f"{nome_arquivo_base}_estado.json")
+        caminho_webm_rel = os.path.relpath(caminho_video_webm)
+        timeline_rel = [
+            {**item, "arquivo": os.path.relpath(item["arquivo"])}
+            for item in timeline_audios
+        ]
         with open(caminho_estado, "w", encoding="utf-8") as f:
             json.dump({
-                "caminho_webm": caminho_video_webm,
-                "timeline":     timeline_audios,
+                "caminho_webm": caminho_webm_rel,
+                "timeline":     timeline_rel,
                 "tempo_corte":  tempo_corte_segundos,
             }, f, indent=2)
         print("Gravacao bruta concluida. Estado salvo.", flush=True)
@@ -642,6 +816,11 @@ if __name__ == "__main__":
             sys.exit(1)
         with open(caminho_estado, "r", encoding="utf-8") as f:
             st = json.load(f)
+        st["caminho_webm"] = os.path.abspath(st["caminho_webm"])
+        st["timeline"] = [
+            {**item, "arquivo": os.path.abspath(item["arquivo"])}
+            for item in st["timeline"]
+        ]
         renderizar_video_final(st["caminho_webm"], st["timeline"], nome_base, st["tempo_corte"])
 
     elif "--record" in sys.argv:
@@ -652,4 +831,9 @@ if __name__ == "__main__":
         if os.path.exists(caminho_estado):
             with open(caminho_estado, "r", encoding="utf-8") as f:
                 st = json.load(f)
+            st["caminho_webm"] = os.path.abspath(st["caminho_webm"])
+            st["timeline"] = [
+                {**item, "arquivo": os.path.abspath(item["arquivo"])}
+                for item in st["timeline"]
+            ]
             renderizar_video_final(st["caminho_webm"], st["timeline"], nome_base, st["tempo_corte"])

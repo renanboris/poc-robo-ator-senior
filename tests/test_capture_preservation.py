@@ -330,7 +330,8 @@ def test_preservation_quality_gate_blocks_low_quality():
     """
     # Case 1: no passos at all
     roteiro_vazio = {"passos": []}
-    aprovado, motivo = capture._validar_roteiro(roteiro_vazio)
+    from utils import validar_roteiro as _validar_roteiro_fn
+    aprovado, motivo = _validar_roteiro_fn(roteiro_vazio)
     assert aprovado is False, "Expected False for roteiro with 0 passos."
     assert motivo, "Expected a non-empty reason string."
 
@@ -350,7 +351,7 @@ def test_preservation_quality_gate_blocks_low_quality():
             }
         ]
     }
-    aprovado, motivo = capture._validar_roteiro(roteiro_um_passo)
+    aprovado, motivo = _validar_roteiro_fn(roteiro_um_passo)
     assert aprovado is False, "Expected False for roteiro with only 1 passo."
     assert motivo, "Expected a non-empty reason string."
 
@@ -389,7 +390,7 @@ def test_preservation_quality_gate_blocks_low_quality():
             },
         ]
     }
-    aprovado, motivo = capture._validar_roteiro(roteiro_baixa_qualidade)
+    aprovado, motivo = _validar_roteiro_fn(roteiro_baixa_qualidade)
     assert aprovado is False, (
         "Expected False for roteiro with all low-confidence actions and no selectors."
     )

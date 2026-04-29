@@ -1,0 +1,125 @@
+{
+  "title": "Step_Model",
+  "description": "Contrato canonico de um passo GPS da extensao Aura DAP. Compartilhado entre backend Python e Content_Script.",
+  "type": "object",
+  "required": ["id", "title", "intent", "ancora", "tooltip", "acao", "target_selector", "label", "validation_type"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Identificador unico do passo"
+    },
+    "title": {
+      "type": "string",
+      "description": "Titulo curto do passo exibido no painel GPS"
+    },
+    "intent": {
+      "type": "string",
+      "description": "Intencao instrucional do passo"
+    },
+    "ancora": {
+      "type": "string",
+      "description": "Texto ancora de orientacao exibido ao usuario"
+    },
+    "tooltip": {
+      "type": "string",
+      "description": "Texto de tooltip exibido sobre o elemento alvo"
+    },
+    "acao": {
+      "type": "string",
+      "description": "Descricao da acao que o usuario deve realizar"
+    },
+    "target_selector": {
+      "type": "string",
+      "description": "Seletor CSS ou ID do elemento alvo da acao"
+    },
+    "label": {
+      "type": "string",
+      "description": "Rotulo legivel do elemento alvo para exibicao ao usuario"
+    },
+    "validation_type": {
+      "type": "string",
+      "enum": [
+        "click",
+        "right_click",
+        "double_click",
+        "type",
+        "enter",
+        "url_change",
+        "element_present",
+        "element_absent",
+        "visual_state"
+      ],
+      "default": "click",
+      "description": "Tipo de acao esperada para validar a conclusao do passo"
+    },
+    "expected_state": {
+      "type": "object",
+      "description": "Estado esperado apos a acao",
+      "properties": {
+        "value": {
+          "type": ["string", "null"],
+          "description": "Valor esperado no campo (usado com validation_type: type)"
+        },
+        "url_pattern": {
+          "type": ["string", "null"],
+          "description": "Padrao de URL esperado (usado com validation_type: url_change)"
+        },
+        "selector": {
+          "type": ["string", "null"],
+          "description": "Seletor CSS do elemento a verificar (usado com element_present / element_absent)"
+        }
+      }
+    },
+    "timeout_sec": {
+      "type": "number",
+      "default": 30,
+      "description": "Tempo maximo em segundos para o usuario completar o passo"
+    },
+    "hint": {
+      "type": "string",
+      "default": "",
+      "description": "Dica opcional exibida ao usuario quando solicitada"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard"],
+      "default": "medium",
+      "description": "Nivel de dificuldade do passo"
+    },
+    "xp_value": {
+      "type": "number",
+      "default": 10,
+      "description": "Pontos de XP concedidos ao completar o passo com sucesso"
+    },
+    "xp_penalty_per_hint": {
+      "type": "number",
+      "default": 5,
+      "description": "Penalidade de XP descontada por cada hint solicitado neste passo"
+    },
+    "scenario_id": {
+      "type": "string",
+      "description": "Reservado para uso futuro em fluxos de roleplay adaptativo. Identifica o cenario ao qual o passo pertence. Ausente em passos de GPS operacional padrao.",
+      "optional": true
+    },
+    "branch_id": {
+      "type": "string",
+      "description": "Reservado para uso futuro em fluxos de roleplay adaptativo. Identifica o ramo de decisao em fluxos com multiplos desfechos. Ausente em passos de GPS operacional padrao.",
+      "optional": true
+    },
+    "timeout_penalty_type": {
+      "type": "string",
+      "enum": ["none", "soft", "hard"],
+      "default": "soft",
+      "description": "Tipo de penalidade aplicada quando o timeout expira no modo prove. 'none': sem penalidade. 'soft': penalidade reduzida (scoringConfig.timeout_penalty). 'hard': penalidade igual a scoringConfig.error_penalty.",
+      "optional": true
+    }
+  },
+  "_defaults": {
+    "validation_type": "click",
+    "timeout_sec": 30,
+    "xp_value": 10,
+    "xp_penalty_per_hint": 5,
+    "difficulty": "medium",
+    "hint": ""
+  }
+}

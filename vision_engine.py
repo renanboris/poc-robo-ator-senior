@@ -5,14 +5,15 @@ Filosofia: cascata de estratégias do mais barato ao mais caro.
 Cada camada só é acionada se a anterior falhar completamente.
 
 Camadas de Resiliência:
-  0  Brain (Memória SQLite Permanente - Auto-Cura e Zero-Touch)
-  1  Foco nativo / active element (campos de digitação inline e novas pastas)
-  1.5 Heurísticas Senior X (Ícones mudos como Home, Lixeira, etc)
-  2  Sniper semântico — 15+ seletores Playwright nativos (getByRole, getByLabel…)
-  3  Seletor hint original (se não for frágil)
-  4  Busca em todos os frames da página (sem depender do hint de iframe)
-  5  Gemini Vision — screenshot atual + referência da gravação
-  6  Coordenadas relativas da gravação (corrigidas por scroll)
+  0    Brain (Memória SQLite Permanente - Auto-Cura e Zero-Touch)
+  0.5  Menu de contexto ativo
+  1    Foco nativo / active element (campos de digitação inline e novas pastas)
+  1.5  Heurísticas Senior X (Ícones mudos como Home, Lixeira, etc)
+  2    Coordenadas capturadas da gravação (corrigidas por scroll) ← MOVIDO
+  2_S  Sniper semântico — 15+ seletores Playwright nativos (getByRole, getByLabel…)
+  3    Seletor hint original (se não for frágil)
+  4    Busca em todos os frames da página (sem depender do hint de iframe)
+  5    Gemini Vision — screenshot atual + referência da gravação
 
 Correcoes aplicadas:
 
@@ -44,18 +45,23 @@ Correcoes aplicadas:
 import asyncio
 import base64
 import hashlib
+import io
 import json
 import logging
 import os
 import re
 import sqlite3
+import time
 from dataclasses import dataclass
 from typing import Optional
+
+import numpy as np
+from PIL import Image as _PILImage
 
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from playwright.async_api import Page
+from playwright.async_api import Page, Frame
 
 load_dotenv()
 
@@ -110,11 +116,50 @@ def _init_db():
                     ultima_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            # Migração idempotente: adiciona coluna de timestamp granular (Req 5.1, 5.4)
+            try:
+                conn.execute(
+                    "ALTER TABLE telemetria_camadas ADD COLUMN ultima_atualizacao_ts INTEGER"
+                )
+            except Exception:
+                pass  # coluna já existe
+
+            # Tabela de telemetria granular por execução (Req 5.1, 5.4, 10.4)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS telemetria_execucoes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    camada TEXT NOT NULL,
+                    acertou INTEGER NOT NULL,
+                    intencao_semantica TEXT,
+                    ts INTEGER NOT NULL
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tel_exec_ts ON telemetria_execucoes(ts)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tel_exec_camada ON telemetria_execucoes(camada)"
+            )
             # TTL: remove memórias não usadas há mais de 90 dias (Fase 2.1)
             conn.execute("""
                 DELETE FROM memoria_semantica
                 WHERE ultima_atualizacao < datetime('now', '-90 days')
                   AND hits < 2
+            """)
+            # View unificada de telemetria — idempotente (CREATE VIEW IF NOT EXISTS)
+            conn.execute("""
+                CREATE VIEW IF NOT EXISTS v_telemetria_unificada AS
+                SELECT
+                    tc.camada,
+                    tc.acertos                                                    AS acertos_total,
+                    tc.falhas                                                     AS falhas_total,
+                    CASE
+                        WHEN (tc.acertos + tc.falhas) > 0
+                        THEN CAST(tc.acertos AS REAL) / (tc.acertos + tc.falhas)
+                        ELSE NULL
+                    END                                                           AS taxa_sucesso,
+                    tc.ultima_atualizacao_ts                                      AS ultima_execucao_ts
+                FROM telemetria_camadas tc
             """)
     except Exception as e:
         logger.error(f"Nao foi possivel inicializar Brain DB em '{DB_PATH}': {e}")
@@ -137,24 +182,113 @@ class EntradaCache:
     hitl_corrigido: int = 0
 
 
-def _registrar_telemetria(camada: str, acertou: bool) -> None:
-    """Registra acerto/falha por camada para observabilidade do self-healing."""
+def _registrar_telemetria(camada: str, acertou: bool, intencao_semantica: str = "") -> None:
+    """Registra acerto/falha por camada e emite logs de observabilidade.
+
+    - Emite INFO com estratégia e resultado (Requisito 1.4.1).
+    - Emite WARNING quando taxa de sucesso acumulada cair abaixo de 60% (Requisito 1.4.3).
+    - Insere registro granular em telemetria_execucoes (Requisitos 5.1, 5.2, 5.3, 9.1).
+    - Usa sqlite3.connect(timeout=5) para lidar com SQLite lock.
+    - Falha de escrita é tratada com logger.warning silencioso — nunca interrompe a execução.
+    """
+    resultado_str = "sucesso" if acertou else "falha"
+    logger.info(f"   [Telemetria] camada={camada} resultado={resultado_str}")
+
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(DB_PATH, timeout=5) as conn:
+            ts_agora = int(time.time() * 1000)
+
+            # 1. Atualiza contadores agregados na tabela existente (sem breaking changes)
             conn.execute("""
-                INSERT INTO telemetria_camadas (camada, acertos, falhas)
-                VALUES (?, ?, ?)
+                INSERT INTO telemetria_camadas (camada, acertos, falhas, ultima_atualizacao_ts)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT(camada) DO UPDATE SET
                     acertos = acertos + ?,
                     falhas  = falhas  + ?,
-                    ultima_atualizacao = CURRENT_TIMESTAMP
+                    ultima_atualizacao = CURRENT_TIMESTAMP,
+                    ultima_atualizacao_ts = ?
             """, (
                 camada,
                 1 if acertou else 0,
                 0 if acertou else 1,
+                ts_agora,
                 1 if acertou else 0,
                 0 if acertou else 1,
+                ts_agora,
             ))
+
+            # 2. Insere registro granular por execução (Requisitos 5.1, 10.4)
+            conn.execute(
+                "INSERT INTO telemetria_execucoes (camada, acertou, intencao_semantica, ts) VALUES (?, ?, ?, ?)",
+                (camada, 1 if acertou else 0, intencao_semantica, ts_agora)
+            )
+
+            # 3. Verifica taxa de sucesso acumulada — alerta se < 60% (Requisito 1.4.3)
+            row = conn.execute(
+                "SELECT acertos, falhas FROM telemetria_camadas WHERE camada = ?", (camada,)
+            ).fetchone()
+            if row:
+                total = row[0] + row[1]
+                if total >= 5:  # mínimo de amostras para evitar falso-positivo no início
+                    taxa = row[0] / total
+                    if taxa < 0.60:
+                        logger.warning(
+                            f"[Telemetria] Taxa de sucesso da camada '{camada}' abaixo de 60%: "
+                            f"{taxa:.1%} ({row[0]} acertos / {total} tentativas)"
+                        )
+    except Exception as e:
+        logger.warning(f"[Telemetria] Falha ao registrar telemetria para camada '{camada}': {e}")
+
+
+def _calcular_taxa_hitl_1h() -> Optional[float]:
+    """Calcula a taxa de HITL (falha_total / total_acoes) na janela deslizante de 1 hora.
+
+    Retorna None se houver menos de 5 ações no período (dados insuficientes).
+    Requisitos: 9.1, 9.2, 9.5
+    """
+    try:
+        ts_1h_atras = int(time.time() * 1000) - 3_600_000
+        with sqlite3.connect(DB_PATH, timeout=5) as conn:
+            total_acoes = conn.execute(
+                "SELECT COUNT(*) FROM telemetria_execucoes WHERE ts >= ?",
+                (ts_1h_atras,)
+            ).fetchone()[0]
+            if total_acoes < 5:
+                return None
+            total_falhas = conn.execute(
+                "SELECT COUNT(*) FROM telemetria_execucoes WHERE ts >= ? AND camada = 'falha_total'",
+                (ts_1h_atras,)
+            ).fetchone()[0]
+            return total_falhas / total_acoes
+    except Exception as e:
+        logger.warning(f"[HITL] Falha ao calcular taxa_hitl_1h: {e}")
+        return None
+
+
+def _registrar_estrategia_vencedora(intencao: str, camada: str) -> None:
+    """Registra a estratégia vencedora no Brain após localização bem-sucedida (Requisito 1.4.4).
+
+    Atualiza o campo `ultima_estrategia_vencedora` em `memoria_semantica` para que o
+    self-healing futuro saiba qual camada resolveu a intenção mais recentemente.
+    A operação é best-effort — falha silenciosa para não interromper a execução.
+    """
+    chave = _chave_cache(intencao)
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            # Migração segura: garante que a coluna existe antes de usá-la
+            try:
+                conn.execute(
+                    "ALTER TABLE memoria_semantica ADD COLUMN ultima_estrategia_vencedora TEXT"
+                )
+            except Exception:
+                pass  # coluna já existe
+
+            conn.execute("""
+                UPDATE memoria_semantica
+                SET ultima_estrategia_vencedora = ?,
+                    ultima_atualizacao = CURRENT_TIMESTAMP
+                WHERE hash_intencao = ?
+            """, (camada, chave))
     except Exception:
         pass
 
@@ -176,6 +310,37 @@ def obter_stats_brain() -> dict:
             }
     except Exception as e:
         return {"erro": str(e)}
+
+
+def obter_relatorio_telemetria() -> dict:
+    """
+    Consulta v_telemetria_unificada e retorna métricas consolidadas da cascata.
+
+    Retorno em caso de sucesso:
+    {
+        "camadas": [
+            {"camada": "0_brain", "acertos_total": 42, "falhas_total": 3,
+             "taxa_sucesso": 0.933, "ultima_execucao_ts": 1718000000000},
+            ...
+        ],
+        "taxa_hitl_1h": 0.05  # ou None se dados insuficientes
+    }
+
+    Retorno em caso de erro:
+    {"camadas": [], "erro": "<mensagem>"}
+    """
+    try:
+        with sqlite3.connect(DB_PATH, timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM v_telemetria_unificada ORDER BY camada"
+            ).fetchall()
+            camadas = [dict(r) for r in rows]
+        taxa_hitl = _calcular_taxa_hitl_1h()
+        return {"camadas": camadas, "taxa_hitl_1h": taxa_hitl}
+    except Exception as e:
+        logger.warning(f"[Telemetria] obter_relatorio_telemetria falhou: {e}")
+        return {"camadas": [], "erro": str(e)}
 
 
 def _consultar_cache(intencao: str) -> Optional[EntradaCache]:
@@ -307,8 +472,15 @@ def _contem_indice_posicional(seletor: str) -> bool:
     ATENÇÃO: [data-testid='item-102'] NÃO é posicional — o número está dentro
     de aspas como valor de atributo. O lookahead (?![^'\"]*['\"]) garante que
     o padrão #\\w*\\d+ não dispare dentro de valores de atributos.
+
+    EXCEÇÃO: seletores compostos com .ui-chkbox (checkboxes PrimeNG) como
+    item#file_8 .ui-chkbox .ui-chkbox-box NÃO são posicionais — o ID é do
+    arquivo/item real, não uma posição de lista.
     """
     if not seletor:
+        return False
+    # Seletores de checkbox PrimeNG com ID de arquivo são legítimos — não posicionais
+    if ".ui-chkbox" in seletor or "p-checkbox" in seletor:
         return False
     padroes = [
         r"#\w*\d+(?![^'\"]*['\"])",   # #file_1, #row3 — mas não dentro de ['...']
@@ -378,6 +550,54 @@ def _gerar_candidatos(
     candidatos: list[TentativaLocalizacao] = []
     eh_digitacao    = acao in ("digitar_e_enter", "preencher_campo")
     is_tag_generica = label_curto.lower() in _TAGS_FRAGEIS
+
+    # ── Candidato especial: checkbox PrimeNG/Angular ──────────────────────────
+    # O seletor capturado pelo JS do capture para checkboxes tem o formato:
+    #   item:has-text("Nome") .ui-chkbox .ui-chkbox-box   (ideal — com texto)
+    #   item#file_8 .ui-chkbox .ui-chkbox-box             (fallback — com ID)
+    # Ambos são seletores compostos legítimos e devem ser tentados primeiro.
+    if seletor_hint and (".ui-chkbox" in seletor_hint or "p-checkbox" in seletor_hint):
+        candidatos.append(TentativaLocalizacao(
+            seletor=seletor_hint, iframe_hint=iframe_hint,
+            descricao=f"checkbox PrimeNG hint '{seletor_hint[:60]}'",
+        ))
+        # Se o seletor usa ID (fallback), também tenta a variante :has-text com label
+        if label_curto and "#file_" in seletor_hint:
+            # Extrai a parte do seletor após o ID para reusar (ex: .ui-chkbox .ui-chkbox-box)
+            partes = seletor_hint.split(" ", 1)
+            sufixo = partes[1] if len(partes) > 1 else ".ui-chkbox .ui-chkbox-box"
+            # Tenta com o label da pasta como :has-text
+            label_clean = label_curto.replace("'", "").replace('"', "")[:40]
+            candidatos.append(TentativaLocalizacao(
+                seletor=f'item:has-text("{label_clean}") {sufixo}',
+                iframe_hint=iframe_hint,
+                descricao=f"checkbox has-text '{label_clean}'",
+            ))
+
+    # ── Candidato especial: botão em dialog de confirmação PrimeNG ────────────
+    # Botões "Sim", "Confirmar", "Não", "Cancelar" dentro de p-confirmDialog
+    # têm IDs dinâmicos (s-button-5, etc.) que mudam a cada renderização.
+    # O Sniper deve buscar dentro do escopo do dialog antes de tentar o DOM geral.
+    _LABELS_CONFIRMACAO = {"sim", "não", "nao", "confirmar", "cancelar", "ok", "yes", "no", "cancel"}
+    if label_curto and label_curto.strip().lower() in _LABELS_CONFIRMACAO:
+        _SELETORES_DIALOG = [
+            "p-confirmdialog", "p-dialog", ".p-dialog", ".ui-dialog",
+            "[role='dialog']", ".p-confirm-dialog",
+            # Senior X / GED usa s-dialog e ui-confirmdialog
+            "s-dialog", ".ui-confirmdialog", ".ui-dialog-content",
+            ".p-dialog-content",
+        ]
+        for _sel_dialog in _SELETORES_DIALOG:
+            candidatos.append(TentativaLocalizacao(
+                seletor=f"{_sel_dialog} button:has-text('{label_curto}')",
+                iframe_hint=iframe_hint,
+                descricao=f"dialog button '{label_curto}' em {_sel_dialog}",
+            ))
+            candidatos.append(TentativaLocalizacao(
+                seletor=f"{_sel_dialog} span:has-text('{label_curto}')",
+                iframe_hint=iframe_hint,
+                descricao=f"dialog span '{label_curto}' em {_sel_dialog}",
+            ))
 
     if label_curto and not is_tag_generica:
         if not eh_digitacao:
@@ -479,6 +699,7 @@ async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
     if not iframe_hint or iframe_hint in ("Pagina Principal", "Página Principal", "iframe-cross-origin"):
         return page
 
+    # Try frame_locator approach first to confirm iframe exists
     for seletor_iframe in [
         f"iframe[name='{iframe_hint}']", f"iframe[src*='{iframe_hint}']",
         f"iframe[id='{iframe_hint}']",   f"iframe[title*='{iframe_hint}']",
@@ -486,10 +707,20 @@ async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
         try:
             fl = page.frame_locator(seletor_iframe)
             await fl.locator("body").wait_for(state="attached", timeout=800)
-            return fl
+            
+            # FIX (Task 3.1): After confirming iframe exists, find the actual Frame object
+            # FrameLocator doesn't have .url or .name attributes needed for coordinate adjustment
+            # We need to return the actual Frame object from page.frames
+            for frame in page.frames:
+                try:
+                    if iframe_hint in frame.url or iframe_hint in frame.name:
+                        return frame  # Return Frame, not FrameLocator
+                except Exception:
+                    continue
         except Exception:
             continue
 
+    # Fallback: iterate through frames directly
     try:
         for frame in page.frames:
             try:
@@ -566,9 +797,9 @@ async def _aguardar_estabilidade(page: Page, timeout_ms: int = 2000) -> None:
 
 async def _digitar_humanizado(page: Page, valor: str) -> None:
     """
-    Digita um valor caractere por caractere com delay variável,
-    simulando ritmo humano real. Usa press_sequentially (keydown/keyup
-    por char) em vez de keyboard.type, que é mais mecânico.
+    Digita um valor com delay variável, simulando ritmo humano real.
+    Usa keyboard.type com delay para suportar caracteres acentuados
+    corretamente (como ã, ç, é, etc.).
 
     Delay base: 65ms por caractere.
     Variação aleatória: ±30ms por caractere (ruído natural).
@@ -576,12 +807,16 @@ async def _digitar_humanizado(page: Page, valor: str) -> None:
     (simula hesitação humana ao digitar).
     """
     import random
-    for char in valor:
-        delay = random.randint(45, 95)  # 45–95ms por caractere
-        await page.keyboard.press(char, delay=delay)
-        # micro-pausa ocasional (~10% dos caracteres)
-        if random.random() < 0.10:
-            await asyncio.sleep(random.uniform(0.12, 0.25))
+    
+    # Calcula delay médio com variação aleatória
+    delay = random.randint(45, 95)  # 45–95ms por caractere
+    
+    # Usa keyboard.type que suporta caracteres Unicode/acentuados
+    await page.keyboard.type(valor, delay=delay)
+    
+    # micro-pausa ocasional para simular hesitação humana
+    if random.random() < 0.10:
+        await asyncio.sleep(random.uniform(0.12, 0.25))
 
 
 async def _executar_acao(locator, page, acao: str, valor: str) -> None:
@@ -948,52 +1183,569 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
         return False
 
 
+# ── Template Matching Visual ──────────────────────────────────
+# Componente Template_Matcher: matching visual via Pillow + NumPy
+# sem dependência de OpenCV. Usado como Layer 1_T na cascata.
 # ──────────────────────────────────────────────────────────────
-# DETECÇÃO DE MENU DE CONTEXTO ATIVO (CAMADA 0.5)
-# ──────────────────────────────────────────────────────────────
-async def _detectar_menu_contexto_ativo(page) -> object | None:
+
+
+def _resolver_screenshot_ref_tm(path_ou_b64: str) -> Optional[bytes]:
     """
-    Verifica se um menu de contexto está visível como overlay na página.
-    Retorna o Locator do primeiro menu visível encontrado, ou None.
-    Usa timeout=300ms para não penalizar o caminho feliz (sem menu ativo).
+    Resolve um screenshot de referência para bytes, suportando:
+      - Base64 JPEG (começa com '/9j/')
+      - Base64 PNG (começa com 'iVBOR')
+      - Path de arquivo em disco
+
+    Nunca lança exceção — retorna None em caso de falha.
     """
-    seletores_menu = [
-        ".p-contextmenu",
-        "[role='menu']",
-        ".context-menu",
-        "ul[class*='contextmenu']",
-        ".p-menu-list",
-    ]
-    for seletor in seletores_menu:
+    if not path_ou_b64:
+        return None
+    # Detecta base64 JPEG ou PNG pelos magic bytes
+    if path_ou_b64.startswith("/9j/") or path_ou_b64.startswith("iVBOR"):
         try:
-            locator = page.locator(seletor).first
-            await locator.wait_for(state="visible", timeout=300)
-            return locator
-        except Exception:
-            continue
+            return base64.b64decode(path_ou_b64)
+        except Exception as exc:
+            logger.warning(f"[TemplateMatcher] Falha ao decodificar base64: {exc}")
+            return None
+    # Trata como path de arquivo
+    if os.path.exists(path_ou_b64):
+        try:
+            with open(path_ou_b64, "rb") as f:
+                return f.read()
+        except Exception as exc:
+            logger.warning(f"[TemplateMatcher] Falha ao ler arquivo '{path_ou_b64}': {exc}")
+            return None
+    logger.warning(f"[TemplateMatcher] Arquivo não encontrado: '{path_ou_b64}'")
     return None
 
 
-async def _buscar_em_escopo_menu(menu_locator, label_curto: str) -> str | None:
+def _ncc_score(template: np.ndarray, region: np.ndarray) -> float:
+    """Calcula o score NCC (Normalized Cross-Correlation) entre template e região."""
+    t = template.astype(np.float32)
+    r = region.astype(np.float32)
+    t_norm = (t - t.mean()) / (t.std() + 1e-8)
+    r_norm = (r - r.mean()) / (r.std() + 1e-8)
+    return float(np.sum(t_norm * r_norm) / t_norm.size)
+
+
+def _sliding_ncc(template_arr: np.ndarray, tela_arr: np.ndarray):
     """
-    Localiza o elemento dentro do container do menu de contexto.
-    Estratégias em ordem de confiança, todas escopadas ao menu_locator.
-    Retorna o seletor usado em caso de sucesso, ou None se não encontrado.
+    Sliding window NCC — retorna (best_score, best_y, best_x).
+    Usa step adaptativo para performance sem OpenCV.
     """
+    th, tw = template_arr.shape[:2]
+    sh, sw = tela_arr.shape[:2]
+    best_score, best_y, best_x = -1.0, 0, 0
+    step = max(1, min(th, tw) // 4)  # step adaptativo
+    for y in range(0, sh - th + 1, step):
+        for x in range(0, sw - tw + 1, step):
+            region = tela_arr[y:y + th, x:x + tw]
+            score = _ncc_score(template_arr, region)
+            if score > best_score:
+                best_score, best_y, best_x = score, y, x
+    return best_score, best_y, best_x
+
+
+def template_match(
+    referencia: bytes,
+    tela_atual: bytes,
+    coords_relativas: Optional[dict],
+    viewport: dict,
+    threshold: float = 0.80,
+) -> Optional[dict]:
+    """
+    Realiza template matching visual entre o screenshot de referência e a tela atual.
+
+    Estratégia:
+      1. Converte referencia e tela_atual para arrays NumPy RGB via Pillow.
+      2. Se coords_relativas fornecido, busca primeiro na janela ±20% do viewport.
+      3. Se score regional >= threshold, retorna coords absolutas do centro do match.
+      4. Caso contrário, busca na tela inteira.
+      5. Retorna None se score < threshold em ambas as buscas.
+
+    Retorna {"x": int, "y": int, "score": float} ou None.
+    """
+    try:
+        # Converte bytes → arrays NumPy RGB
+        ref_img = _PILImage.open(io.BytesIO(referencia)).convert("RGB")
+        tela_img = _PILImage.open(io.BytesIO(tela_atual)).convert("RGB")
+        ref_arr = np.array(ref_img)
+        tela_arr = np.array(tela_img)
+
+        th, tw = ref_arr.shape[:2]
+        sh, sw = tela_arr.shape[:2]
+
+        # Template maior que a tela — impossível fazer match
+        if th > sh or tw > sw:
+            logger.warning(
+                f"[TemplateMatcher] Template ({tw}x{th}) maior que tela ({sw}x{sh}) — pulando"
+            )
+            return None
+
+        vp_w = viewport.get("width", 1920)
+        vp_h = viewport.get("height", 1080)
+
+        # ── Busca regional (±20% do viewport ao redor das coords) ──
+        if coords_relativas and coords_relativas.get("x_pct") is not None:
+            cx = int(coords_relativas["x_pct"] * vp_w)
+            cy = int(coords_relativas["y_pct"] * vp_h)
+            margin_x = int(vp_w * 0.20)
+            margin_y = int(vp_h * 0.20)
+
+            rx1 = max(0, cx - margin_x)
+            ry1 = max(0, cy - margin_y)
+            rx2 = min(sw, cx + margin_x)
+            ry2 = min(sh, cy + margin_y)
+
+            # Região deve ser pelo menos do tamanho do template
+            if (rx2 - rx1) >= tw and (ry2 - ry1) >= th:
+                regiao = tela_arr[ry1:ry2, rx1:rx2]
+                score_r, by_r, bx_r = _sliding_ncc(ref_arr, regiao)
+                if score_r >= threshold:
+                    abs_x = rx1 + bx_r + tw // 2
+                    abs_y = ry1 + by_r + th // 2
+                    logger.info(
+                        f"[TemplateMatcher] Match regional: score={score_r:.3f} "
+                        f"em ({abs_x}, {abs_y})"
+                    )
+                    return {"x": int(abs_x), "y": int(abs_y), "score": float(score_r)}
+
+        # ── Busca na tela inteira ──
+        score_g, by_g, bx_g = _sliding_ncc(ref_arr, tela_arr)
+        if score_g >= threshold:
+            abs_x = bx_g + tw // 2
+            abs_y = by_g + th // 2
+            logger.info(
+                f"[TemplateMatcher] Match global: score={score_g:.3f} "
+                f"em ({abs_x}, {abs_y})"
+            )
+            return {"x": int(abs_x), "y": int(abs_y), "score": float(score_g)}
+
+        logger.debug(f"[TemplateMatcher] Score abaixo do threshold ({score_g:.3f} < {threshold})")
+        return None
+
+    except Exception as exc:
+        logger.warning(f"[TemplateMatcher] Erro no cálculo de matching: {exc}")
+        return None
+
+
+# ──────────────────────────────────────────────────────────────
+# DETECÇÃO DE MENU DE CONTEXTO ATIVO (CAMADA 0.5)
+# ──────────────────────────────────────────────────────────────
+async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None, timeout_ms: int = 150) -> object | None:
+    """
+    Verifica se um menu de contexto está visível como overlay na página ou em frames.
+    Retorna o Locator do primeiro menu visível encontrado, ou None.
+
+    timeout_ms=150 para o caminho feliz (sem menu ativo) — retorna rápido.
+    timeout_ms=2000 quando chamado após clique_direito — aguarda animação de entrada
+                    e busca em todos os frames.
+    """
+    SELETOR_MENU = (
+        ".ngx-contextmenu, "
+        ".cdk-overlay-pane.ngx-contextmenu, "
+        "[class*='ngx-contextmenu'], "
+        ".p-contextmenu, "
+        "[role='menu']"
+    )
+
+    # 1. Busca no DOM principal
+    try:
+        locator = page.locator(SELETOR_MENU).first
+        await locator.wait_for(state="visible", timeout=timeout_ms)
+        return locator
+    except Exception:
+        pass
+
+    # 2. Quando timeout maior (após clique_direito), busca em todos os frames
+    if timeout_ms > 150:
+        for frame in page.frames:
+            if frame == page.main_frame:
+                continue
+            try:
+                locator = frame.locator(SELETOR_MENU).first
+                await locator.wait_for(state="visible", timeout=timeout_ms)
+                logger.debug(f"[MENU-CTX] Menu encontrado em frame: {frame.name or frame.url[:40]}")
+                return locator
+            except Exception:
+                continue
+
+    return None
+
+
+async def _buscar_em_escopo_menu(menu_locator, label_curto: str, page=None) -> str | None:
+    """
+    Localiza e clica em um item dentro do container do menu de contexto ngx-contextmenu.
+
+    O ngx-contextmenu (Angular CDK Overlay) renderiza itens como:
+      <ul class="ngx-menu-content">
+        <li><a><em class="fa ..."></em> Excluir</a></li>
+      </ul>
+
+    Os itens NÃO têm role="menuitem" — são <li>/<a> simples com texto misto
+    (ícone + texto). Por isso usamos :has-text() escopado ao container.
+    """
+    label_safe = label_curto.replace("'", "\\'")
+
     estrategias = [
-        ("role_menuitem", lambda: menu_locator.get_by_role("menuitem", name=label_curto)),
-        ("text_exact",    lambda: menu_locator.get_by_text(label_curto, exact=True)),
-        ("has_text",      lambda: menu_locator.locator(f":has-text('{label_curto}')").last),
+        # ngx-contextmenu: item <li> ou <a> com o texto (ignora ícones internos)
+        ("li_has_text",   lambda: menu_locator.locator(f"li:has-text('{label_safe}')").first),
+        ("a_has_text",    lambda: menu_locator.locator(f"a:has-text('{label_safe}')").first),
+        # Fallback genérico: qualquer elemento visível com o texto exato
+        ("text_exact",    lambda: menu_locator.get_by_text(label_curto, exact=True).first),
+        # Último recurso: texto parcial
+        ("has_text",      lambda: menu_locator.locator(f":has-text('{label_safe}')").last),
     ]
     for nome, fn in estrategias:
         try:
             el = fn()
             await el.wait_for(state="visible", timeout=1000)
+            # Anima o cursor até o item do menu antes de clicar
+            if page is not None:
+                try:
+                    box = await el.bounding_box(timeout=500)
+                    if box:
+                        cx = box["x"] + box["width"] / 2
+                        cy = box["y"] + box["height"] / 2
+                        from cursor_engine import mover_cursor_humanizado
+                        await mover_cursor_humanizado(page, cx, cy)
+                except Exception:
+                    pass
             await el.click()
             return nome
         except Exception:
             continue
     return None
+
+
+# ──────────────────────────────────────────────────────────────
+# RESOLUÇÃO DE ELEMENTOS EM IFRAMES (BUGFIX: robot-element-location-failure)
+# ──────────────────────────────────────────────────────────────
+async def _resolver_elemento_em_iframe(
+    page: Page, x: int, y: int, max_depth: int = 5
+) -> tuple[dict, int, int, bool]:
+    """
+    Resolve recursivamente o elemento em coordenadas (x, y), detectando iframes.
+    
+    Quando elementFromPoint retorna um iframe, ajusta as coordenadas para o sistema
+    de coordenadas do iframe e recursivamente busca o elemento interno.
+    
+    Args:
+        page: Página Playwright
+        x: Coordenada X absoluta no viewport
+        y: Coordenada Y absoluta no viewport
+        max_depth: Profundidade máxima de recursão (proteção contra loops infinitos)
+    
+    Returns:
+        tuple[dict, int, int, bool]: (elemento_info, x_ajustado, y_ajustado, is_cross_origin)
+        - elemento_info: Dicionário com informações do elemento (tagName, innerText, etc.)
+        - x_ajustado: Coordenada X ajustada (relativa ao iframe se aplicável)
+        - y_ajustado: Coordenada Y ajustada (relativa ao iframe se aplicável)
+        - is_cross_origin: True se iframe cross-origin foi detectado (fail-open)
+    
+    Requisitos: 2.1, 2.2, 2.3
+    """
+    if max_depth <= 0:
+        logger.warning(f"[iframe] Max depth atingido na resolução de iframes aninhados em ({x}, {y})")
+        try:
+            elemento = await page.evaluate(
+                "([x, y]) => { const el = document.elementFromPoint(x, y); return el ? { tagName: el.tagName, innerText: el.innerText || '' } : null; }",
+                [x, y]
+            )
+            return (elemento or {}, x, y, False)
+        except Exception:
+            return ({}, x, y, False)
+    
+    try:
+        resultado = await page.evaluate("""
+            ([x, y]) => {
+                const el = document.elementFromPoint(x, y);
+                if (!el) return {tipo: 'null'};
+                
+                if (el.tagName === 'IFRAME') {
+                    const bbox = el.getBoundingClientRect();
+                    return {
+                        tipo: 'iframe',
+                        left: bbox.left,
+                        top: bbox.top,
+                        src: el.src || '',
+                        name: el.name || '',
+                        innerText: el.innerText || 'iframe platform'
+                    };
+                }
+                
+                return {
+                    tipo: 'elemento',
+                    tagName: el.tagName,
+                    innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                };
+            }
+        """, [x, y])
+        
+        if resultado['tipo'] == 'iframe':
+            # Ajustar coordenadas para o sistema do iframe
+            x_rel = int(x - resultado['left'])
+            y_rel = int(y - resultado['top'])
+            
+            logger.info(f"[iframe] Detectado em ({x}, {y}), ajustando para ({x_rel}, {y_rel})")
+            
+            # Tentar acessar o iframe
+            iframe_src = resultado.get('src', '')
+            iframe_name = resultado.get('name', '')
+            
+            # Resolver o frame usando Playwright
+            frame = None
+            for f in page.frames:
+                try:
+                    if iframe_src and iframe_src in f.url:
+                        frame = f
+                        break
+                    if iframe_name and iframe_name == f.name:
+                        frame = f
+                        break
+                except Exception:
+                    continue
+            
+            if not frame:
+                # Cross-origin ou frame não encontrado
+                logger.warning(f"[iframe] Cross-origin ou não acessível em ({x}, {y}) - aplicando fail-open")
+                return (resultado, x, y, True)
+            
+            # Recursivamente resolver no contexto do iframe
+            return await _resolver_elemento_em_iframe_frame(frame, x_rel, y_rel, max_depth - 1)
+        
+        else:
+            # Elemento final encontrado (não é iframe)
+            return (resultado, x, y, False)
+    
+    except Exception as exc:
+        logger.warning(f"[iframe] Erro ao resolver elemento em ({x}, {y}): {exc}")
+        return ({}, x, y, False)
+
+
+async def _resolver_elemento_em_iframe_frame(
+    frame, x: int, y: int, max_depth: int
+) -> tuple[dict, int, int, bool]:
+    """
+    Versão da função _resolver_elemento_em_iframe para contexto de Frame.
+    
+    Implementa a mesma lógica de detecção recursiva de iframes, mas usando
+    frame.evaluate em vez de page.evaluate.
+    
+    Args:
+        frame: Frame Playwright
+        x: Coordenada X relativa ao frame
+        y: Coordenada Y relativa ao frame
+        max_depth: Profundidade máxima de recursão
+    
+    Returns:
+        tuple[dict, int, int, bool]: (elemento_info, x_ajustado, y_ajustado, is_cross_origin)
+    
+    Requisitos: 2.2, 2.3
+    """
+    if max_depth <= 0:
+        logger.warning(f"[iframe] Max depth atingido na resolução de iframes aninhados (frame) em ({x}, {y})")
+        try:
+            elemento = await frame.evaluate(
+                "([x, y]) => { const el = document.elementFromPoint(x, y); return el ? { tagName: el.tagName, innerText: el.innerText || '' } : null; }",
+                [x, y]
+            )
+            return (elemento or {}, x, y, False)
+        except Exception:
+            return ({}, x, y, False)
+    
+    try:
+        resultado = await frame.evaluate("""
+            ([x, y]) => {
+                const el = document.elementFromPoint(x, y);
+                if (!el) return {tipo: 'null'};
+                
+                if (el.tagName === 'IFRAME') {
+                    const bbox = el.getBoundingClientRect();
+                    return {
+                        tipo: 'iframe',
+                        left: bbox.left,
+                        top: bbox.top,
+                        src: el.src || '',
+                        name: el.name || '',
+                        innerText: el.innerText || 'iframe platform'
+                    };
+                }
+                
+                return {
+                    tipo: 'elemento',
+                    tagName: el.tagName,
+                    innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                };
+            }
+        """, [x, y])
+        
+        if resultado['tipo'] == 'iframe':
+            # Ajustar coordenadas para o sistema do iframe aninhado
+            x_rel = int(x - resultado['left'])
+            y_rel = int(y - resultado['top'])
+            
+            logger.info(f"[iframe] Iframe aninhado detectado em ({x}, {y}), ajustando para ({x_rel}, {y_rel})")
+            
+            # Tentar acessar o iframe aninhado
+            iframe_src = resultado.get('src', '')
+            iframe_name = resultado.get('name', '')
+            
+            # Buscar frame aninhado
+            nested_frame = None
+            for f in frame.child_frames:
+                try:
+                    if iframe_src and iframe_src in f.url:
+                        nested_frame = f
+                        break
+                    if iframe_name and iframe_name == f.name:
+                        nested_frame = f
+                        break
+                except Exception:
+                    continue
+            
+            if not nested_frame:
+                # Cross-origin ou frame não encontrado
+                logger.warning(f"[iframe] Iframe aninhado cross-origin ou não acessível em ({x}, {y}) - aplicando fail-open")
+                return (resultado, x, y, True)
+            
+            # Recursivamente resolver no contexto do iframe aninhado
+            return await _resolver_elemento_em_iframe_frame(nested_frame, x_rel, y_rel, max_depth - 1)
+        
+        else:
+            # Elemento final encontrado (não é iframe)
+            return (resultado, x, y, False)
+    
+    except Exception as exc:
+        logger.warning(f"[iframe] Erro ao resolver elemento (frame) em ({x}, {y}): {exc}")
+        return ({}, x, y, False)
+
+
+async def _verificar_identidade_por_coordenadas(
+    page: Page,
+    x: int,
+    y: int,
+    label_curto: str,
+    iframe_hint: Optional[str] = None
+) -> tuple[bool, bool]:
+    """
+    Verifica identidade do elemento nas coordenadas (x, y) ANTES de executar o clique.
+    
+    Esta função implementa o fix para o bug de timing onde cliques eram executados
+    ANTES da verificação de identidade. Agora a verificação acontece PRIMEIRO, e o
+    clique só é executado se a identidade for confirmada.
+    
+    Args:
+        page: Página Playwright
+        x: Coordenada X absoluta no viewport
+        y: Coordenada Y absoluta no viewport
+        label_curto: Texto esperado para verificação de identidade
+        iframe_hint: Hint opcional sobre qual iframe contém o elemento
+    
+    Returns:
+        tuple[bool, bool]: (identidade_confirmada, is_cross_origin)
+        - identidade_confirmada: True se identidade verificada OU fail-open aplicado
+        - is_cross_origin: True se iframe cross-origin detectado (para logging)
+    
+    Fail-open cases (retorna True sem verificação):
+        - label_curto vazio/None → retorna (True, False)
+        - Exceção durante verificação → retorna (True, False)
+        - Iframe cross-origin → retorna (True, True)
+    
+    Bug Fix: Requirements 2.2, 2.3, 2.4
+    Preservation: Requirements 3.1, 3.2, 3.3
+    """
+    # Fail-open: se label_curto vazio, aceitar sem verificação
+    if not label_curto:
+        return (True, False)
+    
+    try:
+        # Determinar se deve usar iframe_hint ou detecção automática
+        usar_iframe_hint = (
+            iframe_hint and
+            iframe_hint not in ("Pagina Principal", "Página Principal", "iframe-cross-origin")
+        )
+        
+        if usar_iframe_hint:
+            logger.info(f"   [Coords Capturadas] Usando iframe_hint: '{iframe_hint}'")
+            contexto = await _resolver_contexto(page, iframe_hint)
+            x_ajustado, y_ajustado = x, y
+            is_cross_origin = False
+            
+            if isinstance(contexto, Frame):
+                try:
+                    # Ajustar coordenadas para iframe offset
+                    iframe_bbox = await page.evaluate(f"""
+                        () => {{
+                            const iframes = document.querySelectorAll('iframe');
+                            for (const iframe of iframes) {{
+                                if (iframe.name === '{iframe_hint}' ||
+                                    iframe.src.includes('{iframe_hint}') ||
+                                    iframe.id === '{iframe_hint}' ||
+                                    (iframe.title && iframe.title.includes('{iframe_hint}'))) {{
+                                    const bbox = iframe.getBoundingClientRect();
+                                    return {{ left: bbox.left, top: bbox.top }};
+                                }}
+                            }}
+                            return null;
+                        }}
+                    """)
+                    if iframe_bbox:
+                        x_ajustado = int(x - iframe_bbox['left'])
+                        y_ajustado = int(y - iframe_bbox['top'])
+                        logger.info(f"   [Coords Capturadas] Coordenadas ajustadas para iframe: ({x}, {y}) -> ({x_ajustado}, {y_ajustado})")
+                    
+                    # Obter elemento no iframe
+                    elemento_info = await contexto.evaluate("""
+                        ([x, y]) => {
+                            const el = document.elementFromPoint(x, y);
+                            if (!el) return null;
+                            return {
+                                tagName: el.tagName,
+                                innerText: el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || ''
+                            };
+                        }
+                    """, [x_ajustado, y_ajustado])
+                except Exception as exc_frame:
+                    logger.warning(f"   [Coords Capturadas] Erro ao usar iframe_hint - fallback para detecção automática: {exc_frame}")
+                    # Fallback para detecção automática
+                    elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
+                        await _resolver_elemento_em_iframe(page, x, y)
+            else:
+                logger.info(f"   [Coords Capturadas] iframe_hint não resolveu para Frame - usando detecção automática")
+                # Fallback para detecção automática
+                elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
+                    await _resolver_elemento_em_iframe(page, x, y)
+        else:
+            logger.info(f"   [Coords Capturadas] Detecção automática de iframe ativada")
+            # Detecção automática de iframe
+            elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
+                await _resolver_elemento_em_iframe(page, x, y)
+        
+        # Fail-open: iframe cross-origin
+        if is_cross_origin:
+            logger.warning(f"   [Coords Capturadas] Iframe cross-origin detectado - fail-open aplicado")
+            return (True, True)
+        
+        # Verificar identidade
+        if elemento_info and elemento_info.get('innerText'):
+            texto_elemento = elemento_info['innerText']
+            if label_curto.strip().lower() in texto_elemento.strip().lower():
+                return (True, False)  # Identidade confirmada
+            else:
+                logger.warning(
+                    f"   [Coords Capturadas] Identidade não confirmada: "
+                    f"esperado '{label_curto}', encontrado '{texto_elemento[:50]}' em ({x_ajustado}, {y_ajustado})"
+                )
+                return (False, False)  # Identidade NÃO confirmada
+        else:
+            # Fail-open: elemento sem texto
+            return (True, False)
+    
+    except Exception as exc_verify:
+        # Fail-open: exceção durante verificação
+        logger.warning(f"   [Coords Capturadas] Verificação de identidade falhou (fail-open): {exc_verify}")
+        return (True, False)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -1017,18 +1769,60 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     html_hint:       str           = alvo.get("html_hint", "")
     coords_relativas: Optional[dict] = alvo.get("coordenadas_relativas")
 
+    # ── Atalho: item de menu de contexto ─────────────────────────────────────
+    # Quando is_context_menu_item=True, a ação é um item do menu de contexto
+    # que foi aberto por um clique_direito anterior. Vai direto para o menu
+    # sem passar pelas camadas normais (Brain, Sniper, Coords, etc.).
+    if acao_tec.get("is_context_menu_item"):
+        logger.info(f"\n   Executando (menu de contexto): {intencao[:80]}")
+        # Aguarda a animação de entrada do ngx-contextmenu (CDK overlay tem fade-in)
+        await asyncio.sleep(0.3)
+        menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint, timeout_ms=2000)
+        if menu_locator is not None:
+            seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page)
+            if seletor_usado:
+                _registrar_sucesso_cache(intencao, seletor=seletor_usado, iframe=iframe_hint)
+                _registrar_telemetria("0.5_menu_ctx", True)
+                _registrar_estrategia_vencedora(intencao, "0.5_menu_ctx")
+                logger.info(f"   [Menu-CTX] Clicou em '{label_curto}' via '{seletor_usado}'")
+                return True
+            else:
+                logger.warning(f"   [Menu-CTX] Menu ativo mas '{label_curto}' não encontrado no escopo")
+                _registrar_telemetria("0.5_menu_ctx", False)
+        else:
+            logger.warning(f"   [Menu-CTX] is_context_menu_item=True mas menu não detectado")
+            _registrar_telemetria("0.5_menu_ctx", False)
+        # IMPORTANTE: não escala para Sniper/Coords — qualquer clique fora do menu
+        # fecha o overlay CDK. Retorna falha para que o executor possa reportar.
+        _registrar_falha_cache(intencao)
+        _registrar_telemetria("falha_total", False)
+        logger.error(f"   [FALHA TOTAL] Menu de contexto não encontrado para: '{label_curto}'")
+        return False
+
+    # ── Guard: intenção vazia desativa o Brain ────────────────────────────────
+    _intencao_valida = bool(intencao and intencao.strip())
+    if not _intencao_valida:
+        intencao = f"clique em '{label_curto}'" if label_curto else "Acao na interface"
+        logger.debug(
+            f"   [Brain] intencao_semantica vazia — Brain desativado para esta ação. "
+            f"Usando label_curto como proxy: '{label_curto}'"
+        )
+
     logger.info(f"\n   Executando: {intencao[:80]}")
     scroll_y = await _scroll_para_area_esperada(page, coords_relativas)
 
-    # ── 0. BRAIN (Memoria SQLite de longo prazo) ──────────────────────────────
+    # ── Camada 0: Brain (Memória SQLite permanente) ──────────────────────────
+    # Ativada apenas quando intencao_semantica está preenchida. Consulta memória
+    # de longo prazo para reutilizar seletores ou coordenadas que funcionaram em
+    # execuções anteriores (zero-touch).
     # [BUG-3] FIX: flag impede double-registration de falha
     brain_registrou_falha = False
-    cache = _consultar_cache(intencao)
+    cache = _consultar_cache(intencao) if _intencao_valida else None
     if cache:
         if cache.seletor:
             # [CTX-MENU] Consciência de overlay: se menu de contexto ativo e seletor
             # não aponta para dentro de um menu, pular Brain e deixar camada 0.5 tratar.
-            _menu_ativo_check = await _detectar_menu_contexto_ativo(page)
+            _menu_ativo_check = await _detectar_menu_contexto_ativo(page, iframe_hint)
             _seletor_aponta_menu = any(
                 p in (cache.seletor or "")
                 for p in (".p-contextmenu", "[role='menu']", ".context-menu", "p-menu", "menuitem")
@@ -1048,6 +1842,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 if await _tentar_candidato(page, cand_cache, acao, valor):
                     _registrar_sucesso_cache(intencao)
                     _registrar_telemetria("0_brain", True)
+                    _registrar_estrategia_vencedora(intencao, "0_brain")
                     return True
                 else:
                     _registrar_falha_cache(intencao)
@@ -1057,19 +1852,23 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if await _clicar_por_coordenadas(page, cache.coords, acao, valor):
                 _registrar_sucesso_cache(intencao)
                 _registrar_telemetria("0_brain_coords", True)
+                _registrar_estrategia_vencedora(intencao, "0_brain_coords")
                 return True
             else:
                 _registrar_falha_cache(intencao)
                 _registrar_telemetria("0_brain_coords", False)
                 brain_registrou_falha = True
 
-    # ── Camada 0.5: Menu de contexto ativo ──────────────────────────────────
-    menu_locator = await _detectar_menu_contexto_ativo(page)
+    # ── Camada 0.5: Menu de contexto ativo ───────────────────────────────────
+    # Ativada quando um overlay de menu de contexto está visível na página.
+    # Escopa a busca dentro do menu para evitar cliques fora do overlay.
+    menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint)
     if menu_locator is not None:
-        seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto)
+        seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page)
         if seletor_usado:
             _registrar_sucesso_cache(intencao, seletor_usado)
             _registrar_telemetria("0.5_menu_ctx", True)
+            _registrar_estrategia_vencedora(intencao, "0.5_menu_ctx")
             logger.info(f"[MENU-CTX] Clicou em '{label_curto}' dentro do menu de contexto via '{seletor_usado}'")
             return True
         else:
@@ -1097,16 +1896,20 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         logger.info("[MENU-CTX] Gemini Vision resolveu o item de menu.")
                         _registrar_sucesso_cache(intencao, coords=coords_ia)
                         _registrar_telemetria("5_gemini_vision", True)
+                        _registrar_estrategia_vencedora(intencao, "5_gemini_vision")
                         return True
             _registrar_telemetria("0.5_menu_ctx", False)
             return False
 
-    # ── 1. Foco Nativo (exclusivo para inputs) ────────────────────────────────
+    # ── Camada 1: Foco nativo / active element ───────────────────────────────
+    # Ativada para ações de digitação. Verifica se o cursor já está posicionado
+    # em um campo editável (inline edit, nova pasta, etc.) sem precisar localizar.
     if acao in ("digitar_e_enter", "preencher_campo"):
         logger.info("   [Foco Nativo] Verificando se cursor ja esta posicionado...")
         if await _digitar_no_active_element(page, acao, valor):
             logger.info("   [Foco Nativo] Texto inserido no campo ja focado!")
             _registrar_telemetria("1_foco_nativo", True)
+            _registrar_estrategia_vencedora(intencao, "1_foco_nativo")
             return True
 
         logger.info("   [Foco Nativo] Buscando div contenteditable generica...")
@@ -1116,11 +1919,14 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             if await loc_edit.count() > 0 and await loc_edit.first.is_visible():
                 await _executar_acao(loc_edit.first, page, acao, valor)
                 _registrar_telemetria("1_foco_nativo", True)
+                _registrar_estrategia_vencedora(intencao, "1_foco_nativo")
                 return True
         except Exception:
             pass
 
-    # ── 1.5. HEURISTICAS SENIOR X (icones mudos) ─────────────────────────────
+    # ── Camada 1.5: Heurísticas Senior X ─────────────────────────────────────
+    # Ativada para ícones mudos (Home, Lixeira, etc.) sem label semântico.
+    # Usa seletores específicos do Senior X para ícones conhecidos.
     is_tag_generica = label_curto.lower() in _TAGS_FRAGEIS
     if is_tag_generica or not label_curto:
         intencao_low          = intencao.lower()
@@ -1144,29 +1950,192 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         logger.info("   [Heuristica] Icone Home atingido com sucesso.")
                         _registrar_sucesso_cache(intencao, seletor=sel, iframe=iframe_hint)
                         _registrar_telemetria("1.5_heuristica_seniorx", True)
+                        _registrar_estrategia_vencedora(intencao, "1.5_heuristica_seniorx")
                         return True
                 except Exception:
                     pass
 
+    # Captura screenshot uma vez para Template_Matcher e Gemini Vision
+    screenshot_atual_tm: Optional[bytes] = None
+    try:
+        screenshot_atual_tm = await page.screenshot(type="jpeg", quality=60, full_page=False)
+    except Exception as exc:
+        logger.warning(f"   [Screenshot] Falha ao capturar screenshot para Template_Matcher: {exc}")
+
+    # ── Camada 1_T: Template Matching visual ─────────────────────────────────
+    # Ativada quando screenshot_elemento está disponível no roteiro.
+    # Compara imagem de referência com tela atual via NCC (sem OpenCV).
+    # Acionada ANTES do Sniper e das Coordenadas — mais confiável que posição absoluta.
+    screenshot_elemento_path = alvo.get("screenshot_elemento")
+    if screenshot_elemento_path and screenshot_atual_tm is not None:
+        try:
+            ref_bytes = _resolver_screenshot_ref_tm(screenshot_elemento_path)
+            if ref_bytes:
+                vp = page.viewport_size or {"width": 1920, "height": 1080}
+                resultado_tm = template_match(
+                    referencia=ref_bytes,
+                    tela_atual=screenshot_atual_tm,
+                    coords_relativas=coords_relativas,
+                    viewport=vp,
+                    threshold=0.80,
+                )
+                if resultado_tm:
+                    coords_tm = {"x": resultado_tm["x"], "y": resultado_tm["y"]}
+                    if await _clicar_por_coordenadas(page, coords_tm, acao, valor):
+                        logger.info(f"   [TemplateMatcher] Clique em {coords_tm} bem-sucedido (score={resultado_tm['score']:.3f}).")
+                        _registrar_telemetria("1_template_matching", True, intencao)
+                        _registrar_estrategia_vencedora(intencao, "1_template_matching")
+                        return True
+                _registrar_telemetria("1_template_matching", False, intencao)
+        except Exception as exc:
+            logger.warning(f"   [TemplateMatcher] Erro na camada 1_T: {exc}")
+
     # ── Gera candidatos ───────────────────────────────────────────────────────
     candidatos = _gerar_candidatos(seletor_hint, label_curto, iframe_hint, acao, tipo_elemento, html_hint)
 
-    # ── 2. Sniper Semantico ───────────────────────────────────────────────────
+    # ── Camada 2_S: Sniper Semântico ─────────────────────────────────────────
+    # Ativada sempre. Tenta 15+ seletores Playwright nativos (getByRole, getByLabel,
+    # getByPlaceholder, getByTitle, text=, aria-label, data-testid, etc.).
+    # Acionada ANTES das Coordenadas — seletores semânticos são mais resilientes
+    # a mudanças de layout do que posições absolutas.
+    # ── 2_sniper. Sniper Semantico ────────────────────────────────────────────
     if candidatos:
         logger.info(f"   [Sniper] {len(candidatos)} candidatos para '{label_curto}'...")
         for cand in candidatos:
-            if await _tentar_candidato(page, cand, acao, valor):
-                logger.info(f"   [Sniper] Acerto: {cand.descricao}")
-                # [BUG-2] FIX: passa apenas cand.seletor (None quando vazio, nao cand.descricao)
-                _registrar_sucesso_cache(
-                    intencao,
-                    seletor=cand.seletor if cand.seletor else None,
-                    iframe=iframe_hint,
+            _t0 = time.monotonic()
+            
+            # [FIX] Identificar candidatos de texto (exato ou parcial) que requerem verificação de identidade
+            is_candidato_texto = (
+                cand.seletor and 
+                (cand.seletor.startswith("text=") or (cand.via_pierce and "text=" in cand.seletor))
+            )
+            
+            if is_candidato_texto and label_curto:
+                # Candidato de texto (exato ou parcial) — aplicar verificação de identidade
+                logger.debug(f"   [Sniper] Candidato texto detectado: {cand.descricao}")
+                try:
+                    ctx = await _resolver_contexto(page, cand.iframe_hint)
+                    # Extrair o texto do seletor "text=..." e usar get_by_text
+                    texto = cand.seletor[5:].strip('"').strip("'")  # Remove "text=" prefix
+                    locator = ctx.get_by_text(texto, exact=cand.exact).first
+                    # Verificar se o elemento está visível antes de verificar identidade
+                    await locator.wait_for(state="visible", timeout=800)
+                    # Verificar identidade: exigir correspondência exata do label_curto
+                    try:
+                        texto_elemento = await locator.inner_text(timeout=1000)
+                        # Normalizar: strip e lowercase
+                        texto_elem_norm = texto_elemento.strip().lower()
+                        label_norm = label_curto.strip().lower()
+                        # Aceitar APENAS se o texto do elemento É exatamente o label_curto (após normalização)
+                        # Não aceitar substring parcial ou word boundary — apenas match exato
+                        identidade_ok = (texto_elem_norm == label_norm)
+                    except Exception as exc_inner:
+                        # Fail-open: se não conseguir ler o texto, aceitar
+                        identidade_ok = True
+                    
+                    if not identidade_ok:
+                        _elapsed_ms = (time.monotonic() - _t0) * 1000
+                        logger.debug(
+                            f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — "
+                            f"miss (identidade não confirmada: '{texto_elemento[:50]}' != '{label_curto}')"
+                        )
+                        continue  # Rejeitar candidato e tentar o próximo
+                    # Identidade confirmada — executar ação
+                    await _executar_acao(locator, page, acao, valor)
+                    _elapsed_ms = (time.monotonic() - _t0) * 1000
+                    logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — OK (identidade confirmada)")
+                    logger.info(f"   [Sniper] Acerto: {cand.descricao}")
+                    logger.warning(
+                        f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_sniper' (texto parcial) — "
+                        f"verifique se o elemento correto foi atingido."
+                    )
+                    _registrar_sucesso_cache(
+                        intencao,
+                        seletor=cand.seletor if cand.seletor else None,
+                        iframe=iframe_hint,
+                    )
+                    _registrar_telemetria("2_sniper", True)
+                    _registrar_estrategia_vencedora(intencao, "2_sniper")
+                    return True
+                except Exception as exc_sniper:
+                    _elapsed_ms = (time.monotonic() - _t0) * 1000
+                    logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — miss ({exc_sniper})")
+                    continue
+            else:
+                # Candidato de alta confiança (aria-label exato, data-testid, role+name, etc.) — sem verificação adicional
+                # Candidatos aria-label e data-testid recebem timeout maior (2000ms) pois são seletores
+                # semânticos confiáveis que podem precisar de mais tempo em SPAs com renderização assíncrona.
+                _is_alta_confianca = cand.seletor and any(
+                    p in cand.seletor for p in ("[aria-label=", "[data-testid=", "[id=", "[name=")
                 )
-                _registrar_telemetria("2_sniper", True)
-                return True
+                _timeout_cand = 2000 if _is_alta_confianca else 800
+                _acertou = await _tentar_candidato(page, cand, acao, valor, timeout_ms=_timeout_cand)
+                _elapsed_ms = (time.monotonic() - _t0) * 1000
+                logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — {'OK' if _acertou else 'miss'}")
+                if _acertou:
+                    logger.info(f"   [Sniper] Acerto: {cand.descricao}")
+                    # [BUG-2] FIX: passa apenas cand.seletor (None quando vazio, nao cand.descricao)
+                    _registrar_sucesso_cache(
+                        intencao,
+                        seletor=cand.seletor if cand.seletor else None,
+                        iframe=iframe_hint,
+                    )
+                    _registrar_telemetria("2_sniper", True)
+                    _registrar_estrategia_vencedora(intencao, "2_sniper")
+                    return True
 
-    # ── 3. Seletor Hint Original ──────────────────────────────────────────────
+    # ── 2. Coordenadas Capturadas (gravação original) ────────────────────────
+    # Acionada APÓS o Sniper Semântico — coordenadas são menos confiáveis que
+    # seletores semânticos pois dependem de layout estável. Usada como fallback
+    # quando nenhum seletor semântico funcionou.
+    #
+    # [FIX] Bug de timing corrigido: Agora verifica identidade ANTES de clicar.
+    # Ordem correta: (1) calcular coords → (2) verificar identidade → (3) clicar se OK
+    if coords_relativas and coords_relativas.get("x_pct"):
+        logger.info("   [Coords Capturadas] Tentando coordenadas relativas da gravação...")
+        try:
+            # Calcular coordenadas absolutas
+            vp = page.viewport_size or {"width": 1920, "height": 1080}
+            x = int(coords_relativas["x_pct"] * vp["width"])
+            y = int(coords_relativas["y_pct"] * vp["height"])
+            
+            # [FIX] Verificar identidade ANTES de executar o clique
+            identidade_confirmada, is_cross_origin = await _verificar_identidade_por_coordenadas(
+                page, x, y, label_curto, iframe_hint
+            )
+            
+            if identidade_confirmada:
+                # Identidade confirmada (ou fail-open aplicado) - executar clique
+                if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
+                    logger.info(f"   [Coords Capturadas] Clique em ({x}, {y}) bem-sucedido.")
+                    if is_cross_origin:
+                        logger.warning(
+                            f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' "
+                            f"(iframe cross-origin - fail-open aplicado)"
+                        )
+                    else:
+                        logger.warning(
+                            f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' — "
+                            f"verifique se o elemento correto foi atingido."
+                        )
+                    _registrar_telemetria("2_coords_capturadas", True)
+                    _registrar_estrategia_vencedora(intencao, "2_coords_capturadas")
+                    return True
+                else:
+                    # Clique falhou
+                    logger.warning(f"   [Coords Capturadas] Clique falhou em ({x}, {y})")
+            else:
+                # Identidade NÃO confirmada - escalar para próxima camada
+                logger.info("   [Coords Capturadas] Escalando para próxima camada (identidade não confirmada).")
+        
+        except Exception as exc:
+            logger.warning(f"   [Coords Capturadas] Falhou: {exc}")
+        
+        _registrar_telemetria("2_coords_capturadas", False)
+
+    # ── Camada 3: Seletor hint original ──────────────────────────────────────
+    # Ativada quando o seletor hint não é frágil (não é tag genérica, não é posicional).
+    # Usa o seletor CSS capturado na gravação original como última tentativa semântica.
     if seletor_hint and not _e_seletor_fragil(seletor_hint):
         # Verificação de identidade para seletores posicionais (fix bug item errado)
         if _contem_indice_posicional(seletor_hint) and label_curto and not is_tag_generica:
@@ -1184,6 +2153,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
                     _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
                     _registrar_telemetria("3_hint_original", True)
+                    _registrar_estrategia_vencedora(intencao, "3_hint_original")
                     return True
         else:
             cand_hint = TentativaLocalizacao(
@@ -1194,24 +2164,34 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
                 _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
                 _registrar_telemetria("3_hint_original", True)
+                _registrar_estrategia_vencedora(intencao, "3_hint_original")
                 return True
 
-    # ── 4. Busca Profunda em Todos os Frames ──────────────────────────────────
+    # ── Camada 4: Busca em todos os frames ───────────────────────────────────
+    # Ativada quando o elemento pode estar em um iframe não identificado pelo hint.
+    # Itera por todos os frames filhos da página sem depender do iframe_hint.
     if candidatos:
         logger.info("   [Todos os Frames] Procurando o elemento em frames filhos...")
         frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
         if frame_url:
             _registrar_sucesso_cache(intencao, iframe=frame_url)
             _registrar_telemetria("4_todos_frames", True)
+            _registrar_estrategia_vencedora(intencao, "4_todos_frames")
             return True
 
-    # ── 5. Gemini Vision (Self-Healing Supremo) ───────────────────────────────
+    # ── Camada 5: Gemini Vision (Self-Healing supremo) ───────────────────────
+    # Ativada como último recurso quando todas as camadas anteriores falharam.
+    # Envia screenshot atual + referência da gravação para o Gemini localizar o elemento.
+    # Custo: latência + tokens de API. Reutiliza screenshot já capturado para 1_T.
     logger.info("   [Vision] DOM esgotado. Acionando Gemini Visual...")
-    try:
-        screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
-    except Exception as exc:
-        logger.warning(f"Screenshot falhou antes do Gemini: {exc}")
-        screenshot_atual = None
+    # Reutiliza screenshot já capturado para Template_Matcher (evita captura dupla)
+    screenshot_atual = screenshot_atual_tm
+    if screenshot_atual is None:
+        try:
+            screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
+        except Exception as exc:
+            logger.warning(f"Screenshot falhou antes do Gemini: {exc}")
+            screenshot_atual = None
 
     if screenshot_atual:
         vp       = page.viewport_size or {"width": 1920, "height": 1080}
@@ -1253,26 +2233,20 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     except Exception:
                         _registrar_sucesso_cache(intencao, coords=coords_ia)
                     _registrar_telemetria("5_gemini_vision", True)
+                    _registrar_estrategia_vencedora(intencao, "5_gemini_vision")
                     return True
-
-    # ── 6. Fallback Cego (Coordenadas Relativas Originais) ───────────────────
-    if coords_relativas and coords_relativas.get("x_pct"):
-        logger.info("   [Fallback Final] Coordenadas da gravacao original...")
-        try:
-            vp = page.viewport_size or {"width": 1920, "height": 1080}
-            x  = int(coords_relativas["x_pct"] * vp["width"])
-            y  = int(coords_relativas["y_pct"] * vp["height"])
-            if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
-                logger.info(f"   [Fallback Final] Clique em ({x}, {y}) executado.")
-                _registrar_telemetria("6_coords_originais", True)
-                return True
-        except Exception as exc:
-            logger.warning(f"Fallback de coordenadas falhou: {exc}")
 
     # ── Falha Total ───────────────────────────────────────────────────────────
     # [BUG-3] FIX: registra falha apenas se o Brain nao registrou uma neste ciclo
     if not brain_registrou_falha:
         _registrar_falha_cache(intencao)
     _registrar_telemetria("falha_total", False)
+    # Verifica taxa de HITL da última hora e emite alerta se > 20% (Req 9.1, 9.2, 9.5)
+    _taxa_hitl = _calcular_taxa_hitl_1h()
+    if _taxa_hitl is not None and _taxa_hitl > 0.20:
+        logger.warning(
+            f"[HITL] Taxa de intervenção manual elevada na última hora: "
+            f"{_taxa_hitl:.1%} — verifique o Vision Engine."
+        )
     logger.error(f"   [FALHA TOTAL] Impossivel executar: '{intencao[:70]}'")
     return False

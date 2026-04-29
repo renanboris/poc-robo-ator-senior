@@ -100,6 +100,7 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                     "alerta": alerta,
                     "audio_id": f"{id_p}_ancora",
                     "imagem_b64": img_ancora,
+                    "ramificacoes": passo.get("ramificacoes", []),
                 })
 
             for i, acao in enumerate(passo.get("acoes_tecnicas", [])):
@@ -129,10 +130,11 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                     "y_pct": coords.get("y_pct", 0.5),
                     "w_pct": coords.get("w_pct", 0.05),
                     "h_pct": coords.get("h_pct", 0.05),
+                    "ramificacoes": passo.get("ramificacoes", []),
                 })
 
         slides_json = json.dumps(slides, ensure_ascii=False)
-        html_content = _gerar_player_html(nome_aula_raw, slides_json)
+        html_content = _gerar_player_html(nome_aula_raw, slides_json, id_treino)
         with open(temp_dir / "index.html", "w", encoding="utf-8") as f:
             f.write(html_content)
 
@@ -153,7 +155,7 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
 
 
 
-def _gerar_player_html(titulo: str, slides_json: str) -> str:
+def _gerar_player_html(titulo: str, slides_json: str, roteiro_id: str = "") -> str:
     html = """<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -182,7 +184,20 @@ var scorm = {
   }
 };
 window.onload = function() { scorm.init(); mostrarIntro(); };
-window.onunload = function() { scorm.finish(scorm.score); };
+window.onunload = function() {
+  scorm.finish(scorm.score);
+  if (typeof cur !== "undefined" && cur < slides.length) {
+    const payload = {
+      roteiro_id: typeof _ROTEIRO_ID !== "undefined" ? _ROTEIRO_ID : "desconhecido",
+      passo_id: (typeof slides !== "undefined" && slides[cur]) ? slides[cur].scene_id : null,
+      evento: "abandonou"
+    };
+    navigator.sendBeacon && navigator.sendBeacon(
+      "/api/analytics/evento",
+      new Blob([JSON.stringify(payload)], {type: "application/json"})
+    );
+  }
+};
 document.addEventListener("contextmenu", e => e.preventDefault());
 </script>
 <style>
@@ -540,8 +555,37 @@ body, html {
 <script>
 (function() {
   const slides = __SLIDES__;
+  const _ROTEIRO_ID = "__ROTEIRO_ID__";
   let cur = 0, acertos = 0, erros = 0, hintTimer = null;
   let audioAtual = null;
+  let _stepStartTs = 0;
+  const _stepErros = {};
+
+  function _emitirEvento(evento, passoId) {
+    const payload = {
+      roteiro_id: _ROTEIRO_ID || "desconhecido",
+      passo_id: passoId || null,
+      evento: evento
+    };
+    try {
+      fetch("/api/analytics/evento", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(() => {
+        navigator.sendBeacon && navigator.sendBeacon(
+          "/api/analytics/evento",
+          new Blob([JSON.stringify(payload)], {type: "application/json"})
+        );
+      });
+    } catch(e) {
+      navigator.sendBeacon && navigator.sendBeacon(
+        "/api/analytics/evento",
+        new Blob([JSON.stringify(payload)], {type: "application/json"})
+      );
+    }
+  }
 
   function tocarAudio(audioId) {
     if (!audioId) return;
@@ -643,6 +687,9 @@ body, html {
     btn.style.display = "none"; btn.className = "izone";
     inp.style.display = "none"; inp.className = "izone"; inp.value = "";
 
+    // Registra timestamp de início do passo para avaliação de ramificações
+    _stepStartTs = Date.now();
+
     if (index >= slides.length) {
       document.getElementById("story-panel").style.display = "none";
       document.getElementById("container").style.display = "none";
@@ -650,6 +697,8 @@ body, html {
       const total = slides.filter(s => s.tipo === "interacao").length;
       const pct = total ? Math.round((acertos / total) * 100) : 100;
       scorm.score = pct;
+
+      _emitirEvento("completou", null);
 
       document.getElementById("score-ring-inner").textContent = pct + "%";
       document.getElementById("score-detail").textContent =
@@ -818,14 +867,43 @@ body, html {
     // Garante que acertos nunca ultrapasse o total de interações
     const totalInteracoes = slides.filter(s => s.tipo === "interacao").length;
     if (acertos > totalInteracoes) acertos = totalInteracoes;
+    _emitirEvento("completou_passo", slides[cur] ? slides[cur].scene_id : null);
     esconderCallout();
     clearTimeout(hintTimer);
     document.getElementById("story-alert").style.display = "none";
     el.classList.remove("hint-active");
     el.classList.add("success-glow");
 
+    // Avalia ramificações adaptativas antes de avançar linearmente
+    const slideAtual = slides[cur];
+    let proximoIndex = cur + 1;
+
+    if (slideAtual && slideAtual.ramificacoes && slideAtual.ramificacoes.length > 0) {
+      const tempoDecorrido = (Date.now() - _stepStartTs) / 1000;
+      const sceneId = slideAtual.scene_id;
+      const errosNoPasso = _stepErros[sceneId] || 0;
+
+      for (const ram of slideAtual.ramificacoes) {
+        let condicaoSatisfeita = false;
+        if (ram.condicao === "completou_em_menos_de") {
+          condicaoSatisfeita = tempoDecorrido < ram.valor;
+        } else if (ram.condicao === "errou_mais_de") {
+          condicaoSatisfeita = errosNoPasso > ram.valor;
+        }
+
+        if (condicaoSatisfeita) {
+          // Busca o índice do slide com scene_id == ir_para_passo
+          const idxDestino = slides.findIndex(s => s.scene_id === ram.ir_para_passo);
+          if (idxDestino !== -1) {
+            proximoIndex = idxDestino;
+          }
+          break;
+        }
+      }
+    }
+
     setTimeout(() => {
-      cur++;
+      cur = proximoIndex;
       mostrar(cur);
     }, 420);
   }
@@ -833,6 +911,11 @@ body, html {
   function errouClique() {
     if (slides[cur] && slides[cur].tipo !== "interacao") return;
     erros++;
+    // Contabiliza erros por passo para avaliação de ramificações
+    const sceneId = slides[cur] ? slides[cur].scene_id : null;
+    if (sceneId !== null) {
+      _stepErros[sceneId] = (_stepErros[sceneId] || 0) + 1;
+    }
     const mask = document.getElementById("error-mask");
     const pill = document.getElementById("error-pill");
     mask.classList.add("error-flash");
@@ -848,6 +931,7 @@ body, html {
       if (e.button === 0 || e.button === 2) errouClique();
     });
     mostrar(0);
+    _emitirEvento("iniciou", null);
   };
 
   window.ir = function(delta) {
@@ -878,7 +962,7 @@ body, html {
 </script>
 </body>
 </html>"""
-    return html.replace("__TITLE__", titulo).replace("__SLIDES__", slides_json)
+    return html.replace("__TITLE__", titulo).replace("__SLIDES__", slides_json).replace("__ROTEIRO_ID__", roteiro_id)
 
 
 if __name__ == "__main__":

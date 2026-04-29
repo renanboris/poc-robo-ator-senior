@@ -1,0 +1,4 @@
+# file: C:\GenUCS\utils.py
+# hypothesis_version: 6.151.10
+
+[0.5, 0.7, '#1a1a1a', '%Y%m%d_%H%M%S_%f', '%Y-%m-%d %H:%M:%S', ',', '-', '.json.tmp', 'ASCII', 'JPEG', 'NFKD', 'RGB', '[\\\\/*?:"<>|]', '_', 'acao', 'acoes_tecnicas', 'ancora', 'baixa', 'concluir_video', 'confianca_captura', 'de-DE', 'de-DE-KatjaNeural', 'elemento_alvo', 'en-GB', 'en-GB-SoniaNeural', 'en-US', 'en-US-JennyNeural', 'es-ES', 'es-ES-ElviraNeural', 'es-MX', 'es-MX-DaliaNeural', 'fr-FR', 'fr-FR-DeniseNeural', 'h', 'ignore', 'is_conclusao', 'it-IT', 'it-IT-ElsaNeural', 'ja-JP', 'ja-JP-NanamiNeural', 'passos', 'pedagogia', 'pt-BR', 'pt-PT', 'pt-PT-RaquelNeural', 'r', 'seletor_hint', 'utf-8', 'w', 'x', 'y', 'zh-CN', 'zh-CN-XiaoxiaoNeural']

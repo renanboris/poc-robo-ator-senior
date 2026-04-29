@@ -1,0 +1,4 @@
+# file: C:\GenUCS\skill_models.py
+# hypothesis_version: 6.151.10
+
+[0.0, 1.0, 'business_entity', 'component_family', 'created_at', 'dual_shadow', 'expected_effect', 'hitl_promoted', 'last_seen', 'legacy_import', 'original_event_id', 'pattern', 'promoted_skill', 'raw_shadow', 'reviewed_shadow', 'runtime_learning', 'screen_family', 'selector', 'semantic_action', 'skill_candidate', 'skill_id', 'skill_name', 'source_file', 'unknown']

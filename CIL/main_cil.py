@@ -53,8 +53,8 @@ logger = logging.getLogger(__name__)
 
 # ── Configuração ────────────────────────────────────────────────
 SENIOR_URL   = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-SENIOR_USER  = os.getenv("SENIOR_USER")
-SENIOR_PASS  = os.getenv("SENIOR_PASS")
+SENIOR_USER  = os.getenv("SENIOR_USER_EXECUTE")
+SENIOR_PASS  = os.getenv("SENIOR_PASS_EXECUTE")
 MAX_PASSOS   = int(os.getenv("CIL_MAX_PASSOS", "20"))
 
 # Gemini
@@ -439,7 +439,7 @@ async def main():
         return
 
     if not SENIOR_USER or not SENIOR_PASS:
-        print("❌ Credenciais ausentes. Configure SENIOR_USER e SENIOR_PASS no .env")
+        print("❌ Credenciais ausentes. Configure SENIOR_USER_EXECUTE e SENIOR_PASS_EXECUTE no .env")
         return
 
     # Executa

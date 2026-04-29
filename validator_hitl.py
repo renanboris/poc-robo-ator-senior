@@ -12,12 +12,26 @@ Três níveis de pausa — cada um com cor e urgência diferentes:
   🟠 CHECKPOINT  — estado da tela NÃO BATE com o esperado APÓS um passo.
                    O Gemini Vision avalia o screenshot e sinaliza desvio.
                    O analista decide continuar, refazer ou pular.
+                   Quando o analista continua mesmo com desvio, a flag
+                   _desvio_anterior é propagada ao próximo passo para
+                   contextualizar possíveis falhas em cascata.
 
   🔴 FALHA DURA  — todas as 7 camadas do vision_engine falharam.
-                   O analista clica no elemento certo na tela.
+                   Três opções para o analista:
+                   • 🖱 Mostrar aqui — radar imediato (tela já está certa)
+                   • 🧭 Navegar e mostrar — analista navega até o estado
+                     correto e confirma antes de ativar o radar
+                   • ↩ Refazer passo anterior — volta ao passo que causou
+                     o desvio de estado e tenta corrigir a causa raiz
                    O seletor é capturado, salvo no Brain e o fluxo retoma.
+                   Screenshot de referência exibido quando disponível.
 
-Cada correção humana é salva no Brain DB (brain.db).
+Melhorias de confiança:
+  - Brain tem prioridade sobre confianca_captura na avaliação de nível
+  - Correções HITL atualizam score_engine além do brain.db
+  - Prompt do Gemini na captura tem critério explícito para confiança
+
+Cada correção humana é salva no Brain DB (brain.db) e em scores.db.
 Na próxima execução, o sistema já sabe onde está o elemento.
 
 Uso:
@@ -47,6 +61,7 @@ from vision_engine import (
     DB_PATH,
     MAX_FALHAS_CACHE,
 )
+import score_engine as _score_engine
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -95,23 +110,30 @@ def _nivel_confianca(acao_tec: dict) -> NivelConfianca:
     """
     Determina a confiança ANTES de tentar executar a ação.
     Combina: histórico no Brain + qualidade do seletor + confiança da captura.
+
+    ORDEM DE PRIORIDADE:
+    1. Brain com hits sólidos → ALTA (ignora confianca_captura)
+    2. Brain com seletor mas sem hits suficientes → MEDIA
+    3. confianca_captura == "baixa" → BAIXA (sem histórico no Brain)
+    4. Seletor frágil → BAIXA
+    5. Seletor semântico sem histórico → MEDIA
     """
     intencao  = acao_tec.get("intencao_semantica", "")
     alvo      = acao_tec.get("elemento_alvo", {})
     seletor   = alvo.get("seletor_hint", "") or alvo.get("seletor_css", "")
     conf_cap  = alvo.get("confianca_captura", "media")
 
-    # Captura original foi classificada como baixa pelo Gemini Vision
-    if conf_cap == "baixa":
-        return NivelConfianca.BAIXA
-
-    # Consulta Brain — memória de longo prazo
+    # Brain tem prioridade — se já aprendeu com hits sólidos, ignora confianca_captura
     if intencao:
         cache = _consultar_cache(intencao)
         if cache and cache.hits >= BRAIN_HITS_ALTA and cache.falhas_consecutivas == 0:
             return NivelConfianca.ALTA
         if cache and cache.seletor:
             return NivelConfianca.MEDIA
+
+    # Sem histórico no Brain — avalia confiança da captura original
+    if conf_cap == "baixa":
+        return NivelConfianca.BAIXA
 
     # Avalia qualidade do seletor
     if not seletor or _e_seletor_fragil(seletor):
@@ -396,6 +418,54 @@ async def _injetar_overlay(
     })
 
 
+# JS do botão flutuante "Pronto, estou na tela certa" — usado no modo "Navegar e mostrar"
+_JS_BOTAO_PRONTO = """
+() => {
+    document.getElementById('hitl-nav-pronto')?.remove();
+    const btn = document.createElement('button');
+    btn.id = 'hitl-nav-pronto';
+    btn.innerHTML = '✅ Pronto — estou na tela certa';
+    btn.style.cssText = `
+        position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+        z-index: 2147483647;
+        background: #22c55e; color: #000;
+        border: none; border-radius: 100px;
+        padding: 14px 32px; font-size: 15px; font-weight: 700;
+        cursor: pointer; font-family: 'Segoe UI', sans-serif;
+        box-shadow: 0 8px 24px rgba(34,197,94,0.5);
+        animation: hitl-pulse-green 1.8s ease infinite;
+    `;
+    const st = document.createElement('style');
+    st.id = 'hitl-nav-pronto-style';
+    st.innerHTML = `
+        @keyframes hitl-pulse-green {
+            0%,100% { box-shadow: 0 8px 24px rgba(34,197,94,0.5); }
+            50%      { box-shadow: 0 8px 32px rgba(34,197,94,0.85); transform: translateX(-50%) scale(1.03); }
+        }
+    `;
+    document.head.appendChild(st);
+    document.documentElement.appendChild(btn);
+    btn.addEventListener('click', () => {
+        btn.remove();
+        document.getElementById('hitl-nav-pronto-style')?.remove();
+        window.__hitl_captura__(JSON.stringify({ seletor: '', acao: 'nav_pronto' }));
+    });
+}
+"""
+
+
+async def _injetar_botao_pronto(page: Page) -> None:
+    """Injeta o botão flutuante verde 'Pronto — estou na tela certa'."""
+    await page.evaluate(_JS_BOTAO_PRONTO)
+
+
+async def _remover_botao_pronto(page: Page) -> None:
+    await page.evaluate("""() => {
+        document.getElementById('hitl-nav-pronto')?.remove();
+        document.getElementById('hitl-nav-pronto-style')?.remove();
+    }""")
+
+
 async def _remover_overlay(page: Page) -> None:
     await page.evaluate("""() => {
         document.getElementById('hitl-overlay')?.remove();
@@ -445,6 +515,10 @@ class HitlValidator:
         # Mapa intencao_semantica → seletor_corrigido
         # Usado ao final para reescrever o roteiro JSON
         self._correcoes_seletores: dict = {}
+        # Flag de desvio de estado — propagada do checkpoint para o próximo passo
+        self._desvio_anterior: bool = False
+        # Referência ao passo anterior — usada na Falha Dura para oferecer "Refazer"
+        self._passo_anterior: dict | None = None
 
     # ─── Setup da captura de clique humano ────────────────────────────────────
 
@@ -637,42 +711,133 @@ class HitlValidator:
 
     # ─── Pausa 🔴 FALHA DURA (todas as camadas falharam) ─────────────────────
 
-    async def _pausa_falha_dura(self, page: Page, acao_tec: dict) -> str:
+    async def _pausa_falha_dura(
+        self,
+        page: Page,
+        acao_tec: dict,
+        passo_anterior: dict | None = None,
+        desvio_anterior: bool = False,
+    ) -> str:
         """
-        Ativa o radar para o analista apontar o elemento correto.
-        Retorna: 'capturou' (com seletor salvo) | 'pular'
+        Oferece três caminhos ao analista quando todas as camadas falharam:
+
+          'mostrar_aqui'   — radar imediato (tela já está no estado certo)
+          'navegar'        — analista navega livremente e confirma com botão flutuante
+          'refazer_passo'  — volta ao passo anterior para corrigir a causa raiz
+          'pular'          — pula esta ação
+
+        Exibe screenshot de referência quando disponível.
+        Exibe aviso de desvio anterior quando desvio_anterior=True.
         """
         self._stats["intervencoes"] += 1
         alvo   = acao_tec.get("elemento_alvo", {})
         label  = alvo.get("label_curto", "?")
         intenc = acao_tec.get("intencao_semantica", "")[:80]
 
+        # Monta mensagem com contexto de desvio anterior
+        aviso_desvio = ""
+        if desvio_anterior:
+            aviso_desvio = (
+                '<div style="margin-bottom:10px;padding:8px 10px;'
+                'background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.4);'
+                'border-radius:8px;font-size:11px;color:#fdba74;line-height:1.4;">'
+                '⚠️ <b>Atenção:</b> o passo anterior teve desvio de estado. '
+                'Esta falha pode ser consequência disso — a tela pode estar diferente do esperado.'
+                '</div>'
+            )
+
+        # Monta miniatura da screenshot de referência se disponível
+        ref_img_html = ""
+        ref_b64 = alvo.get("screenshot_referencia")
+        if ref_b64:
+            ref_img_html = (
+                '<div style="margin-bottom:10px;">'
+                '<div style="font-size:10px;color:#64748b;font-weight:600;'
+                'text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">'
+                '📸 Como a tela deveria estar:</div>'
+                f'<img src="data:image/jpeg;base64,{ref_b64}" '
+                'style="width:100%;border-radius:6px;border:1px solid rgba(255,255,255,0.1);'
+                'opacity:0.85;" />'
+                '</div>'
+            )
+
+        mensagem = (
+            f'{aviso_desvio}'
+            f'{ref_img_html}'
+            f'Esgotei todas as tentativas para encontrar <b>"{label}"</b>.<br><br>'
+            f'Como você quer resolver?'
+        )
+
         await _injetar_overlay(
             page,
             TipoPausa.FALHA_DURA,
             titulo="Elemento Não Encontrado",
-            mensagem=(
-                f'Esgotei todas as tentativas para encontrar <b>"{label}"</b>.<br><br>'
-                f"Clique no elemento correto na tela para eu aprender onde ele está."
-            ),
-            instrucao="Clique no elemento certo — o Radar está ativo",
+            mensagem=mensagem,
+            instrucao="Escolha como continuar",
             nome_acao=intenc,
         )
 
-        await self._adicionar_botoes(page, [
-            {"label": "⏭ Pular esta ação", "acao": "pular", "estilo": "sec"},
-        ])
+        # Monta botões — "Refazer passo anterior" só aparece se há passo anterior
+        botoes = [
+            {"label": "🖱 Mostrar aqui",      "acao": "mostrar_aqui",  "estilo": "ok"},
+            {"label": "🧭 Navegar e mostrar", "acao": "navegar",       "estilo": "sec"},
+        ]
+        if passo_anterior is not None:
+            label_passo = passo_anterior.get("pedagogia", {}).get("tooltip_dap", "") or \
+                          f"Passo {passo_anterior.get('id_passo', '?')}"
+            botoes.append({
+                "label":  f"↩ Refazer: {label_passo[:30]}",
+                "acao":   "refazer_passo",
+                "estilo": "sec",
+            })
+        botoes.append({"label": "⏭ Pular esta ação", "acao": "pular", "estilo": "sec"})
 
-        await self._ativar_radar(page)
+        await self._adicionar_botoes(page, botoes)
+
         decisao = await self._aguardar_decisao()
+        acao    = decisao.get("acao", "pular")
+
+        if acao == "mostrar_aqui":
+            # Radar imediato — tela já está no estado certo
+            await self._ativar_radar(page)
+            decisao = await self._aguardar_decisao()
+            acao    = decisao.get("acao", "pular")
+
+        elif acao == "navegar":
+            # Remove overlay, injeta botão flutuante, aguarda confirmação do analista
+            await _remover_overlay(page)
+            await _injetar_botao_pronto(page)
+            print("   🧭 Modo navegação — aguardando analista confirmar tela certa...", flush=True)
+            decisao = await self._aguardar_decisao(timeout=TIMEOUT_HUMANO)
+            await _remover_botao_pronto(page)
+
+            if decisao.get("acao") == "nav_pronto":
+                # Analista confirmou — agora ativa o radar
+                await _injetar_overlay(
+                    page,
+                    TipoPausa.FALHA_DURA,
+                    titulo="Radar Ativo",
+                    mensagem=f'Agora clique no elemento correto para <b>"{label}"</b>.',
+                    instrucao="Clique no elemento certo — o Radar está ativo",
+                    nome_acao=intenc,
+                )
+                await self._adicionar_botoes(page, [
+                    {"label": "⏭ Pular esta ação", "acao": "pular", "estilo": "sec"},
+                ])
+                await self._ativar_radar(page)
+                decisao = await self._aguardar_decisao()
+                acao    = decisao.get("acao", "pular")
+            else:
+                acao = decisao.get("acao", "pular")
+
         await _remover_overlay(page)
-        return decisao.get("acao", "pular")
+        return acao  # 'capturou' | 'refazer_passo' | 'pular'
 
     # ─── Salva seletor capturado no Brain ─────────────────────────────────────
 
     def _salvar_correcao_no_brain(self, acao_tec: dict, seletor_capturado: str) -> None:
         """
-        Persiste o seletor ensinado pelo analista no Brain DB.
+        Persiste o seletor ensinado pelo analista no Brain DB e atualiza score_engine.
         Na próxima execução, o sistema vai direto nele (alta confiança).
         """
         if not seletor_capturado:
@@ -681,8 +846,21 @@ class HitlValidator:
         alvo     = acao_tec.get("elemento_alvo", {})
         iframe   = alvo.get("iframe_hint")
         if intencao:
+            # Atualiza brain.db — seletor aprendido pelo analista
             _registrar_sucesso_cache(intencao, seletor=seletor_capturado, iframe=iframe)
             logger.info(f"Brain atualizado: '{intencao[:60]}' → '{seletor_capturado}'")
+
+            # Atualiza scores.db — correção HITL equivale a execução bem-sucedida
+            # com confiança máxima (analista confirmou o elemento correto)
+            try:
+                _score_engine.registrar_execucao(
+                    intencao,
+                    sucesso=True,
+                    confianca_captura=1.0,
+                )
+            except Exception as e:
+                logger.warning(f"score_engine não atualizado (não crítico): {e}")
+
             self._stats["passos_corrigidos"] += 1
             # Guarda também no mapa in-memory para reescrita do JSON
             self._correcoes_seletores[intencao] = seletor_capturado
@@ -692,11 +870,11 @@ class HitlValidator:
     async def _fazer_login(self, page: Page) -> bool:
         SENIOR_URL = os.getenv("SENIOR_URL",
             "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-        usuario = os.getenv("SENIOR_USER")
-        senha   = os.getenv("SENIOR_PASS")
+        usuario = os.getenv("SENIOR_USER_EXECUTE")
+        senha   = os.getenv("SENIOR_PASS_EXECUTE")
 
         if not usuario or not senha:
-            print("ERRO: Credenciais ausentes no .env", flush=True)
+            print("ERRO: Credenciais de execução ausentes no .env (SENIOR_USER_EXECUTE / SENIOR_PASS_EXECUTE)", flush=True)
             return False
 
         try:
@@ -742,15 +920,25 @@ class HitlValidator:
 
     # ─── Executar uma ação técnica com HITL ───────────────────────────────────
 
-    async def _executar_acao_com_hitl(self, page: Page, acao_tec: dict) -> bool:
+    async def _executar_acao_com_hitl(
+        self,
+        page: Page,
+        acao_tec: dict,
+        passo_anterior: dict | None = None,
+        desvio_anterior: bool = False,
+    ) -> str:
         """
         Tenta executar uma ação usando vision_engine.
         Se confiança baixa → pausa preventiva (exceto em modo --silent).
-        Se falha total → pausa falha dura.
-        Retorna True se a ação foi executada (com ou sem correção humana).
+        Se falha total → pausa falha dura com opções de navegação e refazer.
+
+        Retorna:
+          'ok'            — ação executada com sucesso
+          'pulou'         — ação pulada pelo analista
+          'refazer_passo' — analista pediu para refazer o passo anterior
         """
         if acao_tec.get("acao") == "concluir_video":
-            return True
+            return "ok"
 
         silent = getattr(self, "_silent", False)
 
@@ -765,7 +953,7 @@ class HitlValidator:
 
             if resposta == "pular":
                 self._stats["acoes_puladas"] += 1
-                return False
+                return "pulou"
 
             if resposta == "capturou" and self._captura_seletor:
                 # Analista apontou o elemento certo — usa diretamente
@@ -775,19 +963,28 @@ class HitlValidator:
                     acao_corrigida["elemento_alvo"] = {}
                 acao_corrigida["elemento_alvo"]["seletor_hint"] = self._captura_seletor
                 sucesso = await encontrar_e_clicar(page, acao_corrigida)
-                return sucesso
+                return "ok" if sucesso else "pulou"
 
             # 'confirmar' → tenta normalmente
+
         # ── Execução via vision_engine (todas as 7 camadas) ──────────────────
         sucesso = await encontrar_e_clicar(page, acao_tec)
 
         # ── 🔴 Falha dura — todas as camadas esgotadas ───────────────────────
         if not sucesso:
-            resposta = await self._pausa_falha_dura(page, acao_tec)
+            resposta = await self._pausa_falha_dura(
+                page,
+                acao_tec,
+                passo_anterior=passo_anterior,
+                desvio_anterior=desvio_anterior,
+            )
 
             if resposta == "pular":
                 self._stats["acoes_puladas"] += 1
-                return False
+                return "pulou"
+
+            if resposta == "refazer_passo":
+                return "refazer_passo"
 
             if resposta == "capturou" and self._captura_seletor:
                 self._salvar_correcao_no_brain(acao_tec, self._captura_seletor)
@@ -797,36 +994,67 @@ class HitlValidator:
                 acao_corrigida["elemento_alvo"]["seletor_hint"] = self._captura_seletor
                 sucesso = await encontrar_e_clicar(page, acao_corrigida)
 
-        return sucesso
+        return "ok" if sucesso else "pulou"
 
     # ─── Executar um passo completo com checkpoint ────────────────────────────
 
-    async def _executar_passo(self, page: Page, passo: dict, idx: int, total: int) -> None:
+    async def _executar_passo(
+        self, page: Page, passo: dict, idx: int, total: int
+    ) -> str:
+        """
+        Executa um passo completo com checkpoint pós-execução.
+
+        Retorna:
+          'ok'            — passo concluído normalmente
+          'refazer_passo' — analista pediu para refazer este passo (sinaliza ao loop externo)
+        """
         id_p    = passo.get("id_passo", idx + 1)
         tooltip = passo.get("pedagogia", {}).get("tooltip_dap", "")
         ancora  = passo.get("pedagogia", {}).get("ancora",  "")
         acoes   = passo.get("acoes_tecnicas", [])
         is_fim  = passo.get("is_conclusao", False)
 
-        print(f"\n── Passo {id_p}/{total} {tooltip or ''}", flush=True)
+        # Aviso contextual quando o passo anterior teve desvio de estado
+        aviso_desvio = ""
+        if self._desvio_anterior:
+            aviso_desvio = " ⚠️ [desvio anterior]"
+
+        print(f"\n── Passo {id_p}/{total} {tooltip or ''}{aviso_desvio}", flush=True)
 
         if is_fim:
             print(f"   [CONCLUSÃO] {ancora[:80]}", flush=True)
             self._stats["passos_ok"] += 1
-            return
+            self._desvio_anterior = False
+            return "ok"
 
-        # Executa todas as ações do passo
+        # Executa todas as ações do passo, propagando contexto de desvio e passo anterior
+        pediu_refazer = False
         for acao_tec in acoes:
-            ok = await self._executar_acao_com_hitl(page, acao_tec)
-            label = acao_tec.get("elemento_alvo", {}).get("label_curto", "?")
-            status = "✅" if ok else "⏭"
+            resultado = await self._executar_acao_com_hitl(
+                page,
+                acao_tec,
+                passo_anterior=self._passo_anterior,
+                desvio_anterior=self._desvio_anterior,
+            )
+            label  = acao_tec.get("elemento_alvo", {}).get("label_curto", "?")
+            status = "✅" if resultado == "ok" else ("↩" if resultado == "refazer_passo" else "⏭")
             print(f"   {status} {acao_tec.get('acao','?')} → {label}", flush=True)
+
+            if resultado == "refazer_passo":
+                pediu_refazer = True
+                break  # interrompe as ações restantes deste passo
+
             await asyncio.sleep(0.6)
+
+        # Se o analista pediu refazer o passo anterior, sinaliza ao loop externo
+        if pediu_refazer:
+            self._desvio_anterior = False
+            return "refazer_passo"
 
         # ── 🟠 Checkpoint: valida estado após o passo ─────────────────────────
         # Em modo --silent, checkpoints são ignorados
         if CHECKPOINT_HABILITADO and tooltip and not getattr(self, "_silent", False):
-            # Fase 3.3: extrai screenshot de referência da última ação do passo
+            # Extrai screenshot de referência da última ação do passo
             screenshot_ref = None
             for acao_tec in reversed(acoes):
                 ref = (acao_tec.get("elemento_alvo") or {}).get("screenshot_referencia")
@@ -845,13 +1073,24 @@ class HitlValidator:
 
                 if decisao == "refazer":
                     print(f"   ↩ Refazendo passo {id_p}...", flush=True)
+                    self._desvio_anterior = False  # refazendo — limpa flag
                     for acao_tec in acoes:
                         await self._executar_acao_com_hitl(page, acao_tec)
                         await asyncio.sleep(0.6)
+                    # Após refazer, limpa desvio
+                    self._desvio_anterior = False
+                else:
+                    # Analista continuou mesmo com desvio — propaga flag ao próximo passo
+                    self._desvio_anterior = (decisao != "continuar" or not estado_ok)
             else:
                 print(f"   ✓ Checkpoint OK: {observacao}", flush=True)
+                self._desvio_anterior = False
+        else:
+            # Sem checkpoint — limpa flag de desvio
+            self._desvio_anterior = False
 
         self._stats["passos_ok"] += 1
+        return "ok"
 
     # ─── Ponto de entrada principal ───────────────────────────────────────────
 
@@ -938,10 +1177,30 @@ class HitlValidator:
             await page.keyboard.press("Escape")
             await asyncio.sleep(0.3)
 
-            # Executa os passos
-            for idx, passo in enumerate(passos):
-                await self._executar_passo(page, passo, idx, total)
+            # Executa os passos com suporte a refazer passo anterior
+            idx = 0
+            while idx < len(passos):
+                passo = passos[idx]
+                self._passo_anterior = passos[idx - 1] if idx > 0 else None
+
+                resultado = await self._executar_passo(page, passo, idx, total)
                 await asyncio.sleep(0.8)
+
+                if resultado == "refazer_passo" and idx > 0:
+                    # Volta ao passo anterior para corrigir a causa raiz
+                    idx_refazer = idx - 1
+                    passo_ant   = passos[idx_refazer]
+                    id_ant      = passo_ant.get("id_passo", idx_refazer + 1)
+                    print(f"\n   ↩ Refazendo passo {id_ant} (causa raiz)...", flush=True)
+                    self._passo_anterior = passos[idx_refazer - 1] if idx_refazer > 0 else None
+                    self._desvio_anterior = False
+                    await self._executar_passo(page, passo_ant, idx_refazer, total)
+                    await asyncio.sleep(0.8)
+                    # Após refazer o anterior, tenta o passo atual novamente
+                    # (não avança idx — o while vai tentar o mesmo passo)
+                    self._passo_anterior = passo_ant
+                else:
+                    idx += 1
 
             await asyncio.sleep(2.0)
             await browser.close()

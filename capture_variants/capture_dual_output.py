@@ -17,7 +17,12 @@ import sys
 import logging
 import re
 import traceback
+import time
 from dotenv import load_dotenv
+
+# Adiciona o diretório pai ao path para importar módulos da raiz
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils import limpar_nome
 from shadow_builder import (
     utc_now,
@@ -28,6 +33,7 @@ from shadow_builder import (
     _is_noise_event,
     _montar_evento_shadow,
     _salvar_shadow_jsonl,
+    inferir_acao_semantica,
 )
 
 from playwright.async_api import async_playwright, Error as PlaywrightError
@@ -57,6 +63,56 @@ cliques_capturados: list = []
 shadow_capturado: list = []
 _id_acao_global: int    = 0
 _lock_id: asyncio.Lock  = None
+
+
+def _retry_com_backoff(func, max_tentativas=5, delay_inicial=2):
+    """
+    Executa uma função com retry e backoff exponencial.
+    Útil para APIs com rate limit (429) ou indisponibilidade temporária (503).
+    """
+    for tentativa in range(max_tentativas):
+        try:
+            return func()
+        except Exception as e:
+            erro_str = str(e)
+            # Erros recuperáveis: 429 (rate limit), 503 (service unavailable)
+            if "429" in erro_str or "503" in erro_str or "UNAVAILABLE" in erro_str or "Too Many Requests" in erro_str:
+                if tentativa < max_tentativas - 1:
+                    delay = delay_inicial * (2 ** tentativa)  # Backoff exponencial
+                    logger.warning(f"Gemini API indisponível (tentativa {tentativa + 1}/{max_tentativas}). Aguardando {delay}s...")
+                    print(f"⚠️  GEMINI INDISPONÍVEL — Tentativa {tentativa + 1}/{max_tentativas}. Aguardando {delay}s...", flush=True)
+                    time.sleep(delay)
+                    continue
+            # Outros erros ou última tentativa: propaga a exceção
+            raise
+    raise Exception(f"Falha após {max_tentativas} tentativas com backoff exponencial")
+
+
+def _chamar_openai_fallback(prompt_sistema: str, prompt_usuario: str, model="gpt-4o") -> dict:
+    """
+    Fallback para OpenAI quando Gemini falha completamente.
+    Usa o mesmo formato de prompt e retorna JSON estruturado.
+    """
+    if not _openai_client:
+        raise Exception("OpenAI não configurado. Impossível usar fallback.")
+    
+    logger.info(f"🔄 Usando OpenAI ({model}) como fallback...")
+    print(f"🔄 FALLBACK ATIVADO: Usando OpenAI {model} para gerar o roteiro...", flush=True)
+    
+    try:
+        resposta = _openai_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": prompt_usuario}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        return json.loads(resposta.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"OpenAI fallback também falhou: {e}")
+        raise
 
 
 def _gerar_embedding_openai(texto: str) -> list[float]:
@@ -119,18 +175,23 @@ Analise o screenshot e responda com um JSON:
   "confianca": "alta | media | baixa"
 }}"""
     try:
-        resposta = await asyncio.to_thread(
-            gemini_client.models.generate_content,
-            model="gemini-2.5-flash",
-            contents=[types.Part.from_bytes(data=screenshot_bytes, mime_type="image/jpeg"), prompt],
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1),
-        )
+        def _chamar_gemini():
+            return gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[types.Part.from_bytes(data=screenshot_bytes, mime_type="image/jpeg"), prompt],
+                config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1),
+            )
+        
+        resposta = await asyncio.to_thread(_retry_com_backoff, _chamar_gemini, max_tentativas=3, delay_inicial=1)
         resultado = json.loads(resposta.text)
         resultado.setdefault("intencao", fallback["intencao"])
         resultado.setdefault("descricao_visual", fallback["descricao_visual"])
         resultado.setdefault("contexto_tela", "Desconhecido")
         return resultado
-    except Exception:
+    except Exception as e:
+        # Gemini falhou na análise de screenshot — usar fallback básico
+        # Não tentamos OpenAI aqui porque análise de imagem requer vision API (mais cara)
+        logger.warning(f"⚠️  Gemini vision falhou para elemento '{label_capturado}': {str(e)[:80]}")
         return fallback
 
 
@@ -167,6 +228,21 @@ async def _injetar_em_contexto(contexto):
                 return 'Caixa de selecao Angular';
             }
 
+            // Itens de menu de contexto (ngx-contextmenu, CDK overlay)
+            // O clique pode cair no <em> (ícone) dentro do <a> ou <li> do menu.
+            // Sobe para o item do menu e pega o texto visível.
+            const menuItem = el.closest('.ngx-contextmenu li, [class*="contextmenu"] li, .cdk-overlay-pane li, .dropdown-menu li');
+            if (menuItem) {
+                // Pega apenas o texto, ignorando ícones (<em>, <i>, <svg>)
+                const textoMenu = Array.from(menuItem.childNodes)
+                    .filter(n => n.nodeType === Node.TEXT_NODE || (n.nodeType === Node.ELEMENT_NODE && !['EM','I','SVG','SPAN'].includes(n.tagName)))
+                    .map(n => (n.textContent || '').trim())
+                    .join(' ').replace(/\\s+/g, ' ').trim();
+                if (textoMenu && textoMenu.length > 1) return textoMenu;
+                // Fallback: innerText do item inteiro sem ícones
+                const textoFull = (menuItem.innerText || menuItem.textContent || '').replace(/\\s+/g, ' ').trim();
+                if (textoFull && textoFull.length > 1 && textoFull.length < 60) return textoFull;
+            }
             const tag = el.tagName.toLowerCase();
             const isEditable = tag === 'input' || tag === 'textarea' || el.getAttribute('contenteditable') === 'true';
             if (isEditable) {
@@ -177,10 +253,26 @@ async def _injetar_em_contexto(contexto):
             const text = el.innerText?.trim().replace(/\\n/g, ' ') || '';
             if (text && text.length > 0 && text.length < 100 && text !== 'undefined') return text;
             let cur = el;
-            for (let i = 0; i < 4; i++) {
+            for (let i = 0; i < 6; i++) {
                 if (!cur) break;
                 if (cur.getAttribute('aria-label')) return cur.getAttribute('aria-label');
                 if (cur.getAttribute('title')) return cur.getAttribute('title');
+                // Tenta o id como label legível quando contém texto descritivo (ex: menu-item-Senior Flow)
+                const elId = cur.getAttribute('id') || '';
+                if (elId && !elId.match(/^(ng-|mat-|cdk-|\\d)/) && elId.includes('-') && elId.length < 60) {
+                    // Extrai a parte descritiva do id (ex: "menu-item-Senior Flow" → "Senior Flow")
+                    const partes = elId.split('-');
+                    const descritivo = partes.slice(2).join(' ').trim();
+                    if (descritivo && descritivo.length > 2) return descritivo;
+                }
+                // Tenta texto de filhos diretos (irmãos do ícone dentro do mesmo pai)
+                if (i === 0) {
+                    const irmaoTexto = Array.from(cur.parentElement?.children || [])
+                        .filter(c => c !== cur && c.tagName !== 'I' && c.tagName !== 'SVG')
+                        .map(c => (c.innerText || c.textContent || '').trim())
+                        .find(t => t && t.length > 1 && t.length < 80);
+                    if (irmaoTexto) return irmaoTexto;
+                }
                 cur = cur.parentElement;
             }
             return tag;
@@ -382,27 +474,32 @@ async def on_capturar_elemento(source, args):
         # Aviso quando coordenadas ainda são padrão após fallback no JS
         if coords.get("x_pct") == 0.5 and coords.get("y_pct") == 0.5:
             logger.warning(f"[FOTO {meu_id_acao}] Coordenadas padrão (0.5/0.5) — fallback de viewport usado para '{label}'.")
-        analise = (
-            await _analisar_elemento_com_gemini(
-                screenshot_bytes, dados.get("html_snapshot", ""), label, coords, acao
-            ) if screenshot_bytes else {
-                "intencao": f"{acao.capitalize()} em '{label}'",
-                "descricao_visual": f"Elemento '{label}'",
-                "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa",
-            }
-        )
 
+        # ── Evento_Bruto: apenas dados mecânicos, sem chamada Gemini ─────────
+        # O enriquecimento semântico (Gemini Vision) ocorre APÓS o encerramento
+        # da sessão, via enriquecer_eventos_com_gemini(). Isso garante que a
+        # captura não seja bloqueada por latência ou falha da API.
         iframe_id = dados.get("iframe", "Pagina Principal")
         valor_input = dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else ""
+
+        # ── Flag de item de menu de contexto ─────────────────────────────────
+        # Se a ação anterior foi clique_direito, este clique é um item do menu
+        # de contexto que foi aberto. Marca para que o executor saiba buscar
+        # dentro do overlay do menu em vez de varrer o DOM geral.
+        _ultima_acao = cliques_capturados[-1].get("acao", "") if cliques_capturados else ""
+        _is_context_menu_item = (acao == "clique" and _ultima_acao == "clique_direito")
+
         evento_base = {
             "id_acao":            meu_id_acao,
             "acao":               acao,
-            "intencao_semantica": analise["intencao"],
+            "intencao_semantica": "",          # preenchido em enriquecer_eventos_com_gemini()
+            "semantic_action":    "",          # preenchido em enriquecer_eventos_com_gemini()
+            "is_context_menu_item": _is_context_menu_item,  # flag para o executor
             "elemento_alvo": {
-                "descricao_visual":      analise["descricao_visual"],
-                "contexto_tela":         analise["contexto_tela"],
-                "tipo_elemento":         analise.get("tipo_elemento", "button"),
-                "confianca_captura":     analise.get("confianca", "media"),
+                "descricao_visual":      "",   # preenchido em enriquecer_eventos_com_gemini()
+                "contexto_tela":         "",   # preenchido em enriquecer_eventos_com_gemini()
+                "tipo_elemento":         dados.get("tag", "button"),
+                "confianca_captura":     "media",  # padrão antes do enriquecimento
                 "label_curto":           label,
                 "coordenadas_relativas": coords,
                 "seletor_hint":          dados["seletor"],
@@ -411,27 +508,147 @@ async def on_capturar_elemento(source, args):
                 "screenshot_referencia": screenshot_b64,
             },
             "valor_input": valor_input,
+            # Metadados de contexto para enriquecimento posterior
+            "_page_title":  page_title,
+            "_page_url":    page_url,
+            "_vp_w":        vp_w,
+            "_vp_h":        vp_h,
+            "_dados_brutos": dados,
         }
         cliques_capturados.append(evento_base)
-        shadow_capturado.append(
-            _montar_evento_shadow(
-                id_acao=meu_id_acao,
-                acao=acao,
-                label=label,
-                dados=dados,
-                analise=analise,
-                iframe_id=iframe_id,
-                coords=coords,
-                screenshot_b64=screenshot_b64,
-                page_title=page_title,
-                page_url=page_url,
-                vp_w=vp_w,
-                vp_h=vp_h,
-                valor_input=valor_input,
-            )
-        )
     except Exception as e:
         logger.error(f"Erro ao processar captura: {e}")
+
+async def enriquecer_eventos_com_gemini(eventos_brutos: list[dict]) -> list[dict]:
+    """
+    Recebe lista de Evento_Bruto e retorna lista de Evento_Enriquecido.
+
+    Opção C: enriquecimento seletivo + paralelização em lotes.
+
+    - Eventos com label descritivo suficiente usam fallback heurístico direto
+      (sem chamar Gemini) — economiza chamadas para eventos óbvios.
+    - Eventos com label genérico ou ambíguo são enviados ao Gemini em lotes
+      paralelos de até LOTE_GEMINI eventos simultâneos.
+    - Nunca lança exceção.
+    """
+    if not eventos_brutos:
+        return []
+
+    # Labels que dispensam Gemini — o fallback heurístico já produz boa qualidade
+    _LABELS_DESCRITIVOS_SUFICIENTES = {
+        "nova pasta", "novo envelope", "excluir", "confirmar", "cancelar",
+        "salvar", "enviar", "fechar", "abrir", "selecionar", "incluir",
+        "upload", "download", "pesquisar", "buscar", "filtrar", "exportar",
+        "importar", "editar", "renomear", "mover", "copiar", "compartilhar",
+        "favoritar", "permissões", "assinar", "tirar foto", "reconhecimento facial",
+        "novo", "criar", "adicionar", "remover", "atualizar", "voltar",
+        "próximo", "anterior", "sim", "não", "ok", "aplicar",
+    }
+
+    # Tags que sempre precisam de Gemini — sem label semântico próprio
+    _TAGS_PRECISAM_GEMINI = {"span", "i", "a", "div", "em", "svg", "path", "button"}
+
+    LOTE_GEMINI = 8  # máximo de chamadas paralelas (dentro do rate limit da API)
+
+    def _precisa_gemini(evento: dict) -> bool:
+        """Decide se o evento precisa de análise Gemini ou se o fallback é suficiente."""
+        if not gemini_client:
+            return False
+        alvo  = evento.get("elemento_alvo", {})
+        label = (alvo.get("label_curto", "") or "").strip().lower()
+        tag   = (alvo.get("tipo_elemento", "") or "").strip().lower()
+        acao  = evento.get("acao", "")
+
+        # Sem screenshot — Gemini não consegue analisar de qualquer forma
+        if not alvo.get("screenshot_referencia"):
+            return False
+        # Label genérico (tag HTML) — Gemini é necessário para entender o contexto
+        if label in _TAGS_PRECISAM_GEMINI or not label or len(label) <= 1:
+            return True
+        # Label começa com "checkbox de:" — já tem contexto suficiente
+        if label.startswith("checkbox de:"):
+            return False
+        # Label descritivo conhecido — fallback heurístico é suficiente
+        if any(label.startswith(d) or label == d for d in _LABELS_DESCRITIVOS_SUFICIENTES):
+            return False
+        # Ações de digitação com valor — fallback é suficiente
+        if acao in ("preencher_campo", "digitar_e_enter") and evento.get("valor_input"):
+            return False
+        # Default: usa Gemini para labels desconhecidos
+        return True
+
+    def _fallback_heuristico(evento: dict) -> dict:
+        """Gera análise heurística sem chamar Gemini."""
+        alvo        = evento.get("elemento_alvo", {})
+        label       = alvo.get("label_curto", "")
+        acao        = evento.get("acao", "clique")
+        valor_input = evento.get("valor_input", "")
+        acao_sem = inferir_acao_semantica(
+            acao, label,
+            alvo.get("seletor_hint", ""),
+            alvo.get("tipo_elemento", ""),
+            valor_input,
+        )
+        return {
+            "intencao":         f"{acao_sem.capitalize()} em '{label}'",
+            "descricao_visual": f"Elemento '{label}'",
+            "contexto_tela":    evento.get("_page_title", "Desconhecido") or "Desconhecido",
+            "tipo_elemento":    alvo.get("tipo_elemento", "button"),
+            "confianca":        "media",
+        }
+
+    async def _enriquecer_um(evento: dict) -> dict:
+        """Enriquece um único evento — Gemini ou fallback conforme critério."""
+        alvo    = evento.get("elemento_alvo", {})
+        label   = alvo.get("label_curto", "")
+        acao    = evento.get("acao", "clique")
+        id_acao = evento.get("id_acao", "?")
+
+        analise = None
+        if _precisa_gemini(evento):
+            screenshot_b64   = alvo.get("screenshot_referencia")
+            screenshot_bytes = base64.b64decode(screenshot_b64) if screenshot_b64 else None
+            try:
+                analise = await _analisar_elemento_com_gemini(
+                    screenshot_bytes,
+                    alvo.get("html_hint", ""),
+                    label,
+                    alvo.get("coordenadas_relativas", {}),
+                    acao,
+                )
+            except Exception as e:
+                logger.warning(f"[Enriquecimento] Gemini falhou para id_acao={id_acao}: {str(e)[:80]}")
+
+        if analise is None:
+            analise = _fallback_heuristico(evento)
+
+        evento_enriquecido = dict(evento)
+        evento_enriquecido["intencao_semantica"] = analise["intencao"]
+        evento_enriquecido["elemento_alvo"] = dict(alvo)
+        evento_enriquecido["elemento_alvo"]["descricao_visual"]  = analise["descricao_visual"]
+        evento_enriquecido["elemento_alvo"]["contexto_tela"]     = analise["contexto_tela"]
+        evento_enriquecido["elemento_alvo"]["tipo_elemento"]     = analise.get("tipo_elemento", "button")
+        evento_enriquecido["elemento_alvo"]["confianca_captura"] = analise.get("confianca", "media")
+        return evento_enriquecido
+
+    # Processa em lotes paralelos preservando a ordem original
+    eventos_enriquecidos = [None] * len(eventos_brutos)
+    gemini_count = sum(1 for e in eventos_brutos if _precisa_gemini(e))
+    fallback_count = len(eventos_brutos) - gemini_count
+    print(f"[Enriquecimento] {len(eventos_brutos)} eventos: {gemini_count} via Gemini, {fallback_count} via fallback heurístico", flush=True)
+
+    for inicio in range(0, len(eventos_brutos), LOTE_GEMINI):
+        lote = eventos_brutos[inicio:inicio + LOTE_GEMINI]
+        resultados = await asyncio.gather(*[_enriquecer_um(e) for e in lote])
+        for j, resultado in enumerate(resultados):
+            eventos_enriquecidos[inicio + j] = resultado
+
+    if not gemini_client or gemini_count == 0:
+        print(f"CAPTURA_SEM_GEMINI:{len(eventos_brutos)}", flush=True)
+
+    return eventos_enriquecidos
+
+
 
 async def capturar_cliques_na_tela():
     global _lock_id, _id_acao_global
@@ -441,15 +658,29 @@ async def capturar_cliques_na_tela():
     shadow_capturado.clear()
 
     SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario    = os.getenv("SENIOR_USER")
-    senha      = os.getenv("SENIOR_PASS")
+    usuario    = os.getenv("SENIOR_USER_CAPTURE")
+    senha      = os.getenv("SENIOR_PASS_CAPTURE")
 
     if not usuario or not senha:
-        print("ERRO FATAL: Credenciais ausentes no .env (SENIOR_USER / SENIOR_PASS).", flush=True)
+        print("ERRO FATAL: Credenciais de captura ausentes no .env (SENIOR_USER_CAPTURE / SENIOR_PASS_CAPTURE).", flush=True)
         return
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False, args=["--start-maximized"])
+        # ── Detecta monitor auxiliar para abrir captura em fullHD ────────────
+        _window_x, _window_y = 0, 0
+        try:
+            from screeninfo import get_monitors
+            monitor_aux = next((m for m in get_monitors() if not m.is_primary), None)
+            if monitor_aux:
+                _window_x = monitor_aux.x
+                _window_y = monitor_aux.y
+        except Exception:
+            pass
+
+        browser = await p.chromium.launch(headless=False, args=[
+            "--start-maximized",
+            f"--window-position={_window_x},{_window_y}",
+        ])
         context = await browser.new_context(no_viewport=True)
         page    = await context.new_page()
 
@@ -538,21 +769,43 @@ async def capturar_cliques_na_tela():
 
         print("CAPTURA DUAL INICIADA! O roteiro oficial segue igual; o shadow semântico será salvo em paralelo. Feche o navegador ao terminar.", flush=True)
         
+        loop_iterations = 0
+        max_iterations = 1800  # 1 hora máximo (1800 * 2 segundos)
+        
         try:
-            while not page.is_closed():
+            while not page.is_closed() and loop_iterations < max_iterations:
                 await asyncio.sleep(2)
+                loop_iterations += 1
+                
+                # Log de progresso a cada 5 minutos
+                if loop_iterations % 150 == 0:
+                    print(f"[DEBUG] Captura ativa há {loop_iterations * 2 // 60} minutos. {len(cliques_capturados)} ações capturadas.", flush=True)
+                
                 try:
                     if page.is_closed():
+                        print("[DEBUG] Navegador fechado detectado.", flush=True)
                         break
                     if not await page.evaluate("() => !!window.__radarInjetado"):
                         await _injetar_em_contexto(page)
                 except PlaywrightError as e:
                     if "Target closed" in str(e) or "browser has been closed" in str(e):
+                        print("[DEBUG] Playwright detectou fechamento do navegador.", flush=True)
                         break 
-                except Exception:
+                except Exception as ex:
+                    print(f"[DEBUG] Exceção no loop de captura: {ex}", flush=True)
                     break
-        except Exception:
-            pass
+            
+            if loop_iterations >= max_iterations:
+                print("[AVISO] Timeout de 1 hora atingido. Finalizando captura.", flush=True)
+                
+        except Exception as e:
+            print(f"[DEBUG] Exceção externa no loop: {e}", flush=True)
+        finally:
+            print(f"[DEBUG] Finalizando captura. Total de ações: {len(cliques_capturados)}", flush=True)
+            try:
+                await browser.close()
+            except Exception:
+                pass
 
 def _validar_roteiro(roteiro: dict) -> tuple[bool, str]:
     """
@@ -642,14 +895,43 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
     )
 
     try:
-        resposta = gemini_client.models.generate_content(
-            model="gemini-2.5-flash", contents=prompt_usuario,
-            config=types.GenerateContentConfig(
-                system_instruction=prompt_sistema,
-                response_mime_type="application/json", temperature=0.2,
-            ),
-        )
+        def _chamar_aura():
+            return gemini_client.models.generate_content(
+                model="gemini-2.5-flash", contents=prompt_usuario,
+                config=types.GenerateContentConfig(
+                    system_instruction=prompt_sistema,
+                    response_mime_type="application/json", temperature=0.2,
+                ),
+            )
+        
+        logger.info("Chamando Gemini para gerar roteiro (com retry automático se necessário)...")
+        resposta = _retry_com_backoff(_chamar_aura, max_tentativas=5, delay_inicial=3)
         dados_da_ia = json.loads(resposta.text)
+        print("✅ Roteiro gerado com sucesso usando Gemini.", flush=True)
+        print("IA_USADA:gemini", flush=True)  # Marcador para o dashboard
+        
+    except Exception as e_gemini:
+        # Gemini falhou completamente após retries — tentar fallback OpenAI
+        logger.error(f"❌ Gemini falhou após todas as tentativas: {e_gemini}")
+        print(f"\n❌ GEMINI FALHOU: {str(e_gemini)[:100]}", flush=True)
+        print("ALERTA_GEMINI_FALHOU:true", flush=True)  # Marcador para alerta visual
+        
+        if not _openai_client:
+            print("❌ OpenAI não configurado. Impossível gerar roteiro.", flush=True)
+            logger.error("OpenAI não configurado. Impossível usar fallback.")
+            return None
+        
+        try:
+            dados_da_ia = _chamar_openai_fallback(prompt_sistema, prompt_usuario, model="gpt-4o")
+            print("✅ Roteiro gerado com sucesso usando OpenAI (fallback).", flush=True)
+            print("IA_USADA:openai-fallback", flush=True)  # Marcador para o dashboard
+        except Exception as e_openai:
+            logger.error(f"❌ OpenAI fallback também falhou: {e_openai}")
+            print(f"❌ OPENAI FALLBACK FALHOU: {str(e_openai)[:100]}", flush=True)
+            print("\n🚨 FALHA CRÍTICA: Nenhuma IA disponível para gerar o roteiro.", flush=True)
+            return None
+    
+    try:
         metadata = dados_da_ia.get("metadata", {}); metadata["nome_aula"] = nome_aula
         roteiro_final = {
             "metadata": metadata,
@@ -684,6 +966,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
                         "acao": acao_bruta["acao"], "intencao_semantica": acao_bruta["intencao_semantica"],
                         "elemento_alvo": acao_bruta["elemento_alvo"], "valor_input": acao_bruta["valor_input"],
                         "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
+                        "is_context_menu_item": acao_bruta.get("is_context_menu_item", False),
                         "_capture_meta": capture_meta,
                     })
             if passo_mesclado["is_conclusao"]:
@@ -760,7 +1043,7 @@ def iniciar_esteira_de_producao():
         if is_auto:
             args_posicionais = [a for a in sys.argv[1:] if not a.startswith("--")]
             if len(args_posicionais) < 2:
-                print("ERRO FATAL: Modo --auto requer: capture.py <nome_aula> <objetivo> --auto", flush=True)
+                print("ERRO FATAL: Modo --auto requer: capture_dual_output.py <nome_aula> <objetivo> --auto", flush=True)
                 sys.exit(1)
             nome_aula = args_posicionais[0]
             objetivo  = args_posicionais[1]
@@ -769,15 +1052,67 @@ def iniciar_esteira_de_producao():
             nome_aula = input("Qual e o nome desta aula? (Ex: Criando Pastas e Subpastas)\n> ")
             objetivo  = input("Qual e o objetivo do treinamento?\n> ")
 
+        print("[DEBUG] Iniciando captura de cliques...", flush=True)
         asyncio.run(capturar_cliques_na_tela())
+        print(f"[DEBUG] Captura finalizada. Total de ações: {len(cliques_capturados)}", flush=True)
 
         if not cliques_capturados:
             print("AVISO: Nenhuma acao capturada. O navegador foi fechado sem interacoes.", flush=True)
             sys.exit(1)
 
-        _salvar_shadow_jsonl(nome_aula, objetivo, shadow_capturado)
-        logger.info(f"{len(cliques_capturados)} acoes capturadas. Processando Roteiro...")
+        print("[DEBUG] Salvando shadow JSONL...", flush=True)
+
+        # ── Enriquecimento pós-captura: Gemini Vision roda aqui, não durante a captura ──
+        # Isso garante que a sessão de captura não foi bloqueada por latência da API.
+        print(f"[DEBUG] Enriquecendo {len(cliques_capturados)} eventos com Gemini Vision...", flush=True)
+        eventos_enriquecidos = asyncio.run(enriquecer_eventos_com_gemini(cliques_capturados))
+
+        # Monta shadow a partir dos eventos enriquecidos
+        shadow_final = []
+        for e in eventos_enriquecidos:
+            alvo    = e.get("elemento_alvo", {})
+            dados_b = e.get("_dados_brutos", {})
+            analise = {
+                "intencao":         e.get("intencao_semantica", ""),
+                "descricao_visual": alvo.get("descricao_visual", ""),
+                "contexto_tela":    alvo.get("contexto_tela", ""),
+                "tipo_elemento":    alvo.get("tipo_elemento", "button"),
+                "confianca":        alvo.get("confianca_captura", "media"),
+            }
+            shadow_final.append(
+                _montar_evento_shadow(
+                    id_acao=e["id_acao"],
+                    acao=e["acao"],
+                    label=alvo.get("label_curto", ""),
+                    dados=dados_b if dados_b else {
+                        "seletor": alvo.get("seletor_hint", ""),
+                        "tag":     alvo.get("tipo_elemento", "button"),
+                        "html_snapshot": alvo.get("html_hint", ""),
+                    },
+                    analise=analise,
+                    iframe_id=alvo.get("iframe_hint"),
+                    coords=alvo.get("coordenadas_relativas", {}),
+                    screenshot_b64=alvo.get("screenshot_referencia"),
+                    page_title=e.get("_page_title", ""),
+                    page_url=e.get("_page_url", ""),
+                    vp_w=e.get("_vp_w", 1920),
+                    vp_h=e.get("_vp_h", 1080),
+                    valor_input=e.get("valor_input", ""),
+                )
+            )
+
+        _salvar_shadow_jsonl(nome_aula, objetivo, shadow_final)
+
+        # ── Atualiza cliques_capturados com os eventos enriquecidos ──────────
+        # CRÍTICO: orquestrador_pos_captura usa cliques_capturados para montar
+        # o prompt da Aura. Sem esta atualização, intencao_semantica, descricao_visual
+        # e contexto_tela chegam vazios ao roteiro, quebrando o Brain na execução.
+        cliques_capturados.clear()
+        cliques_capturados.extend(eventos_enriquecidos)
+
+        print(f"[DEBUG] {len(cliques_capturados)} acoes capturadas. Processando Roteiro com Aura...", flush=True)
         caminho_roteiro_gerado = asyncio.run(orquestrador_pos_captura(nome_aula, objetivo))
+        print(f"[DEBUG] Roteiro gerado: {caminho_roteiro_gerado}", flush=True)
 
         if caminho_roteiro_gerado:
             if is_auto:
@@ -786,6 +1121,9 @@ def iniciar_esteira_de_producao():
                 if input("\nTudo pronto! Iniciar o Motor de Gravacao? (S/N)\n> ").strip().upper() == "S":
                     import subprocess
                     subprocess.run([sys.executable, "main.py", caminho_roteiro_gerado])
+    except KeyboardInterrupt:
+        print("\n[AVISO] Captura interrompida pelo usuário.", flush=True)
+        sys.exit(0)
     except Exception as e:
         print(f"ERRO FATAL DE EXECUCAO: {e}", flush=True)
         traceback.print_exc()
