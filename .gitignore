@@ -47,3 +47,9 @@ old_but_gold/
 
 # Exceção (Asset do sistema):
 !trilha.mp3
+
+# Generated artifacts
+erp_page_content.html
+erp_pattern_analysis.json
+*_analysis.json
+*_debug.html

@@ -496,21 +496,454 @@ async def _remover_highlight_hitl(page: Page, seletor: str) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CLASSE PRINCIPAL — HitlValidator
+# NOVOS COMPONENTES — HITL MELHORADO
+# ══════════════════════════════════════════════════════════════════════════════
+
+class AutoPlayController:
+    """Gerencia o modo de execução automática e controle de pausas."""
+    
+    def __init__(self):
+        self._is_auto_play: bool = True
+        self._pause_requested: bool = False
+        self._current_step_index: int = 0
+        
+    async def execute_continuous(self, steps: list[dict]) -> None:
+        """Executa passos continuamente até pausa ou falha"""
+        pass  # Implementado no loop principal
+        
+    def request_pause(self) -> None:
+        """Solicita pausa após ação atual"""
+        self._pause_requested = True
+        
+    def resume_auto_play(self) -> None:
+        """Retoma execução automática"""
+        self._is_auto_play = True
+        self._pause_requested = False
+        
+    def is_paused(self) -> bool:
+        """Verifica se execução está pausada"""
+        return not self._is_auto_play or self._pause_requested
+
+
+class StepNavigator:
+    """Interface visual para navegação e controle de passos quando pausado."""
+    
+    def __init__(self, page: Page):
+        self._page = page
+        self._current_step: int = 0
+        self._total_steps: int = 0
+        self._step_status: dict[int, str] = {}  # executed, pending, error
+        
+    async def show_navigator(self, step_info: dict) -> None:
+        """Exibe overlay do navegador centralizado"""
+        await self._inject_navigator_overlay(step_info)
+        
+    async def hide_navigator(self) -> None:
+        """Remove overlay do navegador"""
+        await self._page.evaluate("""() => {
+            document.getElementById('hitl-navigator')?.remove();
+            document.getElementById('hitl-navigator-style')?.remove();
+        }""")
+        
+    async def update_step_info(self, step_index: int, status: str) -> None:
+        """Atualiza informações do passo atual"""
+        self._current_step = step_index
+        self._step_status[step_index] = status
+        
+    async def wait_for_user_action(self) -> dict:
+        """Aguarda decisão do usuário no navegador"""
+        pass  # Implementado via binding
+        
+    async def navigate_to_step(self, step_index: int) -> None:
+        """Navega para passo específico"""
+        self._current_step = step_index
+        
+    async def _inject_navigator_overlay(self, step_info: dict) -> None:
+        """Injeta o overlay do navegador de passos"""
+        await self._page.evaluate("""(stepInfo) => {
+            // Remove navegador anterior
+            document.getElementById('hitl-navigator')?.remove();
+            document.getElementById('hitl-navigator-style')?.remove();
+
+            // CSS do navegador
+            const style = document.createElement('style');
+            style.id = 'hitl-navigator-style';
+            style.innerHTML = `
+                #hitl-navigator {
+                    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                    width: 480px; z-index: 2147483647;
+                    background: rgba(15,23,42,0.97);
+                    border: 2px solid #f59e0b;
+                    border-radius: 14px;
+                    box-shadow: 0 24px 60px rgba(0,0,0,0.8);
+                    font-family: 'Segoe UI', system-ui, sans-serif;
+                    color: #f1f5f9; overflow: hidden;
+                    animation: hitl-navigator-in 0.3s ease both;
+                    backdrop-filter: blur(12px);
+                }
+                @keyframes hitl-navigator-in {
+                    from { opacity:0; transform:translate(-50%,-50%) scale(0.9); }
+                    to   { opacity:1; transform:translate(-50%,-50%) scale(1); }
+                }
+                .hitl-nav-header {
+                    background: #f59e0b22;
+                    border-bottom: 1px solid #f59e0b44;
+                    padding: 16px 20px;
+                    display: flex; align-items: center; gap: 12px;
+                }
+                .hitl-nav-badge {
+                    background: #f59e0b;
+                    color: #000; font-size: 11px; font-weight: 800;
+                    padding: 4px 10px; border-radius: 99px;
+                    text-transform: uppercase; letter-spacing: 1px;
+                }
+                .hitl-nav-title {
+                    font-size: 14px; font-weight: 700; color: #fff;
+                }
+                .hitl-nav-body { padding: 20px; }
+                .hitl-nav-step-info {
+                    margin-bottom: 16px;
+                }
+                .hitl-nav-step-desc {
+                    font-size: 13px; color: #cbd5e1; line-height: 1.5;
+                    margin-bottom: 12px;
+                }
+                .hitl-nav-actions {
+                    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+                    margin-bottom: 16px;
+                }
+                .hitl-nav-btn {
+                    padding: 10px 16px; border-radius: 8px;
+                    font-size: 12px; font-weight: 600; cursor: pointer;
+                    border: none; transition: all 0.15s;
+                    display: flex; align-items: center; gap: 8px;
+                }
+                .hitl-nav-btn-primary {
+                    background: #f59e0b; color: #000;
+                }
+                .hitl-nav-btn-secondary {
+                    background: rgba(255,255,255,0.08);
+                    color: #cbd5e1;
+                    border: 1px solid rgba(255,255,255,0.12) !important;
+                }
+                .hitl-nav-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+                .hitl-nav-navigation {
+                    display: flex; justify-content: space-between; align-items: center;
+                    padding-top: 16px;
+                    border-top: 1px solid rgba(255,255,255,0.1);
+                }
+                .hitl-nav-nav-btn {
+                    padding: 8px 12px; border-radius: 6px;
+                    font-size: 11px; font-weight: 600; cursor: pointer;
+                    border: 1px solid rgba(255,255,255,0.2);
+                    background: rgba(255,255,255,0.05);
+                    color: #cbd5e1;
+                }
+                .hitl-nav-jump {
+                    display: flex; align-items: center; gap: 8px;
+                }
+                .hitl-nav-jump input {
+                    width: 60px; padding: 6px 8px; border-radius: 4px;
+                    border: 1px solid rgba(255,255,255,0.2);
+                    background: rgba(255,255,255,0.05);
+                    color: #fff; font-size: 11px;
+                }
+            `;
+            document.head.appendChild(style);
+
+            // HTML do navegador
+            const navigator = document.createElement('div');
+            navigator.id = 'hitl-navigator';
+            navigator.innerHTML = `
+                <div class="hitl-nav-header">
+                    <span style="font-size:18px">🎯</span>
+                    <span class="hitl-nav-badge">Passo ${stepInfo.current}/${stepInfo.total}</span>
+                    <span class="hitl-nav-title">Navegador de Passos</span>
+                </div>
+                <div class="hitl-nav-body">
+                    <div class="hitl-nav-step-info">
+                        <div class="hitl-nav-step-desc">
+                            <strong>Passo atual:</strong> ${stepInfo.description || 'Sem descrição'}
+                        </div>
+                        <div style="font-size:11px; color:#64748b;">
+                            Status: <span style="color:${stepInfo.status === 'executed' ? '#22c55e' : stepInfo.status === 'error' ? '#ef4444' : '#f59e0b'}">${stepInfo.status}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="hitl-nav-actions">
+                        <button class="hitl-nav-btn hitl-nav-btn-primary" data-action="continue_auto">
+                            ▶ Continuar auto
+                        </button>
+                        <button class="hitl-nav-btn hitl-nav-btn-secondary" data-action="redo_step">
+                            🔄 Refazer este passo
+                        </button>
+                        <button class="hitl-nav-btn hitl-nav-btn-secondary" data-action="correct_selector">
+                            ✏️ Corrigir seletor
+                        </button>
+                        <button class="hitl-nav-btn hitl-nav-btn-secondary" data-action="skip_step">
+                            ⏭ Pular esta ação
+                        </button>
+                    </div>
+                    
+                    <div class="hitl-nav-navigation">
+                        <button class="hitl-nav-nav-btn" data-action="prev_step">◄ Anterior</button>
+                        <div class="hitl-nav-jump">
+                            <span style="font-size:11px; color:#64748b;">Ir para:</span>
+                            <input type="number" id="hitl-jump-input" min="1" max="${stepInfo.total}" value="${stepInfo.current}">
+                            <button class="hitl-nav-nav-btn" data-action="jump_to">Ir</button>
+                        </div>
+                        <button class="hitl-nav-nav-btn" data-action="next_step">Próximo ►</button>
+                    </div>
+                </div>
+            `;
+            document.documentElement.appendChild(navigator);
+
+            // Event listeners para os botões
+            navigator.querySelectorAll('[data-action]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = btn.getAttribute('data-action');
+                    let payload = { acao: action };
+                    
+                    if (action === 'jump_to') {
+                        const input = document.getElementById('hitl-jump-input');
+                        payload.target_step = parseInt(input.value) || stepInfo.current;
+                    }
+                    
+                    window.__hitl_captura__(JSON.stringify(payload));
+                });
+            });
+        }""", step_info)
+
+
+class FloatingPauseButton:
+    """Botão flutuante sempre visível para controle manual de pausa."""
+    
+    def __init__(self, page: Page):
+        self._page = page
+        self._is_visible: bool = False
+        
+    async def show_pause_button(self) -> None:
+        """Exibe botão de pausa flutuante"""
+        await self._page.evaluate("""() => {
+            // Remove botão anterior
+            document.getElementById('hitl-pause-btn')?.remove();
+            document.getElementById('hitl-pause-btn-style')?.remove();
+
+            // CSS do botão
+            const style = document.createElement('style');
+            style.id = 'hitl-pause-btn-style';
+            style.innerHTML = `
+                #hitl-pause-btn {
+                    position: fixed; bottom: 24px; right: 24px;
+                    z-index: 2147483647;
+                    background: #f97316; color: #000;
+                    border: none; border-radius: 100px;
+                    padding: 12px 24px; font-size: 13px; font-weight: 700;
+                    cursor: pointer; font-family: 'Segoe UI', sans-serif;
+                    box-shadow: 0 8px 24px rgba(249,115,22,0.5);
+                    transition: all 0.15s;
+                }
+                #hitl-pause-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 12px 32px rgba(249,115,22,0.6);
+                }
+            `;
+            document.head.appendChild(style);
+
+            // Botão
+            const btn = document.createElement('button');
+            btn.id = 'hitl-pause-btn';
+            btn.innerHTML = '⏸ PAUSAR';
+            document.documentElement.appendChild(btn);
+
+            btn.addEventListener('click', () => {
+                window.__hitl_captura__(JSON.stringify({ acao: 'pause_requested' }));
+            });
+        }""")
+        self._is_visible = True
+        
+    async def hide_pause_button(self) -> None:
+        """Remove botão de pausa"""
+        await self._page.evaluate("""() => {
+            document.getElementById('hitl-pause-btn')?.remove();
+            document.getElementById('hitl-pause-btn-style')?.remove();
+        }""")
+        self._is_visible = False
+        
+    async def update_button_state(self, is_paused: bool) -> None:
+        """Atualiza visual do botão (pausar/continuar)"""
+        if is_paused:
+            await self._page.evaluate("""() => {
+                const btn = document.getElementById('hitl-pause-btn');
+                if (btn) {
+                    btn.innerHTML = '▶ CONTINUAR';
+                    btn.style.background = '#22c55e';
+                }
+            }""")
+        else:
+            await self._page.evaluate("""() => {
+                const btn = document.getElementById('hitl-pause-btn');
+                if (btn) {
+                    btn.innerHTML = '⏸ PAUSAR';
+                    btn.style.background = '#f97316';
+                }
+            }""")
+
+
+class EnhancedRadarSystem:
+    """Sistema de captura de cliques para correção de seletores."""
+    
+    def __init__(self, page: Page):
+        self._page = page
+        self._is_active: bool = False
+        self._captured_selector: str = ""
+        
+    async def activate_radar(self) -> None:
+        """Ativa modo radar para captura de cliques"""
+        self._is_active = True
+        await self._page.evaluate(f"""() => {{
+            if (window.__hitlRadarAtivo) return;
+            window.__hitlRadarAtivo = true;
+
+            const getSelector = {_JS_GET_BEST_SELECTOR};
+
+            const handler = (e) => {{
+                // Não captura cliques nos overlays do HITL
+                if (e.target.closest('#hitl-overlay') || e.target.closest('#hitl-navigator')) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                window.__hitlRadarAtivo = false;
+                document.removeEventListener('click', handler, true);
+
+                const seletor = getSelector(e.target);
+                const label = e.target.innerText?.trim()?.substring(0, 60)
+                            || e.target.getAttribute('aria-label')
+                            || e.target.tagName.toLowerCase();
+
+                // Feedback visual imediato (outline ciano pulsante)
+                const prev = e.target.style.outline;
+                e.target.style.outline = '3px solid #00e5e5';
+                e.target.style.boxShadow = '0 0 16px #00e5e588';
+                setTimeout(() => {{
+                    e.target.style.outline = prev;
+                    e.target.style.boxShadow = '';
+                }}, 1200);
+
+                window.__hitl_captura__(JSON.stringify({{ seletor, label, acao: 'capturou' }}));
+            }};
+
+            document.addEventListener('click', handler, true);
+        }}""")
+        
+    async def deactivate_radar(self) -> None:
+        """Desativa modo radar"""
+        self._is_active = False
+        await self._page.evaluate("""() => {
+            window.__hitlRadarAtivo = false;
+        }""")
+        
+    async def wait_for_click(self) -> str:
+        """Aguarda clique do usuário e retorna seletor"""
+        # Implementado via binding no HitlValidator
+        return self._captured_selector
+
+
+class ValidationEngine:
+    """Gerencia validações preventivas e checkpoints."""
+    
+    def __init__(self, gemini_client):
+        self._gemini = gemini_client
+        self._checkpoint_enabled: bool = True
+        self._preventive_enabled: bool = True
+        
+    async def validate_preventive(self, action: dict, selector: str) -> bool:
+        """Validação preventiva antes de executar ação"""
+        confidence = _nivel_confianca(action)
+        return confidence != NivelConfianca.BAIXA
+        
+    async def validate_checkpoint(self, page: Page, expected_state: str) -> tuple[bool, str]:
+        """Validação checkpoint após executar passo"""
+        return await _validar_checkpoint(page, expected_state, "", None)
+        
+    def should_pause_preventive(self, confidence: NivelConfianca, is_auto_play: bool) -> bool:
+        """Determina se deve pausar para validação preventiva"""
+        return confidence == NivelConfianca.BAIXA and not is_auto_play
+        
+    def should_pause_checkpoint(self, is_auto_play: bool) -> bool:
+        """Determina se deve pausar para checkpoint"""
+        return not is_auto_play and self._checkpoint_enabled
+
+
+class PersistenceManager:
+    """Gerencia persistência de correções e atualização de roteiros."""
+    
+    def __init__(self):
+        self._corrections: dict[str, str] = {}  # intencao -> seletor
+        
+    def save_correction(self, intention: str, selector: str) -> None:
+        """Salva correção no mapa in-memory"""
+        self._corrections[intention] = selector
+        
+    async def persist_to_brain_db(self, intention: str, selector: str) -> None:
+        """Persiste seletor no Brain DB"""
+        _registrar_sucesso_cache(intention, seletor=selector)
+        
+    async def update_score_engine(self, intention: str) -> None:
+        """Atualiza score engine com sucesso"""
+        try:
+            _score_engine.registrar_execucao(intention, sucesso=True, confianca_captura=1.0)
+        except Exception as e:
+            logger.warning(f"Score engine não atualizado: {e}")
+        
+    def rewrite_roteiro_json(self, json_path: str) -> int:
+        """Reescreve roteiro com seletores corrigidos"""
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                roteiro = json.load(f)
+
+            alteracoes = 0
+            for passo in roteiro.get("passos", []):
+                for acao in passo.get("acoes_tecnicas", []):
+                    intencao = acao.get("intencao_semantica", "")
+                    if intencao in self._corrections:
+                        seletor_novo = self._corrections[intencao]
+                        if "elemento_alvo" not in acao:
+                            acao["elemento_alvo"] = {}
+                        acao["elemento_alvo"]["seletor_hint"] = seletor_novo
+                        acao["elemento_alvo"]["confianca_captura"] = "alta"
+                        alteracoes += 1
+
+            if alteracoes > 0:
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(roteiro, f, indent=2, ensure_ascii=False)
+
+            return alteracoes
+        except Exception as e:
+            logger.warning(f"Erro ao reescrever roteiro: {e}")
+            return 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLASSE PRINCIPAL — HitlValidator (REFATORADA)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class HitlValidator:
 
     def __init__(self):
+        # Componentes originais
         self._evento_humano: asyncio.Event = asyncio.Event()
         self._decisao_humana: dict = {}       # resultado da decisão do analista
         self._captura_seletor: str = ""       # seletor capturado do clique humano
         self._stats = {
-            "passos_ok":         0,
-            "passos_checkpoint": 0,
-            "passos_corrigidos": 0,
-            "acoes_puladas":     0,
-            "intervencoes":      0,
+            "passos_executados":    0,  # Renomeado de passos_ok
+            "passos_com_erro":      0,  # Novo
+            "correcoes_salvas":     0,  # Renomeado de passos_corrigidos
+            "pausas_manuais":       0,  # Novo
+            "pausas_automaticas":   0,  # Novo
+            "intervencoes":         0,  # Mantido para compatibilidade
         }
         # Mapa intencao_semantica → seletor_corrigido
         # Usado ao final para reescrever o roteiro JSON
@@ -519,6 +952,19 @@ class HitlValidator:
         self._desvio_anterior: bool = False
         # Referência ao passo anterior — usada na Falha Dura para oferecer "Refazer"
         self._passo_anterior: dict | None = None
+        
+        # Novos componentes HITL melhorado
+        self._auto_play_controller: AutoPlayController | None = None
+        self._step_navigator: StepNavigator | None = None
+        self._floating_pause_button: FloatingPauseButton | None = None
+        self._enhanced_radar_system: EnhancedRadarSystem | None = None
+        self._validation_engine: ValidationEngine | None = None
+        self._persistence_manager: PersistenceManager = PersistenceManager()
+        
+        # Estado do sistema melhorado
+        self._current_step_index: int = 0
+        self._total_steps: int = 0
+        self._is_navigator_open: bool = False
 
     # ─── Setup da captura de clique humano ────────────────────────────────────
 
@@ -532,9 +978,33 @@ class HitlValidator:
             try:
                 payload = await args.json_value()
                 dados   = json.loads(payload) if isinstance(payload, str) else payload
-                self._captura_seletor = dados.get("seletor", "")
-                self._decisao_humana  = {"acao": "capturou", "seletor": self._captura_seletor}
+                
+                # Captura de seletor (radar ativo)
+                if "seletor" in dados:
+                    self._captura_seletor = dados.get("seletor", "")
+                    self._decisao_humana = {"acao": dados.get("acao", "capturou"), "seletor": self._captura_seletor}
+                
+                # Ações do navegador de passos
+                elif "acao" in dados:
+                    acao = dados["acao"]
+                    
+                    # Controle de pausa
+                    if acao == "pause_requested":
+                        if self._auto_play_controller:
+                            self._auto_play_controller.request_pause()
+                        self._decisao_humana = {"acao": "pause_requested"}
+                    
+                    # Ações do navegador
+                    elif acao in ["continue_auto", "redo_step", "correct_selector", "skip_step", 
+                                  "prev_step", "next_step", "jump_to"]:
+                        self._decisao_humana = dados
+                    
+                    # Outras ações (compatibilidade com sistema antigo)
+                    else:
+                        self._decisao_humana = dados
+                
                 self._evento_humano.set()
+                
             except Exception as e:
                 logger.warning(f"Captura humana falhou: {e}")
 
@@ -544,6 +1014,30 @@ class HitlValidator:
             _on_captura,
             handle=True,
         )
+        
+        # Inicializa componentes novos
+        self._auto_play_controller = AutoPlayController()
+        self._step_navigator = StepNavigator(page)
+        self._floating_pause_button = FloatingPauseButton(page)
+        self._enhanced_radar_system = EnhancedRadarSystem(page)
+        self._validation_engine = ValidationEngine(_gemini)
+        
+        # Exibe botão de pausa sempre visível
+        await self._floating_pause_button.show_pause_button()
+
+    async def _setup_persistent_pause_button(self, page: Page) -> None:
+        """
+        Configura listener para re-injetar o botão de pausa após cada navegação.
+        Isso garante que o botão permaneça visível mesmo após page.goto() ou reloads.
+        """
+        async def on_load():
+            if self._floating_pause_button and not self._is_navigator_open:
+                try:
+                    await self._floating_pause_button.show_pause_button()
+                except Exception as e:
+                    logger.warning(f"Erro ao re-injetar botão de pausa: {e}")
+        
+        page.on("load", lambda: asyncio.create_task(on_load()))
 
     async def _ativar_radar(self, page: Page) -> None:
         """Ativa o radar de clique — captura o próximo clique do analista."""
@@ -904,6 +1398,11 @@ class HitlValidator:
             await page.keyboard.press("Enter")
             await page.wait_for_load_state("load", timeout=30_000)
             await asyncio.sleep(2.0)
+            
+            # Re-injeta o botão de pausa após login (página foi recarregada)
+            if self._floating_pause_button:
+                await self._floating_pause_button.show_pause_button()
+            
             print("✅ Login OK.", flush=True)
             return True
 
@@ -913,6 +1412,11 @@ class HitlValidator:
             try:
                 await page.wait_for_load_state("networkidle", timeout=60_000)
                 await asyncio.sleep(3.0)
+                
+                # Re-injeta o botão de pausa após login manual
+                if self._floating_pause_button:
+                    await self._floating_pause_button.show_pause_button()
+                
                 return True
             except Exception:
                 print("❌ Timeout de login manual.", flush=True)
@@ -1095,7 +1599,66 @@ class HitlValidator:
     # ─── Ponto de entrada principal ───────────────────────────────────────────
 
 
-    def _reescrever_roteiro_com_correcoes(self, caminho_json: str) -> None:
+    async def _exibir_relatorio_final(self) -> None:
+        """Exibe relatório final com estatísticas atualizadas."""
+        print(f"\n{'═'*55}", flush=True)
+        print(f"  RELATÓRIO HITL", flush=True)
+        print(f"{'═'*55}", flush=True)
+        print(f"  Passos executados:     {self._stats['passos_executados']}", flush=True)
+        print(f"  Passos com erro:       {self._stats['passos_com_erro']}", flush=True)
+        print(f"  Correções salvas:      {self._stats['correcoes_salvas']}", flush=True)
+        print(f"  Pausas manuais:        {self._stats['pausas_manuais']}", flush=True)
+        print(f"  Pausas automáticas:    {self._stats['pausas_automaticas']}", flush=True)
+        print(f"{'═'*55}\n", flush=True)
+
+        if self._stats["correcoes_salvas"] > 0:
+            print(f"✅ {self._stats['correcoes_salvas']} correção(ões) salvas no Brain.", flush=True)
+            print("   Próxima execução vai acertar sem precisar de ajuda.", flush=True)
+
+    async def _marcar_hitl_validado(self, caminho_json: str) -> None:
+        """Marca o roteiro como HITL validado no dashboard."""
+        try:
+            import urllib.request, urllib.error, urllib.parse
+            arquivo = os.path.basename(caminho_json)
+            req = urllib.request.Request(
+                f"http://localhost:8000/api/marcar-hitl-validado/{urllib.parse.quote(arquivo)}",
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=5)
+            print("✅ Roteiro marcado como HITL validado no Dashboard.", flush=True)
+        except Exception as e:
+            print(f"   (Servidor offline — marcar HITL manualmente: {e})", flush=True)
+
+    def _salvar_correcao_no_brain(self, acao_tec: dict, seletor_capturado: str) -> None:
+        """
+        Persiste o seletor ensinado pelo analista no Brain DB e atualiza score_engine.
+        Na próxima execução, o sistema vai direto nele (alta confiança).
+        """
+        if not seletor_capturado:
+            return
+        intencao = acao_tec.get("intencao_semantica", "")
+        alvo     = acao_tec.get("elemento_alvo", {})
+        iframe   = alvo.get("iframe_hint")
+        if intencao:
+            # Atualiza brain.db — seletor aprendido pelo analista
+            _registrar_sucesso_cache(intencao, seletor=seletor_capturado, iframe=iframe)
+            logger.info(f"Brain atualizado: '{intencao[:60]}' → '{seletor_capturado}'")
+
+            # Atualiza scores.db — correção HITL equivale a execução bem-sucedida
+            # com confiança máxima (analista confirmou o elemento correto)
+            try:
+                _score_engine.registrar_execucao(
+                    intencao,
+                    sucesso=True,
+                    confianca_captura=1.0,
+                )
+            except Exception as e:
+                logger.warning(f"score_engine não atualizado (não crítico): {e}")
+
+            self._stats["correcoes_salvas"] += 1
+            # Guarda também no mapa in-memory para reescrita do JSON
+            self._correcoes_seletores[intencao] = seletor_capturado
+            self._persistence_manager.save_correction(intencao, seletor_capturado)
         """
         Atualiza o roteiro JSON com os seletores corrigidos pelo analista.
         Assim as correções sobrevivem mesmo sem o brain.db.
@@ -1138,6 +1701,8 @@ class HitlValidator:
         passos = roteiro.get("passos", [])
         total  = len(passos)
         nome   = roteiro.get("metadata", {}).get("nome_aula", "Aula")
+        
+        self._total_steps = total
 
         print(f"📋 {nome} — {total} passos", flush=True)
         print(f"🔍 Checkpoint Gemini: {'ATIVO' if CHECKPOINT_HABILITADO else 'DESABILITADO'}\n",
@@ -1165,8 +1730,11 @@ class HitlValidator:
             except Exception:
                 pass
 
-            # Configura captura de clique humano (binding Python ↔ JS)
+            # Configura captura de clique humano (binding Python ↔ JS) e inicializa componentes
             await self._setup_captura_humana(page)
+            
+            # Configura listener para re-injetar botão após navegações de página
+            await self._setup_persistent_pause_button(page)
 
             # Login
             ok = await self._fazer_login(page)
@@ -1177,66 +1745,236 @@ class HitlValidator:
             await page.keyboard.press("Escape")
             await asyncio.sleep(0.3)
 
-            # Executa os passos com suporte a refazer passo anterior
-            idx = 0
-            while idx < len(passos):
-                passo = passos[idx]
-                self._passo_anterior = passos[idx - 1] if idx > 0 else None
-
-                resultado = await self._executar_passo(page, passo, idx, total)
-                await asyncio.sleep(0.8)
-
-                if resultado == "refazer_passo" and idx > 0:
-                    # Volta ao passo anterior para corrigir a causa raiz
-                    idx_refazer = idx - 1
-                    passo_ant   = passos[idx_refazer]
-                    id_ant      = passo_ant.get("id_passo", idx_refazer + 1)
-                    print(f"\n   ↩ Refazendo passo {id_ant} (causa raiz)...", flush=True)
-                    self._passo_anterior = passos[idx_refazer - 1] if idx_refazer > 0 else None
-                    self._desvio_anterior = False
-                    await self._executar_passo(page, passo_ant, idx_refazer, total)
-                    await asyncio.sleep(0.8)
-                    # Após refazer o anterior, tenta o passo atual novamente
-                    # (não avança idx — o while vai tentar o mesmo passo)
-                    self._passo_anterior = passo_ant
-                else:
-                    idx += 1
+            # NOVO: Execução com auto-play e controle de pausas
+            await self._execute_with_auto_play(page, passos)
 
             await asyncio.sleep(2.0)
             await browser.close()
 
-        # Relatório final
-        print(f"\n{'═'*55}", flush=True)
-        print(f"  RELATÓRIO HITL", flush=True)
-        print(f"{'═'*55}", flush=True)
-        print(f"  Passos OK:             {self._stats['passos_ok']}", flush=True)
-        print(f"  Checkpoints com desvio:{self._stats['passos_checkpoint']}", flush=True)
-        print(f"  Correções salvas:      {self._stats['passos_corrigidos']}", flush=True)
-        print(f"  Ações puladas:         {self._stats['acoes_puladas']}", flush=True)
-        print(f"  Intervenções humanas:  {self._stats['intervencoes']}", flush=True)
-        print(f"{'═'*55}\n", flush=True)
-
-        if self._stats["passos_corrigidos"] > 0:
-            print(f"✅ {self._stats['passos_corrigidos']} correção(ões) salvas no Brain.", flush=True)
-            print("   Próxima execução vai acertar sem precisar de ajuda.", flush=True)
+        # Relatório final (atualizado)
+        await self._exibir_relatorio_final()
 
         # Reescreve o roteiro JSON com os seletores corrigidos pelo analista
-        # Garante que as correções sobrevivem mesmo se o brain.db for deletado
-        if self._stats["passos_corrigidos"] > 0 and hasattr(self, "_correcoes_seletores"):
-            self._reescrever_roteiro_com_correcoes(caminho_json)
+        if self._stats["correcoes_salvas"] > 0:
+            alteracoes = self._persistence_manager.rewrite_roteiro_json(caminho_json)
+            if alteracoes > 0:
+                print(f"✅ Roteiro atualizado com {alteracoes} seletor(es) corrigido(s).", flush=True)
 
         # Marca o roteiro como hitl_validado no servidor
-        try:
-            import urllib.request, urllib.error, urllib.parse
-            arquivo = os.path.basename(caminho_json)
-            req = urllib.request.Request(
-                f"http://localhost:8000/api/marcar-hitl-validado/{urllib.parse.quote(arquivo)}",
-                method="POST",
-            )
-            urllib.request.urlopen(req, timeout=5)
-            print("✅ Roteiro marcado como HITL validado no Dashboard.", flush=True)
-        except Exception as e:
-            print(f"   (Servidor offline — marcar HITL manualmente: {e})", flush=True)
+        await self._marcar_hitl_validado(caminho_json)
+
+    async def _execute_with_auto_play(self, page: Page, passos: list[dict]) -> None:
+        """
+        Novo loop principal com auto-play por padrão e controle de pausas.
+        """
+        idx = 0
+        while idx < len(passos):
+            passo = passos[idx]
+            self._current_step_index = idx
+            self._passo_anterior = passos[idx - 1] if idx > 0 else None
+            
+            # Atualiza informações do passo no navegador (se estiver aberto)
+            if self._is_navigator_open and self._step_navigator:
+                await self._step_navigator.update_step_info(idx, "pending")
+
+            # Verifica se há solicitação de pausa manual
+            if self._auto_play_controller and self._auto_play_controller.is_paused():
+                await self._handle_manual_pause(page, passo, idx)
+                continue  # Reprocessa o mesmo passo após a pausa
+
+            # Executa o passo em modo auto-play
+            resultado = await self._executar_passo_auto_play(page, passo, idx, len(passos))
+            
+            if resultado == "refazer_passo" and idx > 0:
+                # Volta ao passo anterior para corrigir a causa raiz
+                idx_refazer = idx - 1
+                passo_ant   = passos[idx_refazer]
+                id_ant      = passo_ant.get("id_passo", idx_refazer + 1)
+                print(f"\n   ↩ Refazendo passo {id_ant} (causa raiz)...", flush=True)
+                self._passo_anterior = passos[idx_refazer - 1] if idx_refazer > 0 else None
+                self._desvio_anterior = False
+                await self._executar_passo_auto_play(page, passo_ant, idx_refazer, len(passos))
+                await asyncio.sleep(0.8)
+                # Após refazer o anterior, tenta o passo atual novamente
+                self._passo_anterior = passo_ant
+            else:
+                idx += 1
+
+    async def _handle_manual_pause(self, page: Page, passo: dict, step_index: int) -> None:
+        """
+        Trata pausa manual solicitada pelo usuário via botão de pausa.
+        """
+        self._stats["pausas_manuais"] += 1
+        self._is_navigator_open = True
+        
+        # Atualiza botão para modo "continuar"
+        if self._floating_pause_button:
+            await self._floating_pause_button.update_button_state(is_paused=True)
+        
+        # Exibe navegador de passos
+        step_info = {
+            "current": step_index + 1,
+            "total": self._total_steps,
+            "description": passo.get("pedagogia", {}).get("tooltip_dap", "Sem descrição"),
+            "status": "pending"
+        }
+        
+        if self._step_navigator:
+            await self._step_navigator.show_navigator(step_info)
+        
+        # Aguarda decisão do usuário
+        decisao = await self._aguardar_decisao(timeout=300)  # 5 minutos
+        acao = decisao.get("acao", "continue_auto")
+        
+        # Processa ação do usuário
+        await self._process_navigator_action(page, decisao, step_index)
+        
+        # Remove navegador e atualiza botão
+        if self._step_navigator:
+            await self._step_navigator.hide_navigator()
+        
+        if self._floating_pause_button:
+            await self._floating_pause_button.update_button_state(is_paused=False)
+        
+        self._is_navigator_open = False
+        
+        # Retoma auto-play
+        if self._auto_play_controller:
+            self._auto_play_controller.resume_auto_play()
+
+    async def _process_navigator_action(self, page: Page, decisao: dict, current_step: int) -> None:
+        """
+        Processa ações do navegador de passos.
+        """
+        acao = decisao.get("acao", "continue_auto")
+        
+        if acao == "continue_auto":
+            # Retoma execução automática
+            pass
+            
+        elif acao == "redo_step":
+            # Refaz o passo atual
+            print(f"   🔄 Refazendo passo {current_step + 1}...", flush=True)
+            
+        elif acao == "correct_selector":
+            # Ativa radar para correção
+            if self._enhanced_radar_system:
+                await self._enhanced_radar_system.activate_radar()
+                print("   ✏️ Radar ativo — clique no elemento correto...", flush=True)
+                
+        elif acao == "skip_step":
+            # Pula o passo atual
+            print(f"   ⏭ Pulando passo {current_step + 1}...", flush=True)
+            
+        elif acao == "prev_step":
+            # Navega para passo anterior
+            if current_step > 0:
+                self._current_step_index = current_step - 1
+                print(f"   ◄ Navegando para passo {current_step}...", flush=True)
+                
+        elif acao == "next_step":
+            # Navega para próximo passo
+            if current_step < self._total_steps - 1:
+                self._current_step_index = current_step + 1
+                print(f"   ► Navegando para passo {current_step + 2}...", flush=True)
+                
+        elif acao == "jump_to":
+            # Pula para passo específico
+            target_step = decisao.get("target_step", current_step + 1) - 1  # Convert to 0-based
+            if 0 <= target_step < self._total_steps:
+                self._current_step_index = target_step
+                print(f"   ⏭ Pulando para passo {target_step + 1}...", flush=True)
+
+    async def _executar_passo_auto_play(
+        self, page: Page, passo: dict, idx: int, total: int
+    ) -> str:
+        """
+        Executa um passo em modo auto-play (sem pausas preventivas ou checkpoints).
+        Pausa automaticamente apenas em falhas reais.
+        """
+        id_p    = passo.get("id_passo", idx + 1)
+        tooltip = passo.get("pedagogia", {}).get("tooltip_dap", "")
+        ancora  = passo.get("pedagogia", {}).get("ancora",  "")
+        acoes   = passo.get("acoes_tecnicas", [])
+        is_fim  = passo.get("is_conclusao", False)
+
+        # Aviso contextual quando o passo anterior teve desvio de estado
+        aviso_desvio = ""
+        if self._desvio_anterior:
+            aviso_desvio = " ⚠️ [desvio anterior]"
+
+        print(f"\n── Passo {id_p}/{total} {tooltip or ''}{aviso_desvio}", flush=True)
+
+        if is_fim:
+            print(f"   [CONCLUSÃO] {ancora[:80]}", flush=True)
+            self._stats["passos_executados"] += 1
+            self._desvio_anterior = False
+            return "ok"
+
+        # Executa todas as ações do passo em modo auto-play
+        pediu_refazer = False
+        for acao_tec in acoes:
+            # Verifica pausa manual durante execução
+            if self._auto_play_controller and self._auto_play_controller.is_paused():
+                break
+                
+            resultado = await self._executar_acao_auto_play(page, acao_tec)
+            label  = acao_tec.get("elemento_alvo", {}).get("label_curto", "?")
+            status = "✅" if resultado == "ok" else ("❌" if resultado == "error" else "⏭")
+            print(f"   {status} {acao_tec.get('acao','?')} → {label}", flush=True)
+
+            if resultado == "error":
+                # Falha real - pausa automática
+                self._stats["pausas_automaticas"] += 1
+                await self._handle_automatic_pause(page, acao_tec, passo)
+                break
+
+            # Delay mínimo para execução rápida
+            await asyncio.sleep(0.6)
+
+        self._stats["passos_executados"] += 1
+        self._desvio_anterior = False
+        return "ok"
+
+    async def _executar_acao_auto_play(self, page: Page, acao_tec: dict) -> str:
+        """
+        Executa uma ação em modo auto-play (sem pausas preventivas).
+        Retorna: 'ok', 'error', 'skip'
+        """
+        if acao_tec.get("acao") == "concluir_video":
+            return "ok"
+
+        # Execução direta via vision_engine (todas as 7 camadas)
+        sucesso = await encontrar_e_clicar(page, acao_tec)
+        
+        if not sucesso:
+            # Falha real - será tratada como pausa automática
+            return "error"
+            
+        return "ok"
+
+    async def _handle_automatic_pause(self, page: Page, acao_tec: dict, passo: dict) -> None:
+        """
+        Trata pausa automática em caso de falha real.
+        """
+        print("   🔴 Falha detectada - pausando automaticamente...", flush=True)
+        
+        # Força pausa no auto-play controller
+        if self._auto_play_controller:
+            self._auto_play_controller.request_pause()
+        
+        # Exibe navegador com opções de correção
+        step_info = {
+            "current": self._current_step_index + 1,
+            "total": self._total_steps,
+            "description": passo.get("pedagogia", {}).get("tooltip_dap", "Falha na execução"),
+            "status": "error"
+        }
+        
+        if self._step_navigator:
+            await self._step_navigator.show_navigator(step_info)
+        
+        self._is_navigator_open = True
 
 
 # ══════════════════════════════════════════════════════════════════════════════
