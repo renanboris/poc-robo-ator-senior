@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Test - Iframe DOM Capture Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #666;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        iframe {
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            width: 100%;
+            height: 300px;
+            background: white;
+        }
+        .output {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .test-button {
+            background: #2196F3;
+        }
+        .test-button:hover {
+            background: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="section">
+            <h1>🧪 Manual Test - Iframe DOM Capture Fix</h1>
+            <p><strong>Feature:</strong> aura-iframe-dom-capture-fix</p>
+            <p><strong>Task:</strong> 3.2 Verify bug condition exploration test now passes</p>
+            
+            <div class="status info">
+                <strong>📋 Test Instructions:</strong><br>
+                1. Load the fixed aura_dom_mapper.js module<br>
+                2. Click "Run Capture Test" button<br>
+                3. Verify that iframe elements appear in the output<br>
+                4. Verify that iframe elements have "(iframe: test-frame)" indicator
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Main Document Elements</h2>
+            <button id="main-btn-1">Menu Principal</button>
+            <button id="main-btn-2">Configurações</button>
+            <input type="text" id="main-input" value="Buscar no sistema" />
+        </div>
+
+        <div class="section">
+            <h2>Iframe Content (Simulates Senior X GED)</h2>
+            <iframe id="test-frame" name="test-frame" srcdoc="
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            padding: 20px;
+                            background: #fafafa;
+                        }
+                        button {
+                            background: #FF9800;
+                            color: white;
+                            border: none;
+                            padding: 10px 20px;
+                            margin: 5px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                        }
+                        input {
+                            padding: 8px;
+                            margin: 5px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h3>GED - Gestão Eletrônica de Documentos</h3>
+                    <button id='iframe-btn-1'>Novo Documento</button>
+                    <button id='iframe-btn-2'>Filtros</button>
+                    <input type='text' id='iframe-input' placeholder='Buscar documentos' />
+                    <button id='iframe-btn-3'>Ajuda</button>
+                </body>
+                </html>
+            "></iframe>
+        </div>
+
+        <div class="section">
+            <h2>Test Controls</h2>
+            <button class="test-button" onclick="runCaptureTest()">🧪 Run Capture Test</button>
+            <button onclick="clearOutput()">🗑️ Clear Output</button>
+        </div>
+
+        <div class="section">
+            <h2>Test Output</h2>
+            <div id="output" class="output">Click "Run Capture Test" to see results...</div>
+        </div>
+
+        <div class="section">
+            <h2>Expected Results</h2>
+            <div class="status success">
+                <strong>✅ Expected Behavior After Fix:</strong><br>
+                • Main document elements should be captured (Menu Principal, Configurações, Buscar no sistema)<br>
+                • Iframe elements should be captured (Novo Documento, Filtros, Buscar documentos, Ajuda)<br>
+                • Iframe elements should have "(iframe: test-frame)" indicator<br>
+                • All elements should have unique, sequential IDs (0, 1, 2, 3, 4, 5, 6...)<br>
+                • All elements should have data-aura-map attribute
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the FIXED aura_dom_mapper.js -->
+    <script src="../modules/aura_dom_mapper.js"></script>
+
+    <script>
+        function runCaptureTest() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Check if AuraDomMapper is loaded
+                if (typeof window.AuraDomMapper === 'undefined') {
+                    output.textContent = '❌ ERROR: AuraDomMapper not loaded!\n\nPlease ensure aura_dom_mapper.js is loaded correctly.';
+                    return;
+                }
+
+                // Run the capture
+                const resultado = window.AuraDomMapper.capturar();
+                
+                // Display results
+                let outputText = '✅ CAPTURE SUCCESSFUL!\n\n';
+                outputText += '═══════════════════════════════════════════════════════════\n';
+                outputText += resultado;
+                outputText += '\n═══════════════════════════════════════════════════════════\n\n';
+                
+                // Analyze results
+                outputText += 'ANALYSIS:\n\n';
+                
+                // Check for main document elements
+                const hasMainElements = resultado.includes('Menu Principal') || 
+                                       resultado.includes('Configurações') || 
+                                       resultado.includes('Buscar no sistema');
+                outputText += hasMainElements ? 
+                    '✅ Main document elements captured\n' : 
+                    '❌ Main document elements NOT captured\n';
+                
+                // Check for iframe elements
+                const hasIframeElements = resultado.includes('Novo Documento') || 
+                                         resultado.includes('Filtros') || 
+                                         resultado.includes('Buscar documentos') || 
+                                         resultado.includes('Ajuda');
+                outputText += hasIframeElements ? 
+                    '✅ Iframe elements captured\n' : 
+                    '❌ Iframe elements NOT captured\n';
+                
+                // Check for iframe indicator
+                const hasIframeIndicator = resultado.includes('(iframe: test-frame)');
+                outputText += hasIframeIndicator ? 
+                    '✅ Iframe indicator present\n' : 
+                    '❌ Iframe indicator NOT present\n';
+                
+                // Check data-aura-map attributes
+                const mainElements = document.querySelectorAll('[data-aura-map]');
+                const iframe = document.getElementById('test-frame');
+                const iframeElements = iframe.contentDocument.querySelectorAll('[data-aura-map]');
+                
+                outputText += `\n✅ Main document elements with data-aura-map: ${mainElements.length}\n`;
+                outputText += `✅ Iframe elements with data-aura-map: ${iframeElements.length}\n`;
+                
+                // Overall status
+                outputText += '\n═══════════════════════════════════════════════════════════\n';
+                if (hasMainElements && hasIframeElements && hasIframeIndicator) {
+                    outputText += '🎉 TEST PASSED: Fix is working correctly!\n';
+                } else {
+                    outputText += '⚠️  TEST FAILED: Some requirements not met\n';
+                }
+                outputText += '═══════════════════════════════════════════════════════════\n';
+                
+                output.textContent = outputText;
+                
+            } catch (error) {
+                output.textContent = `❌ ERROR: ${error.message}\n\nStack trace:\n${error.stack}`;
+            }
+        }
+
+        function clearOutput() {
+            document.getElementById('output').textContent = 'Click "Run Capture Test" to see results...';
+        }
+
+        // Auto-run test on page load (optional)
+        // window.addEventListener('load', () => {
+        //     setTimeout(runCaptureTest, 1000);
+        // });
+    </script>
+</body>
+</html>

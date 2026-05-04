@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Iframe Bug Test - AURA DOM Capture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .sidebar {
+            background-color: #34495e;
+            color: white;
+            padding: 15px;
+            width: 200px;
+            float: left;
+            margin-right: 20px;
+        }
+        .main-content {
+            background-color: white;
+            padding: 20px;
+            margin-left: 220px;
+            min-height: 400px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        iframe {
+            width: 100%;
+            height: 500px;
+            border: 2px solid #3498db;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .test-instructions {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .test-instructions h2 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .test-instructions code {
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .expected-result {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .actual-result {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .result-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-instructions">
+            <h2>🧪 Manual Test: AURA Iframe DOM Capture Bug</h2>
+            <p><strong>Bug:</strong> <code>AuraDomMapper.capturar()</code> não captura elementos dentro de iframes acessíveis.</p>
+            
+            <h3>Como testar:</h3>
+            <ol>
+                <li>Carregue a extensão AURA (versão NÃO CORRIGIDA) no Chrome</li>
+                <li>Abra esta página HTML no navegador</li>
+                <li>Abra o Console do DevTools (F12)</li>
+                <li>Execute o comando: <code>AuraDomMapper.capturar()</code></li>
+                <li>Observe o resultado no console</li>
+            </ol>
+
+            <h3>Resultado Esperado (CÓDIGO NÃO CORRIGIDO - BUG PRESENTE):</h3>
+            <div class="actual-result">
+                <strong>❌ BUGGY OUTPUT:</strong>
+                <pre>ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:
+[ID: 0] TIPO: button | TEXTO: "Menu Principal"
+[ID: 1] TIPO: button | TEXTO: "Configurações"
+[ID: 2] TIPO: button | TEXTO: "Novidades e atualizações"
+[ID: 3] TIPO: button | TEXTO: "Executar Teste Manual"</pre>
+                <p><strong>⚠️ PROBLEMA:</strong> Elementos do iframe (Novo Documento, Buscar documentos, Filtros, Exportar) <strong>NÃO APARECEM</strong></p>
+            </div>
+
+            <h3>Resultado Esperado (CÓDIGO CORRIGIDO - BUG RESOLVIDO):</h3>
+            <div class="expected-result">
+                <strong>✅ FIXED OUTPUT:</strong>
+                <pre>ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:
+[ID: 0] TIPO: button | TEXTO: "Menu Principal"
+[ID: 1] TIPO: button | TEXTO: "Configurações"
+[ID: 2] TIPO: button | TEXTO: "Novidades e atualizações"
+[ID: 3] TIPO: button | TEXTO: "Executar Teste Manual"
+[ID: 4] TIPO: button | TEXTO: "Novo Documento" (iframe: ecm_sign)
+[ID: 5] TIPO: input | TEXTO: "Buscar documentos" (iframe: ecm_sign)
+[ID: 6] TIPO: button | TEXTO: "Filtros" (iframe: ecm_sign)
+[ID: 7] TIPO: button | TEXTO: "Exportar" (iframe: ecm_sign)
+[ID: 8] TIPO: a | TEXTO: "Ajuda" (iframe: ecm_sign)</pre>
+                <p><strong>✅ CORRETO:</strong> Elementos do iframe aparecem com indicador <code>(iframe: ecm_sign)</code></p>
+            </div>
+        </div>
+
+        <div class="header">
+            <h1>Senior X - Sistema ERP</h1>
+            <button>Menu Principal</button>
+            <button>Configurações</button>
+        </div>
+
+        <div class="sidebar">
+            <h3>Menu Lateral</h3>
+            <button>Novidades e atualizações</button>
+        </div>
+
+        <div class="main-content">
+            <h2>Área de Conteúdo Principal</h2>
+            <p>Esta página simula a estrutura do Senior X com um iframe contendo o GED (Gestão Eletrônica de Documentos).</p>
+            
+            <button onclick="executarTesteManuall()">Executar Teste Manual</button>
+            <button onclick="limparResultado()">Limpar Resultado</button>
+
+            <div id="resultado" class="result-box" style="display: none;"></div>
+
+            <h3>Iframe: GED (ecm_sign)</h3>
+            <iframe id="ecm_sign" name="ecm_sign" srcdoc="
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            padding: 20px;
+                            background-color: #f9f9f9;
+                        }
+                        h2 {
+                            color: #2c3e50;
+                            border-bottom: 2px solid #3498db;
+                            padding-bottom: 10px;
+                        }
+                        .toolbar {
+                            background-color: #ecf0f1;
+                            padding: 15px;
+                            margin: 20px 0;
+                            border-radius: 4px;
+                        }
+                        button {
+                            padding: 10px 20px;
+                            margin: 5px;
+                            cursor: pointer;
+                            background-color: #27ae60;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                        }
+                        button:hover {
+                            background-color: #229954;
+                        }
+                        input {
+                            padding: 8px;
+                            margin: 5px;
+                            border: 1px solid #bdc3c7;
+                            border-radius: 4px;
+                            width: 300px;
+                        }
+                        a {
+                            color: #3498db;
+                            text-decoration: none;
+                            padding: 5px 10px;
+                            display: inline-block;
+                        }
+                        a:hover {
+                            text-decoration: underline;
+                        }
+                        .info-box {
+                            background-color: #d1ecf1;
+                            border: 1px solid #bee5eb;
+                            padding: 15px;
+                            margin: 20px 0;
+                            border-radius: 4px;
+                            color: #0c5460;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h2>📁 GED - Gestão Eletrônica de Documentos</h2>
+                    
+                    <div class='info-box'>
+                        <strong>ℹ️ Este é o conteúdo DENTRO do iframe ecm_sign</strong>
+                        <p>No código NÃO CORRIGIDO, estes elementos NÃO são capturados pelo AuraDomMapper.capturar()</p>
+                    </div>
+
+                    <div class='toolbar'>
+                        <h3>Barra de Ferramentas</h3>
+                        <button>Novo Documento</button>
+                        <input type='text' placeholder='Buscar documentos' value='Buscar documentos' />
+                        <button>Filtros</button>
+                        <button>Exportar</button>
+                        <a href='#'>Ajuda</a>
+                    </div>
+
+                    <div>
+                        <h3>Documentos Recentes</h3>
+                        <button>Documento 001 - Contrato</button>
+                        <button>Documento 002 - Proposta</button>
+                        <button>Documento 003 - Relatório</button>
+                    </div>
+                </body>
+                </html>
+            "></iframe>
+        </div>
+    </div>
+
+    <script>
+        function executarTesteManuall() {
+            const resultadoDiv = document.getElementById('resultado');
+            resultadoDiv.style.display = 'block';
+            
+            // Verifica se AuraDomMapper está disponível
+            if (typeof window.AuraDomMapper === 'undefined') {
+                resultadoDiv.innerHTML = `
+<strong>❌ ERRO: AuraDomMapper não está disponível</strong>
+
+A extensão AURA não está carregada ou não está injetada nesta página.
+
+<strong>Como resolver:</strong>
+1. Certifique-se de que a extensão AURA está instalada no Chrome
+2. Verifique se a extensão tem permissão para acessar esta página
+3. Recarregue a página (F5)
+4. Tente novamente
+
+<strong>Teste alternativo via Console:</strong>
+Abra o DevTools (F12) e execute manualmente:
+> AuraDomMapper.capturar()
+                `;
+                return;
+            }
+
+            // Executa a captura
+            try {
+                const resultado = window.AuraDomMapper.capturar();
+                
+                // Analisa o resultado
+                const temElementosIframe = resultado.includes('(iframe:');
+                const temNovoDocumento = resultado.includes('Novo Documento');
+                const temBuscarDocumentos = resultado.includes('Buscar documentos');
+                const temFiltros = resultado.includes('Filtros');
+                
+                let analise = '';
+                if (temElementosIframe && temNovoDocumento && temBuscarDocumentos && temFiltros) {
+                    analise = `
+<strong style="color: green;">✅ TESTE PASSOU - BUG CORRIGIDO!</strong>
+
+Elementos do iframe foram capturados corretamente:
+- ✅ Indicador de iframe presente: (iframe: ecm_sign)
+- ✅ "Novo Documento" capturado
+- ✅ "Buscar documentos" capturado
+- ✅ "Filtros" capturado
+
+O código está CORRIGIDO e funcionando conforme esperado.
+                    `;
+                } else {
+                    analise = `
+<strong style="color: red;">❌ TESTE FALHOU - BUG PRESENTE!</strong>
+
+Elementos do iframe NÃO foram capturados:
+- ${temElementosIframe ? '✅' : '❌'} Indicador de iframe: ${temElementosIframe ? 'presente' : 'AUSENTE'}
+- ${temNovoDocumento ? '✅' : '❌'} "Novo Documento": ${temNovoDocumento ? 'capturado' : 'NÃO CAPTURADO'}
+- ${temBuscarDocumentos ? '✅' : '❌'} "Buscar documentos": ${temBuscarDocumentos ? 'capturado' : 'NÃO CAPTURADO'}
+- ${temFiltros ? '✅' : '❌'} "Filtros": ${temFiltros ? 'capturado' : 'NÃO CAPTURADO'}
+
+Isto confirma que o bug existe: AuraDomMapper.capturar() não itera sobre iframes.
+                    `;
+                }
+                
+                resultadoDiv.innerHTML = `
+${analise}
+
+<strong>Resultado completo de AuraDomMapper.capturar():</strong>
+${resultado}
+                `;
+            } catch (error) {
+                resultadoDiv.innerHTML = `
+<strong>❌ ERRO ao executar AuraDomMapper.capturar():</strong>
+
+${error.message}
+
+Stack trace:
+${error.stack}
+                `;
+            }
+        }
+
+        function limparResultado() {
+            const resultadoDiv = document.getElementById('resultado');
+            resultadoDiv.style.display = 'none';
+            resultadoDiv.innerHTML = '';
+        }
+
+        // Mensagem de boas-vindas no console
+        console.log('%c🧪 AURA Iframe Bug Test - Manual Testing Page', 'font-size: 16px; font-weight: bold; color: #3498db;');
+        console.log('%cPara testar o bug, execute:', 'font-size: 14px; color: #2c3e50;');
+        console.log('%cAuraDomMapper.capturar()', 'font-size: 14px; font-weight: bold; background-color: #f8f9fa; padding: 5px;');
+        console.log('');
+        console.log('%cResultado esperado (BUG PRESENTE):', 'font-size: 12px; color: #e74c3c;');
+        console.log('- Elementos do documento principal aparecem');
+        console.log('- Elementos do iframe ecm_sign NÃO aparecem');
+        console.log('');
+        console.log('%cResultado esperado (BUG CORRIGIDO):', 'font-size: 12px; color: #27ae60;');
+        console.log('- Elementos do documento principal aparecem');
+        console.log('- Elementos do iframe ecm_sign aparecem com indicador (iframe: ecm_sign)');
+    </script>
+</body>
+</html>

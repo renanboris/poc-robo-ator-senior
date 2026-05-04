@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preservation Test - Empty Iframe</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #333;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #666;
+            margin-top: 0;
+        }
+        button, input {
+            margin: 10px 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .expected-output {
+            background: #d1ecf1;
+            border: 1px solid #0c5460;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        iframe {
+            width: 100%;
+            height: 300px;
+            border: 2px solid #6c757d;
+            margin-top: 10px;
+            background: #fff;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #0c5460;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Preservation Test - Iframe Vazio</h1>
+    
+    <div class="instructions">
+        <h3>📋 Instruções de Teste Manual</h3>
+        <ol>
+            <li>Abra o console do navegador (F12)</li>
+            <li>Carregue a extensão AURA (versão NÃO CORRIGIDA)</li>
+            <li>Execute no console: <code>AuraDomMapper.capturar()</code></li>
+            <li>Verifique que apenas elementos do documento principal aparecem</li>
+            <li>Verifique que o iframe vazio NÃO contribui elementos</li>
+            <li>Verifique que NÃO há indicador <code>(iframe: ...)</code> na saída</li>
+            <li>Após implementar o fix (Task 3), repita o teste</li>
+            <li>A saída deve ser IDÊNTICA (preservation)</li>
+        </ol>
+        <p><strong>⚠️ IMPORTANTE:</strong> Esta página tem iframe VAZIO (acessível mas sem conteúdo). O código deve iterar sobre ele mas não encontrar elementos para capturar.</p>
+    </div>
+
+    <div class="info">
+        <strong>ℹ️ Cenário de Teste:</strong>
+        <p>Iframe é same-origin (acessível) mas está completamente vazio. Não há elementos interativos dentro dele.</p>
+        <p>Este cenário testa que o código não adiciona elementos inexistentes e não falha ao processar iframes vazios.</p>
+    </div>
+
+    <!-- Elementos do Documento Principal -->
+    <div class="test-section">
+        <h2>Documento Principal</h2>
+        <p><em>Estes elementos DEVEM aparecer na saída</em></p>
+        <button id="btn-main-1">Botão Principal 1</button>
+        <button id="btn-main-2">Botão Principal 2</button>
+        <input type="text" value="Input Principal" />
+        <button id="btn-main-3">Botão Principal 3</button>
+    </div>
+
+    <!-- Iframe Vazio (Acessível mas sem conteúdo) -->
+    <div class="test-section">
+        <h2>Iframe Vazio (Acessível)</h2>
+        <p><em>Este iframe está vazio - NÃO deve contribuir elementos</em></p>
+        <iframe 
+            id="empty-iframe" 
+            name="empty_content"
+            title="Empty Iframe">
+        </iframe>
+        <p><small>ℹ️ Este iframe é same-origin (acessível) mas está vazio</small></p>
+    </div>
+
+    <!-- Expected Output -->
+    <div class="expected-output">
+        <strong>📊 Expected Output (Código NÃO CORRIGIDO e APÓS FIX):</strong>
+
+ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:
+[ID: 0] TIPO: button | TEXTO: "Botão Principal 1"
+[ID: 1] TIPO: button | TEXTO: "Botão Principal 2"
+[ID: 2] TIPO: input | TEXTO: "Input Principal"
+[ID: 3] TIPO: button | TEXTO: "Botão Principal 3"
+
+        <strong>✅ Verificações:</strong>
+        - Apenas elementos do documento principal aparecem
+        - SEM indicador (iframe: ...)
+        - SEM elementos do iframe vazio
+        - Total de 4 elementos capturados
+        - Comportamento idêntico antes e após o fix
+    </div>
+
+    <script>
+        // Garante que o iframe está realmente vazio
+        window.addEventListener('load', function() {
+            const iframe = document.getElementById('empty-iframe');
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            iframeDoc.body.innerHTML = ''; // Explicitamente vazio
+            console.log('✅ Iframe inicializado vazio');
+        });
+
+        // Helper para facilitar teste manual
+        window.testarCaptura = function() {
+            if (typeof AuraDomMapper === 'undefined') {
+                console.error('❌ AuraDomMapper não encontrado. Carregue a extensão AURA primeiro.');
+                return;
+            }
+            
+            console.log('🧪 Executando AuraDomMapper.capturar()...\n');
+            const resultado = AuraDomMapper.capturar();
+            console.log(resultado);
+            
+            // Verificações automáticas
+            console.log('\n✅ Verificações:');
+            console.log('- Contém header:', resultado.includes('ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:'));
+            console.log('- Formato correto:', /\[ID: \d+\] TIPO: \w+ \| TEXTO: ".+"/.test(resultado));
+            console.log('- SEM indicador de iframe:', !resultado.includes('(iframe:'));
+            console.log('- Apenas elementos principais:', resultado.includes('Botão Principal 1'));
+            
+            // Conta elementos capturados
+            const linhas = resultado.split('\n').filter(l => l.trim() && l.includes('[ID:'));
+            console.log('- Total de elementos capturados:', linhas.length, '(esperado: 4)');
+            
+            return resultado;
+        };
+        
+        // Verifica estado do iframe
+        window.verificarIframe = function() {
+            const iframe = document.getElementById('empty-iframe');
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            
+            console.log('🔍 Estado do Iframe:');
+            console.log('- Acessível:', !!iframeDoc);
+            console.log('- Body existe:', !!iframeDoc.body);
+            console.log('- Número de elementos no body:', iframeDoc.body.children.length);
+            console.log('- Conteúdo HTML:', iframeDoc.body.innerHTML || '(vazio)');
+            
+            if (iframeDoc.body.children.length === 0) {
+                console.log('✅ Iframe está vazio conforme esperado');
+            } else {
+                console.warn('⚠️ Iframe não está vazio!');
+            }
+        };
+        
+        console.log('💡 Dicas:');
+        console.log('- Execute window.testarCaptura() para testar captura');
+        console.log('- Execute window.verificarIframe() para verificar estado do iframe');
+    </script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preservation Test - Cross-Origin Iframe</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #333;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #666;
+            margin-top: 0;
+        }
+        button, input {
+            margin: 10px 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .expected-output {
+            background: #d1ecf1;
+            border: 1px solid #0c5460;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #dc3545;
+            margin-top: 10px;
+        }
+        .warning {
+            background: #f8d7da;
+            border: 1px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Preservation Test - Iframe Cross-Origin</h1>
+    
+    <div class="instructions">
+        <h3>📋 Instruções de Teste Manual</h3>
+        <ol>
+            <li>Abra o console do navegador (F12)</li>
+            <li>Carregue a extensão AURA (versão NÃO CORRIGIDA)</li>
+            <li>Execute no console: <code>AuraDomMapper.capturar()</code></li>
+            <li>Verifique que NÃO há exceção/erro no console</li>
+            <li>Verifique que apenas elementos do documento principal aparecem</li>
+            <li>Verifique que NÃO há indicador <code>(iframe: ...)</code> na saída</li>
+            <li>Após implementar o fix (Task 3), repita o teste</li>
+            <li>A saída deve ser IDÊNTICA (preservation)</li>
+        </ol>
+        <p><strong>⚠️ IMPORTANTE:</strong> Esta página tem iframe CROSS-ORIGIN (inacessível). O código NÃO deve tentar acessar seu conteúdo e NÃO deve lançar exceções.</p>
+    </div>
+
+    <div class="warning">
+        <strong>🔒 Cross-Origin Security:</strong>
+        <p>O iframe abaixo carrega conteúdo de origem diferente (example.com). Tentar acessar <code>iframe.contentDocument</code> lançará <code>SecurityError</code>.</p>
+        <p>O código deve capturar esta exceção silenciosamente e continuar normalmente.</p>
+    </div>
+
+    <!-- Elementos do Documento Principal -->
+    <div class="test-section">
+        <h2>Documento Principal</h2>
+        <p><em>Estes elementos DEVEM aparecer na saída</em></p>
+        <button id="btn-main-1">Botão Principal 1</button>
+        <button id="btn-main-2">Botão Principal 2</button>
+        <input type="text" value="Input Principal" />
+    </div>
+
+    <!-- Iframe Cross-Origin (Inacessível) -->
+    <div class="test-section">
+        <h2>Iframe Cross-Origin (Inacessível)</h2>
+        <p><em>Elementos dentro deste iframe NÃO devem aparecer (e não devem causar erro)</em></p>
+        <iframe 
+            id="cross-origin-iframe" 
+            name="external_content"
+            src="https://example.com"
+            sandbox="allow-scripts"
+            title="Cross-Origin Iframe">
+        </iframe>
+        <p><small>⚠️ Este iframe carrega conteúdo de example.com (cross-origin)</small></p>
+    </div>
+
+    <!-- Expected Output -->
+    <div class="expected-output">
+        <strong>📊 Expected Output (Código NÃO CORRIGIDO e APÓS FIX):</strong>
+
+ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:
+[ID: 0] TIPO: button | TEXTO: "Botão Principal 1"
+[ID: 1] TIPO: button | TEXTO: "Botão Principal 2"
+[ID: 2] TIPO: input | TEXTO: "Input Principal"
+
+        <strong>✅ Verificações:</strong>
+        - Apenas elementos do documento principal aparecem
+        - SEM indicador (iframe: ...)
+        - SEM exceções no console
+        - SEM elementos do iframe cross-origin
+        - Comportamento idêntico antes e após o fix
+    </div>
+
+    <script>
+        // Helper para facilitar teste manual
+        window.testarCaptura = function() {
+            if (typeof AuraDomMapper === 'undefined') {
+                console.error('❌ AuraDomMapper não encontrado. Carregue a extensão AURA primeiro.');
+                return;
+            }
+            
+            console.log('🧪 Executando AuraDomMapper.capturar()...\n');
+            
+            try {
+                const resultado = AuraDomMapper.capturar();
+                console.log(resultado);
+                
+                // Verificações automáticas
+                console.log('\n✅ Verificações:');
+                console.log('- Contém header:', resultado.includes('ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:'));
+                console.log('- Formato correto:', /\[ID: \d+\] TIPO: \w+ \| TEXTO: ".+"/.test(resultado));
+                console.log('- SEM indicador de iframe:', !resultado.includes('(iframe:'));
+                console.log('- Apenas elementos principais:', resultado.includes('Botão Principal 1') && resultado.includes('Botão Principal 2'));
+                console.log('- SEM elementos do iframe:', !resultado.includes('example.com'));
+                console.log('- SEM exceções:', true);
+                
+                return resultado;
+            } catch (error) {
+                console.error('❌ ERRO CAPTURADO:', error);
+                console.error('⚠️ O código deve tratar SecurityError silenciosamente!');
+                throw error;
+            }
+        };
+        
+        // Testa acesso ao iframe para demonstrar SecurityError
+        window.testarAcessoIframe = function() {
+            const iframe = document.getElementById('cross-origin-iframe');
+            console.log('🔒 Tentando acessar iframe cross-origin...\n');
+            
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                console.log('✅ Acesso permitido (same-origin):', doc);
+            } catch (error) {
+                console.error('❌ SecurityError capturado (esperado para cross-origin):', error.message);
+                console.log('\n💡 O código de captura deve usar try-catch para tratar este erro silenciosamente.');
+            }
+        };
+        
+        console.log('💡 Dicas:');
+        console.log('- Execute window.testarCaptura() para testar captura');
+        console.log('- Execute window.testarAcessoIframe() para ver SecurityError');
+    </script>
+</body>
+</html>

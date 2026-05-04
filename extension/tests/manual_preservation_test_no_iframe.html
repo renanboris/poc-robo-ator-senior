@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preservation Test - No Iframes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #333;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #666;
+            margin-top: 0;
+        }
+        button, input, select, a {
+            margin: 10px 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .expected-output {
+            background: #d1ecf1;
+            border: 1px solid #0c5460;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .invisible {
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+        .off-screen {
+            position: absolute;
+            top: 10000px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Preservation Test - Página SEM Iframes</h1>
+    
+    <div class="instructions">
+        <h3>📋 Instruções de Teste Manual</h3>
+        <ol>
+            <li>Abra o console do navegador (F12)</li>
+            <li>Carregue a extensão AURA (versão NÃO CORRIGIDA)</li>
+            <li>Execute no console: <code>AuraDomMapper.capturar()</code></li>
+            <li>Compare a saída com o "Expected Output" abaixo</li>
+            <li>Verifique que NÃO há indicador <code>(iframe: ...)</code> na saída</li>
+            <li>Após implementar o fix (Task 3), repita o teste</li>
+            <li>A saída deve ser IDÊNTICA (preservation)</li>
+        </ol>
+        <p><strong>⚠️ IMPORTANTE:</strong> Esta página NÃO tem iframes. O comportamento observado aqui deve ser PRESERVADO após o fix.</p>
+    </div>
+
+    <!-- Seção 1: Elementos Básicos -->
+    <div class="test-section">
+        <h2>Seção 1: Elementos Básicos</h2>
+        <button id="btn-salvar">Salvar</button>
+        <button id="btn-cancelar">Cancelar</button>
+        <input type="text" value="Nome do Usuário" />
+        <input type="email" value="email@example.com" />
+        <select>
+            <option>Opção 1</option>
+            <option>Opção 2</option>
+        </select>
+        <a href="#">Link de Ajuda</a>
+    </div>
+
+    <!-- Seção 2: Elementos com Roles -->
+    <div class="test-section">
+        <h2>Seção 2: Elementos com Roles</h2>
+        <div role="button" style="display: inline-block; padding: 10px; background: #007bff; color: white; cursor: pointer;">
+            Botão com Role
+        </div>
+        <div role="menuitem" style="display: inline-block; padding: 10px; background: #28a745; color: white; cursor: pointer;">
+            Menu Item
+        </div>
+        <div role="tab" style="display: inline-block; padding: 10px; background: #ffc107; color: black; cursor: pointer;">
+            Tab Item
+        </div>
+    </div>
+
+    <!-- Seção 3: Elementos com Classes Especiais -->
+    <div class="test-section">
+        <h2>Seção 3: Elementos com Classes Especiais</h2>
+        <div class="btn-primary" style="display: inline-block; padding: 10px; background: #6c757d; color: white;">
+            Botão Primário
+        </div>
+        <div class="button-action" style="display: inline-block; padding: 10px; background: #17a2b8; color: white;">
+            Ação
+        </div>
+        <div class="icon-settings" style="display: inline-block; padding: 10px; background: #dc3545; color: white;">
+            ⚙️ Configurações
+        </div>
+    </div>
+
+    <!-- Seção 4: Elementos Duplicados (devem ser filtrados) -->
+    <div class="test-section">
+        <h2>Seção 4: Elementos Duplicados</h2>
+        <p><em>Apenas o primeiro "Duplicado" deve aparecer na saída</em></p>
+        <button id="dup1">Duplicado</button>
+        <button id="dup2">Duplicado</button>
+        <button id="dup3">Duplicado</button>
+    </div>
+
+    <!-- Seção 5: Elementos Invisíveis (NÃO devem aparecer) -->
+    <div class="test-section">
+        <h2>Seção 5: Elementos Invisíveis</h2>
+        <p><em>Estes elementos NÃO devem aparecer na saída</em></p>
+        <button class="invisible">Invisível (width=0, height=0)</button>
+        <button class="off-screen">Fora da Tela (top=10000px)</button>
+        <button style="display: none;">Display None</button>
+    </div>
+
+    <!-- Expected Output -->
+    <div class="expected-output">
+        <strong>📊 Expected Output (Código NÃO CORRIGIDO e APÓS FIX):</strong>
+
+ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:
+[ID: 0] TIPO: button | TEXTO: "Salvar"
+[ID: 1] TIPO: button | TEXTO: "Cancelar"
+[ID: 2] TIPO: input | TEXTO: "Nome do Usuário"
+[ID: 3] TIPO: input | TEXTO: "email@example.com"
+[ID: 4] TIPO: select | TEXTO: "Opção 1 Opção 2"
+[ID: 5] TIPO: a | TEXTO: "Link de Ajuda"
+[ID: 6] TIPO: div | TEXTO: "Botão com Role"
+[ID: 7] TIPO: div | TEXTO: "Menu Item"
+[ID: 8] TIPO: div | TEXTO: "Tab Item"
+[ID: 9] TIPO: div | TEXTO: "Botão Primário"
+[ID: 10] TIPO: div | TEXTO: "Ação"
+[ID: 11] TIPO: div | TEXTO: "⚙️ Configurações"
+[ID: 12] TIPO: button | TEXTO: "Duplicado"
+
+        <strong>✅ Verificações:</strong>
+        - Formato: [ID: X] TIPO: Y | TEXTO: "Z"
+        - SEM indicador (iframe: ...)
+        - Apenas primeiro "Duplicado" aparece
+        - Elementos invisíveis NÃO aparecem
+        - IDs são únicos e sequenciais
+    </div>
+
+    <script>
+        // Helper para facilitar teste manual
+        window.testarCaptura = function() {
+            if (typeof AuraDomMapper === 'undefined') {
+                console.error('❌ AuraDomMapper não encontrado. Carregue a extensão AURA primeiro.');
+                return;
+            }
+            
+            console.log('🧪 Executando AuraDomMapper.capturar()...\n');
+            const resultado = AuraDomMapper.capturar();
+            console.log(resultado);
+            
+            // Verificações automáticas
+            console.log('\n✅ Verificações:');
+            console.log('- Contém header:', resultado.includes('ELEMENTOS INTERATIVOS VISÍVEIS NA TELA:'));
+            console.log('- Formato correto:', /\[ID: \d+\] TIPO: \w+ \| TEXTO: ".+"/.test(resultado));
+            console.log('- SEM indicador de iframe:', !resultado.includes('(iframe:'));
+            console.log('- Apenas um "Duplicado":', (resultado.match(/Duplicado/g) || []).length === 1);
+            console.log('- Elementos invisíveis ausentes:', !resultado.includes('Invisível') && !resultado.includes('Fora da Tela'));
+            
+            return resultado;
+        };
+        
+        console.log('💡 Dica: Execute window.testarCaptura() para testar automaticamente');
+    </script>
+</body>
+</html>
