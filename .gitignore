@@ -62,3 +62,6 @@ CIL/brain_v2.db              # base experimental do CIL
 
 # Arquivos temporários de escrita atômica
 *.json.tmp
+
+# Hypothesis property-test cache
+.hypothesis/
