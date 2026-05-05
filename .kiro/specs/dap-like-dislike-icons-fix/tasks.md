@@ -1,0 +1,83 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - SVG Fill/Stroke Conflict Detection
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists
+  - **Scoped PBT Approach**: Focus on feedback buttons with SVG icons that have fill="currentColor" conflicting with CSS fill: none
+  - Test that SVG icons in feedback buttons have fill attribute conflicts with CSS (from Bug Condition in design)
+  - Test that icons render as unrecognizable shapes instead of proper thumbs up/down
+  - Test implementation details: `isBugCondition(svgElement)` where SVG has fill="currentColor" but computed style is fill: none
+  - The test assertions should match the Expected Behavior Properties from design (stroke-based rendering)
+  - Run test on UNFIXED code in `extension/modules/aura_feedback.js`
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bug exists)
+  - Document counterexamples found: SVG fill conflicts, unrecognizable icon shapes, CSS override issues
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Button Functionality Preservation
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for button interactions that don't involve SVG rendering
+  - Observe: Click handlers register feedback and disable buttons correctly
+  - Observe: Hover effects apply color changes and transform animations
+  - Observe: Voted states show proper styling (voted-yes/voted-no classes)
+  - Observe: Accessibility attributes (aria-label, title) work with screen readers
+  - Observe: DOM manipulation, opacity transitions, and cleanup work correctly
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements
+  - Property-based testing generates many test cases for stronger guarantees
+  - Test that all non-icon functionality continues to work across interaction scenarios
+  - Run tests on UNFIXED code in `extension/modules/aura_feedback.js`
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+
+- [x] 3. Fix DAP like/dislike icons SVG rendering
+
+  - [x] 3.1 Replace filled SVG icons with stroke-based icons
+    - Replace like button SVG with stroke-optimized thumbs-up icon from Lucide or Heroicons
+    - Replace dislike button SVG with stroke-optimized thumbs-down icon from Lucide or Heroicons
+    - Remove all `fill="currentColor"` attributes from SVG elements
+    - Use paths designed for stroke rendering (2px stroke width)
+    - Maintain same viewBox (24x24) and dimensions for layout compatibility
+    - Ensure icons are visually clear at 16px rendered size
+    - Keep `stroke-width`, `stroke-linecap`, and `stroke-linejoin` attributes if needed
+    - Maintain `aria-hidden="true"` for accessibility
+    - _Bug_Condition: isBugCondition(input) where SVG has fill="currentColor" conflicting with CSS fill: none_
+    - _Expected_Behavior: expectedBehavior(result) - stroke-based icons render correctly with CSS stroke: currentColor_
+    - _Preservation: All button functionality (clicks, hovers, accessibility, DOM manipulation) from Preservation Requirements_
+    - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5_
+
+  - [x] 3.2 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Stroke-Based Icon Rendering
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior (stroke-based rendering)
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1 on FIXED code
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - Verify SVG icons no longer have fill attribute conflicts
+    - Verify icons render as recognizable thumbs up/down shapes
+    - Verify stroke-based rendering works with CSS stroke: currentColor
+    - _Requirements: Expected Behavior Properties from design (2.1, 2.2, 2.3)_
+
+  - [x] 3.3 Verify preservation tests still pass
+    - **Property 2: Preservation** - Button Functionality Preservation
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2 on FIXED code
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm click handlers still register feedback and disable buttons
+    - Confirm hover effects still apply color changes and transforms
+    - Confirm voted states still show proper styling
+    - Confirm accessibility attributes still work correctly
+    - Confirm DOM manipulation and cleanup still work correctly
+    - Confirm all tests still pass after fix (no regressions)
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Verify bug condition test passes (icons render correctly)
+  - Verify preservation tests pass (no functionality regressions)
+  - Test visual appearance across different themes and color schemes
+  - Test that icon changes don't affect button layout or positioning
+  - Test accessibility with screen readers and keyboard navigation
+  - Ensure all tests pass, ask the user if questions arise

@@ -1,0 +1,87 @@
+{
+  "_comment": "Mapeamento de keywords para namespaces do Pinecone - Detecção Automática de Namespace RAG",
+  "_format": "namespace: [lista de keywords para matching case-insensitive]",
+  "_usage": "Este arquivo é carregado automaticamente pelo namespace_detector.py. Edite para adicionar novos módulos ou keywords.",
+  
+  "hcm": [
+    "recursos humanos",
+    "admissao",
+    "admissão",
+    "folha",
+    "folha de pagamento",
+    "rh",
+    "colaborador",
+    "funcionario",
+    "funcionário",
+    "ponto",
+    "ferias",
+    "férias",
+    "beneficios",
+    "benefícios",
+    "rescisao",
+    "rescisão"
+  ],
+  
+  "financeiro": [
+    "contas a pagar",
+    "contas a receber",
+    "tesouraria",
+    "financas",
+    "finanças",
+    "pagamento",
+    "recebimento",
+    "faturamento",
+    "nota fiscal",
+    "boleto",
+    "cobranca",
+    "cobrança",
+    "fluxo de caixa",
+    "conciliacao",
+    "conciliação"
+  ],
+  
+  "ged": [
+    "documentos",
+    "arquivos",
+    "pastas",
+    "ged",
+    "gestao documental",
+    "gestão documental",
+    "documento eletronico",
+    "documento eletrônico",
+    "anexo",
+    "upload",
+    "download"
+  ],
+  
+  "compras": [
+    "compras",
+    "requisicao",
+    "requisição",
+    "pedido de compra",
+    "cotacao",
+    "cotação",
+    "fornecedor",
+    "ordem de compra",
+    "solicitacao de compra",
+    "solicitação de compra"
+  ],
+  
+  "estoque": [
+    "estoque",
+    "inventario",
+    "inventário",
+    "movimentacao",
+    "movimentação",
+    "armazem",
+    "armazém",
+    "produto",
+    "item",
+    "material",
+    "entrada",
+    "saida",
+    "saída",
+    "transferencia",
+    "transferência"
+  ]
+}

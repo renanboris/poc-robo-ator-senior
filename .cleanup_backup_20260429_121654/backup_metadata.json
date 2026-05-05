@@ -1,0 +1,33 @@
+{
+  "timestamp": "20260429_121654",
+  "files": {
+    "test_aura_search.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_aura_search.py",
+    "test_builders.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_builders.py",
+    "test_erp_discovery.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_erp_discovery.py",
+    "test_final_search.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_final_search.py",
+    "test_ged_access.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_ged_access.py",
+    "test_gestao_page.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_gestao_page.py",
+    "test_important_urls_pipeline.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_important_urls_pipeline.py",
+    "test_important_urls.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_important_urls.py",
+    "test_openai.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_openai.py",
+    "test_recursive_erp.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_recursive_erp.py",
+    "test_single_url.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_single_url.py",
+    "test_sitemap_modules.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_sitemap_modules.py",
+    "test_skill_memory.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_skill_memory.py",
+    "test_spa_discovery.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\test_spa_discovery.py",
+    "conftest.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\conftest.py",
+    "analyze_erp_patterns.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\analyze_erp_patterns.py",
+    "analyze_sitemap_structure.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\analyze_sitemap_structure.py",
+    "check_sitemap_content.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\check_sitemap_content.py",
+    "debug_crawler.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\debug_crawler.py",
+    "debug_erp_discovery.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\debug_erp_discovery.py",
+    "enhanced_crawler.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\enhanced_crawler.py",
+    "enhanced_erp_discovery.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\enhanced_erp_discovery.py",
+    "fix_erp_discovery.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\fix_erp_discovery.py",
+    "intelligent_spa_crawler.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\intelligent_spa_crawler.py",
+    "investigate_sitemaps.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\investigate_sitemaps.py",
+    "manual_important_urls.py": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\manual_important_urls.py",
+    "erp_page_content.html": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\erp_page_content.html",
+    "erp_pattern_analysis.json": "C:\\GenUCS\\.cleanup_backup_20260429_121654\\erp_pattern_analysis.json"
+  }
+}

@@ -278,14 +278,14 @@ The implementation integrates with the existing Training OS infrastructure, usin
     - Test source URL inclusion in response
     - _Requirements: 7.1, 7.2, 7.3, 7.5_
 
-- [ ] 16. Create integration tests
-  - [ ] 16.1 Create test fixtures in `tests/test_integration.py`
+- [x] 16. Create integration tests
+  - [x] 16.1 Create test fixtures in `tests/test_integration.py`
     - Create sample sitemap.xml with 5-10 representative URLs
     - Set up test namespace in Pinecone for isolated testing
     - Create test configuration with test API keys and index name
     - _Requirements: 15.1, 15.2_
   
-  - [ ] 16.2 Write end-to-end integration test
+  - [x] 16.2 Write end-to-end integration test
     - Test full pipeline execution with sample sitemap
     - Verify all stages execute without errors
     - Verify vectors are injected into test namespace
@@ -293,19 +293,19 @@ The implementation integrates with the existing Training OS infrastructure, usin
     - Query test namespace and verify retrieval works
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5_
   
-  - [ ] 16.3 Write error recovery integration test
+  - [x] 16.3 Write error recovery integration test
     - Inject failures at each stage (mocked transient errors)
     - Verify pipeline continues processing remaining items
     - Verify failure counts are tracked correctly
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
   
-  - [ ] 16.4 Write incremental mode integration test
+  - [x] 16.4 Write incremental mode integration test
     - Run pipeline twice with same sitemap
     - Verify cached URLs are skipped on second run
     - Verify cache file is updated correctly
     - _Requirements: 11.2, 11.3, 11.4, 11.5_
   
-  - [ ] 16.5 Write namespace segregation integration test
+  - [x] 16.5 Write namespace segregation integration test
     - Process URLs with different nivel_2 values
     - Verify vectors are segregated by namespace
     - Query each namespace independently and verify isolation
@@ -333,7 +333,7 @@ The implementation integrates with the existing Training OS infrastructure, usin
     - Document Aura DAP namespace parameter usage
     - _Requirements: 7.1, 7.2, 8.1_
 
-- [ ] 18. Final checkpoint and validation
+- [x] 18. Final checkpoint and validation
   - Run full test suite (unit + integration tests)
   - Execute pipeline against sample sitemap in test namespace
   - Verify Aura DAP can retrieve vectors from test namespace

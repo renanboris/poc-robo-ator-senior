@@ -137,6 +137,23 @@ async def lifespan(app: FastAPI):
             logging.info("Migração nps_respostas: OK")
     except Exception as _e:
         logging.warning(f"Migração nps_respostas falhou (startup não bloqueado): {_e}")
+    
+    # Initialize Navigation Fallback Engine (AURA Smart Navigation Fallback)
+    try:
+        from navigation_fallback import initialize_navigation_fallback_engine, NAVIGATION_FALLBACK_ENABLED
+        
+        if NAVIGATION_FALLBACK_ENABLED:
+            logging.info("Inicializando Navigation Fallback Engine...")
+            engine = initialize_navigation_fallback_engine()
+            if engine:
+                logging.info("Navigation Fallback Engine inicializado com sucesso")
+            else:
+                logging.warning("Navigation Fallback Engine não pôde ser inicializado")
+        else:
+            logging.info("Navigation Fallback desabilitado via configuração")
+    except Exception as _e:
+        logging.warning(f"Inicialização Navigation Fallback falhou (startup não bloqueado): {_e}")
+    
     yield
 
 def _norm(s: str) -> str:
@@ -1267,6 +1284,110 @@ async def get_metricas():
         "top_falhas":             top_falhas,
         "acoes_requer_revisao":   acoes_requer_revisao,
     }
+
+@app.get("/api/navigation/metrics")
+async def get_navigation_metrics():
+    """
+    Retorna métricas do sistema de Navigation Fallback.
+    
+    Métricas incluem:
+    - Ativações do fallback
+    - Taxa de sucesso de navegações
+    - Tempo médio de navegação
+    - Taxa de cache hit
+    - Tamanho do índice
+    
+    Returns:
+        dict: Métricas de navegação
+    """
+    try:
+        from navigation_fallback import get_navigation_metrics, get_navigation_fallback_engine
+        
+        # Get metrics
+        metrics = get_navigation_metrics()
+        metrics_data = metrics.get_metrics()
+        
+        # Get index size
+        engine = get_navigation_fallback_engine()
+        if engine:
+            index_size = engine.indexer.get_index_size()
+            metrics_data["index_size"] = index_size
+        
+        return metrics_data
+        
+    except Exception as e:
+        logging.warning(f"[navigation_metrics] Erro ao obter métricas: {e}")
+        return {
+
+
+@app.post("/api/navigation/next-step")
+async def navigation_next_step(request: Request):
+    """
+    Avança para o próximo passo da navegação guiada.
+    
+    Body:
+        {
+            "navigation_path": [...],  # Caminho de navegação completo
+            "current_step": 0,  # Passo atual (0-indexed)
+            "dom_context": "..."  # Contexto DOM atual (opcional)
+        }
+    
+    Returns:
+        dict: {
+            "success": bool,
+            "next_step": dict | null,  # Próximo passo ou null se completou
+            "current_step": int,
+            "total_steps": int,
+            "completed": bool
+        }
+    """
+    try:
+        data = await request.json()
+        navigation_path = data.get("navigation_path", [])
+        current_step = data.get("current_step", 0)
+        
+        # Check if navigation is complete
+        if current_step >= len(navigation_path) - 1:
+            return {
+                "success": True,
+                "next_step": None,
+                "current_step": current_step,
+                "total_steps": len(navigation_path),
+                "completed": True,
+                "message": "Navegação concluída!"
+            }
+        
+        # Get next step
+        next_step_index = current_step + 1
+        next_step = navigation_path[next_step_index]
+        
+        return {
+            "success": True,
+            "next_step": next_step,
+            "current_step": next_step_index,
+            "total_steps": len(navigation_path),
+            "completed": False
+        }
+        
+    except Exception as e:
+        logging.error(f"[navigation_next_step] Erro: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "next_step": None,
+            "completed": False
+        }
+            "fallback_activations": None,
+            "navigation_successes": None,
+            "navigation_failures": None,
+            "success_rate": None,
+            "average_navigation_time_ms": None,
+            "cache_hit_rate": None,
+            "cache_hits": None,
+            "cache_misses": None,
+            "index_size": None,
+            "error": str(e)
+        }
 
 @app.get("/api/status")
 async def get_status():

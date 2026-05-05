@@ -63,7 +63,19 @@ def gerar_roteiro_ia_sync(nome_aula: str, objetivo: str, tenant_id: str = "senio
 
     # ── 1. RAG: busca contexto do manual ────────────────────────────────────
     logger.info(f"Buscando manual para: {objetivo}")
-    contexto_rag = dap_engine.buscar_contexto(objetivo, tenant_id)
+    
+    # NEW: Detecta namespace do objetivo
+    from namespace_detector import detectar_namespace
+    
+    contexto_deteccao = {"objetivo": objetivo}
+    namespace_detectado = detectar_namespace(contexto_deteccao)
+    
+    if namespace_detectado:
+        logger.info(f"[Namespace] Detectado: {namespace_detectado} (fonte: objetivo)")
+        contexto_rag = dap_engine.buscar_contexto(objetivo, tenant_id, namespace=namespace_detectado)
+    else:
+        logger.info(f"[Namespace] Não detectado, usando tenant_id: {tenant_id}")
+        contexto_rag = dap_engine.buscar_contexto(objetivo, tenant_id)
 
     if contexto_rag and contexto_rag.get("texto_rag"):
         texto_manual = contexto_rag["texto_rag"]

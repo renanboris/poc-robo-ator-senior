@@ -36,3 +36,8 @@ hypothesis>=6.100.0
 
 # === TESTES / DEV ===
 pytest-timeout>=2.3.0   # Necessário para --timeout=60 no CI (pytest tests/ -m "not integration" -x --timeout=60)
+
+
+# === FILE WATCHING ===
+watchdog>=3.0.0          # Used for automatic navigation index updates
+unidecode>=1.3.0         # Used for query normalization in navigation fallback

@@ -61,12 +61,25 @@ def _buscar_pinecone_sync(objetivo_aula: str) -> str:
     if not chave_pinecone or not nome_index or not _openai_client:
         return "Nenhum contexto adicional."
     try:
+        # NEW: Detecta namespace do objetivo_aula
+        from namespace_detector import detectar_namespace
+        
+        contexto_deteccao = {"objetivo": objetivo_aula}
+        namespace_detectado = detectar_namespace(contexto_deteccao)
+        
+        if namespace_detectado:
+            namespace_query = namespace_detectado
+            logger.info(f"[Namespace] Detectado: {namespace_detectado} (fonte: objetivo_aula)")
+        else:
+            namespace_query = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+            logger.info(f"[Namespace] Não detectado, usando tenant_id: {namespace_query}")
+        
         pc        = Pinecone(api_key=chave_pinecone)
         index     = pc.Index(nome_index)
         embedding = _gerar_embedding_openai(objetivo_aula)
         resultado = index.query(
             vector=embedding, top_k=3, include_metadata=True,
-            namespace=os.getenv("DEFAULT_TENANT_ID", "senior_default"),
+            namespace=namespace_query,  # CHANGED: usa namespace detectado
         )
         textos = [m["metadata"].get("texto", "") or m["metadata"].get("text", "") for m in resultado.get("matches", []) if "metadata" in m]
         return "\n...\n".join(t for t in textos if t) or "Nenhum contexto."

@@ -26,6 +26,8 @@ from google import genai
 from google.genai import types
 import sqlite3
 from utils import limpar_nome, com_retry
+from guardrails import GuardrailEngine, GuardrailConfig, SecurityEventLogger
+from navigation_fallback import get_navigation_fallback_engine, initialize_navigation_fallback_engine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aura_engine")
@@ -38,6 +40,7 @@ GEMINI_LLM_MODEL    = "gemini-2.5-flash"
 TARGET_DIM          = 3072
 TOP_K               = 5
 SCORE_THRESHOLD     = 0.45
+ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS = int(os.getenv("ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS", "500"))
 
 # =========================================================
 # CACHE PERSISTENTE (SQLite) - SPRINT 3
@@ -171,6 +174,108 @@ except Exception as e:
 
 
 # =========================================================
+# GUARDRAIL SYSTEM INITIALIZATION
+# =========================================================
+_guardrail_config = GuardrailConfig.from_env()
+_guardrail_engine = GuardrailEngine(_guardrail_config)
+_security_logger = SecurityEventLogger()
+
+logger.info(f"Guardrails inicializados: SQL={_guardrail_config.enable_sql_injection}, "
+            f"Prompt={_guardrail_config.enable_prompt_injection}, "
+            f"Offensive={_guardrail_config.enable_offensive_content}, "
+            f"Competitor={_guardrail_config.enable_competitor_filter}, "
+            f"VectorOnly={_guardrail_config.enable_vector_store_only}")
+
+
+# =========================================================
+# ELEMENT VISIBILITY CHECK
+# =========================================================
+
+def _extract_element_keywords(prompt_usuario: str) -> list[str]:
+    """
+    Extract potential element references from user query.
+    
+    Args:
+        prompt_usuario: User query
+        
+    Returns:
+        list[str]: List of keywords that might reference UI elements
+    """
+    # Simple keyword extraction - can be improved with NLP
+    keywords = []
+    
+    # Common UI element patterns
+    ui_patterns = [
+        "botão", "botao", "menu", "aba", "campo", "opção", "opcao",
+        "link", "formulário", "formulario", "tabela", "lista",
+        "painel", "janela", "modal", "dropdown", "checkbox"
+    ]
+    
+    prompt_lower = prompt_usuario.lower()
+    
+    # Extract quoted strings (likely element names)
+    import re
+    quoted = re.findall(r'"([^"]*)"', prompt_usuario)
+    quoted.extend(re.findall(r"'([^']*)'", prompt_usuario))
+    keywords.extend(quoted)
+    
+    # Extract capitalized words (likely proper names)
+    words = prompt_usuario.split()
+    for word in words:
+        if word and word[0].isupper() and len(word) > 2:
+            keywords.append(word)
+    
+    # Extract words after UI patterns
+    for pattern in ui_patterns:
+        if pattern in prompt_lower:
+            idx = prompt_lower.find(pattern)
+            # Get next few words after the pattern
+            remaining = prompt_usuario[idx:].split()[:4]
+            keywords.extend(remaining)
+    
+    # Remove duplicates and empty strings
+    keywords = list(set([k.strip() for k in keywords if k.strip()]))
+    
+    return keywords
+
+
+def _check_element_visibility(prompt_usuario: str, dom_context: str, timeout_ms: int = 500) -> bool:
+    """
+    Check if the requested element is visible in the current DOM.
+    
+    Args:
+        prompt_usuario: User query
+        dom_context: Current DOM context from AuraDomMapper
+        timeout_ms: Maximum time for check (default 500ms)
+    
+    Returns:
+        bool: True if element is visible, False otherwise
+    """
+    start_time = time.time()
+    
+    # Extract potential element references from user query
+    element_keywords = _extract_element_keywords(prompt_usuario)
+    
+    if not element_keywords:
+        # No clear element reference - assume visible (let Vision handle it)
+        return True
+    
+    # Search for keywords in DOM context
+    dom_lower = dom_context.lower()
+    for keyword in element_keywords:
+        keyword_lower = keyword.lower()
+        if keyword_lower in dom_lower:
+            elapsed_ms = (time.time() - start_time) * 1000
+            if elapsed_ms < timeout_ms:
+                logger.debug(f"Element '{keyword}' found in DOM (visibility check: {elapsed_ms:.2f}ms)")
+                return True
+    
+    elapsed_ms = (time.time() - start_time) * 1000
+    logger.info(f"Element not found in DOM (visibility check: {elapsed_ms:.2f}ms)")
+    return False
+
+
+# =========================================================
 # MEMÓRIA VETORIAL (OPENAI) & INGESTÃO
 # =========================================================
 
@@ -255,6 +360,11 @@ def buscar_contexto(
         query_namespace = namespace if namespace is not None else tenant_id
         if not query_namespace:
             query_namespace = "senior_default"
+            logger.warning(f"[Namespace] Fallback: namespace e tenant_id ausentes, usando 'senior_default'")
+        elif namespace is None and tenant_id:
+            logger.debug(f"[Namespace] Fallback: namespace não fornecido, usando tenant_id: {tenant_id}")
+        else:
+            logger.debug(f"[Namespace] Usando namespace fornecido: {query_namespace}")
         
         query_embedding = gerar_embedding(prompt_usuario)
         resultados      = pinecone_index.query(
@@ -349,6 +459,23 @@ aura_schema = types.Schema(
 
 
 # =========================================================
+# SEVERITY RANKING HELPER
+# =========================================================
+def _severity_rank(severity: str) -> int:
+    """
+    Rank severity levels for prioritization.
+    Higher number = more severe.
+    """
+    ranks = {
+        "low": 1,
+        "medium": 2,
+        "high": 3,
+        "critical": 4
+    }
+    return ranks.get(severity.lower(), 0)
+
+
+# =========================================================
 # CEREBRO DA AURA (VISÃO E MEMÓRIA)
 # =========================================================
 
@@ -379,7 +506,22 @@ def _analisar_sync(
     busca_rag = buscar_contexto(texto_busca_rag, tenant_id)
 
     # =========================================================
-    # 3. AI GATE: Bypass do Gemini Vision
+    # 3. VECTOR STORE CONTENT RESTRICTION (FIXED)
+    # O guardrail só bloqueia se:
+    # - HÁ contexto RAG E
+    # - O score é menor que o limiar E
+    # - enable_vector_store_only está ativo
+    # Se não há contexto RAG, proceed para AI Gate / Vision normalmente
+    # =========================================================
+    if _guardrail_config.enable_vector_store_only:
+        # Só bloqueia se TIVER contexto RAG mas com score baixo
+        if busca_rag and busca_rag["score"] < SCORE_THRESHOLD:
+            # Se tem contexto mas score baixo, ainda pode usar Vision
+            # Apenas loga o aviso mas NÃO bloqueia
+            logger.info(f"Vector Store: contexto encontrado mas score baixo ({busca_rag['score']:.2f} < {SCORE_THRESHOLD}). Prosseguindo para Vision...")
+
+    # =========================================================
+    # 4. AI GATE: Bypass do Gemini Vision
     # =========================================================
     if busca_rag and busca_rag["score"] > 0.80 and busca_rag["seletor_direto"]:
         logger.info(f"⚡ AI GATE ATIVADO | Confiança: {busca_rag['score']:.2f} | Seletor: {busca_rag['seletor_direto']}")
@@ -394,12 +536,19 @@ def _analisar_sync(
             "elemento_id": None,
             "seletor_css": busca_rag["seletor_direto"],
             "sugestoes":   ["O que mais posso fazer?", "Proximo passo"],
+            # Add source traceability (Requirement 6)
+            "confidence_score": busca_rag["score"],
+            "source_reference": busca_rag.get("melhor_aula")
         }
+        # Add source_url if available (web documentation)
+        if "source_url" in busca_rag:
+            resultado_rapido["source_url"] = busca_rag["source_url"]
+        
         _cache_set(cache_key, resultado_rapido)
         return resultado_rapido
 
     # =========================================================
-    # 4. FALLBACK: Gemini Vision com Memória Conversacional
+    # 5. FALLBACK: Gemini Vision com Memória Conversacional
     # =========================================================
     contexto_rag = busca_rag["texto_rag"] if busca_rag else "Nao ha manual para isto. Use a sua visao e o DOM para ajudar."
     rag_tem_seletor = busca_rag is not None and "SELETOR_EXATO" in contexto_rag
@@ -479,7 +628,14 @@ INSTRUCOES DE CLIQUE E SUGESTOES (CRITICO):
             "elemento_id": dados.get("elemento_id"),
             "seletor_css": seletor_gerado,
             "sugestoes":   dados.get("sugestoes") or [],
+            # Add source traceability (Requirement 6)
+            "confidence_score": busca_rag["score"] if busca_rag else 0.0,
+            "source_reference": busca_rag.get("melhor_aula") if busca_rag else None
         }
+        
+        # Add source_url if available (web documentation)
+        if busca_rag and "source_url" in busca_rag:
+            resultado_final["source_url"] = busca_rag["source_url"]
 
         _cache_set(cache_key, resultado_final)
         return resultado_final
@@ -491,6 +647,8 @@ INSTRUCOES DE CLIQUE E SUGESTOES (CRITICO):
             "elemento_id": None,
             "seletor_css": None,
             "sugestoes":   ["Tentar novamente"],
+            "confidence_score": 0.0,
+            "source_reference": None
         }
 
 
@@ -505,13 +663,95 @@ async def analisar_tela_dap(
 ) -> dict:
     if historico is None: historico = []
     
+    # =========================================================
+    # STEP 1: GUARDRAIL VALIDATION (BEFORE CACHE)
+    # =========================================================
+    violations = await _guardrail_engine.validate_prompt(prompt_usuario, tenant_id)
+    
+    if violations:
+        # Log all violations
+        for violation in violations:
+            await _security_logger.log_event(
+                event_type="guardrail_blocked",
+                tenant_id=tenant_id,
+                prompt=prompt_usuario,
+                guardrail_name=violation.guardrail_name,
+                severity=violation.severity,
+                user_id=user_name,
+                details=violation.details
+            )
+        
+        # Return error message for highest severity violation
+        highest_severity = max(violations, key=lambda v: _severity_rank(v.severity))
+        logger.warning(f"Guardrail blocked request: {highest_severity.guardrail_name} ({highest_severity.severity})")
+        
+        return {
+            "mensagem": highest_severity.message,
+            "elemento_id": None,
+            "seletor_css": None,
+            "sugestoes": [],
+            "blocked": True,
+            "guardrail": highest_severity.guardrail_name,
+            "confidence_score": 0.0,
+            "source_reference": None
+        }
+    
+    # =========================================================
+    # STEP 2: CHECK AI SERVICE AVAILABILITY
+    # =========================================================
     if not gemini_client or not client_openai:
         return {
             "mensagem":    "Motores de IA desconectados. Verifique as chaves de API no .env",
             "elemento_id": None,
             "seletor_css": None,
             "sugestoes":   [],
+            "confidence_score": 0.0,
+            "source_reference": None
         }
+    
+    # =========================================================
+    # STEP 3: CHECK ELEMENT VISIBILITY (NEW - Requirement 1)
+    # =========================================================
+    element_visible = _check_element_visibility(prompt_usuario, dom_context, 
+                                                timeout_ms=ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS)
+    
+    if not element_visible:
+        # Element not visible - try navigation fallback
+        fallback_engine = get_navigation_fallback_engine()
+        
+        if fallback_engine:
+            logger.info("Element not visible, activating navigation fallback")
+            fallback_result = await fallback_engine.handle_invisible_element(
+                user_query=prompt_usuario,
+                dom_context=dom_context,
+                tenant_id=tenant_id
+            )
+            
+            if fallback_result["fallback_type"] == "navigation":
+                # Get first step for immediate highlight
+                nav_path = fallback_result.get("navigation_path", [])
+                first_step = nav_path[0] if nav_path else None
+                
+                # Return navigation offer with first step highlighted
+                return {
+                    "mensagem": fallback_result["mensagem"],
+                    "elemento_id": first_step.get("element", {}).get("label", "") if first_step else None,
+                    "seletor_css": first_step.get("element", {}).get("selector_hint", "") if first_step else None,
+                    "navigation_path": fallback_result["navigation_path"],
+                    "navigation_mode": "guided",  # Flag to indicate guided navigation
+                    "current_step": 0,  # Start at first step
+                    "total_steps": len(nav_path),
+                    "requires_confirmation": True,
+                    "sugestoes": ["Sim, me guie", "Não, obrigado"],
+                    "confidence_score": fallback_result.get("confidence_score", 0.0),
+                    "source_reference": fallback_result.get("roteiro_name"),
+                    "breadcrumb": fallback_result.get("breadcrumb", "")
+                }
+            # If fallback_type is "general", continue to Vision below
+    
+    # =========================================================
+    # STEP 4: PROCEED WITH NORMAL FLOW (Vision + RAG)
+    # =========================================================
     return await asyncio.to_thread(
         _analisar_sync, image_b64, url, prompt_usuario, dom_context, user_name, tenant_id, historico
     )
