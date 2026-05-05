@@ -73,7 +73,9 @@ async def ler_tela(
         gemini_client: Cliente Gemini (None = só DOM)
     """
     from core.screen_fingerprint import (
-        identificar_tela, extrair_sinais, registrar_tela, listar_telas_conhecidas
+        extrair_sinais,
+        identificar_tela,
+        registrar_tela,
     )
 
     estado = EstadoDaTela()

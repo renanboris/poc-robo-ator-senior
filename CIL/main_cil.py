@@ -22,30 +22,32 @@ USO:
   python main_cil.py data/roteiros/Teste09_-_GED.json
 """
 
-import sys
 import os
+import sys
 
 # Garante que a raiz do CIL está no path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import argparse
 import asyncio
 import json
 import logging
-import argparse
 from pathlib import Path
 from typing import Optional
 
-from dotenv import load_dotenv
-from playwright.async_api import async_playwright, Page
+from core.planner_cil import EntradaHistorico, planejar_proximo_passo
+from core.screen_fingerprint import (
+    carregar_conhecimento_de_schema,
+    extrair_sinais,
+    listar_telas_conhecidas,
+    registrar_tela,
+)
+from core.screen_reader import EstadoDaTela, ler_tela
 
 # ── Módulos CIL ────────────────────────────────────────────────
 from core.vision_engine_cil import encontrar_e_clicar
-from core.screen_reader import ler_tela, EstadoDaTela
-from core.screen_fingerprint import (
-    identificar_tela, extrair_sinais, registrar_tela,
-    carregar_conhecimento_de_schema, listar_telas_conhecidas,
-)
-from core.planner_cil import planejar_proximo_passo, EntradaHistorico
+from dotenv import load_dotenv
+from playwright.async_api import Page, async_playwright
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -181,7 +183,7 @@ async def executar_objetivo(
         )
 
         if acao.tipo == "objetivo_atingido":
-            logger.info(f"\n✅ OBJETIVO ATINGIDO (planner confirmou)!")
+            logger.info("\n✅ OBJETIVO ATINGIDO (planner confirmou)!")
             await _registrar_sucesso(objetivo, historico)
             return True
 
@@ -451,7 +453,7 @@ async def main():
         try:
             await fazer_login(page)
 
-            print(f"\n🚀 Iniciando CIL v3 — Modo Dispatch")
+            print("\n🚀 Iniciando CIL v3 — Modo Dispatch")
             print(f"   Objetivo: {objetivo}")
             print(f"   Skills disponíveis: {len(skills)}")
             print(f"   Telas conhecidas: {len(listar_telas_conhecidas())}")

@@ -1,8 +1,9 @@
 import json
 import os
+
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
 
 load_dotenv()
 gemini_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -16,7 +17,7 @@ def reprocessar_json(caminho_arquivo):
         roteiro_antigo = json.load(f)
 
     nome_aula = roteiro_antigo.get("metadata", {}).get("nome_aula", "Aula Reprocessada")
-    
+
     print(f"\n📦 Lendo o arquivo: {nome_aula}")
 
     # 1. Reconstruir o log de ações brutas a partir do roteiro antigo
@@ -112,7 +113,7 @@ def reprocessar_json(caminho_arquivo):
 
         if passo_mesclado["is_conclusao"]:
             passo_mesclado["acoes_tecnicas"].append({"acao": "concluir_video"})
-            
+
         roteiro_final["passos"].append(passo_mesclado)
 
     # 6. Salvar (Criando backup por segurança)
@@ -122,7 +123,7 @@ def reprocessar_json(caminho_arquivo):
     with open(caminho_arquivo, 'w', encoding='utf-8') as f:
         json.dump(roteiro_final, f, indent=2, ensure_ascii=False)
 
-    print(f"✨ MÁGICA FEITA! O Roteiro foi atualizado com pesos e pausas dinâmicas.")
+    print("✨ MÁGICA FEITA! O Roteiro foi atualizado com pesos e pausas dinâmicas.")
     print(f"✅ Salvo em: {caminho_arquivo}")
     print(f"ℹ️ O seu arquivo original está a salvo em: {backup_path}\n")
 

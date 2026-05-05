@@ -12,27 +12,26 @@ Inclui:
 - fechamento com sensação de habilidade adquirida
 """
 
-import json
-import sys
-import os
-import re
 import base64
+import json
+import os
+import sys
 import textwrap
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from datetime import datetime
 
-from utils import limpar_nome
-
-from reportlab.lib.pagesizes import landscape, A4
+from PIL import Image as PILImage
+from PIL import ImageDraw, ImageFilter
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.platypus import Image as RLImage
-from PIL import Image as PILImage, ImageDraw, ImageFilter
 
+from utils import limpar_nome
 
 # ─────────────────────────────────────────────
 # DESIGN SYSTEM · Senior Playbook Engine
@@ -1051,7 +1050,7 @@ class PDFBuilder:
 
     # ─── Build ───────────────────────────────────────────────────────────────
     def build(self) -> str:
-        print(f"\n📔 Gerando Playbook Premium...")
+        print("\n📔 Gerando Playbook Premium...")
         print(f"   {self.n_passos} cenas  ·  {self.n_acoes} ações  ·  {self.meta.get('titulo', self.meta.get('nome_aula', ''))}")
 
         regular_passos = [p for p in self.passos if not p.get("is_conclusao")]

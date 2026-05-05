@@ -16,21 +16,21 @@ Requisitos: 3.3.1, 3.3.2, 3.3.3, 3.3.4, 3.3.5, 3.3.6, 3.3.7
 
 import os
 import sys
+
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import roi_tracker
 from roi_tracker import (
+    calcular_metricas_roi,
     inicializar_tabela,
-    registrar_inicio_criacao,
-    registrar_fim_criacao,
-    registrar_edicao_hitl,
     registrar_acao_gerada,
     registrar_consulta_aura,
-    calcular_metricas_roi,
+    registrar_edicao_hitl,
+    registrar_fim_criacao,
+    registrar_inicio_criacao,
 )
-
 
 # ──────────────────────────────────────────────────────────────
 # Fixture: banco isolado por teste

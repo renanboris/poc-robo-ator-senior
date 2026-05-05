@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from ingestion_pipeline.crawler import SitemapCrawler
@@ -20,7 +21,7 @@ nivel_2_counts = {}
 for url in urls[:50]:  # Sample first 50 URLs
     breadcrumbs = extractor.extract_breadcrumbs(url)
     nivel_2 = breadcrumbs["nivel_2"]
-    
+
     if nivel_2:
         nivel_2_counts[nivel_2] = nivel_2_counts.get(nivel_2, 0) + 1
 

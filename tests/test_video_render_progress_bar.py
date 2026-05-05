@@ -28,11 +28,13 @@ that must be preserved after the fix is applied.
 Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5
 """
 
-import re
 import os
+import re
 import sys
+
 import pytest
-from hypothesis import given, settings, strategies as st, assume
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # ---------------------------------------------------------------------------
 # Load the index.html source once for all tests

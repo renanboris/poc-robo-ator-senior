@@ -6,10 +6,8 @@ import base64
 import json
 import logging
 import os
-import re
 import sys
 from pathlib import Path
-from typing import Optional
 
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
@@ -17,14 +15,15 @@ from playwright.async_api import async_playwright
 # Adiciona o diretório pai ao path para importar módulos da raiz
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils import limpar_nome
 from shadow_builder import (
-    utc_now,
+    classificar_ruido,
     inferir_acao_semantica,
     inferir_entidade_negocio,
     inferir_padrao_interacao,
-    classificar_ruido,
+    utc_now,
 )
+from utils import limpar_nome
+
 
 # Aliases de compatibilidade — mantidos para testes e código externo que
 # importa pelo nome legado. Internamente delegam para as funções unificadas
@@ -747,11 +746,11 @@ async def capturar_hibrido(nome_aula, objetivo):
             await campo_senha.wait_for(state="visible", timeout=10000)
             await campo_senha.fill(senha)
             await asyncio.sleep(0.5)
-            
+
             # A MÁGICA: Pressionar Enter diretamente no campo de senha
             await page.keyboard.press("Enter")
             await asyncio.sleep(1.0)
-            
+
             # Fallback de segurança caso o Enter não submeta o formulário
             entrar = page.locator("button:has-text('Entrar'), button:has-text('Login'), button:has-text('Acessar'), button[type='submit']").first
             if await entrar.count() > 0:

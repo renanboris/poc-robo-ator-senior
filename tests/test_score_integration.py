@@ -13,20 +13,19 @@ Cobre:
 Requisitos: 3.2.3, 3.2.5
 """
 
-import os
-import sys
 import json
-import tempfile
+import os
 import sqlite3
+import sys
+import tempfile
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import score_engine
-from score_engine import registrar_execucao, obter_score, obter_todos_scores
 from lego_builder import construir_biblioteca
-
+from score_engine import obter_score, obter_todos_scores, registrar_execucao
 
 # ──────────────────────────────────────────────────────────────
 # Fixtures
@@ -327,8 +326,9 @@ def test_construir_biblioteca_score_preenchido_com_historico(roteiros_dir, bibli
     Verifica que o campo é populado corretamente quando obter_score retorna um valor.
     Requisito 3.2.5
     """
+    from unittest.mock import MagicMock, patch
+
     import score_engine as se
-    from unittest.mock import patch, MagicMock
 
     acao_id = "clicar_botao_salvar"
     score_simulado = 0.85

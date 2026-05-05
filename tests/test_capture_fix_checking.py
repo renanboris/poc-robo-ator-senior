@@ -18,9 +18,10 @@ Validates: Requirements 2.1, 2.2, 2.3 (Property 1 — Bug Condition)
 """
 
 import asyncio
-import sys
-import os
 import json
+import os
+import sys
+
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -29,7 +30,6 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import capture  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers

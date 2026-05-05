@@ -4,10 +4,10 @@ Requisitos: 1.3.4
 """
 import json
 import os
+
 import pytest
 
 from lego_builder import construir_biblioteca
-
 
 ROTEIRO_REFERENCIA = {
     "metadata": {

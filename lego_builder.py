@@ -11,16 +11,16 @@ Ou chamado programaticamente (ex: via endpoint /api/rebuild-library):
     from lego_builder import construir_biblioteca
     resultado = construir_biblioteca(verbosity="concise")
 """
-import os
-import sys
 import copy
 import json
 import logging
+import os
+import sys
 from datetime import datetime
-from typing import Literal, List, Dict, Any
+from typing import Any, Dict, List, Literal
 
-from utils import safe_write_json
 import score_engine as _score_engine
+from utils import safe_write_json
 
 logger = logging.getLogger("lego_builder")
 
@@ -36,19 +36,19 @@ VerbosityLevel = Literal["concise", "verbose"]
 
 class _OutputFormatter:
     """Standardize visual presentation of output."""
-    
+
     def __init__(self, separator_length: int = 35):
         self.separator_length = separator_length
-    
+
     def create_separator(self) -> str:
         """Generate consistent separator line."""
         return "=" * self.separator_length
-    
+
     def create_header(self, title: str) -> str:
         """Create concise header with title."""
         sep = self.create_separator()
         return f"{sep}\n{title}\n{sep}"
-    
+
     def format_summary_block(self, stats: Dict[str, Any]) -> str:
         """Format consolidated summary block with aligned columns."""
         sep = self.create_separator()
@@ -63,13 +63,13 @@ class _OutputFormatter:
             f"Arquivo salvo        : {stats['arquivo']}",
             f"Versão               : {stats['versao_biblioteca']}",
         ]
-        
+
         if stats.get('erros'):
             lines.append(f"Arquivos com erro    : {len(stats['erros'])}")
-        
+
         lines.append(sep)
         return "\n".join(lines)
-    
+
     def highlight_critical(self, message: str) -> str:
         """Highlight critical information."""
         return f"[!] {message}"
@@ -77,7 +77,7 @@ class _OutputFormatter:
 
 class _ProgressTracker:
     """Track and report progress during batch processing."""
-    
+
     def __init__(self):
         self.total_files = 0
         self.processed_files = 0
@@ -85,47 +85,47 @@ class _ProgressTracker:
         self.errors: List[str] = []
         self.batch_size = 10
         self.last_progress_update = 0
-    
+
     def update_progress(self, files_processed: int) -> None:
         """Update progress counters."""
         self.processed_files = files_processed
-    
+
     def add_error(self, error_message: str) -> None:
         """Add error to aggregation list."""
         self.errors.append(error_message)
-    
+
     def should_show_progress(self) -> bool:
         """Determine if progress update should be shown."""
         if self.processed_files == 0:
             return False
-        
+
         # Show progress every batch_size files or at completion
-        if (self.processed_files % self.batch_size == 0 or 
+        if (self.processed_files % self.batch_size == 0 or
             self.processed_files == self.total_files):
             if self.processed_files != self.last_progress_update:
                 self.last_progress_update = self.processed_files
                 return True
         return False
-    
+
     def get_progress_string(self) -> str:
         """Format progress string with percentage."""
         if self.total_files == 0:
             return ""
-        
+
         percentage = int((self.processed_files / self.total_files) * 100)
         return f"[Progresso] Processados {self.processed_files}/{self.total_files} roteiros ({percentage}%)"
 
 
 class _VerbosityManager:
     """Manage different verbosity levels and filtering."""
-    
+
     def __init__(self, level: VerbosityLevel = "concise"):
         self.level = level
-    
+
     def should_show_individual_actions(self) -> bool:
         """Check if individual action logging should be shown."""
         return self.level == "verbose"
-    
+
     def should_show_batch_progress(self) -> bool:
         """Check if batch progress should be shown."""
         return self.level == "concise"
@@ -133,41 +133,41 @@ class _VerbosityManager:
 
 class _DisplayController:
     """Central coordination of all display-related functionality."""
-    
+
     def __init__(self, verbosity: VerbosityLevel = "concise"):
         self.verbosity = verbosity
         self.progress_tracker = _ProgressTracker()
         self.formatter = _OutputFormatter()
         self.verbosity_manager = _VerbosityManager(verbosity)
-    
+
     def start_execution(self, total_files: int) -> None:
         """Display execution start header."""
         self.progress_tracker.total_files = total_files
         header = self.formatter.create_header("Extração de Peças de Lego")
         _log(header)
         _log(f"Encontrados {total_files} roteiros para análise.\n")
-    
+
     def log_progress(self) -> None:
         """Log batch progress if appropriate."""
-        if (self.verbosity_manager.should_show_batch_progress() and 
+        if (self.verbosity_manager.should_show_batch_progress() and
             self.progress_tracker.should_show_progress()):
             progress_str = self.progress_tracker.get_progress_string()
             if progress_str:
                 _log(progress_str)
-    
+
     def log_new_action(self, intencao: str, arquivo: str) -> None:
         """Log new action cataloging."""
         self.progress_tracker.new_actions += 1
-        
+
         if self.verbosity_manager.should_show_individual_actions():
             _log(f"  + Peça catalogada: '{intencao}' (de {arquivo})")
-    
+
     def log_error(self, message: str) -> None:
         """Log error (always shown regardless of verbosity)."""
         formatted = self.formatter.highlight_critical(message)
         _log(f"  {formatted}")
         self.progress_tracker.add_error(message)
-    
+
     def complete_execution(self, stats: Dict[str, Any]) -> None:
         """Display final summary."""
         summary = self.formatter.format_summary_block(stats)
@@ -205,9 +205,9 @@ def construir_biblioteca(
         env_verbosity = os.environ.get("LEGO_BUILDER_VERBOSITY", "").lower()
         if env_verbosity in ["verbose", "v"]:
             verbosity = "verbose"
-    
+
     display = _DisplayController(verbosity)
-    
+
     if not os.path.exists(roteiros_dir):
         msg = f"Pasta '{roteiros_dir}' não encontrada."
         _log(f"Erro: {msg}")
@@ -224,7 +224,7 @@ def construir_biblioteca(
 
     # sorted() garante ordem determinística entre execuções e SOs
     arquivos = sorted(f for f in os.listdir(roteiros_dir) if f.endswith(".json"))
-    
+
     display.start_execution(len(arquivos))
 
     for idx, arquivo in enumerate(arquivos, 1):
@@ -338,7 +338,7 @@ if __name__ == "__main__":
     verbosity: VerbosityLevel = "concise"
     if "--verbose" in sys.argv or "-v" in sys.argv:
         verbosity = "verbose"
-    
+
     resultado = construir_biblioteca(verbosity=verbosity)
     if resultado["status"] == "erro":
         sys.exit(1)

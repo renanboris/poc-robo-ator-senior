@@ -20,11 +20,10 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hypothesis import given, settings, assume, HealthCheck
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from brain_backend import SQLiteBrainBackend, EntradaBrain
-
+from brain_backend import EntradaBrain, SQLiteBrainBackend
 
 # ──────────────────────────────────────────────────────────────
 # Estrategias Hypothesis
@@ -66,7 +65,8 @@ def test_property_9_brain_tenant_isolation(tenant_a, tenant_b, intencao, seletor
     """
     assume(tenant_a != tenant_b)
 
-    import tempfile, os
+    import os
+    import tempfile
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     try:
@@ -113,7 +113,8 @@ def test_property_9_brain_multiple_entries_isolation(tenant_a, tenant_b, intenco
     """
     assume(tenant_a != tenant_b)
 
-    import tempfile, os
+    import os
+    import tempfile
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     try:

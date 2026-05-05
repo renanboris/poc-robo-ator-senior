@@ -35,7 +35,6 @@ import re
 import sqlite3
 import time
 from dataclasses import dataclass, field
-from typing import Optional
 
 from playwright.async_api import Page
 

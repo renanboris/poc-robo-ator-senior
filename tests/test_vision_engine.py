@@ -8,6 +8,7 @@ Não requer Playwright nem browser.
 import json
 import os
 import sqlite3
+
 import pytest
 
 import vision_engine

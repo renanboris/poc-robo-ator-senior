@@ -14,40 +14,37 @@ Correcoes aplicadas:
   - Chaveador de Vozes (Edge TTS vs ElevenLabs)
 """
 
-import sys
 import asyncio
-import os
 import json
-import time
-import re
-import shutil  
 import logging
-import requests 
+import os
+import re
+import shutil
+import sys
+import time
 
 import edge_tts
+import PIL.Image
 import pygame
+import requests
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
-
-from vision_engine import encontrar_e_clicar
-import score_engine as _score_engine
-from cursor_engine import (
-    instalar_cursor,
-    garantir_cursor_visivel,
-    mover_cursor_humanizado,
-    obter_coords_acao,
-)
-
 from proglog import ProgressBarLogger
 
-import PIL.Image
+import score_engine as _score_engine
+from cursor_engine import (
+    garantir_cursor_visivel,
+    instalar_cursor,
+)
+from vision_engine import encontrar_e_clicar
+
 if not hasattr(PIL.Image, "ANTIALIAS"):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
-from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 import moviepy.audio.fx.all as afx
+from moviepy.editor import AudioFileClip, CompositeAudioClip, VideoFileClip
 
-from utils import limpar_nome, aplicar_blur_screenshot
+from utils import limpar_nome
 
 load_dotenv()
 
@@ -122,15 +119,15 @@ async def gerar_audio(
                 await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
             else:
                 try:
-                    voice_id = "cjVigY5qzO86Huf0OWal" 
+                    voice_id = "cjVigY5qzO86Huf0OWal"
                     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-                    
+
                     headers = {
                         "Accept": "audio/mpeg",
                         "Content-Type": "application/json",
                         "xi-api-key": api_key
                     }
-                    
+
                     data = {
                         "text": texto_falado,
                         "model_id": "eleven_multilingual_v2",
@@ -139,7 +136,7 @@ async def gerar_audio(
                             "similarity_boost": 0.75
                         }
                     }
-                    
+
                     response = requests.post(url, json=data, headers=headers)
                     if response.status_code == 200:
                         with open(arquivo_mp3, 'wb') as f:
@@ -332,7 +329,7 @@ def renderizar_video_final(
     print("\nINICIANDO POS-PRODUCAO...")
     video = None
     clipes_audio = []
-    
+
     try:
         os.makedirs("videos_prontos", exist_ok=True)
         video = VideoFileClip(caminho_webm).subclip(tempo_corte)
@@ -368,11 +365,11 @@ def renderizar_video_final(
         print(f"Erro na Pos-Producao: {e}")
     finally:
         if video:
-            try: video.close() 
+            try: video.close()
             except: pass
-            
+
         for clipe in clipes_audio:
-            try: clipe.close() 
+            try: clipe.close()
             except: pass
 
 # ==============================================================
@@ -538,7 +535,7 @@ async def executar_roteiro(caminho_json: str) -> None:
 
             campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
             await campo_usr.wait_for(state="visible", timeout=10000)
-            
+
             # 🟢 A MÁGICA 2: Digitação Humanizada no Login
             await campo_usr.press_sequentially(usuario, delay=85)
             await asyncio.sleep(0.5)
@@ -550,7 +547,7 @@ async def executar_roteiro(caminho_json: str) -> None:
 
             campo_senha = page.locator("input[type='password']").first
             await campo_senha.wait_for(state="visible", timeout=10000)
-            
+
             # 🟢 A MÁGICA 2: Digitação Humanizada na Senha
             await campo_senha.press_sequentially(senha, delay=85)
             await asyncio.sleep(0.5)

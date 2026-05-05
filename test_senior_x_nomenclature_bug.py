@@ -12,11 +12,12 @@ This test validates Requirements 1.1, 1.2 from bugfix.md:
 **Validates: Requirements 1.1, 1.2**
 """
 
-import pytest
-from hypothesis import given, strategies as st, settings
 import json
-import glob
 from pathlib import Path
+
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 
 def is_bug_condition_json(file_path):
@@ -75,7 +76,7 @@ def find_x_platform_instances_jsonl(file_path):
                         context['contexto_tela'] = data['contexto_tela']
                     if 'tela_id' in data:
                         context['tela_id'] = data['tela_id']
-                    
+
                     instances.append({
                         'line_number': line_num,
                         'context': context,
@@ -99,7 +100,7 @@ class TestBugConditionExploration:
     
     **Validates: Requirements 1.1, 1.2**
     """
-    
+
     def test_biblioteca_acoes_contains_x_platform(self):
         """
         Test that biblioteca_acoes.json contains "X Platform" in string values
@@ -111,13 +112,13 @@ class TestBugConditionExploration:
         - Line 6332: "contexto_tela": "GED | X Platform" should be "GED | X"
         """
         file_path = 'biblioteca_acoes.json'
-        
+
         # Check if file exists
         assert Path(file_path).exists(), f"Target file {file_path} not found"
-        
+
         # Find all instances of "X Platform"
         instances = find_x_platform_instances_json(file_path)
-        
+
         # Document the counterexamples
         if instances:
             print(f"\n{'='*80}")
@@ -129,7 +130,7 @@ class TestBugConditionExploration:
             if len(instances) > 10:
                 print(f"\n... and {len(instances) - 10} more instances")
             print(f"\n{'='*80}\n")
-        
+
         # Expected behavior: No "X Platform" should exist (will fail on unfixed code)
         assert len(instances) == 0, (
             f"Bug condition detected: Found {len(instances)} instances of 'X Platform' in {file_path}. "
@@ -137,7 +138,7 @@ class TestBugConditionExploration:
             f"This failure confirms the bug exists. "
             f"First instance at line {instances[0]['line_number']}: {instances[0]['content'][:100]}"
         )
-    
+
     def test_shadow_exports_contain_x_platform(self):
         """
         Test that shadow_exports/*.jsonl files contain "X Platform" in string values
@@ -149,31 +150,31 @@ class TestBugConditionExploration:
         - Multiple instances of "contexto_tela": "GED | X Platform" should be "contexto_tela": "GED | X"
         """
         shadow_exports_dir = Path('shadow_exports')
-        
+
         # Check if directory exists
         assert shadow_exports_dir.exists(), "shadow_exports directory not found"
-        
+
         # Get all JSONL files
         jsonl_files = list(shadow_exports_dir.glob('*.jsonl'))
         assert len(jsonl_files) > 0, "No JSONL files found in shadow_exports directory"
-        
+
         # Find all instances across all files
         all_instances = []
         files_with_bug = []
-        
+
         for jsonl_file in jsonl_files:
             instances = find_x_platform_instances_jsonl(jsonl_file)
             if instances:
                 files_with_bug.append(jsonl_file.name)
                 all_instances.extend(instances)
-        
+
         # Document the counterexamples
         if all_instances:
             print(f"\n{'='*80}")
             print(f"BUG DETECTED: Found {len(all_instances)} instances of 'X Platform' across {len(files_with_bug)} JSONL files")
             print(f"{'='*80}")
             print(f"Files affected: {', '.join(files_with_bug)}")
-            print(f"\nSample counterexamples:")
+            print("\nSample counterexamples:")
             for i, instance in enumerate(all_instances[:10], 1):  # Show first 10
                 print(f"\nCounterexample {i}:")
                 print(f"  File: {instance['file']}, Line: {instance['line_number']}")
@@ -184,7 +185,7 @@ class TestBugConditionExploration:
             if len(all_instances) > 10:
                 print(f"\n... and {len(all_instances) - 10} more instances")
             print(f"\n{'='*80}\n")
-        
+
         # Expected behavior: No "X Platform" should exist (will fail on unfixed code)
         assert len(all_instances) == 0, (
             f"Bug condition detected: Found {len(all_instances)} instances of 'X Platform' "
@@ -193,7 +194,7 @@ class TestBugConditionExploration:
             f"This failure confirms the bug exists. "
             f"Files affected: {', '.join(files_with_bug[:5])}"
         )
-    
+
     @given(st.sampled_from(['biblioteca_acoes.json']))
     @settings(max_examples=1)
     def test_bug_condition_property_json(self, file_path):
@@ -207,7 +208,7 @@ class TestBugConditionExploration:
         """
         # This is the bug condition check
         has_bug = is_bug_condition_json(file_path)
-        
+
         if has_bug:
             instances = find_x_platform_instances_json(file_path)
             pytest.fail(
@@ -216,7 +217,7 @@ class TestBugConditionExploration:
                 f"Expected: All instances should be 'X' instead. "
                 f"First instance at line {instances[0]['line_number']}"
             )
-    
+
     @given(st.sampled_from(list(Path('shadow_exports').glob('*.jsonl'))))
     @settings(max_examples=5)
     def test_bug_condition_property_jsonl(self, file_path):
@@ -229,7 +230,7 @@ class TestBugConditionExploration:
         the content should NOT contain "X Platform"
         """
         has_bug = is_bug_condition_jsonl(file_path)
-        
+
         if has_bug:
             instances = find_x_platform_instances_jsonl(file_path)
             pytest.fail(
@@ -238,7 +239,7 @@ class TestBugConditionExploration:
                 f"Expected: All instances should be 'X' instead. "
                 f"First instance at line {instances[0]['line_number']}"
             )
-    
+
     def test_json_validity_baseline(self):
         """
         Baseline test: Verify that all target files are valid JSON/JSONL before any changes
@@ -252,7 +253,7 @@ class TestBugConditionExploration:
                 print("✓ biblioteca_acoes.json is valid JSON")
             except json.JSONDecodeError as e:
                 pytest.fail(f"biblioteca_acoes.json is not valid JSON: {e}")
-        
+
         # Test all JSONL files
         jsonl_files = list(Path('shadow_exports').glob('*.jsonl'))
         for jsonl_file in jsonl_files:
@@ -263,7 +264,7 @@ class TestBugConditionExploration:
                             json.loads(line)
                         except json.JSONDecodeError as e:
                             pytest.fail(f"{jsonl_file.name} line {line_num} is not valid JSON: {e}")
-        
+
         print(f"✓ All {len(jsonl_files)} JSONL files are valid")
 
 

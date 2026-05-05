@@ -53,3 +53,12 @@ erp_page_content.html
 erp_pattern_analysis.json
 *_analysis.json
 *_debug.html
+
+# 🔴 ARQUIVOS RUNTIME GERADOS (não commitar — regenerados automaticamente)
+biblioteca_acoes.json        # gerado por lego_builder.py
+roteiro_index.db             # gerado por navigation_fallback.py
+smartplayer_tokens.json      # gerado em runtime
+CIL/brain_v2.db              # base experimental do CIL
+
+# Arquivos temporários de escrita atômica
+*.json.tmp

@@ -12,17 +12,17 @@ All guardrails execute in parallel to preserve performance (<200ms overhead).
 Configuration is loaded from environment variables for runtime control.
 """
 
-import os
-import re
-import urllib.parse
+import asyncio
+import hashlib
 import json
 import logging
-import time
-import hashlib
+import os
+import re
 import sqlite3
+import time
+import urllib.parse
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, List, Set
-import asyncio
+from typing import Any, Dict, List, Optional, Set
 
 # Configure logger for guardrails module
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class GuardrailConfig:
         ENABLE_COMPETITOR_FILTER: Enable competitor mention detection (default: true)
         ENABLE_VECTOR_STORE_ONLY: Enforce vector store content restriction (default: true)
     """
-    
+
     def __init__(
         self,
         enable_sql_injection: bool,
@@ -75,7 +75,7 @@ class GuardrailConfig:
         self.enable_offensive_content = enable_offensive_content
         self.enable_competitor_filter = enable_competitor_filter
         self.enable_vector_store_only = enable_vector_store_only
-    
+
     @classmethod
     def from_env(cls) -> "GuardrailConfig":
         """
@@ -122,7 +122,7 @@ class GuardrailEngine:
     Executes all enabled guardrails in parallel to validate user prompts
     before they reach the AI generation layer.
     """
-    
+
     def __init__(self, config: GuardrailConfig):
         """
         Initialize the guardrail engine with configuration.
@@ -135,7 +135,7 @@ class GuardrailEngine:
         self.prompt_injection_patterns = self._load_prompt_injection_patterns()
         self.offensive_terms = self._load_offensive_terms()
         self.competitor_names = self._load_competitor_names()
-    
+
     def _load_sql_patterns(self) -> List[re.Pattern]:
         """
         Load SQL injection detection patterns.
@@ -149,30 +149,30 @@ class GuardrailEngine:
         patterns = [
             # SQL keywords with FROM/INTO/TABLE/DATABASE
             re.compile(r'(?i)(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|EXEC)\s+.*(FROM|INTO|TABLE|DATABASE)', re.IGNORECASE),
-            
+
             # OR/AND with numeric equality (e.g., OR 1=1)
             re.compile(r'(?i)(OR|AND)\s+\d+\s*=\s*\d+', re.IGNORECASE),
-            
+
             # OR/AND with string equality (e.g., OR '1'='1')
             re.compile(r'(?i)(OR|AND)\s+[\'"][^\'"]*[\'"]\s*=\s*[\'"][^\'"]*[\'"]', re.IGNORECASE),
-            
+
             # Quote followed by OR/AND (common injection pattern)
             re.compile(r'[\'\"]\s+(OR|AND)\s+', re.IGNORECASE),
-            
+
             # SQL comment sequences
             re.compile(r'--|\*\/|\/\*', re.IGNORECASE),
-            
+
             # UNION SELECT attacks
             re.compile(r'(?i)UNION\s+SELECT', re.IGNORECASE),
-            
+
             # SQL keywords with semicolon (statement termination)
             re.compile(r'(?i)(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|EXEC).*;', re.IGNORECASE),
-            
+
             # SQL keywords with quotes (string manipulation)
             re.compile(r'(?i)(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|EXEC).*[\'"]', re.IGNORECASE),
         ]
         return patterns
-    
+
     def _load_prompt_injection_patterns(self) -> List[re.Pattern]:
         """
         Load prompt injection detection patterns.
@@ -186,42 +186,42 @@ class GuardrailEngine:
         patterns = [
             # Ignore previous instructions variations
             re.compile(r'(?i)ignore\s+(previous|all|prior)\s+(instructions|rules|prompts)', re.IGNORECASE),
-            
+
             # Ignore all/prior without specific noun
             re.compile(r'(?i)ignore\s+(all|prior)\s+\w+', re.IGNORECASE),
-            
+
             # Disregard rules variations
             re.compile(r'(?i)disregard\s+(all|previous|prior)', re.IGNORECASE),
-            
+
             # Reveal prompt/instructions
             re.compile(r'(?i)reveal\s+(your|the)\s+(prompt|instructions|system)', re.IGNORECASE),
-            
+
             # Show me system/instructions
             re.compile(r'(?i)show\s+me\s+(your|the)\s+(system|instructions|prompt)', re.IGNORECASE),
-            
+
             # What is your prompt/instructions
             re.compile(r'(?i)what\s+(is|are)\s+(your|the)\s+(prompt|instructions|system)', re.IGNORECASE),
-            
+
             # Tell me the prompt/instructions
             re.compile(r'(?i)tell\s+me\s+(your|the)\s+(prompt|instructions|system)', re.IGNORECASE),
-            
+
             # Role switching
             re.compile(r'(?i)you\s+are\s+now\s+(a|an)', re.IGNORECASE),
-            
+
             # System/Assistant/User role markers
             re.compile(r'(?i)(system|assistant|user)\s*:', re.IGNORECASE),
-            
+
             # Forget instructions - with "all your"
             re.compile(r'(?i)forget\s+(all|previous)\s+(your\s+)?(instructions|rules)', re.IGNORECASE),
-            
+
             # Act as variations
             re.compile(r'(?i)act\s+as\s+(if|a|an)', re.IGNORECASE),
-            
+
             # Pretend to be
             re.compile(r'(?i)pretend\s+(to\s+be|you\s+are)', re.IGNORECASE),
         ]
         return patterns
-    
+
     def _load_offensive_terms(self) -> Dict[str, Set[str]]:
         """
         Load offensive terms from configuration file with fallback to hardcoded list.
@@ -244,7 +244,7 @@ class GuardrailEngine:
         except (FileNotFoundError, json.JSONDecodeError) as e:
             # Log warning and use fallback
             print(f"[WARNING] Could not load offensive_terms.json: {e}. Using fallback list.")
-            
+
             # Minimal fallback list for Portuguese and English
             # In production, this should be loaded from configuration
             return {
@@ -257,7 +257,7 @@ class GuardrailEngine:
                     "crap", "hell", "dick", "pussy"
                 }
             }
-    
+
     def _load_competitor_names(self) -> List[Dict[str, Any]]:
         """
         Load competitor names from configuration file with fallback to hardcoded list.
@@ -275,7 +275,7 @@ class GuardrailEngine:
         except (FileNotFoundError, json.JSONDecodeError) as e:
             # Log warning and use fallback
             print(f"[WARNING] Could not load competitor_names.json: {e}. Using fallback list.")
-            
+
             # Default competitor list
             return [
                 {"name": "SAP", "variants": ["SAP S/4HANA", "SAP ERP", "SAP Business One", "S/4HANA"]},
@@ -284,7 +284,7 @@ class GuardrailEngine:
                 {"name": "Sankhya", "variants": ["Sankhya W"]},
                 {"name": "Microsiga", "variants": []}
             ]
-    
+
     async def _check_sql_injection(self, prompt: str) -> GuardrailResult:
         """
         Detect SQL injection patterns in user prompt.
@@ -300,7 +300,7 @@ class GuardrailEngine:
         """
         # Check URL-decoded version to catch encoded attacks
         decoded_prompt = urllib.parse.unquote(prompt)
-        
+
         # Check both original and decoded versions
         for text in [prompt, decoded_prompt]:
             for pattern in self.sql_patterns:
@@ -316,13 +316,13 @@ class GuardrailEngine:
                             "matched_text": match.group(0)
                         }
                     )
-        
+
         return GuardrailResult(
             passed=True,
             guardrail_name="sql_injection",
             severity="critical"
         )
-    
+
     async def _check_prompt_injection(self, prompt: str) -> GuardrailResult:
         """
         Detect prompt injection attempts in user prompt.
@@ -338,7 +338,7 @@ class GuardrailEngine:
         """
         # Check URL-decoded version to catch encoded attacks
         decoded_prompt = urllib.parse.unquote(prompt)
-        
+
         # Check both original and decoded versions
         for text in [prompt, decoded_prompt]:
             for pattern in self.prompt_injection_patterns:
@@ -354,13 +354,13 @@ class GuardrailEngine:
                             "matched_text": match.group(0)
                         }
                     )
-        
+
         return GuardrailResult(
             passed=True,
             guardrail_name="prompt_injection",
             severity="high"
         )
-    
+
     async def _check_offensive_content(self, prompt: str) -> GuardrailResult:
         """
         Detect offensive language in user prompt.
@@ -377,7 +377,7 @@ class GuardrailEngine:
         # Normalize prompt for matching (lowercase, URL decode)
         decoded_prompt = urllib.parse.unquote(prompt)
         normalized_prompt = decoded_prompt.lower()
-        
+
         # Check all languages
         detected_terms = []
         for lang, terms in self.offensive_terms.items():
@@ -386,7 +386,7 @@ class GuardrailEngine:
                 if term in normalized_prompt:
                     detected_terms.append(term)
                     continue
-                
+
                 # Fuzzy match for common character substitutions
                 # (e.g., @ for a, 0 for o, 1 for i, 3 for e, $ for s)
                 fuzzy_term = term
@@ -395,11 +395,11 @@ class GuardrailEngine:
                 fuzzy_term = fuzzy_term.replace('i', '[i1!]')
                 fuzzy_term = fuzzy_term.replace('o', '[o0]')
                 fuzzy_term = fuzzy_term.replace('s', '[s$5]')
-                
+
                 fuzzy_pattern = re.compile(fuzzy_term, re.IGNORECASE)
                 if fuzzy_pattern.search(normalized_prompt):
                     detected_terms.append(term)
-        
+
         if detected_terms:
             # Sanitize prompt for logging (replace offensive words with [REDACTED])
             sanitized_prompt = prompt
@@ -410,7 +410,7 @@ class GuardrailEngine:
                     sanitized_prompt,
                     flags=re.IGNORECASE
                 )
-            
+
             return GuardrailResult(
                 passed=False,
                 guardrail_name="offensive_content",
@@ -421,13 +421,13 @@ class GuardrailEngine:
                     "sanitized_prompt": sanitized_prompt
                 }
             )
-        
+
         return GuardrailResult(
             passed=True,
             guardrail_name="offensive_content",
             severity="medium"
         )
-    
+
     async def _check_competitor_mention(self, prompt: str) -> GuardrailResult:
         """
         Detect competitor product or company mentions in user prompt.
@@ -444,24 +444,24 @@ class GuardrailEngine:
         # Normalize prompt for matching (lowercase, URL decode)
         decoded_prompt = urllib.parse.unquote(prompt)
         normalized_prompt = decoded_prompt.lower()
-        
+
         detected_competitors = []
-        
+
         for competitor in self.competitor_names:
             competitor_name = competitor["name"]
             variants = competitor.get("variants", [])
-            
+
             # Check main competitor name
             if competitor_name.lower() in normalized_prompt:
                 detected_competitors.append(competitor_name)
                 continue
-            
+
             # Check product variants
             for variant in variants:
                 if variant.lower() in normalized_prompt:
                     detected_competitors.append(f"{competitor_name} ({variant})")
                     break
-        
+
         if detected_competitors:
             return GuardrailResult(
                 passed=False,
@@ -472,13 +472,13 @@ class GuardrailEngine:
                     "detected_competitors": detected_competitors
                 }
             )
-        
+
         return GuardrailResult(
             passed=True,
             guardrail_name="competitor_mention",
             severity="low"
         )
-    
+
     async def _execute_guardrail_with_timeout(
         self,
         guardrail_coro,
@@ -501,10 +501,10 @@ class GuardrailEngine:
             GuardrailResult if successful, None if failed with exception
         """
         start_time = time.time()
-        
+
         try:
             result = await guardrail_coro
-            
+
             # Check execution time and log warning if exceeded
             elapsed_ms = (time.time() - start_time) * 1000
             if elapsed_ms > timeout_ms:
@@ -512,9 +512,9 @@ class GuardrailEngine:
                     f"[GUARDRAIL] {guardrail_name} took {elapsed_ms:.2f}ms "
                     f"(threshold: {timeout_ms}ms)"
                 )
-            
+
             return result
-            
+
         except Exception as e:
             # Log error but don't raise - allow other guardrails to continue
             elapsed_ms = (time.time() - start_time) * 1000
@@ -523,10 +523,10 @@ class GuardrailEngine:
                 exc_info=True
             )
             return None
-    
+
     async def validate_prompt(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         tenant_id: str
     ) -> List[GuardrailResult]:
         """
@@ -548,7 +548,7 @@ class GuardrailEngine:
         start_time = time.time()
         tasks = []
         guardrail_names = []
-        
+
         # Build list of enabled guardrail tasks with their names
         if self.config.enable_sql_injection:
             tasks.append(
@@ -558,7 +558,7 @@ class GuardrailEngine:
                 )
             )
             guardrail_names.append("sql_injection")
-        
+
         if self.config.enable_prompt_injection:
             tasks.append(
                 self._execute_guardrail_with_timeout(
@@ -567,7 +567,7 @@ class GuardrailEngine:
                 )
             )
             guardrail_names.append("prompt_injection")
-        
+
         if self.config.enable_offensive_content:
             tasks.append(
                 self._execute_guardrail_with_timeout(
@@ -576,7 +576,7 @@ class GuardrailEngine:
                 )
             )
             guardrail_names.append("offensive_content")
-        
+
         if self.config.enable_competitor_filter:
             tasks.append(
                 self._execute_guardrail_with_timeout(
@@ -585,25 +585,25 @@ class GuardrailEngine:
                 )
             )
             guardrail_names.append("competitor_mention")
-        
+
         # Execute all guardrails in parallel
         # gather with return_exceptions=False since we handle exceptions in wrapper
         results = await asyncio.gather(*tasks)
-        
+
         # Calculate total execution time
         total_elapsed_ms = (time.time() - start_time) * 1000
-        
+
         # Log warning if total execution time exceeds 200ms
         if total_elapsed_ms > 200.0:
             logger.warning(
                 f"[GUARDRAIL] Total validation took {total_elapsed_ms:.2f}ms "
                 f"(threshold: 200ms) for {len(tasks)} guardrails"
             )
-        
+
         # Filter out None results (failed guardrails) and return only violations
         # None results are from guardrails that raised exceptions
         valid_results = [r for r in results if r is not None]
-        
+
         # Return only failed guardrails (passed=False)
         return [r for r in valid_results if not r.passed]
 
@@ -628,7 +628,7 @@ class SecurityEventLogger:
         - severity_level: TEXT NOT NULL ("low", "medium", "high", "critical")
         - details: TEXT (JSON-encoded additional context)
     """
-    
+
     def __init__(self, db_path: str = "brain.db"):
         """
         Initialize the security event logger.
@@ -638,7 +638,7 @@ class SecurityEventLogger:
         """
         self.db_path = db_path
         self._init_table()
-    
+
     def _init_table(self):
         """
         Create aura_security_events table and indexes if they don't exist.
@@ -665,22 +665,22 @@ class SecurityEventLogger:
                         details TEXT
                     )
                 """)
-                
+
                 # Create index for tenant-based queries
                 conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_security_events_tenant
                     ON aura_security_events (tenant_id, timestamp)
                 """)
-                
+
                 # Create index for event type queries
                 conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_security_events_type
                     ON aura_security_events (event_type, timestamp)
                 """)
-                
+
                 conn.commit()
                 logger.info("[SECURITY] aura_security_events table initialized successfully")
-                
+
         except Exception as e:
             # Log error but don't raise - table initialization failure should not
             # prevent application startup
@@ -688,7 +688,7 @@ class SecurityEventLogger:
                 f"[SECURITY] Failed to initialize aura_security_events table: {e}",
                 exc_info=True
             )
-    
+
     async def log_event(
         self,
         event_type: str,
@@ -721,13 +721,13 @@ class SecurityEventLogger:
         """
         # Hash the prompt for privacy (SHA-256)
         prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()
-        
+
         # Generate timestamp in milliseconds since epoch
         timestamp = int(time.time() * 1000)
-        
+
         # Serialize details to JSON if provided
         details_json = json.dumps(details) if details else None
-        
+
         # Define the database write operation
         def _write():
             try:
@@ -742,13 +742,13 @@ class SecurityEventLogger:
                         guardrail_name, severity, details_json
                     ))
                     conn.commit()
-                    
+
                     # Log successful event recording
                     logger.info(
                         f"[SECURITY] {event_type} blocked for tenant {tenant_id} - "
                         f"{guardrail_name} ({severity})"
                     )
-                    
+
             except Exception as e:
                 # Log error but don't raise - logging failures should not block
                 # request processing (Requirement 7.3)
@@ -756,7 +756,7 @@ class SecurityEventLogger:
                     f"[SECURITY] Failed to log security event: {e}",
                     exc_info=True
                 )
-        
+
         # Execute database write in thread pool to avoid blocking async loop
         # This ensures logging completes within 100ms requirement (Requirement 7.3)
         await asyncio.to_thread(_write)

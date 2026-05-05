@@ -3,11 +3,17 @@ mission_builder.py — Senior Training OS
 Converte os Roteiros de Gravação (JSON) em Simulações Práticas (Missões Pydantic).
 """
 
+import glob
 import json
 import os
-import glob
-from typing import Dict, Any, Optional
-from contracts.mission import OperationalMission, MissionStep, ValidationRule, MissionScoring
+from typing import Optional
+
+from contracts.mission import (
+    MissionScoring,
+    MissionStep,
+    OperationalMission,
+    ValidationRule,
+)
 from utils import limpar_nome
 
 PASTA_ROTEIROS = "roteiros_salvos"
@@ -76,7 +82,7 @@ def converter_roteiro_para_missao(caminho_arquivo: str) -> Optional[OperationalM
                 xp_penalty_per_hint=15,
                 timeout_for_hint_sec=12 # 12 segundos ocioso = penalidade e dica ativada
             )
-            
+
             mission_steps.append(mission_step)
             step_counter += 1
 
@@ -102,7 +108,7 @@ def compilar_todas_as_missoes():
     """Varre os roteiros antigos e gera o catálogo de missões."""
     os.makedirs(PASTA_MISSOES, exist_ok=True)
     arquivos = glob.glob(os.path.join(PASTA_ROTEIROS, "*.json"))
-    
+
     sucessos = 0
     for arq in arquivos:
         try:

@@ -8,26 +8,31 @@ Atualizações:
   - Resiliência: Retry com Exponential Backoff para falhas de rede nas APIs.
 """
 
-import os
-import json
-import base64
-import logging
 import asyncio
+import base64
+import json
+import logging
+import os
 import threading
 import time
 from functools import wraps
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from pinecone import Pinecone
-from openai import OpenAI
+import sqlite3
+
 from google import genai
 from google.genai import types
-import sqlite3
-from utils import limpar_nome, com_retry
-from guardrails import GuardrailEngine, GuardrailConfig, SecurityEventLogger
-from navigation_fallback import get_navigation_fallback_engine, initialize_navigation_fallback_engine
+from openai import OpenAI
+from pinecone import Pinecone
+
+from guardrails import GuardrailConfig, GuardrailEngine, SecurityEventLogger
+from navigation_fallback import (
+    get_navigation_fallback_engine,
+)
+from utils import com_retry, limpar_nome
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aura_engine")
@@ -70,7 +75,7 @@ def _limpar_cache_antigo(conn):
     # 1. Limpa os que passaram de 30 dias
     limite_tempo = time.time() - _CACHE_TTL_SEGUNDOS
     conn.execute("DELETE FROM dap_cache WHERE timestamp < ?", (limite_tempo,))
-    
+
     # 2. Limpa os mais antigos se ultrapassar 5.000 registos
     conn.execute(f"""
         DELETE FROM dap_cache 
@@ -203,28 +208,28 @@ def _extract_element_keywords(prompt_usuario: str) -> list[str]:
     """
     # Simple keyword extraction - can be improved with NLP
     keywords = []
-    
+
     # Common UI element patterns
     ui_patterns = [
         "botão", "botao", "menu", "aba", "campo", "opção", "opcao",
         "link", "formulário", "formulario", "tabela", "lista",
         "painel", "janela", "modal", "dropdown", "checkbox"
     ]
-    
+
     prompt_lower = prompt_usuario.lower()
-    
+
     # Extract quoted strings (likely element names)
     import re
     quoted = re.findall(r'"([^"]*)"', prompt_usuario)
     quoted.extend(re.findall(r"'([^']*)'", prompt_usuario))
     keywords.extend(quoted)
-    
+
     # Extract capitalized words (likely proper names)
     words = prompt_usuario.split()
     for word in words:
         if word and word[0].isupper() and len(word) > 2:
             keywords.append(word)
-    
+
     # Extract words after UI patterns
     for pattern in ui_patterns:
         if pattern in prompt_lower:
@@ -232,10 +237,10 @@ def _extract_element_keywords(prompt_usuario: str) -> list[str]:
             # Get next few words after the pattern
             remaining = prompt_usuario[idx:].split()[:4]
             keywords.extend(remaining)
-    
+
     # Remove duplicates and empty strings
     keywords = list(set([k.strip() for k in keywords if k.strip()]))
-    
+
     return keywords
 
 
@@ -250,7 +255,7 @@ def _is_navigation_request(prompt_usuario: str) -> bool:
         bool: True if this is a navigation request, False if it's a conceptual question
     """
     prompt_lower = prompt_usuario.lower()
-    
+
     # Navigation request patterns
     navigation_patterns = [
         "como acessar", "como chegar", "como ir", "onde fica", "onde está", "onde esta",
@@ -258,24 +263,24 @@ def _is_navigation_request(prompt_usuario: str) -> bool:
         "acessar", "navegar", "encontrar", "localizar", "chegar em", "chegar no",
         "como faço para", "como fazer para", "caminho para"
     ]
-    
+
     # Conceptual question patterns (should NOT trigger navigation)
     conceptual_patterns = [
         "o que é", "o que e", "o que significa", "para que serve", "qual é", "qual e",
         "explique", "defina", "definição", "conceito", "significado",
         "o que faz", "qual a função", "qual função"
     ]
-    
+
     # Check for conceptual patterns first (higher priority)
     for pattern in conceptual_patterns:
         if pattern in prompt_lower:
             return False
-    
+
     # Check for navigation patterns
     for pattern in navigation_patterns:
         if pattern in prompt_lower:
             return True
-    
+
     # Default: if no clear pattern, assume it's NOT a navigation request
     # (let Vision/RAG handle it)
     return False
@@ -294,14 +299,14 @@ def _check_element_visibility(prompt_usuario: str, dom_context: str, timeout_ms:
         bool: True if element is visible, False otherwise
     """
     start_time = time.time()
-    
+
     # Extract potential element references from user query
     element_keywords = _extract_element_keywords(prompt_usuario)
-    
+
     if not element_keywords:
         # No clear element reference - assume visible (let Vision handle it)
         return True
-    
+
     # Search for keywords in DOM context
     dom_lower = dom_context.lower()
     for keyword in element_keywords:
@@ -311,7 +316,7 @@ def _check_element_visibility(prompt_usuario: str, dom_context: str, timeout_ms:
             if elapsed_ms < timeout_ms:
                 logger.debug(f"Element '{keyword}' found in DOM (visibility check: {elapsed_ms:.2f}ms)")
                 return True
-    
+
     elapsed_ms = (time.time() - start_time) * 1000
     logger.info(f"Element not found in DOM (visibility check: {elapsed_ms:.2f}ms)")
     return False
@@ -333,25 +338,25 @@ def _check_target_element_visibility(prompt_usuario: str, dom_context: str, time
         bool: True if target element is visible, False otherwise
     """
     start_time = time.time()
-    
+
     # Extract the target element from navigation query
     # Remove navigation patterns to get the target
     query_lower = prompt_usuario.lower()
-    
+
     # Remove navigation patterns
     for pattern in ["como acessar", "como chegar", "como ir", "onde fica", "onde está", "onde esta",
                     "me leve", "me guie", "me mostre", "quero ir", "preciso ir", "ir para",
                     "acessar", "navegar", "encontrar", "localizar", "chegar em", "chegar no",
                     "como faço para", "como fazer para", "caminho para", "o ", "a ", "os ", "as "]:
         query_lower = query_lower.replace(pattern, " ")
-    
+
     # Clean up and extract target keywords
     target_keywords = [word.strip() for word in query_lower.split() if len(word.strip()) > 2]
-    
+
     if not target_keywords:
         # No clear target - assume not visible
         return False
-    
+
     # Search for target keywords in DOM context
     dom_lower = dom_context.lower()
     for keyword in target_keywords:
@@ -359,7 +364,7 @@ def _check_target_element_visibility(prompt_usuario: str, dom_context: str, time
             elapsed_ms = (time.time() - start_time) * 1000
             logger.debug(f"Target element '{keyword}' found in DOM (visibility check: {elapsed_ms:.2f}ms)")
             return True
-    
+
     elapsed_ms = (time.time() - start_time) * 1000
     logger.info(f"Target element not found in DOM (visibility check: {elapsed_ms:.2f}ms)")
     return False
@@ -426,7 +431,7 @@ def ingestar_para_pinecone(roteiro: dict, tenant_id: str = "senior_default") -> 
 
 
 def buscar_contexto(
-    prompt_usuario: str, 
+    prompt_usuario: str,
     tenant_id: str = "senior_default",
     namespace: str = None
 ) -> dict | None:
@@ -450,12 +455,12 @@ def buscar_contexto(
         query_namespace = namespace if namespace is not None else tenant_id
         if not query_namespace:
             query_namespace = "senior_default"
-            logger.warning(f"[Namespace] Fallback: namespace e tenant_id ausentes, usando 'senior_default'")
+            logger.warning("[Namespace] Fallback: namespace e tenant_id ausentes, usando 'senior_default'")
         elif namespace is None and tenant_id:
             logger.debug(f"[Namespace] Fallback: namespace não fornecido, usando tenant_id: {tenant_id}")
         else:
             logger.debug(f"[Namespace] Usando namespace fornecido: {query_namespace}")
-        
+
         query_embedding = gerar_embedding(prompt_usuario)
         resultados      = pinecone_index.query(
             vector=query_embedding, top_k=TOP_K, namespace=query_namespace, include_metadata=True
@@ -471,7 +476,7 @@ def buscar_contexto(
             if match.score < SCORE_THRESHOLD:
                 continue
             md      = match.metadata
-            
+
             # Suporta tanto formato roteiro (aula/passo) quanto formato web (url/titulo)
             if md.get('aula'):
                 # Formato roteiro
@@ -493,7 +498,7 @@ def buscar_contexto(
             else:
                 # Formato genérico
                 contexto = f"CONTEUDO: {md.get('text', md.get('texto', ''))}"
-            
+
             if md.get("seletor"):
                 contexto += f"\nSELETOR_EXATO: {md.get('seletor')}"
                 if match.score > melhor_score:
@@ -503,7 +508,7 @@ def buscar_contexto(
             elif match.score > melhor_score:
                 melhor_score = match.score
                 melhor_aula  = md.get("aula") or md.get("titulo")
-            
+
             contextos.append(contexto)
 
         if not contextos:
@@ -515,11 +520,11 @@ def buscar_contexto(
             "score":          melhor_score,
             "melhor_aula":    melhor_aula,  # GPS: nome da aula com maior score
         }
-        
+
         # Adiciona source_url se disponível (documentação web)
         if source_url:
             resultado["source_url"] = source_url
-        
+
         return resultado
 
     except Exception as e:
@@ -633,7 +638,7 @@ def _analisar_sync(
         # Add source_url if available (web documentation)
         if "source_url" in busca_rag:
             resultado_rapido["source_url"] = busca_rag["source_url"]
-        
+
         _cache_set(cache_key, resultado_rapido)
         return resultado_rapido
 
@@ -671,7 +676,7 @@ INSTRUCOES DE CLIQUE E SUGESTOES (CRITICO):
 3. PODE e DEVE preencher os dois campos ao mesmo tempo se ambos existirem.
 4. GERE SUGESTOES: No campo "sugestoes", crie 2 ou 3 perguntas muito curtas (max 5 palavras).
 """
-        
+
         # Chamada à API com Retry Embutido
         tentativas = 0
         resposta = None
@@ -722,7 +727,7 @@ INSTRUCOES DE CLIQUE E SUGESTOES (CRITICO):
             "confidence_score": busca_rag["score"] if busca_rag else 0.0,
             "source_reference": busca_rag.get("melhor_aula") if busca_rag else None
         }
-        
+
         # Add source_url if available (web documentation)
         if busca_rag and "source_url" in busca_rag:
             resultado_final["source_url"] = busca_rag["source_url"]
@@ -752,12 +757,12 @@ async def analisar_tela_dap(
     historico: list  = None
 ) -> dict:
     if historico is None: historico = []
-    
+
     # =========================================================
     # STEP 1: GUARDRAIL VALIDATION (BEFORE CACHE)
     # =========================================================
     violations = await _guardrail_engine.validate_prompt(prompt_usuario, tenant_id)
-    
+
     if violations:
         # Log all violations
         for violation in violations:
@@ -770,11 +775,11 @@ async def analisar_tela_dap(
                 user_id=user_name,
                 details=violation.details
             )
-        
+
         # Return error message for highest severity violation
         highest_severity = max(violations, key=lambda v: _severity_rank(v.severity))
         logger.warning(f"Guardrail blocked request: {highest_severity.guardrail_name} ({highest_severity.severity})")
-        
+
         return {
             "mensagem": highest_severity.message,
             "elemento_id": None,
@@ -785,7 +790,7 @@ async def analisar_tela_dap(
             "confidence_score": 0.0,
             "source_reference": None
         }
-    
+
     # =========================================================
     # STEP 2: CHECK AI SERVICE AVAILABILITY
     # =========================================================
@@ -798,23 +803,23 @@ async def analisar_tela_dap(
             "confidence_score": 0.0,
             "source_reference": None
         }
-    
+
     # =========================================================
     # STEP 3: CHECK ELEMENT VISIBILITY (NEW - Requirement 1)
     # =========================================================
     # First, detect if this is a navigation request or a conceptual question
     is_navigation_request = _is_navigation_request(prompt_usuario)
-    
+
     if is_navigation_request:
         # For navigation requests, check if the TARGET element is visible
         # (not intermediate elements like "Senior Flow")
-        element_visible = _check_target_element_visibility(prompt_usuario, dom_context, 
+        element_visible = _check_target_element_visibility(prompt_usuario, dom_context,
                                                            timeout_ms=ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS)
-        
+
         if not element_visible:
             # Target element not visible - activate navigation fallback
             fallback_engine = get_navigation_fallback_engine()
-            
+
             if fallback_engine:
                 logger.info("Target element not visible, activating navigation fallback")
                 fallback_result = await fallback_engine.handle_invisible_element(
@@ -822,12 +827,12 @@ async def analisar_tela_dap(
                     dom_context=dom_context,
                     tenant_id=tenant_id
                 )
-                
+
                 if fallback_result["fallback_type"] == "navigation":
                     # Get first step for immediate highlight
                     nav_path = fallback_result.get("navigation_path", [])
                     first_step = nav_path[0] if nav_path else None
-                    
+
                     # Return navigation offer with first step highlighted
                     return {
                         "mensagem": fallback_result["mensagem"],
@@ -844,7 +849,7 @@ async def analisar_tela_dap(
                         "breadcrumb": fallback_result.get("breadcrumb", "")
                     }
                 # If fallback_type is "general", continue to Vision below
-    
+
     # =========================================================
     # STEP 4: PROCEED WITH NORMAL FLOW (Vision + RAG)
     # =========================================================

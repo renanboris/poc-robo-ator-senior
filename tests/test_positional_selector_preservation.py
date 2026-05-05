@@ -15,13 +15,13 @@ Isso confirma que o baseline está correto e que o fix não deve regredir esses 
 """
 
 import asyncio
-import sys
 import os
 import re
-import pytest
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from hypothesis import given, settings, HealthCheck, assume
+import pytest
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
 # ---------------------------------------------------------------------------
@@ -30,7 +30,6 @@ from hypothesis import strategies as st
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import vision_engine  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers — mesma estrutura do test_positional_selector_bug.py

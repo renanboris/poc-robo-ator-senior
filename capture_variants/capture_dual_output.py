@@ -10,37 +10,32 @@ Correcoes aplicadas:
 """
 
 import asyncio
-import os
-import json
 import base64
-import sys
+import json
 import logging
-import re
-import traceback
+import os
+import sys
 import time
+import traceback
+
 from dotenv import load_dotenv
 
 # Adiciona o diretório pai ao path para importar módulos da raiz
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils import limpar_nome
-from shadow_builder import (
-    utc_now,
-    _infer_capture_scope,
-    _infer_semantic_action_from_capture,
-    _infer_business_entity_from_capture,
-    _infer_pattern_from_capture,
-    _is_noise_event,
-    _montar_evento_shadow,
-    _salvar_shadow_jsonl,
-    inferir_acao_semantica,
-)
-
-from playwright.async_api import async_playwright, Error as PlaywrightError
 from google import genai
 from google.genai import types
 from openai import OpenAI
 from pinecone import Pinecone
+from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import async_playwright
+
+from shadow_builder import (
+    _montar_evento_shadow,
+    _salvar_shadow_jsonl,
+    inferir_acao_semantica,
+)
+from utils import limpar_nome
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -95,10 +90,10 @@ def _chamar_openai_fallback(prompt_sistema: str, prompt_usuario: str, model="gpt
     """
     if not _openai_client:
         raise Exception("OpenAI não configurado. Impossível usar fallback.")
-    
+
     logger.info(f"🔄 Usando OpenAI ({model}) como fallback...")
     print(f"🔄 FALLBACK ATIVADO: Usando OpenAI {model} para gerar o roteiro...", flush=True)
-    
+
     try:
         resposta = _openai_client.chat.completions.create(
             model=model,
@@ -181,7 +176,7 @@ Analise o screenshot e responda com um JSON:
                 contents=[types.Part.from_bytes(data=screenshot_bytes, mime_type="image/jpeg"), prompt],
                 config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1),
             )
-        
+
         resposta = await asyncio.to_thread(_retry_com_backoff, _chamar_gemini, max_tentativas=3, delay_inicial=1)
         resultado = json.loads(resposta.text)
         resultado.setdefault("intencao", fallback["intencao"])
@@ -692,7 +687,7 @@ async def capturar_cliques_na_tela():
             await page.goto(SENIOR_URL)
             await asyncio.sleep(2.0)
             await page.keyboard.press("Escape")
-            
+
             campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
             await campo_usr.wait_for(state="visible", timeout=10000)
             await campo_usr.fill(usuario)
@@ -702,13 +697,13 @@ async def capturar_cliques_na_tela():
                 await page.locator("button:has-text('Próximo'), button:has-text('Proximo'), button:has-text('Continuar')").first.click(timeout=3000)
             except Exception:
                 await page.keyboard.press("Enter")
-            
+
             campo_senha = page.locator("input[type='password']").first
             await campo_senha.wait_for(state="visible", timeout=10000)
             await campo_senha.fill(senha)
             await asyncio.sleep(0.5)
             await page.keyboard.press("Enter")
-            
+
             print("Login efetuado. A aguardar carregamento do painel...", flush=True)
             await page.wait_for_load_state("load", timeout=30_000)
             await asyncio.sleep(2.0)
@@ -718,8 +713,8 @@ async def capturar_cliques_na_tela():
             print("AVISO: O robô não conseguiu fazer o login automático. Por favor, conclua o login manualmente na janela do Chrome!", flush=True)
             try:
                 await page.wait_for_load_state("networkidle", timeout=60000)
-                await asyncio.sleep(3.0) 
-            except Exception as ex:
+                await asyncio.sleep(3.0)
+            except Exception:
                 print("ERRO FATAL: Tempo esgotado para login manual.", flush=True)
                 await browser.close()
                 return
@@ -768,19 +763,19 @@ async def capturar_cliques_na_tela():
             pass
 
         print("CAPTURA DUAL INICIADA! O roteiro oficial segue igual; o shadow semântico será salvo em paralelo. Feche o navegador ao terminar.", flush=True)
-        
+
         loop_iterations = 0
         max_iterations = 1800  # 1 hora máximo (1800 * 2 segundos)
-        
+
         try:
             while not page.is_closed() and loop_iterations < max_iterations:
                 await asyncio.sleep(2)
                 loop_iterations += 1
-                
+
                 # Log de progresso a cada 5 minutos
                 if loop_iterations % 150 == 0:
                     print(f"[DEBUG] Captura ativa há {loop_iterations * 2 // 60} minutos. {len(cliques_capturados)} ações capturadas.", flush=True)
-                
+
                 try:
                     if page.is_closed():
                         print("[DEBUG] Navegador fechado detectado.", flush=True)
@@ -790,14 +785,14 @@ async def capturar_cliques_na_tela():
                 except PlaywrightError as e:
                     if "Target closed" in str(e) or "browser has been closed" in str(e):
                         print("[DEBUG] Playwright detectou fechamento do navegador.", flush=True)
-                        break 
+                        break
                 except Exception as ex:
                     print(f"[DEBUG] Exceção no loop de captura: {ex}", flush=True)
                     break
-            
+
             if loop_iterations >= max_iterations:
                 print("[AVISO] Timeout de 1 hora atingido. Finalizando captura.", flush=True)
-                
+
         except Exception as e:
             print(f"[DEBUG] Exceção externa no loop: {e}", flush=True)
         finally:
@@ -903,24 +898,24 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
                     response_mime_type="application/json", temperature=0.2,
                 ),
             )
-        
+
         logger.info("Chamando Gemini para gerar roteiro (com retry automático se necessário)...")
         resposta = _retry_com_backoff(_chamar_aura, max_tentativas=5, delay_inicial=3)
         dados_da_ia = json.loads(resposta.text)
         print("✅ Roteiro gerado com sucesso usando Gemini.", flush=True)
         print("IA_USADA:gemini", flush=True)  # Marcador para o dashboard
-        
+
     except Exception as e_gemini:
         # Gemini falhou completamente após retries — tentar fallback OpenAI
         logger.error(f"❌ Gemini falhou após todas as tentativas: {e_gemini}")
         print(f"\n❌ GEMINI FALHOU: {str(e_gemini)[:100]}", flush=True)
         print("ALERTA_GEMINI_FALHOU:true", flush=True)  # Marcador para alerta visual
-        
+
         if not _openai_client:
             print("❌ OpenAI não configurado. Impossível gerar roteiro.", flush=True)
             logger.error("OpenAI não configurado. Impossível usar fallback.")
             return None
-        
+
         try:
             dados_da_ia = _chamar_openai_fallback(prompt_sistema, prompt_usuario, model="gpt-4o")
             print("✅ Roteiro gerado com sucesso usando OpenAI (fallback).", flush=True)
@@ -930,7 +925,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
             print(f"❌ OPENAI FALLBACK FALHOU: {str(e_openai)[:100]}", flush=True)
             print("\n🚨 FALHA CRÍTICA: Nenhuma IA disponível para gerar o roteiro.", flush=True)
             return None
-    
+
     try:
         metadata = dados_da_ia.get("metadata", {}); metadata["nome_aula"] = nome_aula
         roteiro_final = {
@@ -990,6 +985,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
             logger.info(f"Portão de qualidade: APROVADO — {motivo_validacao}")
             try:
                 import threading
+
                 import lego_builder as _lb
 
                 def _rebuild_bg():

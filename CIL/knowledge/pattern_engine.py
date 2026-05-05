@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 logger = logging.getLogger(__name__)

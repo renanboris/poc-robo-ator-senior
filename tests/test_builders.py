@@ -22,8 +22,8 @@ from hypothesis import strategies as st
 # ─── Imports dos builders (pré-renomeação) ───────────────────────────────────
 from pdf_builder_playbook_v3 import PDFBuilder, gerar_pdf
 from scorm_builder_playbook_v2 import criar_pacote_scorm
-from utils import limpar_nome, validar_roteiro
 
+from utils import limpar_nome, validar_roteiro
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FIXTURES — roteiros de teste
@@ -227,7 +227,7 @@ class TestPDFBuilderUnitario:
 
     def test_pdf_paginas_minimas(self):
         """PDF com N passos regulares tem pelo menos N+2 páginas."""
-        from reportlab.lib.pagesizes import landscape, A4
+        from reportlab.lib.pagesizes import A4, landscape
         with tempfile.TemporaryDirectory() as tmpdir:
             builder = PDFBuilder(ROTEIRO_MINIMO, pasta=tmpdir)
             path = builder.build()

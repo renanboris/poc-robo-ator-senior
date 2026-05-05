@@ -19,12 +19,11 @@ Requisitos: 2.3.1, 2.3.2, 2.3.3, 2.3.4
 """
 
 import json
-import logging
 import os
 import tempfile
 from typing import List, Protocol, runtime_checkable
 
-from utils import safe_resolve_path, safe_write_json, configurar_logging
+from utils import configurar_logging, safe_resolve_path, safe_write_json
 
 logger = configurar_logging(__name__)
 

@@ -24,7 +24,7 @@ html_files = [url for url in all_urls if url.endswith('.htm') or url.endswith('.
 directories = [url for url in all_urls if url.endswith('/')]
 other = [url for url in all_urls if not (url.endswith('.htm') or url.endswith('.html') or url.endswith('/'))]
 
-print(f"\nCategorização:")
+print("\nCategorização:")
 print(f"  • Arquivos .htm/.html: {len(html_files)}")
 print(f"  • Diretórios (/): {len(directories)}")
 print(f"  • Outros: {len(other)}")
@@ -45,22 +45,22 @@ important_paths = {
 
 for name, path in important_paths.items():
     matching = [url for url in all_urls if path in url.lower()]
-    
+
     if matching:
         print(f"\n✅ {name} ({path}): {len(matching)} URLs")
-        
+
         # Separate by type
         htm_files = [url for url in matching if url.endswith('.htm') or url.endswith('.html')]
         dirs = [url for url in matching if url.endswith('/')]
-        
+
         print(f"   • Arquivos .htm: {len(htm_files)}")
         print(f"   • Diretórios: {len(dirs)}")
-        
+
         # Show first 10 examples
-        print(f"\n   Exemplos:")
+        print("\n   Exemplos:")
         for url in matching[:10]:
             print(f"     • {url}")
-        
+
         if len(matching) > 10:
             print(f"     ... e mais {len(matching) - 10}")
     else:

@@ -1,12 +1,12 @@
 """Tests for the IngestionPipeline orchestrator."""
 
-import pytest
 import json
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
-from ingestion_pipeline.pipeline import IngestionPipeline
+from unittest.mock import patch
+
+import pytest
+
 from ingestion_pipeline.config import PipelineConfig
+from ingestion_pipeline.pipeline import IngestionPipeline
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def mock_config():
 
 class TestPipelineInitialization:
     """Test IngestionPipeline initialization."""
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -47,7 +47,7 @@ class TestPipelineInitialization:
     ):
         """Test pipeline initialization."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         assert pipeline.config == mock_config
         assert pipeline.extractor is not None
         assert pipeline.validator is not None
@@ -59,7 +59,7 @@ class TestPipelineInitialization:
 
 class TestCacheManagement:
     """Test cache loading and saving."""
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -78,11 +78,11 @@ class TestCacheManagement:
         """Test loading cache when file doesn't exist."""
         mock_config.cache_file = str(tmp_path / "nonexistent.json")
         pipeline = IngestionPipeline(mock_config)
-        
+
         pipeline.load_cache()
-        
+
         assert pipeline.cache == {}
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -107,17 +107,17 @@ class TestCacheManagement:
                 "vector_count": 5
             }
         }
-        
+
         with open(cache_file, 'w') as f:
             json.dump(cache_data, f)
-        
+
         mock_config.cache_file = str(cache_file)
         pipeline = IngestionPipeline(mock_config)
-        
+
         pipeline.load_cache()
-        
+
         assert pipeline.cache == cache_data
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -137,7 +137,7 @@ class TestCacheManagement:
         cache_file = tmp_path / "test_cache.json"
         mock_config.cache_file = str(cache_file)
         pipeline = IngestionPipeline(mock_config)
-        
+
         pipeline.cache = {
             "https://example.com/test": {
                 "content_hash": "abc123",
@@ -145,20 +145,20 @@ class TestCacheManagement:
                 "vector_count": 5
             }
         }
-        
+
         pipeline.save_cache()
-        
+
         assert cache_file.exists()
-        
+
         with open(cache_file, 'r') as f:
             saved_cache = json.load(f)
-        
+
         assert saved_cache == pipeline.cache
 
 
 class TestContentHashing:
     """Test content hash computation."""
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -175,15 +175,15 @@ class TestContentHashing:
     ):
         """Test content hash computation."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         markdown = "# Test Content\n\nThis is a test."
         hash1 = pipeline._compute_content_hash(markdown)
         hash2 = pipeline._compute_content_hash(markdown)
-        
+
         # Same content should produce same hash
         assert hash1 == hash2
         assert len(hash1) == 64  # SHA-256 produces 64 hex characters
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -200,19 +200,19 @@ class TestContentHashing:
     ):
         """Test that different content produces different hashes."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         markdown1 = "# Test Content 1"
         markdown2 = "# Test Content 2"
-        
+
         hash1 = pipeline._compute_content_hash(markdown1)
         hash2 = pipeline._compute_content_hash(markdown2)
-        
+
         assert hash1 != hash2
 
 
 class TestCacheChecking:
     """Test cache checking logic."""
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -229,14 +229,14 @@ class TestCacheChecking:
     ):
         """Test cache check when URL is not cached."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         result = pipeline._is_cached(
             "https://example.com/test",
             "# Test Content"
         )
-        
+
         assert result is False
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -253,10 +253,10 @@ class TestCacheChecking:
     ):
         """Test cache check when content is unchanged."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         markdown = "# Test Content"
         content_hash = pipeline._compute_content_hash(markdown)
-        
+
         pipeline.cache = {
             "https://example.com/test": {
                 "content_hash": content_hash,
@@ -264,11 +264,11 @@ class TestCacheChecking:
                 "vector_count": 5
             }
         }
-        
+
         result = pipeline._is_cached("https://example.com/test", markdown)
-        
+
         assert result is True
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -285,11 +285,11 @@ class TestCacheChecking:
     ):
         """Test cache check when content has changed."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         old_markdown = "# Old Content"
         new_markdown = "# New Content"
         old_hash = pipeline._compute_content_hash(old_markdown)
-        
+
         pipeline.cache = {
             "https://example.com/test": {
                 "content_hash": old_hash,
@@ -297,15 +297,15 @@ class TestCacheChecking:
                 "vector_count": 5
             }
         }
-        
+
         result = pipeline._is_cached("https://example.com/test", new_markdown)
-        
+
         assert result is False
 
 
 class TestCacheUpdate:
     """Test cache update logic."""
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -322,18 +322,18 @@ class TestCacheUpdate:
     ):
         """Test cache update."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         url = "https://example.com/test"
         markdown = "# Test Content"
         vector_count = 5
-        
+
         pipeline._update_cache(url, markdown, vector_count)
-        
+
         assert url in pipeline.cache
         assert "content_hash" in pipeline.cache[url]
         assert "last_updated" in pipeline.cache[url]
         assert pipeline.cache[url]["vector_count"] == vector_count
-        
+
         # Verify hash is correct
         expected_hash = pipeline._compute_content_hash(markdown)
         assert pipeline.cache[url]["content_hash"] == expected_hash
@@ -341,7 +341,7 @@ class TestCacheUpdate:
 
 class TestRunStage:
     """Test stage execution with error handling."""
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -358,14 +358,14 @@ class TestRunStage:
     ):
         """Test successful stage execution."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         def stage_func(input_data):
             return ["result1", "result2"]
-        
+
         result = pipeline.run_stage("test_stage", stage_func, None)
-        
+
         assert result == ["result1", "result2"]
-    
+
     @patch('ingestion_pipeline.pipeline.VectorInjector')
     @patch('ingestion_pipeline.pipeline.EmbeddingGenerator')
     @patch('ingestion_pipeline.pipeline.Chunker')
@@ -382,9 +382,9 @@ class TestRunStage:
     ):
         """Test stage execution failure."""
         pipeline = IngestionPipeline(mock_config)
-        
+
         def stage_func(input_data):
             raise Exception("Stage failed")
-        
+
         with pytest.raises(Exception, match="Stage failed"):
             pipeline.run_stage("test_stage", stage_func, None)

@@ -39,29 +39,24 @@ Uso:
 """
 
 import asyncio
-import sys
-import os
 import json
 import logging
-import sqlite3
-import base64
-import re
-import hashlib
+import os
+import sys
 from enum import Enum
-from typing import Optional
+
 from dotenv import load_dotenv
-from playwright.async_api import async_playwright, Page
+from playwright.async_api import Page, async_playwright
+
+import score_engine as _score_engine
 
 # ── Importa módulos existentes do Training OS ─────────────────────────────────
 from vision_engine import (
-    encontrar_e_clicar,
     _consultar_cache,
-    _registrar_sucesso_cache,
     _e_seletor_fragil,
-    DB_PATH,
-    MAX_FALHAS_CACHE,
+    _registrar_sucesso_cache,
+    encontrar_e_clicar,
 )
-import score_engine as _score_engine
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -501,25 +496,25 @@ async def _remover_highlight_hitl(page: Page, seletor: str) -> None:
 
 class AutoPlayController:
     """Gerencia o modo de execução automática e controle de pausas."""
-    
+
     def __init__(self):
         self._is_auto_play: bool = True
         self._pause_requested: bool = False
         self._current_step_index: int = 0
-        
+
     async def execute_continuous(self, steps: list[dict]) -> None:
         """Executa passos continuamente até pausa ou falha"""
         pass  # Implementado no loop principal
-        
+
     def request_pause(self) -> None:
         """Solicita pausa após ação atual"""
         self._pause_requested = True
-        
+
     def resume_auto_play(self) -> None:
         """Retoma execução automática"""
         self._is_auto_play = True
         self._pause_requested = False
-        
+
     def is_paused(self) -> bool:
         """Verifica se execução está pausada"""
         return not self._is_auto_play or self._pause_requested
@@ -527,37 +522,37 @@ class AutoPlayController:
 
 class StepNavigator:
     """Interface visual para navegação e controle de passos quando pausado."""
-    
+
     def __init__(self, page: Page):
         self._page = page
         self._current_step: int = 0
         self._total_steps: int = 0
         self._step_status: dict[int, str] = {}  # executed, pending, error
-        
+
     async def show_navigator(self, step_info: dict) -> None:
         """Exibe overlay do navegador centralizado"""
         await self._inject_navigator_overlay(step_info)
-        
+
     async def hide_navigator(self) -> None:
         """Remove overlay do navegador"""
         await self._page.evaluate("""() => {
             document.getElementById('hitl-navigator')?.remove();
             document.getElementById('hitl-navigator-style')?.remove();
         }""")
-        
+
     async def update_step_info(self, step_index: int, status: str) -> None:
         """Atualiza informações do passo atual"""
         self._current_step = step_index
         self._step_status[step_index] = status
-        
+
     async def wait_for_user_action(self) -> dict:
         """Aguarda decisão do usuário no navegador"""
         pass  # Implementado via binding
-        
+
     async def navigate_to_step(self, step_index: int) -> None:
         """Navega para passo específico"""
         self._current_step = step_index
-        
+
     async def _inject_navigator_overlay(self, step_info: dict) -> None:
         """Injeta o overlay do navegador de passos"""
         await self._page.evaluate("""(stepInfo) => {
@@ -718,11 +713,11 @@ class StepNavigator:
 
 class FloatingPauseButton:
     """Botão flutuante sempre visível para controle manual de pausa."""
-    
+
     def __init__(self, page: Page):
         self._page = page
         self._is_visible: bool = False
-        
+
     async def show_pause_button(self) -> None:
         """Exibe botão de pausa flutuante"""
         await self._page.evaluate("""() => {
@@ -762,7 +757,7 @@ class FloatingPauseButton:
             });
         }""")
         self._is_visible = True
-        
+
     async def hide_pause_button(self) -> None:
         """Remove botão de pausa"""
         await self._page.evaluate("""() => {
@@ -770,7 +765,7 @@ class FloatingPauseButton:
             document.getElementById('hitl-pause-btn-style')?.remove();
         }""")
         self._is_visible = False
-        
+
     async def update_button_state(self, is_paused: bool) -> None:
         """Atualiza visual do botão (pausar/continuar)"""
         if is_paused:
@@ -793,12 +788,12 @@ class FloatingPauseButton:
 
 class EnhancedRadarSystem:
     """Sistema de captura de cliques para correção de seletores."""
-    
+
     def __init__(self, page: Page):
         self._page = page
         self._is_active: bool = False
         self._captured_selector: str = ""
-        
+
     async def activate_radar(self) -> None:
         """Ativa modo radar para captura de cliques"""
         self._is_active = True
@@ -837,14 +832,14 @@ class EnhancedRadarSystem:
 
             document.addEventListener('click', handler, true);
         }}""")
-        
+
     async def deactivate_radar(self) -> None:
         """Desativa modo radar"""
         self._is_active = False
         await self._page.evaluate("""() => {
             window.__hitlRadarAtivo = false;
         }""")
-        
+
     async def wait_for_click(self) -> str:
         """Aguarda clique do usuário e retorna seletor"""
         # Implementado via binding no HitlValidator
@@ -853,25 +848,25 @@ class EnhancedRadarSystem:
 
 class ValidationEngine:
     """Gerencia validações preventivas e checkpoints."""
-    
+
     def __init__(self, gemini_client):
         self._gemini = gemini_client
         self._checkpoint_enabled: bool = True
         self._preventive_enabled: bool = True
-        
+
     async def validate_preventive(self, action: dict, selector: str) -> bool:
         """Validação preventiva antes de executar ação"""
         confidence = _nivel_confianca(action)
         return confidence != NivelConfianca.BAIXA
-        
+
     async def validate_checkpoint(self, page: Page, expected_state: str) -> tuple[bool, str]:
         """Validação checkpoint após executar passo"""
         return await _validar_checkpoint(page, expected_state, "", None)
-        
+
     def should_pause_preventive(self, confidence: NivelConfianca, is_auto_play: bool) -> bool:
         """Determina se deve pausar para validação preventiva"""
         return confidence == NivelConfianca.BAIXA and not is_auto_play
-        
+
     def should_pause_checkpoint(self, is_auto_play: bool) -> bool:
         """Determina se deve pausar para checkpoint"""
         return not is_auto_play and self._checkpoint_enabled
@@ -879,25 +874,25 @@ class ValidationEngine:
 
 class PersistenceManager:
     """Gerencia persistência de correções e atualização de roteiros."""
-    
+
     def __init__(self):
         self._corrections: dict[str, str] = {}  # intencao -> seletor
-        
+
     def save_correction(self, intention: str, selector: str) -> None:
         """Salva correção no mapa in-memory"""
         self._corrections[intention] = selector
-        
+
     async def persist_to_brain_db(self, intention: str, selector: str) -> None:
         """Persiste seletor no Brain DB"""
         _registrar_sucesso_cache(intention, seletor=selector)
-        
+
     async def update_score_engine(self, intention: str) -> None:
         """Atualiza score engine com sucesso"""
         try:
             _score_engine.registrar_execucao(intention, sucesso=True, confianca_captura=1.0)
         except Exception as e:
             logger.warning(f"Score engine não atualizado: {e}")
-        
+
     def rewrite_roteiro_json(self, json_path: str) -> int:
         """Reescreve roteiro com seletores corrigidos"""
         try:
@@ -952,7 +947,7 @@ class HitlValidator:
         self._desvio_anterior: bool = False
         # Referência ao passo anterior — usada na Falha Dura para oferecer "Refazer"
         self._passo_anterior: dict | None = None
-        
+
         # Novos componentes HITL melhorado
         self._auto_play_controller: AutoPlayController | None = None
         self._step_navigator: StepNavigator | None = None
@@ -960,7 +955,7 @@ class HitlValidator:
         self._enhanced_radar_system: EnhancedRadarSystem | None = None
         self._validation_engine: ValidationEngine | None = None
         self._persistence_manager: PersistenceManager = PersistenceManager()
-        
+
         # Estado do sistema melhorado
         self._current_step_index: int = 0
         self._total_steps: int = 0
@@ -978,33 +973,33 @@ class HitlValidator:
             try:
                 payload = await args.json_value()
                 dados   = json.loads(payload) if isinstance(payload, str) else payload
-                
+
                 # Captura de seletor (radar ativo)
                 if "seletor" in dados:
                     self._captura_seletor = dados.get("seletor", "")
                     self._decisao_humana = {"acao": dados.get("acao", "capturou"), "seletor": self._captura_seletor}
-                
+
                 # Ações do navegador de passos
                 elif "acao" in dados:
                     acao = dados["acao"]
-                    
+
                     # Controle de pausa
                     if acao == "pause_requested":
                         if self._auto_play_controller:
                             self._auto_play_controller.request_pause()
                         self._decisao_humana = {"acao": "pause_requested"}
-                    
+
                     # Ações do navegador
-                    elif acao in ["continue_auto", "redo_step", "correct_selector", "skip_step", 
+                    elif acao in ["continue_auto", "redo_step", "correct_selector", "skip_step",
                                   "prev_step", "next_step", "jump_to"]:
                         self._decisao_humana = dados
-                    
+
                     # Outras ações (compatibilidade com sistema antigo)
                     else:
                         self._decisao_humana = dados
-                
+
                 self._evento_humano.set()
-                
+
             except Exception as e:
                 logger.warning(f"Captura humana falhou: {e}")
 
@@ -1014,14 +1009,14 @@ class HitlValidator:
             _on_captura,
             handle=True,
         )
-        
+
         # Inicializa componentes novos
         self._auto_play_controller = AutoPlayController()
         self._step_navigator = StepNavigator(page)
         self._floating_pause_button = FloatingPauseButton(page)
         self._enhanced_radar_system = EnhancedRadarSystem(page)
         self._validation_engine = ValidationEngine(_gemini)
-        
+
         # Exibe botão de pausa sempre visível
         await self._floating_pause_button.show_pause_button()
 
@@ -1036,7 +1031,7 @@ class HitlValidator:
                     await self._floating_pause_button.show_pause_button()
                 except Exception as e:
                     logger.warning(f"Erro ao re-injetar botão de pausa: {e}")
-        
+
         page.on("load", lambda: asyncio.create_task(on_load()))
 
     async def _ativar_radar(self, page: Page) -> None:
@@ -1398,11 +1393,11 @@ class HitlValidator:
             await page.keyboard.press("Enter")
             await page.wait_for_load_state("load", timeout=30_000)
             await asyncio.sleep(2.0)
-            
+
             # Re-injeta o botão de pausa após login (página foi recarregada)
             if self._floating_pause_button:
                 await self._floating_pause_button.show_pause_button()
-            
+
             print("✅ Login OK.", flush=True)
             return True
 
@@ -1412,11 +1407,11 @@ class HitlValidator:
             try:
                 await page.wait_for_load_state("networkidle", timeout=60_000)
                 await asyncio.sleep(3.0)
-                
+
                 # Re-injeta o botão de pausa após login manual
                 if self._floating_pause_button:
                     await self._floating_pause_button.show_pause_button()
-                
+
                 return True
             except Exception:
                 print("❌ Timeout de login manual.", flush=True)
@@ -1602,7 +1597,7 @@ class HitlValidator:
     async def _exibir_relatorio_final(self) -> None:
         """Exibe relatório final com estatísticas atualizadas."""
         print(f"\n{'═'*55}", flush=True)
-        print(f"  RELATÓRIO HITL", flush=True)
+        print("  RELATÓRIO HITL", flush=True)
         print(f"{'═'*55}", flush=True)
         print(f"  Passos executados:     {self._stats['passos_executados']}", flush=True)
         print(f"  Passos com erro:       {self._stats['passos_com_erro']}", flush=True)
@@ -1618,7 +1613,9 @@ class HitlValidator:
     async def _marcar_hitl_validado(self, caminho_json: str) -> None:
         """Marca o roteiro como HITL validado no dashboard."""
         try:
-            import urllib.request, urllib.error, urllib.parse
+            import urllib.error
+            import urllib.parse
+            import urllib.request
             arquivo = os.path.basename(caminho_json)
             req = urllib.request.Request(
                 f"http://localhost:8000/api/marcar-hitl-validado/{urllib.parse.quote(arquivo)}",
@@ -1659,6 +1656,8 @@ class HitlValidator:
             # Guarda também no mapa in-memory para reescrita do JSON
             self._correcoes_seletores[intencao] = seletor_capturado
             self._persistence_manager.save_correction(intencao, seletor_capturado)
+
+    def _reescrever_roteiro_json(self, caminho_json: str) -> None:
         """
         Atualiza o roteiro JSON com os seletores corrigidos pelo analista.
         Assim as correções sobrevivem mesmo sem o brain.db.
@@ -1692,7 +1691,7 @@ class HitlValidator:
         print(f"\n{'═'*55}", flush=True)
         print(f"  VALIDADOR HITL — {os.path.basename(caminho_json)}", flush=True)
         if silent:
-            print(f"  MODO SILENCIOSO — só pausa em falha dura", flush=True)
+            print("  MODO SILENCIOSO — só pausa em falha dura", flush=True)
         print(f"{'═'*55}\n", flush=True)
 
         with open(caminho_json, "r", encoding="utf-8") as f:
@@ -1701,7 +1700,7 @@ class HitlValidator:
         passos = roteiro.get("passos", [])
         total  = len(passos)
         nome   = roteiro.get("metadata", {}).get("nome_aula", "Aula")
-        
+
         self._total_steps = total
 
         print(f"📋 {nome} — {total} passos", flush=True)
@@ -1732,7 +1731,7 @@ class HitlValidator:
 
             # Configura captura de clique humano (binding Python ↔ JS) e inicializa componentes
             await self._setup_captura_humana(page)
-            
+
             # Configura listener para re-injetar botão após navegações de página
             await self._setup_persistent_pause_button(page)
 
@@ -1772,7 +1771,7 @@ class HitlValidator:
             passo = passos[idx]
             self._current_step_index = idx
             self._passo_anterior = passos[idx - 1] if idx > 0 else None
-            
+
             # Atualiza informações do passo no navegador (se estiver aberto)
             if self._is_navigator_open and self._step_navigator:
                 await self._step_navigator.update_step_info(idx, "pending")
@@ -1784,7 +1783,7 @@ class HitlValidator:
 
             # Executa o passo em modo auto-play
             resultado = await self._executar_passo_auto_play(page, passo, idx, len(passos))
-            
+
             if resultado == "refazer_passo" and idx > 0:
                 # Volta ao passo anterior para corrigir a causa raiz
                 idx_refazer = idx - 1
@@ -1806,11 +1805,11 @@ class HitlValidator:
         """
         self._stats["pausas_manuais"] += 1
         self._is_navigator_open = True
-        
+
         # Atualiza botão para modo "continuar"
         if self._floating_pause_button:
             await self._floating_pause_button.update_button_state(is_paused=True)
-        
+
         # Exibe navegador de passos
         step_info = {
             "current": step_index + 1,
@@ -1818,26 +1817,26 @@ class HitlValidator:
             "description": passo.get("pedagogia", {}).get("tooltip_dap", "Sem descrição"),
             "status": "pending"
         }
-        
+
         if self._step_navigator:
             await self._step_navigator.show_navigator(step_info)
-        
+
         # Aguarda decisão do usuário
         decisao = await self._aguardar_decisao(timeout=300)  # 5 minutos
         acao = decisao.get("acao", "continue_auto")
-        
+
         # Processa ação do usuário
         await self._process_navigator_action(page, decisao, step_index)
-        
+
         # Remove navegador e atualiza botão
         if self._step_navigator:
             await self._step_navigator.hide_navigator()
-        
+
         if self._floating_pause_button:
             await self._floating_pause_button.update_button_state(is_paused=False)
-        
+
         self._is_navigator_open = False
-        
+
         # Retoma auto-play
         if self._auto_play_controller:
             self._auto_play_controller.resume_auto_play()
@@ -1847,37 +1846,37 @@ class HitlValidator:
         Processa ações do navegador de passos.
         """
         acao = decisao.get("acao", "continue_auto")
-        
+
         if acao == "continue_auto":
             # Retoma execução automática
             pass
-            
+
         elif acao == "redo_step":
             # Refaz o passo atual
             print(f"   🔄 Refazendo passo {current_step + 1}...", flush=True)
-            
+
         elif acao == "correct_selector":
             # Ativa radar para correção
             if self._enhanced_radar_system:
                 await self._enhanced_radar_system.activate_radar()
                 print("   ✏️ Radar ativo — clique no elemento correto...", flush=True)
-                
+
         elif acao == "skip_step":
             # Pula o passo atual
             print(f"   ⏭ Pulando passo {current_step + 1}...", flush=True)
-            
+
         elif acao == "prev_step":
             # Navega para passo anterior
             if current_step > 0:
                 self._current_step_index = current_step - 1
                 print(f"   ◄ Navegando para passo {current_step}...", flush=True)
-                
+
         elif acao == "next_step":
             # Navega para próximo passo
             if current_step < self._total_steps - 1:
                 self._current_step_index = current_step + 1
                 print(f"   ► Navegando para passo {current_step + 2}...", flush=True)
-                
+
         elif acao == "jump_to":
             # Pula para passo específico
             target_step = decisao.get("target_step", current_step + 1) - 1  # Convert to 0-based
@@ -1917,7 +1916,7 @@ class HitlValidator:
             # Verifica pausa manual durante execução
             if self._auto_play_controller and self._auto_play_controller.is_paused():
                 break
-                
+
             resultado = await self._executar_acao_auto_play(page, acao_tec)
             label  = acao_tec.get("elemento_alvo", {}).get("label_curto", "?")
             status = "✅" if resultado == "ok" else ("❌" if resultado == "error" else "⏭")
@@ -1946,11 +1945,11 @@ class HitlValidator:
 
         # Execução direta via vision_engine (todas as 7 camadas)
         sucesso = await encontrar_e_clicar(page, acao_tec)
-        
+
         if not sucesso:
             # Falha real - será tratada como pausa automática
             return "error"
-            
+
         return "ok"
 
     async def _handle_automatic_pause(self, page: Page, acao_tec: dict, passo: dict) -> None:
@@ -1958,11 +1957,11 @@ class HitlValidator:
         Trata pausa automática em caso de falha real.
         """
         print("   🔴 Falha detectada - pausando automaticamente...", flush=True)
-        
+
         # Força pausa no auto-play controller
         if self._auto_play_controller:
             self._auto_play_controller.request_pause()
-        
+
         # Exibe navegador com opções de correção
         step_info = {
             "current": self._current_step_index + 1,
@@ -1970,10 +1969,10 @@ class HitlValidator:
             "description": passo.get("pedagogia", {}).get("tooltip_dap", "Falha na execução"),
             "status": "error"
         }
-        
+
         if self._step_navigator:
             await self._step_navigator.show_navigator(step_info)
-        
+
         self._is_navigator_open = True
 
 

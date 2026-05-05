@@ -23,8 +23,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from storage_adapter import LocalStorageAdapter, ARTIFACT_DIRS, StorageAdapter
-
+from storage_adapter import ARTIFACT_DIRS, LocalStorageAdapter, StorageAdapter
 
 # ──────────────────────────────────────────────────────────────
 # Fixture: adapter com diretórios isolados por teste

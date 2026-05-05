@@ -17,15 +17,14 @@ Requirements: 14.1–14.4
 
 import logging
 from pathlib import Path
-from typing import Optional
 
-from triage_pipeline import Triage_Pipeline
-from triage_models import IngestionReport
 from legacy_bridge import LegacyBridge
 from observed_action_models import ObservedAction
-from screen_observer import ScreenObserver
 from promotion_engine import Promotion_Gate_Engine
+from screen_observer import ScreenObserver
 from skill_memory import SkillMemory
+from triage_models import IngestionReport
+from triage_pipeline import Triage_Pipeline
 
 logger = logging.getLogger(__name__)
 

@@ -37,11 +37,10 @@ import base64
 import json
 import logging
 import os
-import re
 import sys
 import traceback
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from dotenv import load_dotenv
 from google import genai
@@ -835,7 +834,7 @@ def _inferir_mudanca(antes: dict, depois: dict) -> str:
     if antes.get("sidebar_estado") != depois.get("sidebar_estado"):
         partes.append(f"sidebar: {antes.get('sidebar_estado','')} → {depois.get('sidebar_estado','')}")
     if antes.get("conteudo_central") != depois.get("conteudo_central"):
-        partes.append(f"conteúdo central atualizou")
+        partes.append("conteúdo central atualizou")
     return "; ".join(partes) if partes else "sem mudança detectada"
 
 # ──────────────────────────────────────────────────────────────

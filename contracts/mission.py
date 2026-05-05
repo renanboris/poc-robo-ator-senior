@@ -3,20 +3,22 @@ contracts/mission.py — Senior Training OS
 Contratos de Dados para a Plataforma de Enablement Operacional.
 """
 
-from pydantic import BaseModel, Field
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
 
 class MissionScoring(BaseModel):
     base_xp: int = Field(
-        default=100, 
+        default=100,
         description="XP ganho ao completar a missão com sucesso (ainda que com dicas)."
     )
     no_help_bonus: int = Field(
-        default=50, 
+        default=50,
         description="Bônus de XP se a missão for concluída sem ativar o Assistente Visual."
     )
     time_target_sec: int = Field(
-        default=120, 
+        default=120,
         description="Tempo alvo em segundos. Se bater a meta, ganha multiplicador de velocidade."
     )
 
@@ -25,11 +27,11 @@ class ValidationRule(BaseModel):
         description="Seletor CSS primário que o usuário DEVE interagir para o passo ser válido."
     )
     fallback_text: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="Texto do elemento caso o seletor CSS mude (uso do CIL para resgate)."
     )
     rule_type: str = Field(
-        default="click", 
+        default="click",
         description="Tipo de validação: 'click', 'input_text', 'element_visible'"
     )
 
@@ -43,11 +45,11 @@ class MissionStep(BaseModel):
         description="O texto que o DAP exibe se o usuário travar neste passo."
     )
     xp_penalty_per_hint: int = Field(
-        default=15, 
+        default=15,
         description="Quantos pontos de XP o usuário perde se o highlight acender."
     )
     timeout_for_hint_sec: int = Field(
-        default=12, 
+        default=12,
         description="Tempo ocioso (em segundos) até o sistema considerar que o usuário travou e acender a dica."
     )
 

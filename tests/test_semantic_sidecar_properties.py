@@ -11,23 +11,24 @@ import io
 import json
 import os
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "capture_variants"))
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from shadow_builder import (
-    _infer_capture_scope,
-    _infer_semantic_action_from_capture,
     _infer_business_entity_from_capture,
+    _infer_capture_scope,
     _infer_pattern_from_capture,
+    _infer_semantic_action_from_capture,
     _is_noise_event,
     _montar_evento_shadow,
     _salvar_shadow_jsonl,
     utc_now,
 )
-
 
 # ──────────────────────────────────────────────────────────────
 # UNIT TESTS — shadow_builder importa sem Playwright
@@ -92,6 +93,7 @@ def test_salvar_shadow_jsonl_nao_emite_se_falha(tmp_path, monkeypatch, capsys):
 def test_capture_dual_importa_de_shadow_builder():
     """As 8 funções devem ser importadas de shadow_builder, não definidas localmente."""
     import capture_dual_output
+
     import shadow_builder
 
     funcoes = [
@@ -119,6 +121,7 @@ def test_capture_dual_importa_de_shadow_builder():
 def test_hybrid_utc_now_importado_de_shadow_builder():
     """utc_now em capture_hybrid_shadow deve ser a mesma função de shadow_builder."""
     import capture_hybrid_shadow
+
     import shadow_builder
     assert capture_hybrid_shadow.utc_now is shadow_builder.utc_now
 
@@ -146,7 +149,8 @@ def test_hybrid_infer_semantic_action_selecionar_opcao():
 def test_estado_inicial_tem_shadow_path_none():
     """estado_servidor deve ter shadow_path == None na inicialização."""
     # Verifica diretamente no código fonte sem importar app (evita dep de fastapi no test env)
-    import ast, pathlib
+    import ast
+    import pathlib
     src = pathlib.Path("app.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     for node in ast.walk(tree):
@@ -215,7 +219,8 @@ def test_montar_evento_shadow_campos_obrigatorios(id_acao, acao, label, seletor,
 @settings(max_examples=100)
 def test_salvar_shadow_jsonl_ordena_por_id_acao(eventos):
     """O arquivo JSONL deve conter eventos em ordem crescente de id_acao."""
-    import tempfile, os as _os
+    import os as _os
+    import tempfile
     with tempfile.TemporaryDirectory() as tmpdir:
         orig = _os.getcwd()
         _os.chdir(tmpdir)

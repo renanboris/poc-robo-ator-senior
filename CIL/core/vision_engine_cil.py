@@ -560,10 +560,10 @@ async def _validar(
             is_home = any(w in label_lower for w in ("home", "inicial", "raiz", "root"))
             if is_home:
                 prompt = (
-                    f"Esta é a área de conteúdo de um ERP. O usuário voltou para a página raiz.\n"
-                    f"Aceite como SUCESSO se: breadcrumb mostra só 1 nível, listagem de pastas raiz visível, ou área resetou para o início.\n"
-                    f"NÃO exija texto 'Home' — é um ícone.\n"
-                    f'JSON: {{"sucesso":true/false,"motivo":"..."}}'
+                    "Esta é a área de conteúdo de um ERP. O usuário voltou para a página raiz.\n"
+                    "Aceite como SUCESSO se: breadcrumb mostra só 1 nível, listagem de pastas raiz visível, ou área resetou para o início.\n"
+                    "NÃO exija texto 'Home' — é um ícone.\n"
+                    'JSON: {"sucesso":true/false,"motivo":"..."}'
                 )
             else:
                 prompt = (

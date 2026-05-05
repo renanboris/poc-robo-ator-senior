@@ -1,5 +1,17 @@
 # ruff.toml — Configuração do linter para Senior Training OS
 
+# Diretórios excluídos da verificação (top-level — deve vir antes de qualquer seção)
+exclude = [
+    "venv/",
+    "old_but_gold/",
+    ".hypothesis/",
+    ".git/",
+    "__pycache__/",
+    ".pytest_cache/",
+    "extension/dotlottie-player.js",
+    "extension/node_env/",
+]
+
 [lint]
 # Categorias obrigatórias:
 #   E — erros de estilo PEP8 (pycodestyle)
@@ -19,14 +31,3 @@ ignore = ["E501", "E402"]
 "tests/**/*.py" = ["F401", "F811"]
 # Arquivos legados: ignorar todos os erros
 "old_but_gold/**/*.py" = ["E", "F", "W"]
-
-[exclude]
-# Diretórios excluídos da verificação
-paths = [
-    "venv/",
-    "old_but_gold/",
-    ".hypothesis/",
-    ".git/",
-    "__pycache__/",
-    ".pytest_cache/",
-]

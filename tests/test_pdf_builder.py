@@ -4,6 +4,7 @@ Requisitos: 1.3.5
 """
 import json
 import os
+
 import pytest
 
 reportlab = pytest.importorskip(
@@ -16,7 +17,6 @@ PIL = pytest.importorskip(
 )
 
 from pdf_builder import PDFBuilder
-
 
 ROTEIRO_REFERENCIA = {
     "metadata": {

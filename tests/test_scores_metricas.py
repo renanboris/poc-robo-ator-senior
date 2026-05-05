@@ -12,17 +12,17 @@ Cobre:
 Requisitos: 3.2.1, 3.2.4
 """
 
+import json
 import os
 import sys
-import json
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import score_engine
-from score_engine import registrar_execucao, obter_todos_scores
-
+from score_engine import obter_todos_scores, registrar_execucao
 
 # ──────────────────────────────────────────────────────────────
 # Fixture: banco isolado por teste

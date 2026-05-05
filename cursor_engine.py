@@ -9,9 +9,9 @@ Correcoes aplicadas:
 """
 
 import asyncio
+import logging
 import math
 import random
-import logging
 from typing import Optional
 
 # ══════════════════════════════════════════════════════════
@@ -234,9 +234,9 @@ async def mover_cursor_humanizado(
         t     = i / passos
         ease  = _ease_cubic_inout(t)
         px, py = _bezier_cubica(ease, x_ini, y_ini, cp1x, cp1y, cp2x, cp2y, x_alvo_final, y_alvo_final)
-        
+
         await page.mouse.move(px, py)
-        
+
         # 🟢 FIX IFRAME: Força a página principal a desenhar o cursor, ignorando se estamos num iframe!
         try:
             await page.evaluate(f"if(window.updateRoboCursor) window.updateRoboCursor({px}, {py});")

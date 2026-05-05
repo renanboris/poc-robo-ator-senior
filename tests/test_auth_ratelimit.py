@@ -24,8 +24,7 @@ from hypothesis import strategies as st
 
 # Importa as funções e o cache diretamente de app
 import app as app_module
-from app import verificar_rate_limit, verificar_token, _rate_limit_cache
-
+from app import _rate_limit_cache, verificar_rate_limit, verificar_token
 
 # ---------------------------------------------------------------------------
 # Fixture: limpa o cache entre testes para evitar contaminação

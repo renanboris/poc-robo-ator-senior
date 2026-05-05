@@ -56,12 +56,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-from PIL import Image as _PILImage
-
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from playwright.async_api import Page, Frame
+from PIL import Image as _PILImage
+from playwright.async_api import Frame, Page
 
 load_dotenv()
 
@@ -707,7 +706,7 @@ async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
         try:
             fl = page.frame_locator(seletor_iframe)
             await fl.locator("body").wait_for(state="attached", timeout=800)
-            
+
             # FIX (Task 3.1): After confirming iframe exists, find the actual Frame object
             # FrameLocator doesn't have .url or .name attributes needed for coordinate adjustment
             # We need to return the actual Frame object from page.frames
@@ -807,13 +806,13 @@ async def _digitar_humanizado(page: Page, valor: str) -> None:
     (simula hesitação humana ao digitar).
     """
     import random
-    
+
     # Calcula delay médio com variação aleatória
     delay = random.randint(45, 95)  # 45–95ms por caractere
-    
+
     # Usa keyboard.type que suporta caracteres Unicode/acentuados
     await page.keyboard.type(valor, delay=delay)
-    
+
     # micro-pausa ocasional para simular hesitação humana
     if random.random() < 0.10:
         await asyncio.sleep(random.uniform(0.12, 0.25))
@@ -834,9 +833,9 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
             from cursor_engine import mover_cursor_humanizado
             await page.evaluate("() => { const c = document.getElementById('robo-cursor'); if(c) c.style.opacity = '1'; }")
             await mover_cursor_humanizado(page, cx, cy)
-            
+
             # 🟢 A PEÇA QUE FALTAVA: O Hover estabilizador
-            # Como o rato já está em (cx, cy), não há teleporte visual. 
+            # Como o rato já está em (cx, cy), não há teleporte visual.
             # Ele apenas protege contra o bug de "Abre e logo Fecha" do Angular.
             await locator.hover(timeout=2000)
     except Exception:
@@ -854,16 +853,16 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
         pass
 
     if acao == "upload" or is_file:
-        import tempfile
         import os
+        import tempfile
         nome_arquivo = valor if valor else "documento_treinamento.pdf"
-        nome_arquivo = nome_arquivo.split("\\")[-1].split("/")[-1] 
-        
+        nome_arquivo = nome_arquivo.split("\\")[-1].split("/")[-1]
+
         tmp_path = os.path.join(tempfile.gettempdir(), nome_arquivo)
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(f"{nome_arquivo.upper()}\n\nLorem ipsum dolor sit amet. Este documento é uma simulação.")
-        
-        await page.evaluate(f"""(nome) => {{
+
+        await page.evaluate("""(nome) => {
             const overlay = document.createElement('div');
             overlay.id = 'senior-upload-overlay';
             overlay.style.cssText = `
@@ -876,14 +875,14 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
             overlay.innerHTML = `
                 <div style="font-size:64px; margin-bottom:15px; animation: bounce-vertical 1s infinite alternate;">📁</div>
                 <h2 style="font-weight:400; font-size:28px; margin:0;">Buscando arquivo local no computador...</h2>
-                <p style="color:#00e5e5; font-size:22px; font-weight:bold; margin-top:20px; letter-spacing:1px;">Selecionando: ${{nome}}</p>
+                <p style="color:#00e5e5; font-size:22px; font-weight:bold; margin-top:20px; letter-spacing:1px;">Selecionando: ${nome}</p>
             `;
             document.body.appendChild(overlay);
             setTimeout(() => overlay.style.opacity = '1', 50);
-        }}""", nome_arquivo)
-        
+        }""", nome_arquivo)
+
         await asyncio.sleep(2.5)
-        
+
         try:
             await locator.set_input_files(tmp_path, timeout=2000)
         except Exception:
@@ -894,7 +893,7 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
                 await file_chooser.set_files(tmp_path)
             except Exception:
                 pass
-        
+
         await page.evaluate("""() => {
             const overlay = document.getElementById('senior-upload-overlay');
             if(overlay) {
@@ -1455,7 +1454,7 @@ async def _resolver_elemento_em_iframe(
             return (elemento or {}, x, y, False)
         except Exception:
             return ({}, x, y, False)
-    
+
     try:
         resultado = await page.evaluate("""
             ([x, y]) => {
@@ -1481,18 +1480,18 @@ async def _resolver_elemento_em_iframe(
                 };
             }
         """, [x, y])
-        
+
         if resultado['tipo'] == 'iframe':
             # Ajustar coordenadas para o sistema do iframe
             x_rel = int(x - resultado['left'])
             y_rel = int(y - resultado['top'])
-            
+
             logger.info(f"[iframe] Detectado em ({x}, {y}), ajustando para ({x_rel}, {y_rel})")
-            
+
             # Tentar acessar o iframe
             iframe_src = resultado.get('src', '')
             iframe_name = resultado.get('name', '')
-            
+
             # Resolver o frame usando Playwright
             frame = None
             for f in page.frames:
@@ -1505,19 +1504,19 @@ async def _resolver_elemento_em_iframe(
                         break
                 except Exception:
                     continue
-            
+
             if not frame:
                 # Cross-origin ou frame não encontrado
                 logger.warning(f"[iframe] Cross-origin ou não acessível em ({x}, {y}) - aplicando fail-open")
                 return (resultado, x, y, True)
-            
+
             # Recursivamente resolver no contexto do iframe
             return await _resolver_elemento_em_iframe_frame(frame, x_rel, y_rel, max_depth - 1)
-        
+
         else:
             # Elemento final encontrado (não é iframe)
             return (resultado, x, y, False)
-    
+
     except Exception as exc:
         logger.warning(f"[iframe] Erro ao resolver elemento em ({x}, {y}): {exc}")
         return ({}, x, y, False)
@@ -1553,7 +1552,7 @@ async def _resolver_elemento_em_iframe_frame(
             return (elemento or {}, x, y, False)
         except Exception:
             return ({}, x, y, False)
-    
+
     try:
         resultado = await frame.evaluate("""
             ([x, y]) => {
@@ -1579,18 +1578,18 @@ async def _resolver_elemento_em_iframe_frame(
                 };
             }
         """, [x, y])
-        
+
         if resultado['tipo'] == 'iframe':
             # Ajustar coordenadas para o sistema do iframe aninhado
             x_rel = int(x - resultado['left'])
             y_rel = int(y - resultado['top'])
-            
+
             logger.info(f"[iframe] Iframe aninhado detectado em ({x}, {y}), ajustando para ({x_rel}, {y_rel})")
-            
+
             # Tentar acessar o iframe aninhado
             iframe_src = resultado.get('src', '')
             iframe_name = resultado.get('name', '')
-            
+
             # Buscar frame aninhado
             nested_frame = None
             for f in frame.child_frames:
@@ -1603,19 +1602,19 @@ async def _resolver_elemento_em_iframe_frame(
                         break
                 except Exception:
                     continue
-            
+
             if not nested_frame:
                 # Cross-origin ou frame não encontrado
                 logger.warning(f"[iframe] Iframe aninhado cross-origin ou não acessível em ({x}, {y}) - aplicando fail-open")
                 return (resultado, x, y, True)
-            
+
             # Recursivamente resolver no contexto do iframe aninhado
             return await _resolver_elemento_em_iframe_frame(nested_frame, x_rel, y_rel, max_depth - 1)
-        
+
         else:
             # Elemento final encontrado (não é iframe)
             return (resultado, x, y, False)
-    
+
     except Exception as exc:
         logger.warning(f"[iframe] Erro ao resolver elemento (frame) em ({x}, {y}): {exc}")
         return ({}, x, y, False)
@@ -1658,20 +1657,20 @@ async def _verificar_identidade_por_coordenadas(
     # Fail-open: se label_curto vazio, aceitar sem verificação
     if not label_curto:
         return (True, False)
-    
+
     try:
         # Determinar se deve usar iframe_hint ou detecção automática
         usar_iframe_hint = (
             iframe_hint and
             iframe_hint not in ("Pagina Principal", "Página Principal", "iframe-cross-origin")
         )
-        
+
         if usar_iframe_hint:
             logger.info(f"   [Coords Capturadas] Usando iframe_hint: '{iframe_hint}'")
             contexto = await _resolver_contexto(page, iframe_hint)
             x_ajustado, y_ajustado = x, y
             is_cross_origin = False
-            
+
             if isinstance(contexto, Frame):
                 try:
                     # Ajustar coordenadas para iframe offset
@@ -1694,7 +1693,7 @@ async def _verificar_identidade_por_coordenadas(
                         x_ajustado = int(x - iframe_bbox['left'])
                         y_ajustado = int(y - iframe_bbox['top'])
                         logger.info(f"   [Coords Capturadas] Coordenadas ajustadas para iframe: ({x}, {y}) -> ({x_ajustado}, {y_ajustado})")
-                    
+
                     # Obter elemento no iframe
                     elemento_info = await contexto.evaluate("""
                         ([x, y]) => {
@@ -1712,21 +1711,21 @@ async def _verificar_identidade_por_coordenadas(
                     elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
                         await _resolver_elemento_em_iframe(page, x, y)
             else:
-                logger.info(f"   [Coords Capturadas] iframe_hint não resolveu para Frame - usando detecção automática")
+                logger.info("   [Coords Capturadas] iframe_hint não resolveu para Frame - usando detecção automática")
                 # Fallback para detecção automática
                 elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
                     await _resolver_elemento_em_iframe(page, x, y)
         else:
-            logger.info(f"   [Coords Capturadas] Detecção automática de iframe ativada")
+            logger.info("   [Coords Capturadas] Detecção automática de iframe ativada")
             # Detecção automática de iframe
             elemento_info, x_ajustado, y_ajustado, is_cross_origin = \
                 await _resolver_elemento_em_iframe(page, x, y)
-        
+
         # Fail-open: iframe cross-origin
         if is_cross_origin:
-            logger.warning(f"   [Coords Capturadas] Iframe cross-origin detectado - fail-open aplicado")
+            logger.warning("   [Coords Capturadas] Iframe cross-origin detectado - fail-open aplicado")
             return (True, True)
-        
+
         # Verificar identidade
         if elemento_info and elemento_info.get('innerText'):
             texto_elemento = elemento_info['innerText']
@@ -1741,7 +1740,7 @@ async def _verificar_identidade_por_coordenadas(
         else:
             # Fail-open: elemento sem texto
             return (True, False)
-    
+
     except Exception as exc_verify:
         # Fail-open: exceção durante verificação
         logger.warning(f"   [Coords Capturadas] Verificação de identidade falhou (fail-open): {exc_verify}")
@@ -1790,7 +1789,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 logger.warning(f"   [Menu-CTX] Menu ativo mas '{label_curto}' não encontrado no escopo")
                 _registrar_telemetria("0.5_menu_ctx", False)
         else:
-            logger.warning(f"   [Menu-CTX] is_context_menu_item=True mas menu não detectado")
+            logger.warning("   [Menu-CTX] is_context_menu_item=True mas menu não detectado")
             _registrar_telemetria("0.5_menu_ctx", False)
         # IMPORTANTE: não escala para Sniper/Coords — qualquer clique fora do menu
         # fecha o overlay CDK. Retorna falha para que o executor possa reportar.
@@ -2003,13 +2002,13 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         logger.info(f"   [Sniper] {len(candidatos)} candidatos para '{label_curto}'...")
         for cand in candidatos:
             _t0 = time.monotonic()
-            
+
             # [FIX] Identificar candidatos de texto (exato ou parcial) que requerem verificação de identidade
             is_candidato_texto = (
-                cand.seletor and 
+                cand.seletor and
                 (cand.seletor.startswith("text=") or (cand.via_pierce and "text=" in cand.seletor))
             )
-            
+
             if is_candidato_texto and label_curto:
                 # Candidato de texto (exato ou parcial) — aplicar verificação de identidade
                 logger.debug(f"   [Sniper] Candidato texto detectado: {cand.descricao}")
@@ -2029,10 +2028,10 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         # Aceitar APENAS se o texto do elemento É exatamente o label_curto (após normalização)
                         # Não aceitar substring parcial ou word boundary — apenas match exato
                         identidade_ok = (texto_elem_norm == label_norm)
-                    except Exception as exc_inner:
+                    except Exception:
                         # Fail-open: se não conseguir ler o texto, aceitar
                         identidade_ok = True
-                    
+
                     if not identidade_ok:
                         _elapsed_ms = (time.monotonic() - _t0) * 1000
                         logger.debug(
@@ -2098,12 +2097,12 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             vp = page.viewport_size or {"width": 1920, "height": 1080}
             x = int(coords_relativas["x_pct"] * vp["width"])
             y = int(coords_relativas["y_pct"] * vp["height"])
-            
+
             # [FIX] Verificar identidade ANTES de executar o clique
             identidade_confirmada, is_cross_origin = await _verificar_identidade_por_coordenadas(
                 page, x, y, label_curto, iframe_hint
             )
-            
+
             if identidade_confirmada:
                 # Identidade confirmada (ou fail-open aplicado) - executar clique
                 if await _clicar_por_coordenadas(page, {"x": x, "y": y}, acao, valor):
@@ -2127,10 +2126,10 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             else:
                 # Identidade NÃO confirmada - escalar para próxima camada
                 logger.info("   [Coords Capturadas] Escalando para próxima camada (identidade não confirmada).")
-        
+
         except Exception as exc:
             logger.warning(f"   [Coords Capturadas] Falhou: {exc}")
-        
+
         _registrar_telemetria("2_coords_capturadas", False)
 
     # ── Camada 3: Seletor hint original ──────────────────────────────────────

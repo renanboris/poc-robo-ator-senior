@@ -35,13 +35,13 @@ class Promotion_Gate_Engine:
     - Level 2: skill_candidate (clear pattern + semantic action)
     - Level 3: promoted_skill (passes benchmark policy)
     """
-    
+
     def __init__(self):
         """Initialize the Promotion Gate Engine."""
         self.benchmark = PromotionBenchmark()
-    
+
     def evaluate_promotion_readiness(
-        self, 
+        self,
         shadow_record: Dict[str, Any]
     ) -> Tuple[int, str]:
         """
@@ -75,12 +75,12 @@ class Promotion_Gate_Engine:
         # Start at Level 0 (raw_shadow)
         level = 0
         promotion_state = "raw_shadow"
-        
+
         # Check Level 0 → Level 1 criteria
         if self.promote_to_level_1(shadow_record):
             level = 1
             promotion_state = "reviewed_shadow"
-            
+
             logger.debug(
                 "Record promoted to Level 1",
                 extra={
@@ -98,13 +98,13 @@ class Promotion_Gate_Engine:
                     "promotion_state": promotion_state
                 }
             )
-        
+
         # Note: Level 1 → Level 2 and Level 2 → Level 3 promotions
         # are implemented in promote_to_level_2() and promote_to_level_3()
         # which are called separately with additional context (history, benchmark)
-        
+
         return level, promotion_state
-    
+
     def promote_to_level_1(self, record: Dict[str, Any]) -> bool:
         """
         Evaluates Level 0 → Level 1 promotion criteria.
@@ -129,7 +129,7 @@ class Promotion_Gate_Engine:
             ...     print("Record is ready for Level 1")
         """
         event_id = record.get("id_acao", "unknown")
-        
+
         # Criterion 1: Non-empty screen_family (not "unknown")
         screen_family = record.get("screen_family", "")
         if not screen_family or screen_family == "unknown":
@@ -142,7 +142,7 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # Criterion 2: Non-empty component_family (not "unknown")
         component_family = record.get("component_family", "")
         if not component_family or component_family == "unknown":
@@ -155,7 +155,7 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # Criterion 3: is_noise = false
         is_noise = record.get("is_noise", True)
         if is_noise:
@@ -168,7 +168,7 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # Criterion 4: confianca_captura in ['media', 'alta']
         confianca_captura = record.get("confianca_captura", "")
         if confianca_captura not in {"media", "alta"}:
@@ -181,7 +181,7 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # Criterion 5: Non-empty intencao_semantica
         intencao_semantica = record.get("intencao_semantica", "")
         if not intencao_semantica:
@@ -194,7 +194,7 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # All criteria passed
         logger.info(
             "Level 1 promotion criteria met",
@@ -206,10 +206,10 @@ class Promotion_Gate_Engine:
             }
         )
         return True
-    
+
     def promote_to_level_2(
-        self, 
-        record: Dict[str, Any], 
+        self,
+        record: Dict[str, Any],
         history: list[Dict[str, Any]]
     ) -> bool:
         """
@@ -235,7 +235,7 @@ class Promotion_Gate_Engine:
             ...     print("Record is ready for Level 2")
         """
         event_id = record.get("id_acao", "unknown")
-        
+
         # Criterion 1: Clear semantic_action (not 'navigate' or 'unknown')
         semantic_action = record.get("semantic_action", "")
         if not semantic_action or semantic_action in {"navigate", "unknown"}:
@@ -248,7 +248,7 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # Criterion 2: Non-empty business_entity
         business_entity = record.get("business_entity", "")
         if not business_entity:
@@ -261,7 +261,7 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # Criterion 3: Non-empty screen_family
         screen_family = record.get("screen_family", "")
         if not screen_family or screen_family == "unknown":
@@ -274,11 +274,11 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # Criterion 4: At least 2 occurrences of same pattern_detectado for same business_target
         pattern_detectado = record.get("pattern_detectado", "")
         business_target = record.get("business_target", "")
-        
+
         if not pattern_detectado or not business_target:
             logger.debug(
                 "Level 2 promotion failed: pattern_detectado or business_target is empty",
@@ -290,17 +290,17 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # Count occurrences of same pattern + business_target in history
         matching_count = sum(
             1 for hist_record in history
             if (hist_record.get("pattern_detectado") == pattern_detectado and
                 hist_record.get("business_target") == business_target)
         )
-        
+
         # Include current record in count
         matching_count += 1
-        
+
         if matching_count < 2:
             logger.debug(
                 "Level 2 promotion failed: insufficient pattern frequency",
@@ -313,7 +313,7 @@ class Promotion_Gate_Engine:
                 }
             )
             return False
-        
+
         # All criteria passed
         logger.info(
             "Level 2 promotion criteria met",
@@ -326,10 +326,10 @@ class Promotion_Gate_Engine:
             }
         )
         return True
-    
+
     def promote_to_level_3(
-        self, 
-        skill_candidate: Any, 
+        self,
+        skill_candidate: Any,
         benchmark: PromotionBenchmark | None = None
     ) -> bool:
         """
@@ -361,12 +361,12 @@ class Promotion_Gate_Engine:
         """
         if benchmark is None:
             benchmark = self.benchmark
-        
+
         skill_id = getattr(skill_candidate, 'skill_id', 'unknown')
-        
+
         # Delegate to PromotionBenchmark for evaluation
         passes, failing_criteria = benchmark.evaluate(skill_candidate)
-        
+
         if passes:
             logger.info(
                 "Level 3 promotion criteria met",
@@ -383,13 +383,13 @@ class Promotion_Gate_Engine:
                     "failing_criteria": failing_criteria
                 }
             )
-        
+
         return passes
-    
+
     def record_gate_failure(
-        self, 
-        record: Dict[str, Any], 
-        level: int, 
+        self,
+        record: Dict[str, Any],
+        level: int,
         reason: str
     ) -> None:
         """
@@ -412,9 +412,9 @@ class Promotion_Gate_Engine:
         """
         gate_failure_reason = f"Level {level}: {reason}"
         record["gate_failure_reason"] = gate_failure_reason
-        
+
         event_id = record.get("id_acao") or record.get("skill_id", "unknown")
-        
+
         logger.warning(
             "Promotion gate failure recorded",
             extra={

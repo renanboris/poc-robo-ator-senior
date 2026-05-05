@@ -1,13 +1,13 @@
-import os
-import re
 import json
-import time
 import logging
+import os
+import time
 from typing import Optional
-from google import genai
+
 from google.genai import types
+
 import dap_engine
-from utils import limpar_nome, validar_roteiro, validar_roteiro_ia, safe_write_json
+from utils import limpar_nome, safe_write_json, validar_roteiro_ia
 
 logger = logging.getLogger("generator_engine")
 
@@ -63,13 +63,13 @@ def gerar_roteiro_ia_sync(nome_aula: str, objetivo: str, tenant_id: str = "senio
 
     # ── 1. RAG: busca contexto do manual ────────────────────────────────────
     logger.info(f"Buscando manual para: {objetivo}")
-    
+
     # NEW: Detecta namespace do objetivo
     from namespace_detector import detectar_namespace
-    
+
     contexto_deteccao = {"objetivo": objetivo}
     namespace_detectado = detectar_namespace(contexto_deteccao)
-    
+
     if namespace_detectado:
         logger.info(f"[Namespace] Detectado: {namespace_detectado} (fonte: objetivo)")
         contexto_rag = dap_engine.buscar_contexto(objetivo, tenant_id, namespace=namespace_detectado)
@@ -197,7 +197,7 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
     ultimo_erro = None
     for tentativa in range(1, _MAX_TENTATIVAS + 1):
         try:
-            # Não dependemos mais do arquivo .txt externo para o System Prompt, 
+            # Não dependemos mais do arquivo .txt externo para o System Prompt,
             # a instrução completa e atômica já está no prompt_usuario, garantindo força total.
             resposta = dap_engine.gemini_client.models.generate_content(
                 model=dap_engine.GEMINI_LLM_MODEL,
@@ -230,7 +230,7 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
 
     # ── 5. Pós-processamento e persistência ─────────────────────────────────
     nome_arquivo_base = limpar_nome(nome_aula)
-    
+
     # Previne quebra se a IA esquecer campos críticos da raiz
     roteiro_final.setdefault("metadata", {})
     roteiro_final["metadata"]["id_treinamento"] = nome_arquivo_base
@@ -254,7 +254,7 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
     os.makedirs("roteiros_salvos", exist_ok=True)
     nome_arquivo = f"{nome_arquivo_base}.json"
     caminho = os.path.join("roteiros_salvos", nome_arquivo)
-    
+
     contador = 1
     while os.path.exists(caminho):
         nome_arquivo = f"{nome_arquivo_base}_{contador}.json"

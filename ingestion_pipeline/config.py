@@ -1,11 +1,11 @@
 """Configuration management for the ingestion pipeline."""
 
-import os
-import sys
 import logging
+import os
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -21,36 +21,36 @@ class PipelineConfig:
     All configuration values are loaded from environment variables.
     Required variables must be set or initialization will fail.
     """
-    
+
     # API Keys (required)
     openai_api_key: str
     pinecone_api_key: str
     pinecone_index_name: str
-    
+
     # Optional API Keys
     firecrawl_api_key: Optional[str] = None
-    
+
     # Extraction settings
     extraction_backend: str = "crawl4ai"  # "crawl4ai" or "firecrawl"
-    
+
     # Chunking settings
     chunk_size: int = 800  # Approximate tokens
     chunk_overlap: int = 100  # Approximate tokens
-    
+
     # Embedding settings
     embedding_model: str = "text-embedding-3-large"
     embedding_dimensions: int = 3072
-    
+
     # Injection settings
     batch_size: int = 100
-    
+
     # Retry settings
     max_retries: int = 3
     retry_delays: List[int] = field(default_factory=lambda: [1, 2, 4])
-    
+
     # Incremental mode settings
     cache_file: str = ".ingestion_cache.json"
-    
+
     @classmethod
     def from_env(cls) -> "PipelineConfig":
         """Create configuration from environment variables.
@@ -67,7 +67,7 @@ class PipelineConfig:
             "PINECONE_API_KEY": os.getenv("PINECONE_API_KEY"),
             "PINECONE_INDEX_NAME": os.getenv("PINECONE_INDEX_NAME"),
         }
-        
+
         missing = [key for key, value in required_vars.items() if not value]
         if missing:
             error_msg = (
@@ -76,7 +76,7 @@ class PipelineConfig:
             )
             logger.error(error_msg)
             raise ValueError(error_msg)
-        
+
         return cls(
             openai_api_key=required_vars["OPENAI_API_KEY"],
             pinecone_api_key=required_vars["PINECONE_API_KEY"],
@@ -84,7 +84,7 @@ class PipelineConfig:
             firecrawl_api_key=os.getenv("FIRECRAWL_API_KEY"),
             extraction_backend=os.getenv("EXTRACTION_BACKEND", "crawl4ai"),
         )
-    
+
     def validate(self) -> None:
         """Validate configuration values.
         
@@ -96,22 +96,22 @@ class PipelineConfig:
                 f"Invalid extraction_backend: {self.extraction_backend}. "
                 f"Must be 'crawl4ai' or 'firecrawl'"
             )
-        
+
         if self.extraction_backend == "firecrawl" and not self.firecrawl_api_key:
             raise ValueError(
                 "FIRECRAWL_API_KEY environment variable is required when "
                 "using firecrawl backend"
             )
-        
+
         if self.chunk_size < 100:
             raise ValueError(f"chunk_size must be at least 100, got {self.chunk_size}")
-        
+
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError(
                 f"chunk_overlap ({self.chunk_overlap}) must be less than "
                 f"chunk_size ({self.chunk_size})"
             )
-        
+
         if self.embedding_dimensions not in [1536, 3072]:
             raise ValueError(
                 f"embedding_dimensions must be 1536 or 3072, got {self.embedding_dimensions}"
@@ -136,7 +136,7 @@ class ExtractedContent:
     nivel_1: str
     nivel_2: str
     nivel_3: str = ""
-    
+
     def to_dict(self) -> Dict[str, str]:
         """Convert to dictionary for serialization.
         
@@ -165,7 +165,7 @@ class Chunk:
     text: str
     chunk_index: int
     metadata: Dict[str, str]
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization.
         
@@ -193,7 +193,7 @@ class Vector:
     values: List[float]
     metadata: Dict[str, str]
     namespace: str
-    
+
     def to_pinecone_format(self) -> Dict[str, Any]:
         """Convert to Pinecone upsert format.
         
@@ -232,7 +232,7 @@ class PipelineReport:
     start_time: datetime
     end_time: datetime
     duration_seconds: float
-    
+
     # Stage metrics
     urls_discovered: int
     urls_fetched: int
@@ -240,18 +240,18 @@ class PipelineReport:
     chunks_created: int
     embeddings_generated: int
     vectors_injected: int
-    
+
     # Failure counts
     failed_fetches: int
     failed_validations: int
     failed_embeddings: int
     failed_upserts: int
     skipped_low_quality: int
-    
+
     # Incremental mode
     urls_skipped_cached: int = 0
     urls_skipped_module_filter: int = 0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for logging/display.
         
@@ -284,53 +284,53 @@ class PipelineReport:
                 "urls_skipped_module_filter": self.urls_skipped_module_filter,
             },
         }
-    
+
     def print_summary(self) -> None:
         """Print human-readable summary to console."""
         print("\n" + "=" * 60)
         print("PIPELINE EXECUTION SUMMARY")
         print("=" * 60)
-        
-        print(f"\nTiming:")
+
+        print("\nTiming:")
         print(f"   Start: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"   End:   {self.end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"   Duration: {self.duration_seconds:.2f} seconds")
-        
-        print(f"\nStage Metrics:")
+
+        print("\nStage Metrics:")
         print(f"   URLs Discovered:      {self.urls_discovered}")
         print(f"   URLs Fetched:         {self.urls_fetched}")
         print(f"   URLs Validated:       {self.urls_validated}")
         print(f"   Chunks Created:       {self.chunks_created}")
         print(f"   Embeddings Generated: {self.embeddings_generated}")
         print(f"   Vectors Injected:     {self.vectors_injected}")
-        
-        print(f"\nFailure Counts:")
+
+        print("\nFailure Counts:")
         print(f"   Failed Fetches:       {self.failed_fetches}")
         print(f"   Failed Validations:   {self.failed_validations}")
         print(f"   Failed Embeddings:    {self.failed_embeddings}")
         print(f"   Failed Upserts:       {self.failed_upserts}")
         print(f"   Skipped Low Quality:  {self.skipped_low_quality}")
-        
+
         if self.urls_skipped_cached > 0:
-            print(f"\nIncremental Mode:")
+            print("\nIncremental Mode:")
             print(f"   URLs Skipped (Cached): {self.urls_skipped_cached}")
-        
+
         if self.urls_skipped_module_filter > 0:
-            print(f"\nModule Filter:")
+            print("\nModule Filter:")
             print(f"   URLs Skipped (Filter): {self.urls_skipped_module_filter}")
-        
+
         # Calculate success rate
         if self.urls_discovered > 0:
             success_rate = (self.urls_validated / self.urls_discovered) * 100
             print(f"\nSuccess Rate: {success_rate:.1f}%")
-        
+
         print("=" * 60)
-        
+
         # Calculate success rate
         total_urls = self.urls_discovered
         successful_urls = self.urls_validated
         if total_urls > 0:
             success_rate = (successful_urls / total_urls) * 100
             print(f"\n📊 Success Rate: {success_rate:.1f}%")
-        
+
         print("\n" + "=" * 60 + "\n")

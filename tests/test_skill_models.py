@@ -6,14 +6,16 @@ Tests the evolved KnownSkill contract with full provenance and governance metada
 **Validates: Requirements 4.1**
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
+
 from skill_models import KnownSkill
 
 
 class TestKnownSkillCreation:
     """Tests for KnownSkill instantiation and validation."""
-    
+
     def test_create_minimal_known_skill(self):
         """Test creating a KnownSkill with all required fields."""
         skill = KnownSkill(
@@ -29,7 +31,7 @@ class TestKnownSkillCreation:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.skill_id == "skill_001"
         assert skill.skill_name == "Open GED Document"
         assert skill.semantic_action == "open"
@@ -50,7 +52,7 @@ class TestKnownSkillCreation:
         assert skill.created_at == "2024-01-15T10:30:00Z"
         assert skill.last_seen == "2024-01-15T10:30:00Z"
         assert skill.last_validated_at is None
-    
+
     def test_create_full_known_skill(self):
         """Test creating a KnownSkill with all fields populated."""
         skill = KnownSkill(
@@ -83,7 +85,7 @@ class TestKnownSkillCreation:
             last_seen="2024-01-20T14:22:00Z",
             last_validated_at="2024-01-18T09:00:00Z"
         )
-        
+
         assert skill.skill_id == "skill_002"
         assert skill.fallback_selectors == ["li[data-action='delete']", "li.delete-action"]
         assert skill.success_count == 15
@@ -98,7 +100,7 @@ class TestKnownSkillCreation:
 
 class TestKnownSkillValidation:
     """Tests for KnownSkill field validation."""
-    
+
     def test_empty_skill_id_raises_error(self):
         """Test that empty skill_id raises ValueError."""
         with pytest.raises(ValueError, match="skill_id cannot be empty"):
@@ -115,7 +117,7 @@ class TestKnownSkillValidation:
                 created_at="2024-01-15T10:30:00Z",
                 last_seen="2024-01-15T10:30:00Z"
             )
-    
+
     def test_empty_selector_raises_error(self):
         """Test that empty selector raises ValueError."""
         with pytest.raises(ValueError, match="selector cannot be empty"):
@@ -132,7 +134,7 @@ class TestKnownSkillValidation:
                 created_at="2024-01-15T10:30:00Z",
                 last_seen="2024-01-15T10:30:00Z"
             )
-    
+
     def test_invalid_promotion_state_raises_error(self):
         """Test that invalid promotion_state raises ValueError."""
         with pytest.raises(ValueError, match="promotion_state must be one of"):
@@ -150,7 +152,7 @@ class TestKnownSkillValidation:
                 created_at="2024-01-15T10:30:00Z",
                 last_seen="2024-01-15T10:30:00Z"
             )
-    
+
     def test_invalid_source_stage_raises_error(self):
         """Test that invalid source_stage raises ValueError."""
         with pytest.raises(ValueError, match="source_stage must be one of"):
@@ -168,7 +170,7 @@ class TestKnownSkillValidation:
                 created_at="2024-01-15T10:30:00Z",
                 last_seen="2024-01-15T10:30:00Z"
             )
-    
+
     def test_invalid_confidence_below_zero_raises_error(self):
         """Test that average_confidence below 0.0 raises ValueError."""
         with pytest.raises(ValueError, match="average_confidence must be between 0.0 and 1.0"):
@@ -186,7 +188,7 @@ class TestKnownSkillValidation:
                 created_at="2024-01-15T10:30:00Z",
                 last_seen="2024-01-15T10:30:00Z"
             )
-    
+
     def test_invalid_confidence_above_one_raises_error(self):
         """Test that average_confidence above 1.0 raises ValueError."""
         with pytest.raises(ValueError, match="average_confidence must be between 0.0 and 1.0"):
@@ -204,7 +206,7 @@ class TestKnownSkillValidation:
                 created_at="2024-01-15T10:30:00Z",
                 last_seen="2024-01-15T10:30:00Z"
             )
-    
+
     def test_negative_success_count_raises_error(self):
         """Test that negative success_count raises ValueError."""
         with pytest.raises(ValueError, match="success_count must be non-negative"):
@@ -222,7 +224,7 @@ class TestKnownSkillValidation:
                 created_at="2024-01-15T10:30:00Z",
                 last_seen="2024-01-15T10:30:00Z"
             )
-    
+
     def test_negative_failure_count_raises_error(self):
         """Test that negative failure_count raises ValueError."""
         with pytest.raises(ValueError, match="failure_count must be non-negative"):
@@ -244,7 +246,7 @@ class TestKnownSkillValidation:
 
 class TestKnownSkillMethods:
     """Tests for KnownSkill helper methods."""
-    
+
     def test_get_success_rate_with_executions(self):
         """Test success rate calculation with executions."""
         skill = KnownSkill(
@@ -262,9 +264,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.get_success_rate() == 0.7
-    
+
     def test_get_success_rate_with_no_executions(self):
         """Test success rate calculation with no executions."""
         skill = KnownSkill(
@@ -280,9 +282,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.get_success_rate() == 0.0
-    
+
     def test_get_success_rate_perfect(self):
         """Test success rate calculation with 100% success."""
         skill = KnownSkill(
@@ -300,9 +302,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.get_success_rate() == 1.0
-    
+
     def test_is_promoted_true(self):
         """Test is_promoted returns True for promoted_skill."""
         skill = KnownSkill(
@@ -319,9 +321,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.is_promoted() is True
-    
+
     def test_is_promoted_false(self):
         """Test is_promoted returns False for non-promoted states."""
         skill = KnownSkill(
@@ -338,9 +340,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.is_promoted() is False
-    
+
     def test_is_skill_candidate_true(self):
         """Test is_skill_candidate returns True for skill_candidate."""
         skill = KnownSkill(
@@ -357,9 +359,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.is_skill_candidate() is True
-    
+
     def test_is_skill_candidate_false(self):
         """Test is_skill_candidate returns False for other states."""
         skill = KnownSkill(
@@ -376,9 +378,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.is_skill_candidate() is False
-    
+
     def test_needs_review_flag_true(self):
         """Test needs_review returns True when review_required flag is set."""
         skill = KnownSkill(
@@ -397,9 +399,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.needs_review() is True
-    
+
     def test_needs_review_failure_exceeds_success(self):
         """Test needs_review returns True when failures exceed successes."""
         skill = KnownSkill(
@@ -418,9 +420,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.needs_review() is True
-    
+
     def test_needs_review_false(self):
         """Test needs_review returns False when no review needed."""
         skill = KnownSkill(
@@ -439,9 +441,9 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         assert skill.needs_review() is False
-    
+
     def test_get_provenance_summary(self):
         """Test provenance summary generation."""
         skill = KnownSkill(
@@ -462,10 +464,10 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         summary = skill.get_provenance_summary()
         assert summary == "dual_shadow | event_id: 42 | source: shadow_exports/capture_2024_01_15.jsonl"
-    
+
     def test_get_provenance_summary_missing_fields(self):
         """Test provenance summary with missing provenance fields."""
         skill = KnownSkill(
@@ -482,18 +484,18 @@ class TestKnownSkillMethods:
             created_at="2024-01-15T10:30:00Z",
             last_seen="2024-01-15T10:30:00Z"
         )
-        
+
         summary = skill.get_provenance_summary()
         assert summary == "runtime_learning | event_id: unknown | source: unknown"
 
 
 class TestKnownSkillPromotionStates:
     """Tests for different promotion states."""
-    
+
     def test_all_promotion_states_valid(self):
         """Test that all four promotion states are valid."""
         states = ["raw_shadow", "reviewed_shadow", "skill_candidate", "promoted_skill"]
-        
+
         for state in states:
             skill = KnownSkill(
                 skill_id=f"skill_{state}",
@@ -514,11 +516,11 @@ class TestKnownSkillPromotionStates:
 
 class TestKnownSkillSourceStages:
     """Tests for different source stages."""
-    
+
     def test_all_source_stages_valid(self):
         """Test that all four source stages are valid."""
         stages = ["legacy_import", "dual_shadow", "runtime_learning", "hitl_promoted"]
-        
+
         for stage in stages:
             skill = KnownSkill(
                 skill_id=f"skill_{stage}",

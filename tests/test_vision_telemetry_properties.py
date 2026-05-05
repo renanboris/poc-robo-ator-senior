@@ -18,7 +18,8 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 # ──────────────────────────────────────────────────────────────
 # Helpers
@@ -138,14 +139,14 @@ def test_property6_telemetria_incrementa_corretamente(camada, acertou):
                 f"acertos deveria ter incrementado: antes={antes['acertos']}, depois={depois['acertos']}"
             )
             assert depois["falhas"] == antes["falhas"], (
-                f"falhas não deveria ter mudado em caso de acerto"
+                "falhas não deveria ter mudado em caso de acerto"
             )
         else:
             assert depois["falhas"] == antes["falhas"] + 1, (
                 f"falhas deveria ter incrementado: antes={antes['falhas']}, depois={depois['falhas']}"
             )
             assert depois["acertos"] == antes["acertos"], (
-                f"acertos não deveria ter mudado em caso de falha"
+                "acertos não deveria ter mudado em caso de falha"
             )
     finally:
         _limpar_db(db_path)
@@ -324,6 +325,7 @@ def test_registrar_estrategia_vencedora_persiste(tmp_path, monkeypatch):
 def test_telemetria_warning_taxa_baixa(tmp_path, monkeypatch, caplog):
     """_registrar_telemetria deve emitir WARNING quando taxa de sucesso < 60%."""
     import logging
+
     import vision_engine as ve
 
     db_path = str(tmp_path / "brain_test.db")

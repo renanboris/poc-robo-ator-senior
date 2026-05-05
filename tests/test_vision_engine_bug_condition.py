@@ -27,15 +27,15 @@ NÃO corrija o código nem os testes quando eles falharem.
 """
 
 import asyncio
-import sys
 import os
+import sys
+from unittest.mock import AsyncMock, MagicMock, call, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import vision_engine  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers — construção de acao_tec

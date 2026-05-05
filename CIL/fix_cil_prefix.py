@@ -3,7 +3,8 @@ fix_cil_prefix.py — Remove o prefixo 'CIL.' dos imports
 Execute em C:\\GenUCS\\CIL:
     python fix_cil_prefix.py
 """
-import os, re
+import os
+import re
 
 ARQUIVOS = [
     "main_cil.py",

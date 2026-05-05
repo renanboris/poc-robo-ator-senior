@@ -22,10 +22,11 @@ NÃO corrija o código nem o teste quando ele falhar.
 """
 
 import asyncio
-import sys
 import os
+import sys
+from unittest.mock import AsyncMock, MagicMock, call, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch, call
 from fastapi.websockets import WebSocketDisconnect
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -160,9 +161,8 @@ async def test_bug1_ultimo_cliente_desconecta_processo_deve_ser_encerrado():
 # Após o fix (Tarefa 3), esses mesmos testes devem continuar passando.
 # ===========================================================================
 
-from hypothesis import given, settings, HealthCheck
 import hypothesis.strategies as st
-
+from hypothesis import HealthCheck, given, settings
 
 # ---------------------------------------------------------------------------
 # Teste determinístico 1: 2 clientes conectados, um desconecta → processo NÃO

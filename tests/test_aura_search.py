@@ -24,26 +24,26 @@ for pergunta, namespace in test_queries:
     print(f"\n📝 Pergunta: {pergunta}")
     print(f"🔍 Namespace: {namespace}")
     print("-" * 80)
-    
+
     try:
         resultado = buscar_contexto(pergunta, namespace=namespace)
-        
+
         if resultado:
-            print(f"✅ Resultado encontrado!")
+            print("✅ Resultado encontrado!")
             print(f"   Score: {resultado.get('score', 0):.4f}")
             print(f"   Melhor aula/título: {resultado.get('melhor_aula', 'N/A')}")
             if resultado.get('source_url'):
                 print(f"   URL: {resultado['source_url']}")
-            print(f"\n   Contexto RAG (primeiros 300 chars):")
+            print("\n   Contexto RAG (primeiros 300 chars):")
             print(f"   {resultado.get('texto_rag', 'N/A')[:300]}...")
         else:
             print("❌ Nenhum resultado encontrado")
-    
+
     except Exception as e:
         print(f"❌ Erro: {e}")
         import traceback
         traceback.print_exc()
-    
+
     print("-" * 80)
 
 print("\n" + "=" * 80)

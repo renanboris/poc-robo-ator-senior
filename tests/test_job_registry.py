@@ -21,12 +21,12 @@ import sys
 import tempfile
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import job_registry
-
 
 # ──────────────────────────────────────────────────────────────
 # Fixture: banco de dados isolado por teste

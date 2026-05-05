@@ -26,12 +26,12 @@ NÃO corrija o código nem os testes quando eles falharem.
 """
 
 import asyncio
-import sys
 import os
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+import sys
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
-from hypothesis import given, settings, HealthCheck
+import pytest
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 # ---------------------------------------------------------------------------
@@ -40,7 +40,6 @@ from hypothesis import strategies as st
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import vision_engine  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers — construção de acao_tec e mocks
@@ -278,8 +277,8 @@ async def test_comportamental_clica_tela_principal_em_vez_de_menu():
         f"O Sniper encontrou o elemento na tela principal sem verificar o overlay."
     )
     assert not estado["clicou_tela_principal"], (
-        f"BUG CONFIRMADO: clique ocorreu na tela principal (toolbar) "
-        f"em vez do item do menu de contexto."
+        "BUG CONFIRMADO: clique ocorreu na tela principal (toolbar) "
+        "em vez do item do menu de contexto."
     )
 
 

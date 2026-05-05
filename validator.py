@@ -14,12 +14,13 @@ Melhorias:
   - Não aborta na primeira falha — acumula e exibe ao final
 """
 
-import sys
-import json
 import asyncio
+import json
 import os
-from playwright.async_api import async_playwright
+import sys
+
 from dotenv import load_dotenv
+from playwright.async_api import async_playwright
 
 load_dotenv()
 

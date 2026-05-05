@@ -12,10 +12,10 @@ causing it to always report success even when clicking the wrong element. This p
 fallback layers (3, 4, 5) from executing and causes the Brain to learn incorrect coordinates.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from playwright.async_api import Page, Frame
 
+import pytest
+from playwright.async_api import Frame, Page
 
 # ──────────────────────────────────────────────────────────────
 # PHASE 1: EXPLORATORY BUG CONDITION TESTING (BEFORE FIX)
@@ -33,7 +33,7 @@ class TestBugConditionExploration:
     
     GOAL: Surface counterexamples that demonstrate clicks execute before identity verification.
     """
-    
+
     @pytest.mark.asyncio
     async def test_wrong_button_clicks_before_verification(self):
         """
@@ -58,7 +58,7 @@ class TestBugConditionExploration:
         """
         # Import here to avoid circular dependencies
         from vision_engine import encontrar_e_clicar
-        
+
         # Mock Playwright page
         page = AsyncMock(spec=Page)
         page.viewport_size = {"width": 1920, "height": 1080}
@@ -66,7 +66,7 @@ class TestBugConditionExploration:
         page.evaluate = AsyncMock()
         page.frames = []
         page.screenshot = AsyncMock(return_value=b'fake_screenshot_data')
-        
+
         # Mock element at coordinates (100, 100) with text "Cancelar"
         # The function expects a dict with 'tipo' key for _resolver_elemento_em_iframe
         page.evaluate.return_value = {
@@ -74,7 +74,7 @@ class TestBugConditionExploration:
             'tagName': 'BUTTON',
             'innerText': 'Cancelar'
         }
-        
+
         # Create action with wrong coordinates
         acao_tec = {
             "acao": "clique",
@@ -93,23 +93,23 @@ class TestBugConditionExploration:
             },
             "valor_input": ""
         }
-        
+
         # Track if click was executed
         click_executed = False
         original_click = page.mouse.click
-        
+
         async def track_click(*args, **kwargs):
             nonlocal click_executed
             click_executed = True
             return await original_click(*args, **kwargs)
-        
+
         page.mouse.click = track_click
-        
+
         # Execute the function
         result = await encontrar_e_clicar(page, acao_tec)
-        
+
         # ASSERTIONS FOR EXPECTED BEHAVIOR (will fail on unfixed code):
-        
+
         # 1. Identity verification should happen BEFORE click
         # On unfixed code: click_executed will be True (BUG)
         # On fixed code: click_executed will be False (identity mismatch detected before click)
@@ -118,7 +118,7 @@ class TestBugConditionExploration:
             "Expected: Identity verification BEFORE click. "
             "Actual: Click executed despite element mismatch ('Cancelar' != 'Confirmar')"
         )
-        
+
         # 2. Function should return False when identity verification fails
         # On unfixed code: result will be True (BUG)
         # On fixed code: result will be False (identity mismatch causes escalation)
@@ -127,13 +127,13 @@ class TestBugConditionExploration:
             "Expected: Return False to escalate to fallback layers. "
             "Actual: Returned True (success) for wrong element"
         )
-        
+
         # 3. Verify that page.evaluate was called to check element identity
         # This confirms identity verification logic was executed
         assert page.evaluate.called, (
             "Identity verification was not attempted"
         )
-    
+
     @pytest.mark.asyncio
     async def test_wrong_table_row_clicks_before_verification(self):
         """
@@ -145,7 +145,7 @@ class TestBugConditionExploration:
         Expected on FIXED code: Detects wrong row, skips click, returns False, escalates
         """
         from vision_engine import encontrar_e_clicar
-        
+
         # Mock page
         page = AsyncMock(spec=Page)
         page.viewport_size = {"width": 1920, "height": 1080}
@@ -153,14 +153,14 @@ class TestBugConditionExploration:
         page.evaluate = AsyncMock()
         page.frames = []
         page.screenshot = AsyncMock(return_value=b'fake_screenshot_data')
-        
+
         # Mock element at coordinates - row 2 with different text
         page.evaluate.return_value = {
             'tipo': 'elemento',
             'tagName': 'TR',
             'innerText': 'Row 2 Data - Different Content'
         }
-        
+
         # Create action with coordinates pointing to row 2
         acao_tec = {
             "acao": "clique",
@@ -179,19 +179,19 @@ class TestBugConditionExploration:
             },
             "valor_input": ""
         }
-        
+
         # Track click execution
         click_executed = False
-        
+
         async def track_click(*args, **kwargs):
             nonlocal click_executed
             click_executed = True
-        
+
         page.mouse.click = track_click
-        
+
         # Execute
         result = await encontrar_e_clicar(page, acao_tec)
-        
+
         # ASSERTIONS (will fail on unfixed code):
         assert not click_executed, (
             "BUG: Clicked wrong table row before identity verification"
@@ -199,7 +199,7 @@ class TestBugConditionExploration:
         assert result is False, (
             "BUG: Returned True despite clicking wrong row"
         )
-    
+
     @pytest.mark.asyncio
     async def test_layout_change_clicks_before_verification(self):
         """
@@ -211,7 +211,7 @@ class TestBugConditionExploration:
         Expected on FIXED code: Detects layout change, skips click, allows self-healing
         """
         from vision_engine import encontrar_e_clicar
-        
+
         # Mock page
         page = AsyncMock(spec=Page)
         page.viewport_size = {"width": 1920, "height": 1080}
@@ -219,14 +219,14 @@ class TestBugConditionExploration:
         page.evaluate = AsyncMock()
         page.frames = []
         page.screenshot = AsyncMock(return_value=b'fake_screenshot_data')
-        
+
         # Mock element at old coordinates - now points to different element due to layout change
         page.evaluate.return_value = {
             'tipo': 'elemento',
             'tagName': 'DIV',
             'innerText': 'Unexpected Element After Layout Change'
         }
-        
+
         # Create action with old coordinates
         acao_tec = {
             "acao": "clique",
@@ -245,19 +245,19 @@ class TestBugConditionExploration:
             },
             "valor_input": ""
         }
-        
+
         # Track click execution
         click_executed = False
-        
+
         async def track_click(*args, **kwargs):
             nonlocal click_executed
             click_executed = True
-        
+
         page.mouse.click = track_click
-        
+
         # Execute
         result = await encontrar_e_clicar(page, acao_tec)
-        
+
         # ASSERTIONS (will fail on unfixed code):
         assert not click_executed, (
             "BUG: Clicked wrong element after layout change before identity verification"
@@ -280,7 +280,7 @@ class TestPreservationProperties:
     
     Expected: These tests PASS on both unfixed and fixed code (no regressions).
     """
-    
+
     @pytest.mark.asyncio
     async def test_empty_label_curto_fail_open(self):
         """
@@ -289,14 +289,14 @@ class TestPreservationProperties:
         This is CORRECT behavior that must be preserved.
         """
         from vision_engine import encontrar_e_clicar
-        
+
         # Mock page
         page = AsyncMock(spec=Page)
         page.viewport_size = {"width": 1920, "height": 1080}
         page.mouse = AsyncMock()
         page.evaluate = AsyncMock()
         page.frames = []
-        
+
         # Create action with empty label_curto
         acao_tec = {
             "acao": "clique",
@@ -315,19 +315,19 @@ class TestPreservationProperties:
             },
             "valor_input": ""
         }
-        
+
         # Track click execution
         click_executed = False
-        
+
         async def track_click(*args, **kwargs):
             nonlocal click_executed
             click_executed = True
-        
+
         page.mouse.click = track_click
-        
+
         # Execute
         result = await encontrar_e_clicar(page, acao_tec)
-        
+
         # PRESERVATION ASSERTIONS (should pass on both unfixed and fixed code):
         assert click_executed, (
             "REGRESSION: Empty label_curto should trigger fail-open (click without verification)"
@@ -335,7 +335,7 @@ class TestPreservationProperties:
         assert result is True, (
             "REGRESSION: Empty label_curto should return True (fail-open behavior)"
         )
-    
+
     @pytest.mark.asyncio
     async def test_none_label_curto_fail_open(self):
         """
@@ -346,7 +346,7 @@ class TestPreservationProperties:
         For now, we skip this test and rely on empty string test.
         """
         pytest.skip("label_curto=None causes AttributeError in current code - separate bug to fix")
-    
+
     @pytest.mark.asyncio
     async def test_correct_coordinates_execute_successfully(self):
         """
@@ -355,21 +355,21 @@ class TestPreservationProperties:
         This is CORRECT behavior that must be preserved.
         """
         from vision_engine import encontrar_e_clicar
-        
+
         # Mock page
         page = AsyncMock(spec=Page)
         page.viewport_size = {"width": 1920, "height": 1080}
         page.mouse = AsyncMock()
         page.evaluate = AsyncMock()
         page.frames = []
-        
+
         # Mock element at coordinates with MATCHING text
         page.evaluate.return_value = {
             'tipo': 'elemento',
             'tagName': 'BUTTON',
             'innerText': 'Confirmar'  # Matches label_curto
         }
-        
+
         # Create action with correct coordinates
         acao_tec = {
             "acao": "clique",
@@ -388,19 +388,19 @@ class TestPreservationProperties:
             },
             "valor_input": ""
         }
-        
+
         # Track click execution
         click_executed = False
-        
+
         async def track_click(*args, **kwargs):
             nonlocal click_executed
             click_executed = True
-        
+
         page.mouse.click = track_click
-        
+
         # Execute
         result = await encontrar_e_clicar(page, acao_tec)
-        
+
         # PRESERVATION ASSERTIONS:
         assert click_executed, (
             "REGRESSION: Correct coordinates should execute click"

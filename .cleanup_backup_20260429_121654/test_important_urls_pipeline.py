@@ -5,10 +5,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from ingestion_pipeline.extractor import SemanticExtractor
-from ingestion_pipeline.validator import ContentValidator
 from ingestion_pipeline.chunker import Chunker
 from ingestion_pipeline.embedder import EmbeddingGenerator
+from ingestion_pipeline.extractor import SemanticExtractor
+from ingestion_pipeline.validator import ContentValidator
 
 # URLs importantes para testar
 test_urls = [
@@ -34,30 +34,30 @@ results = []
 for i, url in enumerate(test_urls, 1):
     print(f"\n{i}. Testando: {url}")
     print("-" * 100)
-    
+
     try:
         # Stage 1: Extraction
         print("   🔄 Extraindo conteúdo...")
         content = extractor.extract_content(url)
-        
+
         if not content:
             print("   ❌ Falha na extração")
             continue
-        
+
         print(f"   ✅ Extraído: {len(content['markdown'])} chars")
         print(f"      Título: {content['titulo']}")
         print(f"      Breadcrumbs: {content['nivel_1']} / {content['nivel_2']} / {content.get('nivel_3', '')}")
-        
+
         # Stage 2: Validation
         print("   🔄 Validando qualidade...")
         is_valid, reason = validator.validate(content)
-        
+
         if not is_valid:
             print(f"   ❌ Validação falhou: {reason}")
             continue
-        
+
         print("   ✅ Validação passou")
-        
+
         # Stage 3: Chunking
         print("   🔄 Criando chunks...")
         chunks = chunker.chunk_content(
@@ -70,15 +70,15 @@ for i, url in enumerate(test_urls, 1):
                 "nivel_3": content.get("nivel_3", ""),
             }
         )
-        
+
         print(f"   ✅ Criados {len(chunks)} chunks")
-        
+
         # Stage 4: Embedding (test first chunk only)
         if chunks:
             print("   🔄 Gerando embedding...")
             embedding = embedder.generate_embedding(chunks[0].text)
             print(f"   ✅ Embedding gerado: {len(embedding)} dimensões")
-        
+
         results.append({
             "url": url,
             "status": "success",
@@ -86,7 +86,7 @@ for i, url in enumerate(test_urls, 1):
             "namespace": content["nivel_2"],
             "chunks": len(chunks),
         })
-        
+
     except Exception as e:
         print(f"   ❌ Erro: {type(e).__name__}: {e}")
         results.append({
@@ -115,7 +115,7 @@ for result in failed:
 print(f"\n📊 Taxa de sucesso: {len(successful)}/{len(results)} ({len(successful)/len(results)*100:.1f}%)")
 
 if successful:
-    print(f"\n🎯 NAMESPACES ESPERADOS:")
+    print("\n🎯 NAMESPACES ESPERADOS:")
     namespaces = set(r["namespace"] for r in successful)
     for ns in sorted(namespaces):
         count = sum(1 for r in successful if r["namespace"] == ns)

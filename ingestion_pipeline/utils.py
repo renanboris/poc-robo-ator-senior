@@ -1,12 +1,11 @@
 """Shared utilities for the ingestion pipeline."""
 
-import time
+import json
 import logging
 import logging.handlers
-import json
-from typing import Callable, Any, Tuple, Type, Optional, Dict
-from functools import wraps
+import time
 from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +32,9 @@ def retry_with_backoff(
     """
     if delays is None:
         delays = [1, 2, 4]
-    
+
     last_exception = None
-    
+
     for attempt in range(max_retries):
         try:
             return func()
@@ -44,16 +43,16 @@ def retry_with_backoff(
             if attempt == max_retries - 1:
                 # Last attempt failed, raise the exception
                 raise
-            
+
             # Calculate delay for this attempt
             delay = delays[attempt] if attempt < len(delays) else delays[-1]
-            
+
             logger.warning(
                 f"Attempt {attempt + 1}/{max_retries} failed: {e}. "
                 f"Retrying in {delay}s..."
             )
             time.sleep(delay)
-    
+
     # Should never reach here, but just in case
     if last_exception:
         raise last_exception
@@ -70,23 +69,23 @@ def sanitize_filename(text: str) -> str:
     """
     # Convert to lowercase
     text = text.lower()
-    
+
     # Replace spaces and special characters with underscores
     import re
     text = re.sub(r'[^a-z0-9]+', '_', text)
-    
+
     # Remove leading/trailing underscores
     text = text.strip('_')
-    
+
     # Collapse multiple underscores
     text = re.sub(r'_+', '_', text)
-    
+
     return text
 
 
 class JSONFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging."""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON.
         
@@ -102,7 +101,7 @@ class JSONFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        
+
         # Add context fields if present
         if hasattr(record, "stage"):
             log_data["stage"] = record.stage
@@ -112,11 +111,11 @@ class JSONFormatter(logging.Formatter):
             log_data["chunk_index"] = record.chunk_index
         if hasattr(record, "context"):
             log_data["context"] = record.context
-            
+
         # Add exception info if present
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
-            
+
         return json.dumps(log_data)
 
 
@@ -141,14 +140,14 @@ def setup_logging(
     # Create log directory if it doesn't exist
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
-    
+
     # Get root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, level.upper()))
-    
+
     # Remove existing handlers
     root_logger.handlers.clear()
-    
+
     # Create rotating file handler
     file_handler = logging.handlers.RotatingFileHandler(
         filename=log_path / log_file,
@@ -156,10 +155,10 @@ def setup_logging(
         backupCount=backup_count,
         encoding='utf-8'
     )
-    
+
     # Create console handler
     console_handler = logging.StreamHandler()
-    
+
     # Set formatters
     if json_format:
         formatter = JSONFormatter(datefmt='%Y-%m-%d %H:%M:%S')
@@ -177,7 +176,7 @@ def setup_logging(
         )
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
-    
+
     # Add handlers to root logger
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
@@ -202,7 +201,7 @@ def log_with_context(
         context: Additional context dictionary
     """
     log_func = getattr(logger, level.lower())
-    
+
     # Create extra dict with context fields
     extra = {}
     if stage is not None:
@@ -213,7 +212,7 @@ def log_with_context(
         extra["chunk_index"] = chunk_index
     if context is not None:
         extra["context"] = context
-    
+
     log_func(message, extra=extra)
 
 
@@ -303,7 +302,7 @@ def log_error(
         "error_type": type(error).__name__,
         "error_message": str(error)
     }
-    
+
     log_with_context(
         "error",
         message,

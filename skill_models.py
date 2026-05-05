@@ -84,43 +84,43 @@ class KnownSkill:
         ...     last_validated_at="2024-01-18T09:00:00Z"
         ... )
     """
-    
+
     # Core identification
     skill_id: str
     skill_name: str
-    
+
     # Semantic classification
     semantic_action: str
     business_entity: str
     screen_family: str
     component_family: str
     pattern: str
-    
+
     # Effect specification
     expected_effect: str
-    
+
     # Execution data
     selector: str
     fallback_selectors: list[str] = field(default_factory=list)
-    
+
     # Quality metrics
     success_count: int = 0
     failure_count: int = 0
     average_confidence: float = 0.0
-    
+
     # Governance
     promotion_state: str = "raw_shadow"  # raw_shadow, reviewed_shadow, skill_candidate, promoted_skill
     source_stage: str = "dual_shadow"    # legacy_import, dual_shadow, runtime_learning, hitl_promoted
     review_required: bool = False
-    
+
     # Provenance
     provenance: dict = field(default_factory=dict)
-    
+
     # Timestamps
     created_at: str = ""
     last_seen: str = ""
     last_validated_at: Optional[str] = None
-    
+
     def __post_init__(self):
         """
         Validates field values after initialization.
@@ -134,12 +134,12 @@ class KnownSkill:
             "screen_family", "component_family", "pattern", "expected_effect",
             "selector", "created_at", "last_seen"
         ]
-        
+
         for field_name in required_fields:
             value = getattr(self, field_name)
             if not value:
                 raise ValueError(f"KnownSkill.{field_name} cannot be empty")
-        
+
         # Validate promotion_state is from allowed values
         allowed_promotion_states = {
             "raw_shadow",
@@ -152,7 +152,7 @@ class KnownSkill:
                 f"KnownSkill.promotion_state must be one of {allowed_promotion_states}, "
                 f"got '{self.promotion_state}'"
             )
-        
+
         # Validate source_stage is from allowed values
         allowed_source_stages = {
             "legacy_import",
@@ -165,14 +165,14 @@ class KnownSkill:
                 f"KnownSkill.source_stage must be one of {allowed_source_stages}, "
                 f"got '{self.source_stage}'"
             )
-        
+
         # Validate average_confidence is in valid range
         if not (0.0 <= self.average_confidence <= 1.0):
             raise ValueError(
                 f"KnownSkill.average_confidence must be between 0.0 and 1.0, "
                 f"got {self.average_confidence}"
             )
-        
+
         # Validate counts are non-negative
         if self.success_count < 0:
             raise ValueError(
@@ -182,7 +182,7 @@ class KnownSkill:
             raise ValueError(
                 f"KnownSkill.failure_count must be non-negative, got {self.failure_count}"
             )
-    
+
     def get_success_rate(self) -> float:
         """
         Calculates the success rate of this skill.
@@ -200,7 +200,7 @@ class KnownSkill:
         if total == 0:
             return 0.0
         return self.success_count / total
-    
+
     def is_promoted(self) -> bool:
         """
         Checks if this skill has been promoted to Level 3 (promoted_skill).
@@ -214,7 +214,7 @@ class KnownSkill:
             True
         """
         return self.promotion_state == "promoted_skill"
-    
+
     def is_skill_candidate(self) -> bool:
         """
         Checks if this skill is at Level 2 (skill_candidate).
@@ -228,7 +228,7 @@ class KnownSkill:
             True
         """
         return self.promotion_state == "skill_candidate"
-    
+
     def needs_review(self) -> bool:
         """
         Checks if this skill requires human review.
@@ -246,7 +246,7 @@ class KnownSkill:
             True
         """
         return self.review_required or (self.failure_count > self.success_count)
-    
+
     def get_provenance_summary(self) -> str:
         """
         Returns a human-readable summary of this skill's provenance.

@@ -16,23 +16,24 @@ Requisitos: 3.2.1, 3.2.2, 3.2.3, 3.2.5
 
 import os
 import sys
+
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hypothesis import given, settings, strategies as st, HealthCheck
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 import score_engine
 from score_engine import (
-    inicializar_tabela,
+    _calcular_score_formula,
     calcular_score,
-    registrar_execucao,
+    inicializar_tabela,
     marcar_requer_revisao,
     obter_score,
     obter_todos_scores,
-    _calcular_score_formula,
+    registrar_execucao,
 )
-
 
 # ──────────────────────────────────────────────────────────────
 # Fixture: banco isolado por teste
@@ -283,7 +284,9 @@ def test_property_12_score_invariante_entre_zero_e_um(execucoes):
     Property 12: Para qualquer ação com qualquer histórico de execuções,
     0.0 <= score(A) <= 1.0 deve ser sempre verdadeiro.
     """
-    import tempfile, os, sqlite3
+    import os
+    import sqlite3
+    import tempfile
     # Usa arquivo temporário explícito para evitar PermissionError no Windows
     tmp_fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(tmp_fd)
@@ -337,7 +340,8 @@ def test_property_13_monotonicidade_com_sucesso(dados):
     o único componente que muda é taxa_sucesso (que aumenta com sucesso) e
     fator_execucoes (que nunca decresce).
     """
-    import tempfile, os
+    import os
+    import tempfile
     historico, confianca_fixa = dados
 
     tmp_fd, db_path = tempfile.mkstemp(suffix=".db")

@@ -16,17 +16,18 @@ EXPECTED OUTCOME: Todos os testes devem PASSAR no código não corrigido E no c�
 """
 
 import asyncio
-import sys
 import os
-import pytest
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
-from playwright.async_api import async_playwright, Page, Frame
-from hypothesis import given, strategies as st, settings, HealthCheck
+
+import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+from playwright.async_api import Frame, Page, async_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import vision_engine  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Test HTML Pages
@@ -107,25 +108,25 @@ async def test_preservation_no_iframe_hint_uses_automatic_detection():
     
     Expected Outcome: Test PASSES (on both unfixed and fixed code)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             await page.set_content(HTML_MAIN_PAGE_NO_IFRAME)
             await page.wait_for_load_state("networkidle")
-            
+
             # Call _resolver_contexto with no iframe_hint
             contexto = await vision_engine._resolver_contexto(page, None)
-            
+
             # Should return Page object (automatic detection)
             assert contexto == page, (
                 f"Preservation violation: _resolver_contexto(page, None) should return page. "
                 f"Got: {type(contexto).__name__}"
             )
-            
+
         finally:
             await browser.close()
 
@@ -147,27 +148,27 @@ async def test_preservation_generic_iframe_hint_returns_page():
     
     Expected Outcome: Test PASSES (on both unfixed and fixed code)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             await page.set_content(HTML_MAIN_PAGE_NO_IFRAME)
             await page.wait_for_load_state("networkidle")
-            
+
             # Test all generic iframe_hint values
             generic_hints = ["Pagina Principal", "Página Principal", "iframe-cross-origin"]
-            
+
             for hint in generic_hints:
                 contexto = await vision_engine._resolver_contexto(page, hint)
-                
+
                 assert contexto == page, (
                     f"Preservation violation: _resolver_contexto(page, '{hint}') should return page. "
                     f"Got: {type(contexto).__name__}"
                 )
-            
+
         finally:
             await browser.close()
 
@@ -189,27 +190,27 @@ async def test_preservation_main_page_clicks_work_without_adjustment():
     
     Expected Outcome: Test PASSES (on both unfixed and fixed code)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             await page.set_content(HTML_MAIN_PAGE_NO_IFRAME)
             await page.wait_for_load_state("networkidle")
-            
+
             # Get button coordinates
             button = await page.query_selector("#save-btn")
             assert button is not None, "Button not found"
-            
+
             button_box = await button.bounding_box()
             assert button_box is not None, "Could not get button bounding box"
-            
+
             # Calculate center coordinates
             x = int(button_box["x"] + button_box["width"] / 2)
             y = int(button_box["y"] + button_box["height"] / 2)
-            
+
             # Execute elementFromPoint in main page context
             elemento_info = await page.evaluate(
                 """([x, y]) => {
@@ -222,7 +223,7 @@ async def test_preservation_main_page_clicks_work_without_adjustment():
                 }""",
                 [x, y]
             )
-            
+
             # Should find button with text "Salvar"
             assert elemento_info is not None, "Element not found at coordinates"
             assert elemento_info["tagName"] == "BUTTON", (
@@ -231,7 +232,7 @@ async def test_preservation_main_page_clicks_work_without_adjustment():
             assert "Salvar" in elemento_info["innerText"], (
                 f"Expected 'Salvar' in text, got '{elemento_info['innerText']}'"
             )
-            
+
         finally:
             await browser.close()
 
@@ -252,20 +253,20 @@ async def test_preservation_empty_label_curto_skips_verification():
     
     Expected Outcome: Test PASSES (on both unfixed and fixed code)
     """
-    
+
     # This is a behavioral test - we verify the fail-open logic exists
     # The actual implementation in vision_engine.py has:
     # if label_curto:  # Fail-open: se label_curto vazio, aceitar o clique
     #     ... identity verification ...
     # else:
     #     identidade_confirmada = True (implicit)
-    
+
     # We can verify this by checking the code structure
     # For now, we'll document the expected behavior
-    
+
     # The preservation requirement is that empty label_curto should skip verification
     # This is already implemented in the code and should not be changed by the fix
-    
+
     assert True, "Preservation requirement documented: empty label_curto skips verification"
 
 
@@ -286,25 +287,25 @@ async def test_preservation_resolver_contexto_fallback_to_page():
     
     Expected Outcome: Test PASSES (on both unfixed and fixed code)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             await page.set_content(HTML_MAIN_PAGE_NO_IFRAME)
             await page.wait_for_load_state("networkidle")
-            
+
             # Call _resolver_contexto with non-existent iframe_hint
             contexto = await vision_engine._resolver_contexto(page, "non-existent-iframe")
-            
+
             # Should fallback to returning Page object
             assert contexto == page, (
                 f"Preservation violation: _resolver_contexto should fallback to page when iframe not found. "
                 f"Got: {type(contexto).__name__}"
             )
-            
+
         finally:
             await browser.close()
 
@@ -326,27 +327,27 @@ async def test_preservation_clicks_outside_iframes_work_correctly():
     
     Expected Outcome: Test PASSES (on both unfixed and fixed code)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             await page.set_content(HTML_MAIN_PAGE_NO_IFRAME)
             await page.wait_for_load_state("networkidle")
-            
+
             # Simulate click action
             button = await page.query_selector("#save-btn")
             assert button is not None, "Button not found"
-            
+
             # Click the button
             await button.click()
-            
+
             # Verify click worked (button should be clickable)
             is_enabled = await button.is_enabled()
             assert is_enabled, "Button should be enabled after click"
-            
+
         finally:
             await browser.close()
 
@@ -363,7 +364,7 @@ async def test_preservation_clicks_outside_iframes_work_correctly():
     )
 )
 @settings(
-    max_examples=5, 
+    max_examples=5,
     deadline=None,  # Disable deadline for Playwright tests
     suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
@@ -382,25 +383,25 @@ async def test_property_generic_hints_always_return_page(iframe_hint):
     
     Expected Outcome: Test PASSES (on both unfixed and fixed code)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             await page.set_content(HTML_MAIN_PAGE_NO_IFRAME)
             await page.wait_for_load_state("networkidle")
-            
+
             # Call _resolver_contexto with generic hint
             contexto = await vision_engine._resolver_contexto(page, iframe_hint)
-            
+
             # Property: should always return Page object
             assert contexto == page, (
                 f"Property violation: _resolver_contexto(page, {iframe_hint!r}) should return page. "
                 f"Got: {type(contexto).__name__}"
             )
-            
+
         finally:
             await browser.close()
 
@@ -430,16 +431,16 @@ async def test_property_main_page_coordinates_no_adjustment(x, y):
     
     Expected Outcome: Test PASSES (on both unfixed and fixed code)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             await page.set_content(HTML_MAIN_PAGE_NO_IFRAME)
             await page.wait_for_load_state("networkidle")
-            
+
             # Execute elementFromPoint at generated coordinates
             elemento_info = await page.evaluate(
                 """([x, y]) => {
@@ -452,13 +453,13 @@ async def test_property_main_page_coordinates_no_adjustment(x, y):
                 }""",
                 [x, y]
             )
-            
+
             # Property: should always return some element (even if it's BODY or HTML)
             # The key is that no coordinate adjustment should be applied
             assert elemento_info is not None or True, (
                 f"Property: elementFromPoint({x}, {y}) should work in main page context"
             )
-            
+
         finally:
             await browser.close()
 

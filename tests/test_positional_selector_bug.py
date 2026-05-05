@@ -17,12 +17,12 @@ NÃO corrija o código nem os testes quando eles falharem.
 """
 
 import asyncio
-import sys
 import os
-import pytest
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from hypothesis import given, settings, HealthCheck
+import pytest
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 # ---------------------------------------------------------------------------
@@ -31,7 +31,6 @@ from hypothesis import strategies as st
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import vision_engine  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers — construção de mocks e acao_tec

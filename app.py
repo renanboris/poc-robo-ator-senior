@@ -7,39 +7,56 @@ Atualizações Finais (Sprint 4):
   - Otimizações prévias mantidas: Rate Limiting, JWT, Path Traversal, Locks.
 """
 
-from fastapi import FastAPI, Request, HTTPException, Security, Depends, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import APIKeyHeader
-from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Union
-from contextlib import asynccontextmanager
-import unicodedata
-import glob
-import uvicorn
-import os
-import json
-import subprocess
-import sys
-import threading
 import asyncio
+import glob
+import hashlib
+import json
+import logging
+import os
 import re
 import sqlite3
-import uuid
-import logging
-import time
+import subprocess
+import sys
 import tempfile
-import hashlib
-import generator_engine
-import lego_builder
-import dap_engine
-import job_registry
-import scorm_builder
+import threading
+import time
+import unicodedata
+import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
-from utils import limpar_nome, validar_roteiro, salvar_versao_roteiro, aplicar_blur_screenshot, VOZES_POR_IDIOMA, obter_voz_idioma
+from typing import Any, Dict, List, Optional, Union
+
+import uvicorn
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    Security,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.security import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
+
+import dap_engine
+import generator_engine
+import job_registry
+import lego_builder
+import scorm_builder
+from utils import (
+    VOZES_POR_IDIOMA,
+    aplicar_blur_screenshot,
+    limpar_nome,
+    obter_voz_idioma,
+    salvar_versao_roteiro,
+    validar_roteiro,
+)
 
 
 def _atomic_write_json(caminho: str, dados: dict) -> None:
@@ -137,11 +154,14 @@ async def lifespan(app: FastAPI):
             logging.info("Migração nps_respostas: OK")
     except Exception as _e:
         logging.warning(f"Migração nps_respostas falhou (startup não bloqueado): {_e}")
-    
+
     # Initialize Navigation Fallback Engine (AURA Smart Navigation Fallback)
     try:
-        from navigation_fallback import initialize_navigation_fallback_engine, NAVIGATION_FALLBACK_ENABLED
-        
+        from navigation_fallback import (
+            NAVIGATION_FALLBACK_ENABLED,
+            initialize_navigation_fallback_engine,
+        )
+
         if NAVIGATION_FALLBACK_ENABLED:
             logging.info("Inicializando Navigation Fallback Engine...")
             engine = initialize_navigation_fallback_engine()
@@ -153,7 +173,7 @@ async def lifespan(app: FastAPI):
             logging.info("Navigation Fallback desabilitado via configuração")
     except Exception as _e:
         logging.warning(f"Inicialização Navigation Fallback falhou (startup não bloqueado): {_e}")
-    
+
     yield
 
 def _norm(s: str) -> str:
@@ -344,13 +364,13 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = Non
         linhas_log = []
         ia_usada = None
         alerta_gemini_falhou = False
-        
+
         for linha in iter(proc.stdout.readline, ""):
             linha_limpa = linha.strip()
             if linha_limpa:
                 print(f"[ROBÔ BASTIDORES]: {linha_limpa}")
                 linhas_log.append(linha_limpa)
-                
+
                 # Detecta progresso
                 if "PROGRESSO:" in linha_limpa:
                     try:
@@ -360,16 +380,16 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = Non
                             job_registry.atualizar_job(job_id, progresso=pct)
                     except Exception:
                         pass
-                
+
                 # Detecta shadow JSONL gerado
                 if linha_limpa.startswith("SHADOW_GERADO:"):
                     _shadow_path = linha_limpa.split("SHADOW_GERADO:", 1)[1].strip()
                     _set_estado(shadow_path=_shadow_path)
-                
+
                 # Detecta qual IA foi usada
                 if linha_limpa.startswith("IA_USADA:"):
                     ia_usada = linha_limpa.split("IA_USADA:", 1)[1].strip()
-                
+
                 # Detecta alerta de falha do Gemini
                 if linha_limpa.startswith("ALERTA_GEMINI_FALHOU:"):
                     alerta_gemini_falhou = True
@@ -403,14 +423,14 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = Non
         else:
             # Processo concluído com sucesso
             mensagem_final = msg_sucesso
-            
+
             # Adiciona alerta visual se OpenAI foi usado como fallback
             if ia_usada == "openai-fallback":
                 mensagem_final = "⚠️ Roteiro gerado com OpenAI (Gemini indisponível). " + msg_sucesso
                 logging.warning("Roteiro gerado usando OpenAI como fallback — Gemini estava indisponível.")
             elif alerta_gemini_falhou and ia_usada != "gemini":
                 mensagem_final = "⚠️ Gemini falhou. " + msg_sucesso
-            
+
             _set_estado(sucesso=mensagem_final)
             if job_id:
                 job_registry.atualizar_job(job_id, status="concluido")
@@ -666,7 +686,6 @@ async def ingerir_evento_extensao(payload: ExtensaoEventoReq, request: Request):
     ts = int(time.time() * 1000)
 
     try:
-        import json as _json
         with sqlite3.connect("brain.db", timeout=5) as conn:
             conn.execute(
                 """
@@ -960,7 +979,6 @@ def listar_missoes_ativas():
     (padrão: Teste*, TES_*, roteiros com sufixo numérico simples).
     Passe ?incluir_testes=1 para ver todas.
     """
-    from fastapi import Request as _Req
     pasta = "missoes_ativas"
     if not os.path.exists(pasta):
         return []
@@ -1301,20 +1319,23 @@ async def get_navigation_metrics():
         dict: Métricas de navegação
     """
     try:
-        from navigation_fallback import get_navigation_metrics, get_navigation_fallback_engine
-        
+        from navigation_fallback import (
+            get_navigation_fallback_engine,
+            get_navigation_metrics,
+        )
+
         # Get metrics
         metrics = get_navigation_metrics()
         metrics_data = metrics.get_metrics()
-        
+
         # Get index size
         engine = get_navigation_fallback_engine()
         if engine:
             index_size = engine.indexer.get_index_size()
             metrics_data["index_size"] = index_size
-        
+
         return metrics_data
-        
+
     except Exception as e:
         logging.warning(f"[navigation_metrics] Erro ao obter métricas: {e}")
         return {
@@ -1351,7 +1372,7 @@ async def navigation_next_step(request: Request):
         data = await request.json()
         navigation_path = data.get("navigation_path", [])
         current_step = data.get("current_step", 0)
-        
+
         # Check if navigation is complete
         if current_step >= len(navigation_path) - 1:
             return {
@@ -1362,11 +1383,11 @@ async def navigation_next_step(request: Request):
                 "completed": True,
                 "message": "Navegação concluída!"
             }
-        
+
         # Get next step
         next_step_index = current_step + 1
         next_step = navigation_path[next_step_index]
-        
+
         return {
             "success": True,
             "next_step": next_step,
@@ -1374,7 +1395,7 @@ async def navigation_next_step(request: Request):
             "total_steps": len(navigation_path),
             "completed": False
         }
-        
+
     except Exception as e:
         logging.error(f"[navigation_next_step] Erro: {e}")
         return {
@@ -1765,8 +1786,8 @@ async def renomear_roteiro(arquivo: str, req: RenomearReq):
 @app.post("/analyze")
 async def analyze_screen(req: DapRequest, request: Request, token: str = Depends(verificar_token)):
     ip_cliente = request.client.host if request.client else "unknown"
-    verificar_rate_limit(ip_cliente) 
-    
+    verificar_rate_limit(ip_cliente)
+
     resultado = await dap_engine.analisar_tela_dap(
         req.image, req.url, req.prompt, req.dom_context, req.user_name, req.tenant_id, req.historico
     )
@@ -1775,18 +1796,18 @@ async def analyze_screen(req: DapRequest, request: Request, token: str = Depends
 @app.post("/api/ingest/{arquivo}")
 async def ingestar_no_dap(arquivo: str):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
-    
+
     if not os.path.exists(caminho):
         return JSONResponse(status_code=404, content={"erro": "Ficheiro não encontrado"})
-        
+
     with open(caminho, "r", encoding="utf-8") as f:
         dados = json.load(f)
-        
+
     tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
-    
+
     # Chama o motor da Aura para enviar ao Pinecone
     res = dap_engine.ingestar_para_pinecone(dados, tenant_id=tenant)
-    
+
     if res.get("status") == "sucesso":
         dados.setdefault("metadata", {})
         dados["metadata"]["ingestado_dap"] = True

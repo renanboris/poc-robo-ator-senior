@@ -12,15 +12,16 @@ import json
 import os
 import sys
 import tempfile
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from hypothesis import given, settings, strategies as st, assume
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 from utils import limpar_nome, validar_roteiro, validar_roteiro_ia
-from vision_engine import _resolver_screenshot_ref
 from validator import _e_acao_navegacao
-
+from vision_engine import _resolver_screenshot_ref
 
 # ──────────────────────────────────────────────────────────────
 # PROPERTY 1: _resolver_screenshot_ref retorna bytes para referência válida

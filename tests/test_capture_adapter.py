@@ -22,6 +22,7 @@ Bug 2 — Exploração da bug condition (Tarefa 4):
 
 import os
 import sys
+
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -30,11 +31,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from contracts.capture_adapter import (
     CaptureAdapter,
-    SeniorXAdapter,
     MockAdapter,
+    SeniorXAdapter,
     get_capture_adapter,
 )
-
 
 # ──────────────────────────────────────────────────────────────
 # Conformidade com o protocolo

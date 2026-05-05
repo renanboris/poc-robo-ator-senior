@@ -18,12 +18,12 @@ Validates: Requirements 1.1, 1.2, 1.3, 1.4
 """
 
 import asyncio
+import importlib
 import json
 import os
 import sys
 import tempfile
 import unittest.mock as mock
-import importlib
 
 import pytest
 from hypothesis import given, settings

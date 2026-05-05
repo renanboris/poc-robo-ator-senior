@@ -12,21 +12,22 @@ Correcoes aplicadas:
 """
 
 import asyncio
-import os
-import json
 import base64
-import sys
+import json
 import logging
-import re
+import os
+import sys
 import traceback
-from dotenv import load_dotenv
-from utils import limpar_nome, validar_roteiro, safe_write_json, aplicar_blur_screenshot
 
-from playwright.async_api import async_playwright, Error as PlaywrightError
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from openai import OpenAI
 from pinecone import Pinecone
+from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import async_playwright
+
+from utils import aplicar_blur_screenshot, limpar_nome, safe_write_json, validar_roteiro
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -63,17 +64,17 @@ def _buscar_pinecone_sync(objetivo_aula: str) -> str:
     try:
         # NEW: Detecta namespace do objetivo_aula
         from namespace_detector import detectar_namespace
-        
+
         contexto_deteccao = {"objetivo": objetivo_aula}
         namespace_detectado = detectar_namespace(contexto_deteccao)
-        
+
         if namespace_detectado:
             namespace_query = namespace_detectado
             logger.info(f"[Namespace] Detectado: {namespace_detectado} (fonte: objetivo_aula)")
         else:
             namespace_query = os.getenv("DEFAULT_TENANT_ID", "senior_default")
             logger.info(f"[Namespace] Não detectado, usando tenant_id: {namespace_query}")
-        
+
         pc        = Pinecone(api_key=chave_pinecone)
         index     = pc.Index(nome_index)
         embedding = _gerar_embedding_openai(objetivo_aula)
@@ -526,7 +527,6 @@ async def on_capturar_elemento(source, args):
 
                 # Persistir de volta no mesmo formato (arquivo ou base64)
                 if os.path.isfile(screenshot_ref):
-                    import io as _io
                     _img_bytes = base64.b64decode(_b64_borrado)
                     with open(screenshot_ref, "wb") as _f:
                         _f.write(_img_bytes)
@@ -630,7 +630,7 @@ async def capturar_cliques_na_tela():
             await page.goto(SENIOR_URL)
             await asyncio.sleep(2.0)
             await page.keyboard.press("Escape")
-            
+
             campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
             await campo_usr.wait_for(state="visible", timeout=10000)
             await campo_usr.fill(usuario)
@@ -640,13 +640,13 @@ async def capturar_cliques_na_tela():
                 await page.locator("button:has-text('Próximo'), button:has-text('Proximo'), button:has-text('Continuar')").first.click(timeout=3000)
             except Exception:
                 await page.keyboard.press("Enter")
-            
+
             campo_senha = page.locator("input[type='password']").first
             await campo_senha.wait_for(state="visible", timeout=10000)
             await campo_senha.fill(senha)
             await asyncio.sleep(0.5)
             await page.keyboard.press("Enter")
-            
+
             print("Login efetuado. A aguardar carregamento do painel...", flush=True)
             await page.wait_for_load_state("load", timeout=30_000)
             await asyncio.sleep(2.0)
@@ -656,8 +656,8 @@ async def capturar_cliques_na_tela():
             print("AVISO: O robô não conseguiu fazer o login automático. Por favor, conclua o login manualmente na janela do Chrome!", flush=True)
             try:
                 await page.wait_for_load_state("networkidle", timeout=60000)
-                await asyncio.sleep(3.0) 
-            except Exception as ex:
+                await asyncio.sleep(3.0)
+            except Exception:
                 print("ERRO FATAL: Tempo esgotado para login manual.", flush=True)
                 await browser.close()
                 return
@@ -706,7 +706,7 @@ async def capturar_cliques_na_tela():
             pass
 
         print("GRAVACAO INICIADA! Use o sistema de forma cadenciada. Feche o navegador ao terminar.", flush=True)
-        
+
         try:
             while not page.is_closed():
                 await asyncio.sleep(2)
@@ -717,7 +717,7 @@ async def capturar_cliques_na_tela():
                         await _injetar_em_contexto(page)
                 except PlaywrightError as e:
                     if "Target closed" in str(e) or "browser has been closed" in str(e):
-                        break 
+                        break
                 except Exception:
                     break
         except Exception:
@@ -826,6 +826,7 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
             logger.info(f"Portão de qualidade: APROVADO — {motivo_validacao}")
             try:
                 import threading
+
                 import lego_builder as _lb
 
                 def _rebuild_bg():

@@ -13,30 +13,31 @@ import re
 import sys
 from pathlib import Path
 
+
 def verificar_fix():
     """Verifica se o fix foi implementado corretamente"""
-    
+
     print("=" * 80)
     print("Task 3.2: Verificação do Fix - Iframe DOM Capture")
     print("=" * 80)
     print()
-    
+
     # Carrega o código corrigido
     aura_dom_mapper_path = Path(__file__).parent.parent / 'modules' / 'aura_dom_mapper.js'
-    
+
     if not aura_dom_mapper_path.exists():
         print(f"❌ ERRO: Arquivo não encontrado: {aura_dom_mapper_path}")
         return False
-    
+
     with open(aura_dom_mapper_path, 'r', encoding='utf-8') as f:
         codigo = f.read()
-    
+
     print(f"✓ Arquivo carregado: {aura_dom_mapper_path}")
     print()
-    
+
     # Lista de verificações
     verificacoes = []
-    
+
     # ── Verificação 1: Função auxiliar _capturarEmDocumento existe ────────────
     print("Verificação 1: Função auxiliar _capturarEmDocumento")
     if re.search(r'function\s+_capturarEmDocumento\s*\(', codigo):
@@ -46,7 +47,7 @@ def verificar_fix():
         print("  ❌ FALHOU: Função _capturarEmDocumento NÃO encontrada")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 2: Função aceita parâmetros corretos ──────────────────────
     print("Verificação 2: Parâmetros da função _capturarEmDocumento")
     match = re.search(r'function\s+_capturarEmDocumento\s*\(([^)]+)\)', codigo)
@@ -59,13 +60,13 @@ def verificar_fix():
             verificacoes.append(True)
         else:
             print(f"  ❌ FALHOU: Parâmetros incorretos: {params}")
-            print(f"     Esperado: doc, frameInfo, startIndex, elementosMapeados")
+            print("     Esperado: doc, frameInfo, startIndex, elementosMapeados")
             verificacoes.append(False)
     else:
         print("  ❌ FALHOU: Não foi possível extrair parâmetros")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 3: Iteração sobre iframes ─────────────────────────────────
     print("Verificação 3: Iteração sobre iframes no documento")
     if re.search(r'document\.querySelectorAll\s*\(\s*[\'"]iframe[\'"]\s*\)', codigo):
@@ -75,7 +76,7 @@ def verificar_fix():
         print("  ❌ FALHOU: Código NÃO itera sobre iframes")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 4: Try-catch para SecurityError ───────────────────────────
     print("Verificação 4: Tratamento de SecurityError para iframes cross-origin")
     # Procura por try-catch em torno do acesso a contentDocument
@@ -91,7 +92,7 @@ def verificar_fix():
         print("  ❌ FALHOU: Try-catch NÃO encontrado ou mal posicionado")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 5: Indicador de iframe no formato de saída ────────────────
     print("Verificação 5: Indicador de iframe no formato de saída")
     if re.search(r'\(iframe:\s*\$\{.*?\}\)', codigo):
@@ -101,7 +102,7 @@ def verificar_fix():
         print("  ❌ FALHOU: Indicador de iframe NÃO encontrado")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 6: Atribuição de data-aura-map ────────────────────────────
     print("Verificação 6: Atribuição de data-aura-map a elementos")
     if re.search(r'setAttribute\s*\(\s*[\'"]data-aura-map[\'"]', codigo):
@@ -111,7 +112,7 @@ def verificar_fix():
         print("  ❌ FALHOU: Atribuição de data-aura-map NÃO encontrada")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 7: Manutenção de índices globalmente únicos ───────────────
     print("Verificação 7: Manutenção de índices globalmente únicos")
     # Verifica se proximoIndice é atualizado após cada captura
@@ -122,7 +123,7 @@ def verificar_fix():
         print("  ❌ FALHOU: proximoIndice NÃO é atualizado corretamente")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 8: Retorno de elementos e próximo índice ──────────────────
     print("Verificação 8: Retorno de elementos e próximo índice")
     if re.search(r'return\s*\{.*?elementos.*?proximoIndice.*?\}', codigo, re.DOTALL):
@@ -132,7 +133,7 @@ def verificar_fix():
         print("  ❌ FALHOU: Retorno incorreto da função auxiliar")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 9: Extração do nome do iframe ─────────────────────────────
     print("Verificação 9: Extração do nome do iframe")
     if re.search(r'frame\.name\s*\|\|\s*frame\.id\s*\|\|\s*[\'"]iframe[\'"]', codigo):
@@ -142,7 +143,7 @@ def verificar_fix():
         print("  ❌ FALHOU: Extração do nome do iframe NÃO encontrada")
         verificacoes.append(False)
     print()
-    
+
     # ── Verificação 10: Concatenação de elementos de múltiplas fontes ─────────
     print("Verificação 10: Concatenação de elementos do documento principal e iframes")
     if re.search(r'todosElementos\.push\s*\(\.\.\.resultado.*?\.elementos\)', codigo):
@@ -152,21 +153,21 @@ def verificar_fix():
         print("  ❌ FALHOU: Concatenação de elementos NÃO encontrada")
         verificacoes.append(False)
     print()
-    
+
     # ── Resumo ────────────────────────────────────────────────────────────────
     print("=" * 80)
     print("RESUMO DA VERIFICAÇÃO")
     print("=" * 80)
-    
+
     total = len(verificacoes)
     passou = sum(verificacoes)
     falhou = total - passou
-    
+
     print(f"Total de verificações: {total}")
     print(f"✅ Passou: {passou}")
     print(f"❌ Falhou: {falhou}")
     print()
-    
+
     if falhou == 0:
         print("🎉 SUCESSO: Todas as verificações passaram!")
         print()

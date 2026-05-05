@@ -9,15 +9,16 @@ Uses Hypothesis to verify correctness properties defined in:
 Each test is tagged with the property it validates.
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from hypothesis import given, settings, strategies as st, assume
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 from utils import limpar_nome, validar_roteiro
-
 
 # ──────────────────────────────────────────────────────────────
 # STRATEGIES

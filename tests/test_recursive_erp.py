@@ -18,28 +18,28 @@ async def test_recursive_erp():
     print("=" * 80)
     print("TESTE: DESCOBERTA RECURSIVA DO ERP")
     print("=" * 80)
-    
+
     # Initialize crawler
     sitemap_url = "https://documentacao.senior.com.br/sitemap.xml"
     crawler = SitemapCrawler(sitemap_url)
-    
+
     # Test ERP recursive discovery
     erp_base_url = "https://documentacao.senior.com.br/seniorxplatform/manual-do-usuario/erp/"
-    
+
     try:
         from playwright.async_api import async_playwright
-        
+
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            
-            print(f"\n🔍 Descoberta recursiva do ERP...")
+
+            print("\n🔍 Descoberta recursiva do ERP...")
             discovered_urls = await crawler._discover_spa_urls_recursive(browser, erp_base_url, max_depth=2)
-            
+
             await browser.close()
-            
-            print(f"\n📊 RESULTADO:")
+
+            print("\n📊 RESULTADO:")
             print(f"   URLs descobertas: {len(discovered_urls)}")
-            
+
             # Group by category
             categories = {}
             for url in discovered_urls:
@@ -61,8 +61,8 @@ async def test_recursive_erp():
                     categories.setdefault('Custos', []).append(url)
                 else:
                     categories.setdefault('Outros', []).append(url)
-            
-            print(f"\n📊 POR CATEGORIA:")
+
+            print("\n📊 POR CATEGORIA:")
             for category, urls in sorted(categories.items()):
                 print(f"   • {category}: {len(urls)} URLs")
                 for url in urls[:5]:  # Show first 5
@@ -70,11 +70,11 @@ async def test_recursive_erp():
                     print(f"      - {filename}")
                 if len(urls) > 5:
                     print(f"      ... e mais {len(urls) - 5}")
-            
-            print(f"\n🎯 TODAS AS URLs:")
+
+            print("\n🎯 TODAS AS URLs:")
             for i, url in enumerate(discovered_urls, 1):
                 print(f"   {i:2d}. {url}")
-    
+
     except ImportError:
         print("❌ Playwright não disponível")
     except Exception as e:

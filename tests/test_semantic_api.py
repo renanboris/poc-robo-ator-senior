@@ -13,11 +13,12 @@ Cobre:
 Requisitos: 3.1.1, 3.1.2, 3.1.3, 3.1.4
 """
 
+import json
 import os
 import sys
-import json
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

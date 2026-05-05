@@ -22,6 +22,7 @@ import tempfile
 import time
 import unicodedata
 
+
 def aplicar_blur_screenshot(imagem_b64: str, regioes: list) -> str:
     """
     Aplica retângulo sólido (#1a1a1a) sobre regiões sensíveis de um screenshot.
@@ -46,8 +47,9 @@ def aplicar_blur_screenshot(imagem_b64: str, regioes: list) -> str:
         return imagem_b64
 
     try:
-        import io
         import base64
+        import io
+
         from PIL import Image, ImageDraw
 
         # Remove prefixo data URI se presente

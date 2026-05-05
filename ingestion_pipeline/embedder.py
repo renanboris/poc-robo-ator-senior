@@ -3,6 +3,7 @@
 import logging
 import os
 from typing import List
+
 from openai import OpenAI
 
 from .utils import retry_with_backoff
@@ -16,7 +17,7 @@ class EmbeddingGenerator:
     Uses text-embedding-3-large model with 3072 dimensions
     for semantic similarity search.
     """
-    
+
     def __init__(self, model: str = "text-embedding-3-large", dimensions: int = 3072):
         """Initialize with OpenAI client.
         
@@ -26,17 +27,17 @@ class EmbeddingGenerator:
         """
         self.model = model
         self.dimensions = dimensions
-        
+
         # Initialize OpenAI client with API key from environment
         # The OpenAI client automatically reads OPENAI_API_KEY from environment
         api_key = os.getenv("OPENAI_API_KEY")
-        
+
         if not api_key:
             logger.error("OPENAI_API_KEY not found in environment!")
             raise ValueError("OPENAI_API_KEY environment variable is required")
-        
+
         logger.info(f"OPENAI_API_KEY found: {api_key[:10]}...{api_key[-4:]}")
-        
+
         try:
             self.client = OpenAI(api_key=api_key)
             logger.info(
@@ -46,7 +47,7 @@ class EmbeddingGenerator:
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI client: {e}")
             raise
-    
+
     def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding vector with retry logic.
         
@@ -62,10 +63,10 @@ class EmbeddingGenerator:
         if not text or not text.strip():
             logger.warning("Empty text provided for embedding generation")
             return [0.0] * self.dimensions
-        
+
         # Truncate text preview for logging
         text_preview = text[:100] + "..." if len(text) > 100 else text
-        
+
         def _generate():
             """Internal function for retry wrapper."""
             try:
@@ -75,7 +76,7 @@ class EmbeddingGenerator:
                     input=text,
                     dimensions=self.dimensions
                 )
-                logger.debug(f"OpenAI API response received successfully")
+                logger.debug("OpenAI API response received successfully")
                 return response.data[0].embedding
             except Exception as e:
                 logger.error(
@@ -85,7 +86,7 @@ class EmbeddingGenerator:
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 raise
-        
+
         try:
             # Call with retry logic: up to 3 attempts with exponential backoff [1, 2, 4]
             embedding = retry_with_backoff(
@@ -94,13 +95,13 @@ class EmbeddingGenerator:
                 delays=[1, 2, 4],
                 exceptions=(Exception,)
             )
-            
+
             logger.debug(
                 f"Successfully generated embedding for text: '{text_preview}'"
             )
-            
+
             return embedding
-        
+
         except Exception as e:
             # Log final failure with chunk text preview
             logger.error(

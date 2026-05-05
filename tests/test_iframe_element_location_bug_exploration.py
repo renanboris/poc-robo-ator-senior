@@ -24,16 +24,16 @@ EXPECTED OUTCOME: Este teste DEVE FALHAR no código não corrigido.
 """
 
 import asyncio
-import sys
 import os
-import pytest
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from playwright.async_api import async_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import vision_engine  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Test HTML Page with Iframe
@@ -174,36 +174,36 @@ async def test_iframe_element_location_bug_condition():
     - Example: `elementFromPoint(960, 540)` returns `<iframe>` instead of `<button>`
     - Example: Identity verification fails with "esperado 'Salvar', encontrado 'iframe platform'"
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page with iframe
             await page.set_content(HTML_PAGE_WITH_IFRAME)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.5)  # Ensure iframe is fully loaded
-            
+
             # Verify iframe is present
             iframe_element = await page.query_selector("#test-iframe")
             assert iframe_element is not None, "Iframe element not found in test page"
-            
+
             # Get iframe bounding box to calculate coordinates
             iframe_box = await iframe_element.bounding_box()
             assert iframe_box is not None, "Could not get iframe bounding box"
-            
+
             # Calculate coordinates pointing to button inside iframe
             # Button is centered in iframe at approximately (400, 300) relative to iframe
             # Absolute coordinates: iframe.left + 400, iframe.top + 300
             button_x_abs = int(iframe_box["x"] + 400)
             button_y_abs = int(iframe_box["y"] + 300)
-            
+
             # Convert to relative coordinates (percentage of viewport)
             x_pct = button_x_abs / 1920
             y_pct = button_y_abs / 1080
-            
+
             # Verify that elementFromPoint in main context returns iframe (bug condition)
             element_info = await page.evaluate(
                 """([x, y]) => {
@@ -216,7 +216,7 @@ async def test_iframe_element_location_bug_condition():
                 }""",
                 [button_x_abs, button_y_abs]
             )
-            
+
             # Confirm bug condition: elementFromPoint returns IFRAME, not BUTTON
             assert element_info["tagName"] == "IFRAME", (
                 f"Bug condition not reproduced: expected IFRAME, got {element_info['tagName']}. "
@@ -224,14 +224,14 @@ async def test_iframe_element_location_bug_condition():
             )
             # Note: iframe innerText may be empty when accessed from main context
             # The key bug is that we get IFRAME instead of BUTTON
-            
+
             # Construct acao_tec with coordinates pointing to button inside iframe
             acao_tec = _make_acao_tec_iframe(
                 label_curto="Salvar",
                 x_pct=x_pct,
                 y_pct=y_pct
             )
-            
+
             # Patch to isolate coords_capturadas layer
             with patch.object(vision_engine, "_consultar_cache", return_value=None), \
                  patch.object(vision_engine, "_registrar_sucesso_cache", return_value=None), \
@@ -241,10 +241,10 @@ async def test_iframe_element_location_bug_condition():
                  patch.object(vision_engine, "_tentar_candidato", new=AsyncMock(return_value=False)), \
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)):
-                
+
                 # Execute encontrar_e_clicar
                 resultado = await vision_engine.encontrar_e_clicar(page, acao_tec)
-            
+
             # EXPECTED BEHAVIOR (after fix):
             # - Should detect iframe at coordinates
             # - Should adjust coordinates to iframe context
@@ -252,13 +252,13 @@ async def test_iframe_element_location_bug_condition():
             # - Should find button with text "Salvar"
             # - Identity verification should pass
             # - Should return True
-            
+
             # CURRENT BEHAVIOR (unfixed code):
             # - Executes elementFromPoint in main page context
             # - Returns <iframe> element with text "iframe platform"
             # - Identity verification fails: "Salvar" not in "iframe platform"
             # - Returns False (or True without verification - both are bugs)
-            
+
             # This assertion encodes the EXPECTED behavior
             # It will FAIL on unfixed code, confirming the bug exists
             assert resultado is True, (
@@ -275,7 +275,7 @@ async def test_iframe_element_location_bug_condition():
                 f"\n  - Identity verification: FAILED ('Salvar' not in 'iframe platform')"
                 f"\n  - Result: {resultado} (expected: True after fix)"
             )
-            
+
         finally:
             await browser.close()
 
@@ -302,26 +302,26 @@ async def test_iframe_element_location_identity_verification_failure():
     Documented Counterexample:
     - Identity verification: esperado 'Salvar', encontrado 'iframe platform'
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page
             await page.set_content(HTML_PAGE_WITH_IFRAME)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.5)
-            
+
             # Get iframe coordinates
             iframe_element = await page.query_selector("#test-iframe")
             iframe_box = await iframe_element.bounding_box()
-            
+
             # Coordinates pointing to button inside iframe
             button_x = int(iframe_box["x"] + 400)
             button_y = int(iframe_box["y"] + 300)
-            
+
             # Execute identity verification (current implementation)
             texto_elemento = await page.evaluate(
                 """([x, y]) => {
@@ -330,26 +330,26 @@ async def test_iframe_element_location_identity_verification_failure():
                 }""",
                 [button_x, button_y]
             )
-            
+
             # Current behavior: finds empty text or iframe text instead of "Salvar"
             # This is the BUG - identity verification executed in wrong context
             # When elementFromPoint returns iframe, we can't access the button's text
-            
+
             label_curto = "Salvar"
             identidade_confirmada = label_curto.strip().lower() in texto_elemento.strip().lower()
-            
+
             # EXPECTED BEHAVIOR (after fix):
             # - Should detect iframe, adjust coordinates
             # - Should execute elementFromPoint in iframe context
             # - Should find "Salvar"
             # - identidade_confirmada should be True
-            
+
             # CURRENT BEHAVIOR (unfixed code):
             # - Executes elementFromPoint in main page context
             # - Returns iframe element (not button inside)
             # - texto_elemento is empty or "iframe platform" (not "Salvar")
             # - identidade_confirmada is False
-            
+
             # This assertion encodes the EXPECTED behavior
             # It will FAIL on unfixed code, confirming the bug
             assert identidade_confirmada is True, (
@@ -366,7 +366,7 @@ async def test_iframe_element_location_identity_verification_failure():
                 f"\n\nThis demonstrates the bug: elementFromPoint in main page context "
                 f"returns the iframe container, not the button inside it."
             )
-            
+
         finally:
             await browser.close()
 

@@ -22,19 +22,18 @@ Isso confirma que o baseline está correto e que o fix não deve regredir esses 
 """
 
 import asyncio
-import sys
 import os
-import pytest
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
-from playwright.async_api import async_playwright
 
-from hypothesis import given, settings, HealthCheck
+import pytest
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from playwright.async_api import async_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import vision_engine  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Test HTML Pages - Non-Iframe Elements
@@ -153,33 +152,33 @@ async def test_preservation_non_iframe_element_identity_verification():
     - For all coordinates pointing to elements outside iframes, identity verification
       behaves exactly as before (no iframe detection needed)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page with main content (no iframes)
             await page.set_content(HTML_PAGE_MAIN_CONTENT)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.3)
-            
+
             # Get button coordinates
             button = await page.query_selector("#salvar-btn")
             assert button is not None, "Button not found in test page"
-            
+
             button_box = await button.bounding_box()
             assert button_box is not None, "Could not get button bounding box"
-            
+
             # Calculate center coordinates
             button_x = int(button_box["x"] + button_box["width"] / 2)
             button_y = int(button_box["y"] + button_box["height"] / 2)
-            
+
             # Convert to relative coordinates
             x_pct = button_x / 1920
             y_pct = button_y / 1080
-            
+
             # Verify that elementFromPoint returns button (not iframe)
             element_info = await page.evaluate(
                 """([x, y]) => {
@@ -192,7 +191,7 @@ async def test_preservation_non_iframe_element_identity_verification():
                 }""",
                 [button_x, button_y]
             )
-            
+
             # Confirm baseline behavior: elementFromPoint returns BUTTON (not IFRAME)
             assert element_info["tagName"] == "BUTTON", (
                 f"Baseline behavior changed: expected BUTTON, got {element_info['tagName']}"
@@ -200,20 +199,20 @@ async def test_preservation_non_iframe_element_identity_verification():
             assert "Salvar" in element_info["innerText"], (
                 f"Baseline behavior changed: expected 'Salvar' in text, got '{element_info['innerText']}'"
             )
-            
+
             # Construct acao_tec
             acao_tec = _make_acao_tec_main_page(
                 label_curto="Salvar",
                 x_pct=x_pct,
                 y_pct=y_pct
             )
-            
+
             # Track telemetry calls
             telemetry_calls = []
-            
+
             def mock_registrar_telemetria(camada: str, acertou: bool, intencao_semantica: str = ""):
                 telemetry_calls.append({"camada": camada, "acertou": acertou})
-            
+
             # Patch to isolate coords_capturadas layer
             with patch.object(vision_engine, "_consultar_cache", return_value=None), \
                  patch.object(vision_engine, "_registrar_sucesso_cache", return_value=None), \
@@ -223,28 +222,28 @@ async def test_preservation_non_iframe_element_identity_verification():
                  patch.object(vision_engine, "_tentar_candidato", new=AsyncMock(return_value=False)), \
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)):
-                
+
                 # Execute encontrar_e_clicar
                 resultado = await vision_engine.encontrar_e_clicar(page, acao_tec)
-            
+
             # PRESERVATION PROPERTY:
             # - elementFromPoint returns button (not iframe)
             # - Identity verification passes (text matches)
             # - Telemetry registers success for 2_coords_capturadas
             # - Result is True
-            
+
             assert resultado is True, (
                 f"Preservation property violated: encontrar_e_clicar should succeed for "
                 f"non-iframe element. Expected: True, Got: {resultado}"
             )
-            
+
             # Verify telemetry was called with success
             success_telemetry = [t for t in telemetry_calls if t["camada"] == "2_coords_capturadas" and t["acertou"]]
             assert len(success_telemetry) > 0, (
                 f"Preservation property violated: telemetry should register success for "
                 f"2_coords_capturadas. Telemetry calls: {telemetry_calls}"
             )
-            
+
         finally:
             await browser.close()
 
@@ -275,37 +274,37 @@ async def test_preservation_fail_open_empty_label():
     - For all clicks with empty label_curto, identity verification is skipped
       and click is accepted (fail-open behavior unchanged)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page
             await page.set_content(HTML_PAGE_MAIN_CONTENT)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.3)
-            
+
             # Get button coordinates
             button = await page.query_selector("#salvar-btn")
             button_box = await button.bounding_box()
-            
+
             button_x = int(button_box["x"] + button_box["width"] / 2)
             button_y = int(button_box["y"] + button_box["height"] / 2)
-            
+
             x_pct = button_x / 1920
             y_pct = button_y / 1080
-            
+
             # Construct acao_tec with EMPTY label_curto
             acao_tec = _make_acao_tec_empty_label(x_pct=x_pct, y_pct=y_pct)
-            
+
             # Track telemetry calls
             telemetry_calls = []
-            
+
             def mock_registrar_telemetria(camada: str, acertou: bool, intencao_semantica: str = ""):
                 telemetry_calls.append({"camada": camada, "acertou": acertou})
-            
+
             # Patch to isolate coords_capturadas layer
             with patch.object(vision_engine, "_consultar_cache", return_value=None), \
                  patch.object(vision_engine, "_registrar_sucesso_cache", return_value=None), \
@@ -315,27 +314,27 @@ async def test_preservation_fail_open_empty_label():
                  patch.object(vision_engine, "_tentar_candidato", new=AsyncMock(return_value=False)), \
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)):
-                
+
                 # Execute encontrar_e_clicar
                 resultado = await vision_engine.encontrar_e_clicar(page, acao_tec)
-            
+
             # PRESERVATION PROPERTY (Fail-Open):
             # - When label_curto is empty, identity verification is skipped
             # - Click is accepted without verification
             # - Result is True
-            
+
             assert resultado is True, (
                 f"Preservation property violated: fail-open behavior should accept click "
                 f"when label_curto is empty. Expected: True, Got: {resultado}"
             )
-            
+
             # Verify telemetry registered success
             success_telemetry = [t for t in telemetry_calls if t["camada"] == "2_coords_capturadas" and t["acertou"]]
             assert len(success_telemetry) > 0, (
                 f"Preservation property violated: telemetry should register success for "
                 f"fail-open case. Telemetry calls: {telemetry_calls}"
             )
-            
+
         finally:
             await browser.close()
 
@@ -365,50 +364,50 @@ async def test_preservation_fail_open_exception():
     - When page.evaluate throws exception, fail-open is applied
       and click is accepted (behavior unchanged)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page
             await page.set_content(HTML_PAGE_MAIN_CONTENT)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.3)
-            
+
             # Get button coordinates
             button = await page.query_selector("#salvar-btn")
             button_box = await button.bounding_box()
-            
+
             button_x = int(button_box["x"] + button_box["width"] / 2)
             button_y = int(button_box["y"] + button_box["height"] / 2)
-            
+
             x_pct = button_x / 1920
             y_pct = button_y / 1080
-            
+
             # Construct acao_tec
             acao_tec = _make_acao_tec_main_page(
                 label_curto="Salvar",
                 x_pct=x_pct,
                 y_pct=y_pct
             )
-            
+
             # Track telemetry calls
             telemetry_calls = []
-            
+
             def mock_registrar_telemetria(camada: str, acertou: bool, intencao_semantica: str = ""):
                 telemetry_calls.append({"camada": camada, "acertou": acertou})
-            
+
             # Mock page.evaluate to throw exception during identity verification
             original_evaluate = page.evaluate
-            
+
             async def mock_evaluate_with_exception(script, *args, **kwargs):
                 # Only throw exception for elementFromPoint calls (identity verification)
                 if "elementFromPoint" in str(script):
                     raise Exception("Simulated page.evaluate exception")
                 return await original_evaluate(script, *args, **kwargs)
-            
+
             # Patch to isolate coords_capturadas layer and inject exception
             with patch.object(vision_engine, "_consultar_cache", return_value=None), \
                  patch.object(vision_engine, "_registrar_sucesso_cache", return_value=None), \
@@ -419,27 +418,27 @@ async def test_preservation_fail_open_exception():
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)), \
                  patch.object(page, "evaluate", side_effect=mock_evaluate_with_exception):
-                
+
                 # Execute encontrar_e_clicar
                 resultado = await vision_engine.encontrar_e_clicar(page, acao_tec)
-            
+
             # PRESERVATION PROPERTY (Fail-Open on Exception):
             # - When page.evaluate throws exception, exception is caught
             # - Fail-open is applied: click is accepted
             # - Result is True
-            
+
             assert resultado is True, (
                 f"Preservation property violated: fail-open behavior should accept click "
                 f"when page.evaluate throws exception. Expected: True, Got: {resultado}"
             )
-            
+
             # Verify telemetry registered success
             success_telemetry = [t for t in telemetry_calls if t["camada"] == "2_coords_capturadas" and t["acertou"]]
             assert len(success_telemetry) > 0, (
                 f"Preservation property violated: telemetry should register success for "
                 f"fail-open case. Telemetry calls: {telemetry_calls}"
             )
-            
+
         finally:
             await browser.close()
 
@@ -473,29 +472,29 @@ async def test_preservation_property_non_iframe_coordinates(x_offset, y_offset):
     
     Expected Outcome: Test PASSES for all generated coordinates (confirms baseline)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page
             await page.set_content(HTML_PAGE_MAIN_CONTENT)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.2)
-            
+
             # Get button coordinates with offset
             button = await page.query_selector("#salvar-btn")
             button_box = await button.bounding_box()
-            
+
             # Apply offset within button bounds
             button_x = int(button_box["x"] + min(x_offset, button_box["width"] - 10))
             button_y = int(button_box["y"] + min(y_offset, button_box["height"] - 10))
-            
+
             x_pct = button_x / 1920
             y_pct = button_y / 1080
-            
+
             # Verify elementFromPoint returns button
             element_info = await page.evaluate(
                 """([x, y]) => {
@@ -507,18 +506,18 @@ async def test_preservation_property_non_iframe_coordinates(x_offset, y_offset):
                 }""",
                 [button_x, button_y]
             )
-            
+
             # Skip if coordinates don't hit the button (edge case)
             if element_info["tagName"] != "BUTTON":
                 return
-            
+
             # Construct acao_tec
             acao_tec = _make_acao_tec_main_page(
                 label_curto="Salvar",
                 x_pct=x_pct,
                 y_pct=y_pct
             )
-            
+
             # Patch to isolate coords_capturadas layer
             with patch.object(vision_engine, "_consultar_cache", return_value=None), \
                  patch.object(vision_engine, "_registrar_sucesso_cache", return_value=None), \
@@ -528,10 +527,10 @@ async def test_preservation_property_non_iframe_coordinates(x_offset, y_offset):
                  patch.object(vision_engine, "_tentar_candidato", new=AsyncMock(return_value=False)), \
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)):
-                
+
                 # Execute encontrar_e_clicar
                 resultado = await vision_engine.encontrar_e_clicar(page, acao_tec)
-            
+
             # PRESERVATION PROPERTY:
             # For all coordinates pointing to non-iframe elements,
             # behavior is unchanged (identity verification passes, click succeeds)
@@ -539,7 +538,7 @@ async def test_preservation_property_non_iframe_coordinates(x_offset, y_offset):
                 f"Preservation property violated at coordinates ({button_x}, {button_y}): "
                 f"Expected: True, Got: {resultado}"
             )
-            
+
         finally:
             await browser.close()
 
@@ -569,18 +568,18 @@ async def test_preservation_fail_open_invalid_coordinates():
     - When coordinates are invalid and page.evaluate throws exception or returns null,
       fail-open is applied and click is accepted (behavior unchanged)
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page
             await page.set_content(HTML_PAGE_MAIN_CONTENT)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.3)
-            
+
             # Construct acao_tec with INVALID coordinates (outside viewport)
             # This triggers fail-open behavior
             acao_tec = _make_acao_tec_main_page(
@@ -588,13 +587,13 @@ async def test_preservation_fail_open_invalid_coordinates():
                 x_pct=2.0,  # Invalid: outside viewport
                 y_pct=2.0   # Invalid: outside viewport
             )
-            
+
             # Track telemetry calls
             telemetry_calls = []
-            
+
             def mock_registrar_telemetria(camada: str, acertou: bool, intencao_semantica: str = ""):
                 telemetry_calls.append({"camada": camada, "acertou": acertou})
-            
+
             # Patch to isolate coords_capturadas layer
             with patch.object(vision_engine, "_consultar_cache", return_value=None), \
                  patch.object(vision_engine, "_registrar_sucesso_cache", return_value=None), \
@@ -604,27 +603,27 @@ async def test_preservation_fail_open_invalid_coordinates():
                  patch.object(vision_engine, "_tentar_candidato", new=AsyncMock(return_value=False)), \
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)):
-                
+
                 # Execute encontrar_e_clicar
                 resultado = await vision_engine.encontrar_e_clicar(page, acao_tec)
-            
+
             # PRESERVATION PROPERTY (Fail-Open on Invalid Coordinates):
             # - When coordinates are invalid (outside viewport), elementFromPoint returns null or throws
             # - Fail-open is applied: click is accepted
             # - Result is True
-            
+
             assert resultado is True, (
                 f"Preservation property violated: fail-open behavior should accept click "
                 f"when coordinates are invalid. Expected: True, Got: {resultado}"
             )
-            
+
             # Verify telemetry registered success (fail-open accepted the click)
             success_telemetry = [t for t in telemetry_calls if t["camada"] == "2_coords_capturadas" and t["acertou"]]
             assert len(success_telemetry) > 0, (
                 f"Preservation property violated: telemetry should register success for "
                 f"fail-open case. Telemetry calls: {telemetry_calls}"
             )
-            
+
         finally:
             await browser.close()
 
@@ -654,18 +653,18 @@ async def test_preservation_fallback_layers_when_coords_unavailable():
     - When coords_capturadas is not available (no coordinates),
       other fallback layers (Sniper) are triggered and work correctly
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page
             await page.set_content(HTML_PAGE_MAIN_CONTENT)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.3)
-            
+
             # Construct acao_tec WITHOUT coordinates (will skip coords_capturadas)
             acao_tec = {
                 "acao": "clique",
@@ -683,13 +682,13 @@ async def test_preservation_fallback_layers_when_coords_unavailable():
                     "screenshot_referencia": None,
                 },
             }
-            
+
             # Track which layers were called
             layers_called = []
-            
+
             def mock_registrar_telemetria(camada: str, acertou: bool, intencao_semantica: str = ""):
                 layers_called.append({"camada": camada, "acertou": acertou})
-            
+
             # Patch to allow fallback layers to execute
             with patch.object(vision_engine, "_consultar_cache", return_value=None), \
                  patch.object(vision_engine, "_registrar_sucesso_cache", return_value=None), \
@@ -697,32 +696,32 @@ async def test_preservation_fallback_layers_when_coords_unavailable():
                  patch.object(vision_engine, "_registrar_telemetria", side_effect=mock_registrar_telemetria), \
                  patch.object(vision_engine, "_registrar_estrategia_vencedora", return_value=None), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)):
-                
+
                 # Execute encontrar_e_clicar
                 resultado = await vision_engine.encontrar_e_clicar(page, acao_tec)
-            
+
             # PRESERVATION PROPERTY:
             # - coords_capturadas is skipped (no coordinates)
             # - Fallback layers (Sniper) are triggered
             # - Sniper succeeds (finds button by text "Salvar")
             # - Result is True
-            
+
             # Verify coords_capturadas was NOT attempted (no coordinates)
             coords_telemetry = [t for t in layers_called if t["camada"] == "2_coords_capturadas"]
             assert len(coords_telemetry) == 0, "coords_capturadas should have been skipped (no coordinates)"
-            
+
             # Verify that Sniper succeeded
             sniper_telemetry = [t for t in layers_called if t["camada"] == "2_sniper" and t["acertou"]]
             assert len(sniper_telemetry) > 0, (
                 f"Sniper should have succeeded. Telemetry calls: {layers_called}"
             )
-            
+
             # Verify overall result is True (fallback layers work)
             assert resultado is True, (
                 f"Preservation property violated: fallback layers should work when "
                 f"coords_capturadas is not available. Expected: True, Got: {resultado}"
             )
-            
+
         finally:
             await browser.close()
 

@@ -5,8 +5,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from ingestion_pipeline.extractor import SemanticExtractor
 from ingestion_pipeline.crawler import SitemapCrawler
+from ingestion_pipeline.extractor import SemanticExtractor
 
 # URLs importantes identificadas manualmente
 important_urls = {
@@ -36,7 +36,7 @@ extractor = SemanticExtractor(extraction_backend="crawl4ai")
 for nome, url in important_urls.items():
     # Normalizar URL (remover query params e trailing slash para comparação)
     url_clean = url.split('?')[0].rstrip('/')
-    
+
     # Verificar se está no sitemap (comparação flexível)
     found_in_sitemap = False
     matched_url = None
@@ -46,12 +46,12 @@ for nome, url in important_urls.items():
             found_in_sitemap = True
             matched_url = sitemap_url
             break
-    
+
     if found_in_sitemap:
         print(f"✅ {nome}")
         print(f"   URL original: {url}")
         print(f"   URL no sitemap: {matched_url}")
-        
+
         # Extrair breadcrumbs
         breadcrumbs = extractor.extract_breadcrumbs(matched_url)
         print(f"   Namespace (nivel_2): {breadcrumbs['nivel_2']}")
@@ -59,8 +59,8 @@ for nome, url in important_urls.items():
     else:
         print(f"❌ {nome}")
         print(f"   URL: {url}")
-        print(f"   MOTIVO: Não encontrada no sitemap")
-    
+        print("   MOTIVO: Não encontrada no sitemap")
+
     print()
 
 # 2. Análise dos namespaces esperados vs reais

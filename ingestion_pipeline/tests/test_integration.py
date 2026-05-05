@@ -12,17 +12,16 @@ Requirements validated:
 - 6.1, 6.4, 7.2: Namespace segregation
 """
 
-import os
-import pytest
 import json
-import tempfile
+import os
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
+
+import pytest
 from pinecone import Pinecone
 
 from ingestion_pipeline.config import PipelineConfig
 from ingestion_pipeline.pipeline import IngestionPipeline
-
 
 # =========================================================
 # TEST FIXTURES
@@ -133,8 +132,8 @@ def cleanup_test_cache():
     reason="Integration tests require OPENAI_API_KEY and PINECONE_API_KEY"
 )
 def test_end_to_end_pipeline_execution(
-    test_config, 
-    sample_sitemap_xml, 
+    test_config,
+    sample_sitemap_xml,
     sample_html_content,
     test_namespace,
     cleanup_test_cache
@@ -154,7 +153,7 @@ def test_end_to_end_pipeline_execution(
             "https://docs.senior.com.br/senior-x/hcm/folha-pagamento",
             "https://docs.senior.com.br/senior-x/financeiro/contas-pagar"
         ]
-        
+
         # Mock the extraction to avoid real HTTP requests
         with patch('ingestion_pipeline.extractor.SemanticExtractor.extract_content') as mock_extract:
             mock_extract.return_value = {
@@ -165,25 +164,25 @@ def test_end_to_end_pipeline_execution(
                 "nivel_2": "hcm",
                 "nivel_3": "admissao"
             }
-            
+
             # Mock embedding generation to avoid real API calls in unit test mode
             with patch('ingestion_pipeline.embedder.EmbeddingGenerator.generate_embedding') as mock_embed:
                 # Return a dummy 3072-dimensional vector
                 mock_embed.return_value = [0.1] * 3072
-                
+
                 # Mock Pinecone upsert to avoid real API calls in unit test mode
                 with patch('ingestion_pipeline.injector.VectorInjector.inject_batch') as mock_inject:
                     mock_inject.return_value = {"success": 3, "failed": 0}
-                    
+
                     # Initialize pipeline
                     pipeline = IngestionPipeline(test_config)
-                    
+
                     # Run pipeline
                     report = pipeline.run(
                         sitemap_url="https://docs.senior.com.br/sitemap.xml",
                         incremental=False
                     )
-                    
+
                     # Verify metrics
                     assert report.urls_discovered > 0, "Should discover URLs from sitemap"
                     assert report.urls_fetched > 0, "Should fetch at least one URL"
@@ -191,7 +190,7 @@ def test_end_to_end_pipeline_execution(
                     assert report.embeddings_generated > 0, "Should generate embeddings"
                     assert report.vectors_injected > 0, "Should inject vectors to Pinecone"
                     assert report.failed_upserts == 0, "Should have no failed upserts"
-                    
+
                     # Verify that mocks were called
                     assert mock_crawl.called, "Crawler should be called"
                     assert mock_extract.called, "Extractor should be called"
@@ -223,9 +222,9 @@ def test_error_recovery_continues_processing(test_config, cleanup_test_cache):
     <url><loc>https://example.com/page1</loc></url>
 </urlset>"""  # Second attempt succeeds
         ]
-        
+
         pipeline = IngestionPipeline(test_config)
-        
+
         # Should not raise exception despite initial failure
         # (retry logic should handle it)
         try:
@@ -254,7 +253,7 @@ def test_incremental_mode_skips_cached_urls(test_config, cleanup_test_cache):
     # Mock the crawler to return sample URLs
     with patch('ingestion_pipeline.crawler.SitemapCrawler.crawl') as mock_crawl:
         mock_crawl.return_value = ["https://example.com/page1"]
-        
+
         # Mock extraction to return consistent content
         with patch('ingestion_pipeline.extractor.SemanticExtractor.extract_content') as mock_extract:
             mock_extract.return_value = {
@@ -265,34 +264,34 @@ def test_incremental_mode_skips_cached_urls(test_config, cleanup_test_cache):
                 "nivel_2": "integration",
                 "nivel_3": ""
             }
-            
+
             # Mock embedding and injection
             with patch('ingestion_pipeline.embedder.EmbeddingGenerator.generate_embedding') as mock_embed:
                 mock_embed.return_value = [0.1] * 3072
-                
+
                 with patch('ingestion_pipeline.injector.VectorInjector.inject_batch') as mock_inject:
                     mock_inject.return_value = {"success": 1, "failed": 0}
-                    
+
                     pipeline = IngestionPipeline(test_config)
-                    
+
                     # First run: should process all URLs
                     report1 = pipeline.run("https://example.com/sitemap.xml", incremental=True)
                     urls_processed_first = report1.urls_fetched
-                    
+
                     # Second run: should skip cached URLs
                     report2 = pipeline.run("https://example.com/sitemap.xml", incremental=True)
                     urls_skipped_second = report2.urls_skipped_cached
-                    
+
                     # Verify cache behavior
                     assert urls_processed_first > 0, "First run should process URLs"
                     assert urls_skipped_second > 0, "Second run should skip cached URLs"
                     # Note: urls_fetched may still be > 0 because the URL is fetched to check the hash
                     # but the content processing is skipped (urls_skipped_cached > 0)
-                    
+
                     # Verify cache file exists
                     cache_file = Path(test_config.cache_file)
                     assert cache_file.exists(), "Cache file should be created"
-                    
+
                     # Verify cache content
                     with open(cache_file, 'r') as f:
                         cache_data = json.load(f)
@@ -324,7 +323,7 @@ def test_namespace_segregation(test_config, cleanup_test_cache):
             "https://example.com/hcm/page1",
             "https://example.com/financeiro/page1"
         ]
-        
+
         # Mock extraction with different nivel_2 values
         with patch('ingestion_pipeline.extractor.SemanticExtractor.extract_content') as mock_extract:
             # First URL: nivel_2 = "hcm"
@@ -347,20 +346,20 @@ def test_namespace_segregation(test_config, cleanup_test_cache):
                     "nivel_3": "contas"
                 }
             ]
-            
+
             # Mock embedding and injection
             with patch('ingestion_pipeline.embedder.EmbeddingGenerator.generate_embedding') as mock_embed:
                 mock_embed.return_value = [0.1] * 3072
-                
+
                 with patch('ingestion_pipeline.injector.VectorInjector.inject_batch') as mock_inject:
                     mock_inject.return_value = {"success": 2, "failed": 0}
-                    
+
                     pipeline = IngestionPipeline(test_config)
                     report = pipeline.run("https://example.com/sitemap.xml", incremental=False)
-                    
+
                     # Verify vectors were injected
                     assert report.vectors_injected > 0, "Should inject vectors"
-                    
+
                     # Verify that injector was called with correct namespaces
                     # (This would require inspecting the actual calls to inject_batch)
                     assert mock_inject.called, "Injector should be called"
@@ -389,17 +388,17 @@ def test_aura_dap_namespace_retrieval(test_config, test_namespace):
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if root_dir not in sys.path:
         sys.path.insert(0, root_dir)
-    
+
     try:
         from dap_engine import buscar_contexto
-        
+
         # Test 1: Retrieval with namespace parameter
         result_with_namespace = buscar_contexto(
             prompt_usuario="Como fazer admissão de colaborador?",
             tenant_id="senior_default",
             namespace="hcm"  # Specific namespace
         )
-        
+
         # Should return results if vectors exist in namespace
         if result_with_namespace:
             assert "texto_rag" in result_with_namespace, "Should return RAG text"
@@ -408,32 +407,32 @@ def test_aura_dap_namespace_retrieval(test_config, test_namespace):
             if "source_url" in result_with_namespace:
                 assert result_with_namespace["source_url"].startswith("http"), \
                     "Source URL should be valid HTTP URL"
-        
+
         # Test 2: Retrieval without namespace (default behavior)
         result_default = buscar_contexto(
             prompt_usuario="Como fazer admissão de colaborador?",
             tenant_id="senior_default"
             # No namespace parameter - should use tenant_id
         )
-        
+
         # Should work with default namespace
         # Note: May return None if no vectors exist in default namespace
         # This is expected in a clean test environment
         # The test validates that the function accepts the namespace parameter correctly
         assert True, "Namespace parameter is accepted by buscar_contexto()"
-        
+
         # Test 3: Verify namespace parameter overrides tenant_id
         result_override = buscar_contexto(
             prompt_usuario="Como fazer admissão de colaborador?",
             tenant_id="different_tenant",
             namespace="hcm"  # Should use this instead of tenant_id
         )
-        
+
         # If both returned results, they should be similar (same namespace)
         if result_with_namespace and result_override:
             assert result_with_namespace["score"] == result_override["score"], \
                 "Same namespace should return same results regardless of tenant_id"
-    
+
     except ImportError as e:
         pytest.skip(f"Could not import dap_engine: {e}")
 
@@ -448,7 +447,7 @@ def cleanup_test_namespace(config: PipelineConfig, namespace: str):
         if os.getenv("PINECONE_API_KEY") and os.getenv("PINECONE_INDEX_NAME"):
             pc = Pinecone(api_key=config.pinecone_api_key)
             index = pc.Index(config.pinecone_index_name)
-            
+
             # Delete all vectors in test namespace
             index.delete(delete_all=True, namespace=namespace)
             print(f"Cleaned up test namespace: {namespace}")

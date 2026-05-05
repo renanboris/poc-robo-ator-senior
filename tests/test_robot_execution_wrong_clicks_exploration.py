@@ -23,16 +23,16 @@ EXPECTED OUTCOME: Este teste DEVE FALHAR no código não corrigido.
 """
 
 import asyncio
-import sys
 import os
-import pytest
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
-from playwright.async_api import async_playwright, Frame
+
+import pytest
+from playwright.async_api import Frame, async_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import vision_engine  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Test HTML Page with Senior X-like Iframe Structure
@@ -214,37 +214,37 @@ async def test_bug1_resolver_contexto_returns_framelocator_not_frame():
     - type(contexto).__name__ == "FrameLocator" (not "Frame")
     - hasattr(contexto, 'url') == False
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page with ci iframe
             await page.set_content(HTML_PAGE_WITH_CI_IFRAME)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.5)  # Ensure iframe is fully loaded
-            
+
             # Verify iframe exists
             iframe_element = await page.query_selector("iframe#ci")
             assert iframe_element is not None, "CI iframe not found in test page"
-            
+
             # Call _resolver_contexto with iframe_hint="ci"
             contexto = await vision_engine._resolver_contexto(page, "ci")
-            
+
             # EXPECTED BEHAVIOR (after fix):
             # - Should return Frame object
             # - isinstance(contexto, Frame) should be True
             # - hasattr(contexto, 'url') should be True
             # - hasattr(contexto, 'name') should be True
-            
+
             # CURRENT BEHAVIOR (unfixed code):
             # - Returns FrameLocator object (line 611: return fl)
             # - isinstance(contexto, Frame) is False
             # - hasattr(contexto, 'url') is False
             # - type(contexto).__name__ == "FrameLocator"
-            
+
             # This assertion encodes the EXPECTED behavior
             # It will FAIL on unfixed code, confirming Bug 1 exists
             assert isinstance(contexto, Frame), (
@@ -259,19 +259,19 @@ async def test_bug1_resolver_contexto_returns_framelocator_not_frame():
                 f"\n\nRoot cause: Line 611 in vision_engine.py returns 'fl' (FrameLocator) "
                 f"instead of finding and returning the actual Frame object."
             )
-            
+
             # Additional verification: Frame should have url and name attributes
             assert hasattr(contexto, 'url'), (
                 f"BUG 1 CONFIRMED: Returned object does not have 'url' attribute. "
                 f"Type: {type(contexto).__name__}. "
                 f"This causes hasattr(contexto, 'url') check to fail in coordinate adjustment logic."
             )
-            
+
             assert hasattr(contexto, 'name'), (
                 f"BUG 1 CONFIRMED: Returned object does not have 'name' attribute. "
                 f"Type: {type(contexto).__name__}."
             )
-            
+
         finally:
             await browser.close()
 
@@ -308,52 +308,52 @@ async def test_bug2_coordinates_not_adjusted_correctly():
     - Expected adjusted: (1568, 732)
     - Actual: (1633, 732) - no adjustment
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page
             await page.set_content(HTML_PAGE_WITH_CI_IFRAME)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.5)
-            
+
             # Get iframe bounding box
             iframe_element = await page.query_selector("iframe#ci")
             iframe_box = await iframe_element.bounding_box()
             assert iframe_box is not None, "Could not get iframe bounding box"
-            
+
             # Calculate button coordinates inside iframe
             # Button is at approximately (400, 300) relative to iframe content
             button_x_rel = 400
             button_y_rel = 300
             button_x_abs = int(iframe_box["x"] + button_x_rel)
             button_y_abs = int(iframe_box["y"] + button_y_rel)
-            
+
             # Call _resolver_contexto
             contexto = await vision_engine._resolver_contexto(page, "ci")
-            
+
             # Simulate the coordinate adjustment logic from lines 1658-1750
             # Current implementation checks hasattr(contexto, 'url')
             # Since contexto is FrameLocator (Bug 1), this check fails
             # Therefore, no coordinate adjustment happens
-            
+
             has_url_attr = hasattr(contexto, 'url')
-            
+
             # EXPECTED BEHAVIOR (after fix):
             # - contexto should be Frame (Bug 1 fixed)
             # - hasattr(contexto, 'url') should be True
             # - Coordinates should be adjusted: x_ajustado = x - iframe.left
-            
+
             # CURRENT BEHAVIOR (unfixed code):
             # - contexto is FrameLocator (Bug 1)
             # - hasattr(contexto, 'url') is False
             # - System logs "iframe_hint não resolveu para Frame - usando detecção automática"
             # - Falls back to automatic detection
             # - Coordinates may not be adjusted correctly
-            
+
             # This assertion encodes the EXPECTED behavior
             assert has_url_attr is True, (
                 f"BUG 2 CONFIRMED: hasattr(contexto, 'url') returned False. "
@@ -370,13 +370,13 @@ async def test_bug2_coordinates_not_adjusted_correctly():
                 f"\n  - actual: no adjustment (falls back to automatic detection)"
                 f"\n\nRoot cause: Bug 1 causes hasattr check to fail, preventing coordinate adjustment."
             )
-            
+
             # If we reach here (test passes), verify coordinates would be adjusted correctly
             if isinstance(contexto, Frame):
                 # Simulate coordinate adjustment
                 x_ajustado = int(button_x_abs - iframe_box['x'])
                 y_ajustado = int(button_y_abs - iframe_box['y'])
-                
+
                 # Verify adjustment is correct (allow 1-2 pixel tolerance for rounding)
                 assert abs(x_ajustado - button_x_rel) <= 2, (
                     f"Coordinate adjustment incorrect: expected x≈{button_x_rel}, got x={x_ajustado}"
@@ -384,7 +384,7 @@ async def test_bug2_coordinates_not_adjusted_correctly():
                 assert abs(y_ajustado - button_y_rel) <= 2, (
                     f"Coordinate adjustment incorrect: expected y≈{button_y_rel}, got y={y_ajustado}"
                 )
-            
+
         finally:
             await browser.close()
 
@@ -420,22 +420,22 @@ async def test_bug3_wrong_element_found_parent_container():
     - Found element text: "SIGN\nCaixa de Entrada\nFILTRAR DADOS\n..."
     - Identity verification: FAILED
     """
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1920, "height": 1080})
         page = await context.new_page()
-        
+
         try:
             # Load test page
             await page.set_content(HTML_PAGE_WITH_CI_IFRAME)
             await page.wait_for_load_state("networkidle")
             await asyncio.sleep(0.5)
-            
+
             # Get iframe and button coordinates
             iframe_element = await page.query_selector("iframe#ci")
             iframe_box = await iframe_element.bounding_box()
-            
+
             # Get button position inside iframe
             # We need to access the iframe's content to find the button
             frames = page.frames
@@ -447,20 +447,20 @@ async def test_bug3_wrong_element_found_parent_container():
                         break
                 except:
                     continue
-            
+
             assert ci_frame is not None, "Could not find ci frame"
-            
+
             # Get button bounding box relative to iframe
             button_element = await ci_frame.query_selector("#acompanhar-btn")
             assert button_element is not None, "Button not found in iframe"
-            
+
             button_box = await button_element.bounding_box()
             assert button_box is not None, "Could not get button bounding box"
-            
+
             # Calculate absolute coordinates (relative to main page viewport)
             button_x_abs = int(iframe_box["x"] + button_box["x"] + button_box["width"] / 2)
             button_y_abs = int(iframe_box["y"] + button_box["y"] + button_box["height"] / 2)
-            
+
             # Simulate current implementation: execute elementFromPoint in main page context
             # This is the BUG - should execute in iframe context with adjusted coordinates
             elemento_info_wrong_context = await page.evaluate(
@@ -474,14 +474,14 @@ async def test_bug3_wrong_element_found_parent_container():
                 }""",
                 [button_x_abs, button_y_abs]
             )
-            
+
             # Current behavior: returns iframe element or parent container
             # Not the specific button we want
-            
+
             # Now test the EXPECTED behavior: execute in iframe context with adjusted coords
             button_x_rel = int(button_box["x"] + button_box["width"] / 2)
             button_y_rel = int(button_box["y"] + button_box["height"] / 2)
-            
+
             elemento_info_correct_context = await ci_frame.evaluate(
                 """([x, y]) => {
                     const el = document.elementFromPoint(x, y);
@@ -493,40 +493,40 @@ async def test_bug3_wrong_element_found_parent_container():
                 }""",
                 [button_x_rel, button_y_rel]
             )
-            
+
             # EXPECTED BEHAVIOR (after fix):
             # - Should execute elementFromPoint in Frame context
             # - Should use adjusted coordinates (relative to iframe)
             # - Should find BUTTON element with text "Acompanhar assinaturas"
             # - Identity verification should pass
-            
+
             # CURRENT BEHAVIOR (unfixed code):
             # - Executes elementFromPoint in main page context (or wrong context)
             # - Uses absolute coordinates (not adjusted)
             # - Finds IFRAME or parent DIV with text "SIGN\nCaixa de Entrada\n..."
             # - Identity verification fails
-            
+
             label_curto = "Acompanhar assinaturas"
-            
+
             # Check if correct context finds the right element
             if elemento_info_correct_context:
                 texto_correto = elemento_info_correct_context.get('innerText', '')
                 identidade_correta = label_curto.strip().lower() in texto_correto.strip().lower()
-                
+
                 assert identidade_correta, (
                     f"Test setup error: Button not found even in correct context. "
                     f"Expected '{label_curto}', found '{texto_correto}'"
                 )
-            
+
             # Now verify that wrong context returns wrong element (Bug 3)
             if elemento_info_wrong_context:
                 texto_errado = elemento_info_wrong_context.get('innerText', '')
                 identidade_errada = label_curto.strip().lower() in texto_errado.strip().lower()
-                
+
                 # This assertion encodes the EXPECTED behavior
                 # Current implementation uses wrong context, so identidade_errada is False
                 # After fix, this should be True (but we're testing the bug condition)
-                
+
                 # For bug exploration, we expect the wrong context to fail
                 # But the system should use the correct context after fix
                 assert identidade_errada is False, (
@@ -536,11 +536,11 @@ async def test_bug3_wrong_element_found_parent_container():
                     f"This test requires coordinates to point inside iframe where "
                     f"main page context returns wrong element."
                 )
-            
+
             # The real test: after fix, the system should use correct context
             # Simulate the fixed behavior
             contexto = await vision_engine._resolver_contexto(page, "ci")
-            
+
             # After fix, contexto should be Frame and we should execute in that context
             if isinstance(contexto, Frame):
                 # This is the EXPECTED behavior after fix
@@ -555,11 +555,11 @@ async def test_bug3_wrong_element_found_parent_container():
                     }""",
                     [button_x_rel, button_y_rel]
                 )
-                
+
                 if elemento_info_fixed:
                     texto_fixed = elemento_info_fixed.get('innerText', '')
                     identidade_fixed = label_curto.strip().lower() in texto_fixed.strip().lower()
-                    
+
                     assert identidade_fixed is True, (
                         f"After fix, identity verification should pass. "
                         f"Expected '{label_curto}', found '{texto_fixed}'"
@@ -581,7 +581,7 @@ async def test_bug3_wrong_element_found_parent_container():
                     f"\n\nRoot cause: Bugs 1 and 2 prevent correct Frame context and coordinate adjustment, "
                     f"causing elementFromPoint to return wrong element."
                 )
-            
+
         finally:
             await browser.close()
 

@@ -23,7 +23,7 @@ Requirements: 6.1–6.8, 8.2, 8.4
 import logging
 from typing import Optional
 
-from observed_action_models import ObservedAction, RawTarget, Provenance
+from observed_action_models import ObservedAction, Provenance, RawTarget
 
 logger = logging.getLogger(__name__)
 

@@ -10,11 +10,11 @@ sistema realiza pelo menos 2 tentativas adicionais com delay crescente.
 """
 
 import time
-from hypothesis import given, settings, assume
+
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from utils import com_retry
-
 
 # ---------------------------------------------------------------------------
 # Helpers

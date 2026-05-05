@@ -26,25 +26,26 @@ that must be preserved after the fix is applied.
 Validates: Requirements 3.1, 3.2, 3.3, 3.4
 """
 
-import sys
-import os
-import json
 import asyncio
+import json
+import os
+import sys
 import threading
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hypothesis import given, settings, strategies as st, assume
 from fastapi.testclient import TestClient
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # ---------------------------------------------------------------------------
 # Import app and its shared state
 # ---------------------------------------------------------------------------
 import app as app_module
-from app import app, estado_servidor, _set_estado, _estado_lock
-
+from app import _estado_lock, _set_estado, app, estado_servidor
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -272,8 +273,8 @@ def test_1_3_property_ingest_sempre_emite_sinal_de_conclusao(mock_res):
     Uses asyncio.run to call the endpoint handler directly (avoids TestClient
     overhead from lego_builder side effects on each hypothesis example).
     """
-    import tempfile
     import os as _os
+    import tempfile
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         roteiro_nome = "roteiro_prop_test.json"
@@ -581,8 +582,8 @@ def test_2_4_property_ingestar_no_dap_preserva_contrato_json(mock_res):
 
     EXPECTED TO PASS on unfixed code — confirms baseline.
     """
-    import tempfile
     import os as _os
+    import tempfile
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         roteiro_nome = "roteiro_preservation_test.json"

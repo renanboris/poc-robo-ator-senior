@@ -22,7 +22,7 @@ import hashlib
 import json
 import os
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional, Protocol, runtime_checkable
 
 from utils import configurar_logging

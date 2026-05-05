@@ -24,7 +24,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import job_registry
 
-
 # ──────────────────────────────────────────────────────────────
 # Fixture: banco de dados isolado por teste
 # ──────────────────────────────────────────────────────────────

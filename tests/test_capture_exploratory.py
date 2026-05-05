@@ -20,9 +20,10 @@ real Playwright browser.
 """
 
 import asyncio
-import sys
-import os
 import json
+import os
+import sys
+
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -31,7 +32,6 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import capture  # noqa: E402  (imported after sys.path patch)
-
 
 # ---------------------------------------------------------------------------
 # Helpers

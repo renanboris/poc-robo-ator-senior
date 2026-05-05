@@ -20,9 +20,10 @@ Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 (Property 2 — Preservatio
 """
 
 import asyncio
-import sys
-import os
 import json
+import os
+import sys
+
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -31,7 +32,6 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import capture  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers

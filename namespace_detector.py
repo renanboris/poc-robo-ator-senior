@@ -31,11 +31,10 @@ Configuração:
 Requirements: 1-14 (ver requirements.md)
 """
 
-import os
 import json
 import logging
+import os
 from typing import Optional
-from urllib.parse import urlparse
 
 logger = logging.getLogger("namespace_detector")
 
@@ -106,7 +105,7 @@ def detectar_namespace(contexto: dict) -> Optional[str]:
     if not isinstance(contexto, dict):
         logger.debug("[Namespace] Contexto inválido (não é dict), retornando None")
         return None
-    
+
     try:
         # Prioridade 1: URL extraction
         if "url" in contexto and contexto["url"]:
@@ -114,14 +113,14 @@ def detectar_namespace(contexto: dict) -> Optional[str]:
             if namespace:
                 logger.info(f"[Namespace] Detectado: {namespace} (fonte: URL)")
                 return namespace
-        
+
         # Prioridade 2: Metadata extraction
         if "metadata" in contexto and contexto["metadata"]:
             namespace = _extrair_namespace_de_metadata(contexto["metadata"])
             if namespace:
                 logger.info(f"[Namespace] Detectado: {namespace} (fonte: metadata)")
                 return namespace
-        
+
         # Prioridade 3: Keyword matching
         texto_busca = contexto.get("objetivo") or contexto.get("nome_aula")
         if texto_busca:
@@ -129,11 +128,11 @@ def detectar_namespace(contexto: dict) -> Optional[str]:
             if namespace:
                 logger.info(f"[Namespace] Detectado: {namespace} (fonte: keyword)")
                 return namespace
-        
+
         # Nenhuma detecção bem-sucedida
         logger.warning("[Namespace] Não detectado em nenhuma fonte, fallback para tenant_id")
         return None
-        
+
     except Exception as e:
         logger.error(f"[Namespace] Erro na detecção: {e}")
         return None
@@ -161,24 +160,24 @@ def _extrair_namespace_de_url(url: str) -> Optional[str]:
     """
     if not url or not isinstance(url, str):
         return None
-    
+
     try:
         # Importa e reutiliza lógica do Extractor
         from ingestion_pipeline.extractor import SemanticExtractor
-        
+
         extractor = SemanticExtractor()
         breadcrumbs = extractor.extract_breadcrumbs(url)
-        
+
         # nivel_2 é o namespace (segundo segmento do path)
         namespace = breadcrumbs.get("nivel_2", "")
-        
+
         if namespace:
             logger.debug(f"[Namespace] URL extraction: {url} → {namespace}")
             return namespace
         else:
             logger.debug(f"[Namespace] URL sem nivel_2: {url}")
             return None
-            
+
     except ImportError as e:
         logger.error(f"[Namespace] Falha ao importar extractor: {e}")
         return None
@@ -205,7 +204,7 @@ def _extrair_namespace_de_metadata(metadata: dict) -> Optional[str]:
     """
     if not isinstance(metadata, dict):
         return None
-    
+
     try:
         # Prioridade 1: Campo explícito 'module'
         if "module" in metadata and metadata["module"]:
@@ -213,23 +212,23 @@ def _extrair_namespace_de_metadata(metadata: dict) -> Optional[str]:
             if namespace:
                 logger.debug(f"[Namespace] Metadata extraction: module field → {namespace}")
                 return namespace
-        
+
         # Prioridade 2: Extração de source_url
         if "source_url" in metadata and metadata["source_url"]:
             namespace = _extrair_namespace_de_url(metadata["source_url"])
             if namespace:
                 logger.debug(f"[Namespace] Metadata extraction: source_url → {namespace}")
                 return namespace
-        
+
         # Prioridade 3: Keyword matching em nome_aula
         if "nome_aula" in metadata and metadata["nome_aula"]:
             namespace = _extrair_namespace_de_keywords(metadata["nome_aula"])
             if namespace:
                 logger.debug(f"[Namespace] Metadata extraction: nome_aula keyword → {namespace}")
                 return namespace
-        
+
         return None
-        
+
     except Exception as e:
         logger.warning(f"[Namespace] Erro ao extrair de metadata: {e}")
         return None
@@ -257,28 +256,28 @@ def _extrair_namespace_de_keywords(texto: str) -> Optional[str]:
     """
     if not texto or not isinstance(texto, str):
         return None
-    
+
     try:
         # Carrega mapeamento de keywords
         keyword_mapping = _carregar_mapeamento_keywords()
-        
+
         # Normaliza texto para lowercase
         texto_lower = texto.lower()
-        
+
         # Itera por namespaces e keywords
         # Filtra chaves que começam com _ (metadados do JSON)
         for namespace, keywords in keyword_mapping.items():
             # Ignora chaves de metadados (_comment, _format, _usage, etc.)
             if namespace.startswith("_"):
                 continue
-            
+
             for keyword in keywords:
                 if keyword.lower() in texto_lower:
                     logger.debug(f"[Namespace] Keyword match: '{keyword}' → {namespace}")
                     return namespace
-        
+
         return None
-        
+
     except Exception as e:
         logger.warning(f"[Namespace] Erro no keyword matching: {e}")
         return None
@@ -308,9 +307,9 @@ def _carregar_mapeamento_keywords() -> dict:
     Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 12.4
     """
     global _keyword_mapping_cache, _keyword_mapping_mtime
-    
+
     config_file = "namespace_keywords.json"
-    
+
     # Verifica se cache é válido
     if _keyword_mapping_cache is not None:
         if os.path.exists(config_file):
@@ -323,11 +322,11 @@ def _carregar_mapeamento_keywords() -> dict:
             if _keyword_mapping_mtime is None:
                 # Cache de env var ou default, ainda válido
                 return _keyword_mapping_cache
-    
+
     # Cache inválido ou não existe, recarrega
     mapping = None
     source = None
-    
+
     # Prioridade 1: Arquivo JSON
     if os.path.exists(config_file):
         try:
@@ -337,7 +336,7 @@ def _carregar_mapeamento_keywords() -> dict:
             _keyword_mapping_mtime = os.path.getmtime(config_file)
         except Exception as e:
             logger.warning(f"[Namespace] Erro ao carregar {config_file}: {e}")
-    
+
     # Prioridade 2: Environment variable
     if mapping is None:
         env_var = os.getenv("NAMESPACE_KEYWORDS")
@@ -348,24 +347,24 @@ def _carregar_mapeamento_keywords() -> dict:
                 _keyword_mapping_mtime = None
             except Exception as e:
                 logger.warning(f"[Namespace] Erro ao parsear NAMESPACE_KEYWORDS: {e}")
-    
+
     # Prioridade 3: Hardcoded default
     if mapping is None:
         mapping = _DEFAULT_KEYWORD_MAPPING
         source = "hardcoded defaults"
         _keyword_mapping_mtime = None
-    
+
     # Valida estrutura
     if not isinstance(mapping, dict):
-        logger.warning(f"[Namespace] Config inválida, usando defaults")
+        logger.warning("[Namespace] Config inválida, usando defaults")
         mapping = _DEFAULT_KEYWORD_MAPPING
         source = "hardcoded defaults (fallback)"
-    
+
     # Atualiza cache
     _keyword_mapping_cache = mapping
-    
+
     # Log
     namespace_count = len(mapping)
     logger.info(f"[Namespace] Config carregado: {source} ({namespace_count} namespaces)")
-    
+
     return mapping

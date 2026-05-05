@@ -1,8 +1,8 @@
 """Investigate if there are multiple sitemaps or a sitemap index."""
 
-import requests
-from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
+
+import requests
 
 base_url = "https://documentacao.senior.com.br"
 
@@ -19,7 +19,7 @@ try:
     if response.status_code == 200:
         print("✅ robots.txt encontrado:")
         print(response.text[:500])
-        
+
         # Look for sitemap references
         if "sitemap" in response.text.lower():
             print("\n📍 Sitemaps mencionados no robots.txt:")
@@ -39,14 +39,14 @@ try:
     response = requests.get(f"{base_url}/sitemap_index.xml", timeout=10)
     if response.status_code == 200:
         print("✅ sitemap_index.xml encontrado!")
-        
+
         # Parse XML
         root = ET.fromstring(response.content)
-        
+
         # Find all sitemap URLs
         ns = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
         sitemaps = root.findall('.//ns:sitemap/ns:loc', ns)
-        
+
         if sitemaps:
             print(f"\n📍 Encontrados {len(sitemaps)} sitemaps:")
             for sitemap in sitemaps:
@@ -80,7 +80,7 @@ for sitemap_name in sitemap_variations:
             ns = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
             urls = root.findall('.//ns:url/ns:loc', ns)
             sitemaps = root.findall('.//ns:sitemap/ns:loc', ns)
-            
+
             if urls:
                 print(f"✅ {sitemap_name}: {len(urls)} URLs")
             elif sitemaps:

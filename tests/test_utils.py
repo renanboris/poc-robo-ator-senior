@@ -20,13 +20,12 @@ from pathlib import Path
 import pytest
 
 from utils import (
-    limpar_nome,
-    validar_roteiro,
-    safe_write_json,
-    safe_resolve_path,
     com_retry,
+    limpar_nome,
+    safe_resolve_path,
+    safe_write_json,
+    validar_roteiro,
 )
-
 
 # ============================================================================
 # TESTES PARA limpar_nome()

@@ -22,12 +22,12 @@ conjunto de objetivos que o planner sabe como atingir.
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from playwright.async_api import Page
 
-from core.screen_reader import EstadoDaTela, ler_tela, objetivo_atingido
+from core.screen_reader import EstadoDaTela, ler_tela
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,8 @@ MAX_PASSOS = 15  # segurança: não fica preso em loop infinito
 # Import SkillMemory lazily to avoid hard dependency when running
 # without the Next integration layer.
 try:
-    import sys as _sys
     import os as _os
+    import sys as _sys
     _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), "..", ".."))
     from skill_memory import SkillMemory as _SkillMemory
     from skill_models import KnownSkill as _KnownSkill
@@ -322,7 +322,7 @@ async def executar_objetivo(
         )
 
         if acao.tipo == "objetivo_atingido":
-            logger.info(f"[Planner] ✅ OBJETIVO ATINGIDO (planner confirmou)")
+            logger.info("[Planner] ✅ OBJETIVO ATINGIDO (planner confirmou)")
             return True, historico
 
         if acao.tipo == "falhou":
@@ -358,7 +358,7 @@ async def executar_objetivo(
         ))
 
         if not sucesso:
-            logger.warning(f"[Planner] Ação falhou. Planner vai reavaliard a tela.")
+            logger.warning("[Planner] Ação falhou. Planner vai reavaliard a tela.")
             await asyncio.sleep(1.0)
             # Continua o loop — planner vai ver a tela e tentar diferente
 

@@ -15,19 +15,19 @@ Requisitos: 2.4.1, 2.4.2, 2.4.4
 
 import os
 import sys
+
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import brain_backend
 from brain_backend import (
-    SQLiteBrainBackend,
-    NullBrainBackend,
-    EntradaBrain,
-    BrainBackend,
     MAX_FALHAS_CACHE,
+    BrainBackend,
+    EntradaBrain,
+    NullBrainBackend,
+    SQLiteBrainBackend,
 )
-
 
 # ──────────────────────────────────────────────────────────────
 # Fixture: banco isolado por teste

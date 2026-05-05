@@ -2,10 +2,11 @@
 Extrai design tokens (CSS vars, cores, tipografia) do SmartPlayer ScaleUp.
 Uso: python extrai_design_tokens.py
 """
+import argparse
 import asyncio
 import json
-import argparse
 from pathlib import Path
+
 from playwright.async_api import async_playwright
 
 SMARTPLAYER_URLS = {

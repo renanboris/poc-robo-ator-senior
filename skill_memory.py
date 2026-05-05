@@ -17,6 +17,7 @@ Requirements: 4.2, 4.3, 4.4, 4.5, 4.6
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+
 from skill_models import KnownSkill
 
 logger = logging.getLogger(__name__)

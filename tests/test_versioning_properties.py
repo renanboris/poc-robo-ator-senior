@@ -17,12 +17,11 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from utils import (
-    salvar_versao_roteiro,
-    restaurar_versao_roteiro,
     listar_versoes_roteiro,
+    restaurar_versao_roteiro,
+    salvar_versao_roteiro,
+    validar_roteiro,
 )
-from utils import validar_roteiro
-
 
 # ---------------------------------------------------------------------------
 # Estratégias Hypothesis

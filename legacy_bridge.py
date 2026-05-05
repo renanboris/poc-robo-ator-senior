@@ -18,9 +18,9 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from shadow_schema import Shadow_Schema_Validator
 from observed_action_adapter import ObservedAction_Adapter
 from observed_action_models import ObservedAction
+from shadow_schema import Shadow_Schema_Validator
 
 logger = logging.getLogger(__name__)
 

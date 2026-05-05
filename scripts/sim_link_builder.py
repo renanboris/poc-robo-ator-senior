@@ -15,8 +15,6 @@ mas gerada automaticamente a partir do roteiro, com rastreamento opcional.
 
 import json
 import os
-import re
-import shutil
 import sys
 from pathlib import Path
 
