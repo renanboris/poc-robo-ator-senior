@@ -19,8 +19,14 @@
         return new Promise(function (resolve, reject) {
             var s = document.createElement('script');
             s.src = 'chrome-extension://' + extensionId + '/' + src;
-            s.onload = resolve;
-            s.onerror = reject;
+            s.onload = function() {
+                console.log('[Aura] Script loaded successfully:', src);
+                resolve();
+            };
+            s.onerror = function(err) {
+                console.error('[Aura] Failed to load script:', src, err);
+                reject(err);
+            };
             (document.head || document.documentElement).appendChild(s);
         });
     }
@@ -32,6 +38,8 @@
             'modules/aura_ui.js',
             'modules/aura_dom_mapper.js',
             'modules/aura_spotlight.js',
+            'modules/navigation_highlighter.js',
+            'modules/guided_navigation_controller.js',
             'modules/aura_gps_engine.js',
             'modules/aura_mission_engine.js',
             'modules/aura_assist_engine.js',
@@ -40,9 +48,17 @@
             'hesitation_detector.js',
             'nps_modal.js'
         ];
+        console.log('[Aura] Starting to load', modulos.length, 'modules...');
         for (var i = 0; i < modulos.length; i++) {
-            await _injectScript(modulos[i], extensionId);
+            try {
+                console.log('[Aura] Loading module', (i + 1) + '/' + modulos.length + ':', modulos[i]);
+                await _injectScript(modulos[i], extensionId);
+            } catch (err) {
+                console.error('[Aura] Failed to load module:', modulos[i], err);
+                throw err;
+            }
         }
+        console.log('[Aura] All modules loaded successfully');
     }
 
     // ── Obter extensionId injetado pelo background ────────────────────────────

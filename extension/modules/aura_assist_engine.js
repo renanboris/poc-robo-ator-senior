@@ -175,6 +175,10 @@
 
             const temGPS = payload.gps_passos && Array.isArray(payload.gps_passos) && payload.gps_passos.length > 0;
             const temSpotlight = !!(payload.seletor_css || payload.elemento_id);
+            const temNavigationGuided = payload.navigation_mode === 'guided' && 
+                                       payload.navigation_path && 
+                                       Array.isArray(payload.navigation_path) && 
+                                       payload.navigation_path.length > 0;
             const tenantIdResp = (global.AuraState && global.AuraState.session && global.AuraState.session.tenant_id)
                 ? global.AuraState.session.tenant_id
                 : 'senior_default';
@@ -188,13 +192,54 @@
                     payload: {
                         has_gps:      temGPS,
                         has_spotlight: temSpotlight,
+                        has_navigation: temNavigationGuided,
                         tenant_id:    tenantIdResp,
                         timestamp:    new Date().toISOString()
                     }
                 }
             }, window.location.origin);
 
-            if (temGPS) {
+            if (temNavigationGuided) {
+                // ── Navegação guiada passo-a-passo ────────────────────────────
+                console.log('[AuraAssistEngine] Iniciando navegação guiada:', payload.breadcrumb);
+                console.log('[AuraAssistEngine] window.GuidedNavigationController disponível?', typeof window.GuidedNavigationController);
+                
+                // Exibe mensagem do AURA
+                if (global.AuraUI) {
+                    global.AuraUI.exibirBalao(textoResposta, sugestoes, true);
+                }
+                
+                // Inicializa o GuidedNavigationController se disponível
+                if (window.GuidedNavigationController) {
+                    console.log('[AuraAssistEngine] GuidedNavigationController encontrado, criando instância...');
+                    
+                    // Cria instância se não existir
+                    if (!window._auraNavController) {
+                        window._auraNavController = new window.GuidedNavigationController();
+                        console.log('[AuraAssistEngine] Nova instância criada');
+                    } else {
+                        console.log('[AuraAssistEngine] Usando instância existente');
+                    }
+                    
+                    // Inicia navegação guiada
+                    window._auraNavController.startNavigation(
+                        payload.navigation_path,
+                        payload.breadcrumb || ''
+                    ).then(function(success) {
+                        if (success) {
+                            console.log('[AuraAssistEngine] Navegação guiada iniciada com sucesso');
+                        } else {
+                            console.warn('[AuraAssistEngine] Falha ao iniciar navegação guiada');
+                        }
+                    }).catch(function(err) {
+                        console.error('[AuraAssistEngine] Erro ao iniciar navegação guiada:', err);
+                    });
+                } else {
+                    console.warn('[AuraAssistEngine] GuidedNavigationController não disponível');
+                    console.warn('[AuraAssistEngine] window object keys:', Object.keys(window).filter(function(k) { return k.includes('Navigation') || k.includes('Guided'); }));
+                }
+                
+            } else if (temGPS) {
                 // ── CTA explícito para GPS — NÃO inicia automaticamente ──────
                 // Preserva o Step_Model canônico sem achatamento (sem missionDataAdapter)
                 const roteiro = {

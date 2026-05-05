@@ -239,6 +239,48 @@ def _extract_element_keywords(prompt_usuario: str) -> list[str]:
     return keywords
 
 
+def _is_navigation_request(prompt_usuario: str) -> bool:
+    """
+    Detect if the user query is requesting navigation/guidance vs asking a conceptual question.
+    
+    Args:
+        prompt_usuario: User query
+        
+    Returns:
+        bool: True if this is a navigation request, False if it's a conceptual question
+    """
+    prompt_lower = prompt_usuario.lower()
+    
+    # Navigation request patterns
+    navigation_patterns = [
+        "como acessar", "como chegar", "como ir", "onde fica", "onde está", "onde esta",
+        "me leve", "me guie", "me mostre", "quero ir", "preciso ir", "ir para",
+        "acessar", "navegar", "encontrar", "localizar", "chegar em", "chegar no",
+        "como faço para", "como fazer para", "caminho para"
+    ]
+    
+    # Conceptual question patterns (should NOT trigger navigation)
+    conceptual_patterns = [
+        "o que é", "o que e", "o que significa", "para que serve", "qual é", "qual e",
+        "explique", "defina", "definição", "conceito", "significado",
+        "o que faz", "qual a função", "qual função"
+    ]
+    
+    # Check for conceptual patterns first (higher priority)
+    for pattern in conceptual_patterns:
+        if pattern in prompt_lower:
+            return False
+    
+    # Check for navigation patterns
+    for pattern in navigation_patterns:
+        if pattern in prompt_lower:
+            return True
+    
+    # Default: if no clear pattern, assume it's NOT a navigation request
+    # (let Vision/RAG handle it)
+    return False
+
+
 def _check_element_visibility(prompt_usuario: str, dom_context: str, timeout_ms: int = 500) -> bool:
     """
     Check if the requested element is visible in the current DOM.
@@ -272,6 +314,54 @@ def _check_element_visibility(prompt_usuario: str, dom_context: str, timeout_ms:
     
     elapsed_ms = (time.time() - start_time) * 1000
     logger.info(f"Element not found in DOM (visibility check: {elapsed_ms:.2f}ms)")
+    return False
+
+
+def _check_target_element_visibility(prompt_usuario: str, dom_context: str, timeout_ms: int = 500) -> bool:
+    """
+    Check if the TARGET element (not intermediate navigation elements) is visible in the DOM.
+    
+    For navigation queries like "Como acessar o SIGN?", this checks for "SIGN" specifically,
+    not intermediate elements like "Senior Flow".
+    
+    Args:
+        prompt_usuario: User query
+        dom_context: Current DOM context from AuraDomMapper
+        timeout_ms: Maximum time for check (default 500ms)
+    
+    Returns:
+        bool: True if target element is visible, False otherwise
+    """
+    start_time = time.time()
+    
+    # Extract the target element from navigation query
+    # Remove navigation patterns to get the target
+    query_lower = prompt_usuario.lower()
+    
+    # Remove navigation patterns
+    for pattern in ["como acessar", "como chegar", "como ir", "onde fica", "onde está", "onde esta",
+                    "me leve", "me guie", "me mostre", "quero ir", "preciso ir", "ir para",
+                    "acessar", "navegar", "encontrar", "localizar", "chegar em", "chegar no",
+                    "como faço para", "como fazer para", "caminho para", "o ", "a ", "os ", "as "]:
+        query_lower = query_lower.replace(pattern, " ")
+    
+    # Clean up and extract target keywords
+    target_keywords = [word.strip() for word in query_lower.split() if len(word.strip()) > 2]
+    
+    if not target_keywords:
+        # No clear target - assume not visible
+        return False
+    
+    # Search for target keywords in DOM context
+    dom_lower = dom_context.lower()
+    for keyword in target_keywords:
+        if keyword in dom_lower:
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.debug(f"Target element '{keyword}' found in DOM (visibility check: {elapsed_ms:.2f}ms)")
+            return True
+    
+    elapsed_ms = (time.time() - start_time) * 1000
+    logger.info(f"Target element not found in DOM (visibility check: {elapsed_ms:.2f}ms)")
     return False
 
 
@@ -712,42 +802,48 @@ async def analisar_tela_dap(
     # =========================================================
     # STEP 3: CHECK ELEMENT VISIBILITY (NEW - Requirement 1)
     # =========================================================
-    element_visible = _check_element_visibility(prompt_usuario, dom_context, 
-                                                timeout_ms=ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS)
+    # First, detect if this is a navigation request or a conceptual question
+    is_navigation_request = _is_navigation_request(prompt_usuario)
     
-    if not element_visible:
-        # Element not visible - try navigation fallback
-        fallback_engine = get_navigation_fallback_engine()
+    if is_navigation_request:
+        # For navigation requests, check if the TARGET element is visible
+        # (not intermediate elements like "Senior Flow")
+        element_visible = _check_target_element_visibility(prompt_usuario, dom_context, 
+                                                           timeout_ms=ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS)
         
-        if fallback_engine:
-            logger.info("Element not visible, activating navigation fallback")
-            fallback_result = await fallback_engine.handle_invisible_element(
-                user_query=prompt_usuario,
-                dom_context=dom_context,
-                tenant_id=tenant_id
-            )
+        if not element_visible:
+            # Target element not visible - activate navigation fallback
+            fallback_engine = get_navigation_fallback_engine()
             
-            if fallback_result["fallback_type"] == "navigation":
-                # Get first step for immediate highlight
-                nav_path = fallback_result.get("navigation_path", [])
-                first_step = nav_path[0] if nav_path else None
+            if fallback_engine:
+                logger.info("Target element not visible, activating navigation fallback")
+                fallback_result = await fallback_engine.handle_invisible_element(
+                    user_query=prompt_usuario,
+                    dom_context=dom_context,
+                    tenant_id=tenant_id
+                )
                 
-                # Return navigation offer with first step highlighted
-                return {
-                    "mensagem": fallback_result["mensagem"],
-                    "elemento_id": first_step.get("element", {}).get("label", "") if first_step else None,
-                    "seletor_css": first_step.get("element", {}).get("selector_hint", "") if first_step else None,
-                    "navigation_path": fallback_result["navigation_path"],
-                    "navigation_mode": "guided",  # Flag to indicate guided navigation
-                    "current_step": 0,  # Start at first step
-                    "total_steps": len(nav_path),
-                    "requires_confirmation": True,
-                    "sugestoes": ["Sim, me guie", "Não, obrigado"],
-                    "confidence_score": fallback_result.get("confidence_score", 0.0),
-                    "source_reference": fallback_result.get("roteiro_name"),
-                    "breadcrumb": fallback_result.get("breadcrumb", "")
-                }
-            # If fallback_type is "general", continue to Vision below
+                if fallback_result["fallback_type"] == "navigation":
+                    # Get first step for immediate highlight
+                    nav_path = fallback_result.get("navigation_path", [])
+                    first_step = nav_path[0] if nav_path else None
+                    
+                    # Return navigation offer with first step highlighted
+                    return {
+                        "mensagem": fallback_result["mensagem"],
+                        "elemento_id": first_step.get("element", {}).get("label", "") if first_step else None,
+                        "seletor_css": first_step.get("element", {}).get("selector_hint", "") if first_step else None,
+                        "navigation_path": fallback_result["navigation_path"],
+                        "navigation_mode": "guided",  # Flag to indicate guided navigation
+                        "current_step": 0,  # Start at first step
+                        "total_steps": len(nav_path),
+                        "requires_confirmation": True,
+                        "sugestoes": ["Sim, me guie", "Não, obrigado"],
+                        "confidence_score": fallback_result.get("confidence_score", 0.0),
+                        "source_reference": fallback_result.get("roteiro_name"),
+                        "breadcrumb": fallback_result.get("breadcrumb", "")
+                    }
+                # If fallback_type is "general", continue to Vision below
     
     # =========================================================
     # STEP 4: PROCEED WITH NORMAL FLOW (Vision + RAG)

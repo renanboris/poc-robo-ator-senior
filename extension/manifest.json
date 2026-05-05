@@ -42,6 +42,8 @@
         "modules/aura_ui.js",
         "modules/aura_dom_mapper.js",
         "modules/aura_spotlight.js",
+        "modules/navigation_highlighter.js",
+        "modules/guided_navigation_controller.js",
         "modules/aura_gps_engine.js",
         "modules/aura_mission_engine.js",
         "modules/aura_assist_engine.js",

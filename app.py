@@ -1318,6 +1318,12 @@ async def get_navigation_metrics():
     except Exception as e:
         logging.warning(f"[navigation_metrics] Erro ao obter métricas: {e}")
         return {
+            "fallback_activations": 0,
+            "navigation_success_rate": 0.0,
+            "average_navigation_time_ms": 0.0,
+            "cache_hit_rate": 0.0,
+            "index_size": 0
+        }
 
 
 @app.post("/api/navigation/next-step")
@@ -1376,17 +1382,6 @@ async def navigation_next_step(request: Request):
             "error": str(e),
             "next_step": None,
             "completed": False
-        }
-            "fallback_activations": None,
-            "navigation_successes": None,
-            "navigation_failures": None,
-            "success_rate": None,
-            "average_navigation_time_ms": None,
-            "cache_hit_rate": None,
-            "cache_hits": None,
-            "cache_misses": None,
-            "index_size": None,
-            "error": str(e)
         }
 
 @app.get("/api/status")

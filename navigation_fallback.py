@@ -611,12 +611,13 @@ class NavigationPathExtractor:
     - Target element identification
     """
     
-    def extract_navigation_path(self, roteiro_data: Dict) -> Optional[Dict]:
+    def extract_navigation_path(self, roteiro_data: Dict, target_query: Optional[str] = None) -> Optional[Dict]:
         """
         Extract navigation path from roteiro JSON.
         
         Args:
             roteiro_data: Parsed roteiro JSON
+            target_query: Optional query to limit extraction to specific target element
         
         Returns:
             dict: {
@@ -632,11 +633,43 @@ class NavigationPathExtractor:
             
             steps = []
             breadcrumb_parts = []
+            target_found = False
+            
+            # Normalize target query for matching
+            normalized_target = None
+            if target_query:
+                # Extract keywords from query (remove question words and patterns)
+                query_lower = target_query.lower()
+                
+                # Remove common question patterns (more aggressive)
+                patterns_to_remove = [
+                    'o que é', 'o que e', 'como acessar', 'como chegar', 'como ir', 
+                    'onde fica', 'onde está', 'onde esta', 'me leve', 'me guie', 
+                    'me mostre', 'quero ir', 'preciso ir', 'ir para', 'acessar',
+                    'navegar', 'encontrar', 'localizar', 'chegar em', 'chegar no',
+                    'como faço para', 'como fazer para', 'caminho para',
+                    'o ', 'a ', 'os ', 'as ', 'um ', 'uma ', '?', '!'
+                ]
+                
+                query_clean = query_lower
+                for pattern in patterns_to_remove:
+                    query_clean = query_clean.replace(pattern, ' ')
+                
+                # Normalize and clean
+                normalized_target = unidecode(query_clean).strip()
+                # Remove extra spaces and punctuation
+                normalized_target = ' '.join(normalized_target.split())
+                # Remove remaining punctuation
+                import re
+                normalized_target = re.sub(r'[^\w\s]', '', normalized_target).strip()
+                
+                logger.info(f"Target query: '{target_query}' -> normalized: '{normalized_target}'")
             
             for passo in passos:
                 step = self._parse_step(passo)
                 if step:
                     steps.append(step)
+                    
                     # Build breadcrumb from tooltips
                     tooltip = step.get("tooltip", "")
                     if tooltip and " > " in tooltip:
@@ -648,6 +681,30 @@ class NavigationPathExtractor:
                         label = step["element"]["label"]
                         if label not in breadcrumb_parts:
                             breadcrumb_parts.append(label)
+                    
+                    # Check if this step matches the target query
+                    if normalized_target and normalized_target.strip():
+                        step_label = step.get("element", {}).get("label", "")
+                        normalized_label = unidecode(step_label.lower()).strip()
+                        
+                        # Split target into words for flexible matching
+                        target_words = normalized_target.split()
+                        
+                        logger.debug(f"Checking step {len(steps)}: label='{step_label}' (normalized='{normalized_label}') against target words={target_words}")
+                        
+                        # Check if any target word matches the label
+                        match_found = False
+                        for word in target_words:
+                            if len(word) >= 3:  # Only match words with 3+ characters
+                                if word in normalized_label or normalized_label in word:
+                                    match_found = True
+                                    logger.debug(f"  -> Match found! word='{word}' in label='{normalized_label}'")
+                                    break
+                        
+                        if match_found:
+                            target_found = True
+                            logger.info(f"Target element '{step_label}' found at step {len(steps)}, stopping extraction")
+                            break
             
             if not steps:
                 return None
@@ -1037,15 +1094,45 @@ class NavigationFallbackEngine:
             
             # Get best match
             best_match = results[0]
-            breadcrumb = best_match["breadcrumb"]
+            roteiro_name = best_match["roteiro_name"]
             confidence = best_match["confidence_score"]
+            
+            # Re-extract navigation path from roteiro with target query to limit steps
+            roteiro_path = Path("roteiros_salvos") / f"{roteiro_name}.json"
+            if roteiro_path.exists():
+                try:
+                    with open(roteiro_path, 'r', encoding='utf-8') as f:
+                        roteiro_data = json.load(f)
+                    
+                    # Extract path with target query to stop at the target element
+                    nav_path = self.path_extractor.extract_navigation_path(roteiro_data, target_query=user_query)
+                    
+                    if nav_path and nav_path.get("steps"):
+                        breadcrumb = nav_path["breadcrumb"]
+                        navigation_path = nav_path["steps"]
+                        
+                        logger.info(f"Re-extracted navigation path with {len(navigation_path)} steps (limited to target)")
+                    else:
+                        # Fallback to indexed path if re-extraction fails
+                        breadcrumb = best_match["breadcrumb"]
+                        navigation_path = best_match["navigation_path"]
+                        logger.warning("Re-extraction failed, using indexed path")
+                except Exception as e:
+                    logger.error(f"Failed to re-extract navigation path: {e}")
+                    # Fallback to indexed path
+                    breadcrumb = best_match["breadcrumb"]
+                    navigation_path = best_match["navigation_path"]
+            else:
+                # Roteiro file not found, use indexed path
+                breadcrumb = best_match["breadcrumb"]
+                navigation_path = best_match["navigation_path"]
             
             # Log path found
             log_navigation_event(
                 event_type="path_found",
                 tenant_id=tenant_id,
                 user_query=user_query,
-                roteiro_name=best_match["roteiro_name"],
+                roteiro_name=roteiro_name,
                 confidence_score=confidence
             )
             
@@ -1054,11 +1141,11 @@ class NavigationFallbackEngine:
             
             return {
                 "mensagem": mensagem,
-                "navigation_path": best_match["navigation_path"],
+                "navigation_path": navigation_path,
                 "requires_confirmation": True,
                 "fallback_type": "navigation",
                 "confidence_score": confidence,
-                "roteiro_name": best_match["roteiro_name"]
+                "roteiro_name": roteiro_name
             }
             
         except Exception as e:
