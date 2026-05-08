@@ -277,10 +277,8 @@ async def _injetar_em_contexto(contexto):
             // 1. Identifica se a sub-parte clicada é de um widget composto PrimeNG
             let suffix = '', partName = '', hostId = '';
             
-            if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, button.ui-button-icon-only, .ui-autocomplete-dropdown')) {
-                suffix = 'button.button-addon'; partName = 'search_button'; hostId = 'p-autocomplete';
-            } else if (el.closest('button.ui-datepicker-trigger, .ui-datepicker-trigger, button[icon*="calendar"]')) {
-                suffix = 'button.ui-datepicker-trigger'; partName = 'calendar_trigger'; hostId = 'p-calendar';
+            if (el.closest('.ui-datepicker-trigger, button[icon*="calendar"], p-calendar button, .ui-calendar button')) {
+                suffix = 'button'; partName = 'calendar_trigger'; hostId = 'p-calendar';
             } else if (el.closest('.ui-dropdown-trigger, .p-dropdown-trigger')) {
                 suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger'; hostId = 'p-dropdown';
             } else if (el.closest('.ui-dropdown-label, .p-dropdown-label')) {
@@ -299,20 +297,22 @@ async def _injetar_em_contexto(contexto):
                 suffix = '.ui-chips-token-icon'; partName = 'remove_chip'; hostId = 'p-chips';
             } else if (el.closest('.ui-fileupload-choose, .p-fileupload-choose')) {
                 suffix = '.ui-fileupload-choose'; partName = 'choose_button'; hostId = 'p-fileupload';
+            } else if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, s-autocomplete button, .ui-autocomplete-dropdown')) {
+                suffix = 'button'; partName = 'search_button'; hostId = 'p-autocomplete';
+            } else if (el.closest('button.ui-button-icon-only, button[pbutton]')) {
+                // Genérico em um inputgroup
+                const primeHost = el.closest('.p-inputgroup, .ui-inputgroup');
+                if (primeHost) {
+                    suffix = 'button'; partName = 'addon_button'; hostId = 'p-inputgroup';
+                }
             } else if (el.tagName.toLowerCase() === 'input' || el.closest('input')) {
-                // Para inputs, precisamos garantir que é um PrimeNG e não input solto
+                // Para inputs, verificamos parent
                 const primeHost = el.closest('p-autocomplete, .ui-autocomplete, p-calendar, .ui-calendar, p-spinner, .ui-spinner, p-chips, .ui-chips, .p-inputgroup, .ui-inputgroup, s-autocomplete');
                 if (primeHost) {
                     suffix = 'input'; partName = 'input';
                     hostId = primeHost.tagName.toLowerCase().includes('calendar') ? 'p-calendar' :
                              primeHost.tagName.toLowerCase().includes('spinner') ? 'p-spinner' :
                              primeHost.tagName.toLowerCase().includes('chips') ? 'p-chips' : 'p-autocomplete';
-                }
-            } else if (el.closest('button.ui-button, button[pbutton]')) {
-                // Botão genérico em inputgroup
-                const primeHost = el.closest('.p-inputgroup, .ui-inputgroup');
-                if (primeHost) {
-                    suffix = 'button.ui-button'; partName = 'addon_button'; hostId = 'p-inputgroup';
                 }
             }
 
@@ -339,7 +339,7 @@ async def _injetar_em_contexto(contexto):
 
             if (identifier) {
                 let isSameElement = false;
-                try { isSameElement = cur.matches(suffix); } catch(e) {}
+                try { isSameElement = (cur === el) || cur.matches(suffix); } catch(e) {}
                 
                 if (isSameElement) {
                     const tagPart = suffix.split('.')[0];
@@ -481,7 +481,19 @@ async def _injetar_em_contexto(contexto):
                 processarEvento(e.target, 'digitar_e_enter', e.target.value || e.target.innerText || '');
             }
         }, true);
+
+        // --- ANTI-FANTASMA: rastrear se o usuario realmente interagiu via teclado, mouse ou paste
+        document.addEventListener('input', (e) => {
+            if (e.isTrusted && e.target && e.target.tagName) {
+                const tag = e.target.tagName.toLowerCase();
+                if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) {
+                    e.target.dataset.userTyped = 'true';
+                }
+            }
+        }, true);
+
         document.addEventListener('blur', (e) => {
+            if (!e.target || !e.target.tagName) return;
             const tag = e.target.tagName.toLowerCase();
             const tipo = (e.target.getAttribute('type') || '').toLowerCase();
             // Ignora checkboxes e radios — nunca geram preencher_campo
@@ -490,8 +502,13 @@ async def _injetar_em_contexto(contexto):
             const val = e.target.value || '';
             if (!val.trim() || val === 'undefined' || val === 'null') return;
             if (e.target === ultimoEnterTarget && Date.now() - ultimoEnterTime < 500) return;
+            
             if ((tag === 'input' || tag === 'textarea' || e.target.isContentEditable) && e.target.value) {
-                processarEvento(e.target, 'preencher_campo', e.target.value);
+                // SÓ EMITE SE O USUARIO EFETIVAMENTE DIGITOU ALGO (isTrusted input)
+                if (e.target.dataset.userTyped === 'true') {
+                    processarEvento(e.target, 'preencher_campo', e.target.value);
+                    e.target.dataset.userTyped = 'false'; // Reseta após emitir
+                }
             }
         }, true);
     }"""
