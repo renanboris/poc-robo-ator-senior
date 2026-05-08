@@ -321,6 +321,7 @@ async def _injetar_em_contexto(contexto):
             // 2. Encontrar o identificador (âncora)
             let cur = el;
             let identifier = '';
+            let borrowedFromInput = false;
 
             for (let i = 0; i < 8; i++) {
                 if (!cur) break;
@@ -334,10 +335,34 @@ async def _injetar_em_contexto(contexto):
                 if (testid) { identifier = `[data-testid='${testid}']`; break; }
                 if (idAttr) { identifier = `#${idAttr}`; break; }
                 
+                // NOVO: 'Roubar' o identificador do input interno se o wrapper for um componente PrimeNG conhecido
+                if (cur.tagName.toLowerCase().startsWith('p-') || cur.classList.contains('ui-calendar') || cur.classList.contains('ui-autocomplete') || cur.classList.contains('ui-dropdown') || cur.classList.contains('ui-multiselect') || cur.classList.contains('ui-inputgroup')) {
+                    const innerInput = cur.querySelector('input:not([type="hidden"])');
+                    if (innerInput && innerInput !== el) {
+                        const iname = innerInput.getAttribute('name') || innerInput.getAttribute('formcontrolname');
+                        if (iname) { identifier = `[name='${iname}']`; borrowedFromInput = true; break; }
+                        const itest = innerInput.getAttribute('data-testid') || innerInput.getAttribute('data-test');
+                        if (itest) { identifier = `[data-testid='${itest}']`; borrowedFromInput = true; break; }
+                        const iid = innerInput.id && !innerInput.id.match(/(ng-|mat-|cdk-|^\\d)/) && !innerInput.id.includes('autocomplete') ? innerInput.id : null;
+                        if (iid) { identifier = `#${iid}`; borrowedFromInput = true; break; }
+                    }
+                }
+                
                 cur = cur.parentElement;
             }
 
             if (identifier) {
+                if (borrowedFromInput) {
+                    const wrapperTag = cur.tagName.toLowerCase();
+                    let wrapperClass = '';
+                    if (cur.classList.length > 0) {
+                        const c = Array.from(cur.classList).find(cls => cls.startsWith('ui-') || cls.startsWith('p-'));
+                        if (c) wrapperClass = `.${c}`;
+                    }
+                    const wrapperSel = `${wrapperTag}${wrapperClass}`;
+                    return { seletor: `${wrapperSel}:has(${identifier}) ${suffix}`, componentType: `${hostId}:${partName}`, partName, identifier };
+                }
+
                 let isSameElement = false;
                 try { isSameElement = (cur === el) || cur.matches(suffix); } catch(e) {}
                 
