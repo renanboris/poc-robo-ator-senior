@@ -273,6 +273,112 @@ async def _injetar_em_contexto(contexto):
             return tag;
         };
 
+        // ── PrimeNG Composite Component Resolver ──────────────────────────────
+        // Identifica se el está dentro de um widget composto PrimeNG e retorna
+        // um seletor preciso que aponta para a SUB-PARTE correta (botão de busca,
+        // trigger de dropdown, ícone de calendário, etc.).
+        // Cobre tanto prefixo ui-* (PrimeNG v7/v8) quanto p-* (v9+).
+        const resolvePrimeNGComponent = (el) => {
+            const HOST_MAP = [
+                { sel: 'p-autocomplete, .ui-autocomplete',       id: 'p-autocomplete'  },
+                { sel: 'p-calendar, .ui-calendar',               id: 'p-calendar'      },
+                { sel: 'p-dropdown, .ui-dropdown',               id: 'p-dropdown'      },
+                { sel: 'p-multiselect, .ui-multiselect',         id: 'p-multiselect'   },
+                { sel: 'p-spinner, .ui-spinner, p-inputnumber',  id: 'p-spinner'       },
+                { sel: 'p-splitbutton, .ui-splitbutton',         id: 'p-splitbutton'   },
+                { sel: 'p-inputswitch, .ui-inputswitch',         id: 'p-inputswitch'   },
+                { sel: 'p-chips, .ui-chips',                     id: 'p-chips'         },
+                { sel: 'p-fileupload, .ui-fileupload',           id: 'p-fileupload'    },
+                { sel: '.p-inputgroup, .ui-inputgroup',          id: 'p-inputgroup'    },
+            ];
+
+            let hostEl = null, hostId = null;
+            for (const { sel, id } of HOST_MAP) {
+                hostEl = el.closest(sel);
+                if (hostEl) { hostId = id; break; }
+            }
+            if (!hostEl) return null;
+
+            // Busca identificador estável: host ou input filho
+            let identifier = '';
+            const hostName = hostEl.getAttribute('name') || hostEl.getAttribute('formcontrolname');
+            const hostElId = hostEl.id && !hostEl.id.match(/(ng-|mat-|cdk-|^\d)/) ? hostEl.id : '';
+            const inputFilho = hostEl.querySelector('input:not([type="hidden"])');
+            const inputName = inputFilho ? inputFilho.getAttribute('name') : '';
+            const inputId   = inputFilho && inputFilho.id && !inputFilho.id.includes('autocomplete')
+                              && !inputFilho.id.match(/(ng-|mat-|cdk-)/) ? inputFilho.id : '';
+
+            if (hostName)          identifier = `[name='${hostName}']`;
+            else if (hostElId)     identifier = `#${hostElId}`;
+            else if (inputName)    identifier = `[name='${inputName}']`;
+            else if (inputId)      identifier = `[id='${inputId}']`;
+
+            // Identifica a sub-parte clicada
+            let suffix = '', partName = '';
+
+            if (hostId === 'p-autocomplete') {
+                if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, button.ui-button-icon-only')) {
+                    suffix = 'button.button-addon'; partName = 'search_button';
+                } else { suffix = 'input'; partName = 'input'; }
+
+            } else if (hostId === 'p-calendar') {
+                if (el.closest('button.ui-datepicker-trigger, .ui-datepicker-trigger, button[icon]')) {
+                    suffix = 'button.ui-datepicker-trigger'; partName = 'calendar_trigger';
+                } else { suffix = 'input'; partName = 'input'; }
+
+            } else if (hostId === 'p-dropdown') {
+                if (el.closest('.ui-dropdown-trigger, .p-dropdown-trigger')) {
+                    suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger';
+                } else if (el.closest('.ui-dropdown-label, .p-dropdown-label')) {
+                    suffix = '.ui-dropdown-label'; partName = 'label';
+                } else { suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger'; }
+
+            } else if (hostId === 'p-multiselect') {
+                if (el.closest('.ui-multiselect-trigger, .p-multiselect-trigger')) {
+                    suffix = '.ui-multiselect-trigger'; partName = 'trigger';
+                } else { suffix = '.ui-multiselect-trigger'; partName = 'trigger'; }
+
+            } else if (hostId === 'p-spinner') {
+                if (el.closest('.ui-spinner-up, .p-inputnumber-button-up')) {
+                    suffix = '.ui-spinner-up'; partName = 'increment';
+                } else if (el.closest('.ui-spinner-down, .p-inputnumber-button-down')) {
+                    suffix = '.ui-spinner-down'; partName = 'decrement';
+                } else { suffix = 'input'; partName = 'input'; }
+
+            } else if (hostId === 'p-splitbutton') {
+                if (el.closest('.ui-splitbutton-menubutton, .p-splitbutton-menubutton')) {
+                    suffix = '.ui-splitbutton-menubutton'; partName = 'menu_trigger';
+                } else { suffix = 'button:first-child'; partName = 'main_button'; }
+
+            } else if (hostId === 'p-inputswitch') {
+                suffix = '.ui-inputswitch-slider'; partName = 'slider';
+
+            } else if (hostId === 'p-chips') {
+                if (el.closest('.ui-chips-token-icon, .p-chips-token-icon')) {
+                    suffix = '.ui-chips-token-icon'; partName = 'remove_chip';
+                } else { suffix = 'input'; partName = 'input'; }
+
+            } else if (hostId === 'p-fileupload') {
+                if (el.closest('.ui-fileupload-choose, .p-fileupload-choose')) {
+                    suffix = '.ui-fileupload-choose'; partName = 'choose_button';
+                } else { suffix = 'input[type="file"]'; partName = 'file_input'; }
+
+            } else if (hostId === 'p-inputgroup') {
+                if (el.closest('button[pbutton], button.ui-button, button.button-addon')) {
+                    suffix = 'button.ui-button'; partName = 'addon_button';
+                } else { suffix = 'input'; partName = 'input'; }
+            }
+
+            if (!suffix) return null;
+
+            // Gera seletor composto: âncora no hostId + identificador + sub-elemento
+            const seletor = identifier
+                ? `${hostId}${identifier} ${suffix}`
+                : `${hostId} ${suffix}`;
+
+            return { seletor, componentType: `${hostId}:${partName}`, partName, identifier };
+        };
+
         const getBestSelector = (el) => {
             const customCheckbox = el.closest('p-checkbox, mat-checkbox, [role="checkbox"], .ui-chkbox');
             if (customCheckbox) {
@@ -305,8 +411,14 @@ async def _injetar_em_contexto(contexto):
                 }
             }
 
+            // PrimeNG composite component: resolve ANTES do fallback genérico
+            const _primeResult = resolvePrimeNGComponent(el);
+            if (_primeResult) return _primeResult.seletor;
+
+            // Fallback genérico: sobe na árvore DOM buscando atributo estável
+            // Profundidade aumentada para 8 para cobrir componentes aninhados
             let cur = el;
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 8; i++) {
                 if (!cur) break;
                 const tid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
                 if (tid) return `[data-testid='${tid}']`;
@@ -358,10 +470,14 @@ async def _injetar_em_contexto(contexto):
 
         const processarEvento = (target, acao, valor = '') => {
             const rect = getRectComFallback(target);
+            // Resolve PrimeNG uma vez: reutiliza para seletor + metadado
+            const _pResult = resolvePrimeNGComponent(target);
+            const _seletor = _pResult ? _pResult.seletor : getBestSelector(target);
             window.capturarElemento(JSON.stringify({
                 tag: target.tagName.toLowerCase(),
                 texto_encontrado: valor || getElementName(target),
-                seletor: getBestSelector(target),
+                seletor: _seletor,
+                primeng_component: _pResult ? _pResult.componentType : '',
                 iframe: getFrameId(), acao,
                 posicao_visual: `x:${Math.round(rect.x)},y:${Math.round(rect.y)},w:${Math.round(rect.width)},h:${Math.round(rect.height)}`,
                 html_snapshot: target.outerHTML.substring(0, 300)
@@ -498,6 +614,7 @@ async def on_capturar_elemento(source, args):
                 "label_curto":           label,
                 "coordenadas_relativas": coords,
                 "seletor_hint":          dados["seletor"],
+                "primeng_component":     dados.get("primeng_component", ""),
                 "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
                 "html_hint":             dados.get("html_snapshot", "")[:300],
                 "screenshot_referencia": screenshot_b64,

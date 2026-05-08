@@ -454,6 +454,13 @@ def _e_seletor_fragil(seletor: str) -> bool:
     for prefixo in ("text=", "has-text", "[aria-label=", "[data-testid=", "[id=", "[name=", "[placeholder=", "[role="):
         if prefixo in seletor:
             return False
+    # Seletores PrimeNG compostos com identificador são resilientes
+    if any(p in seletor for p in (
+        "p-autocomplete", "p-calendar", "p-dropdown", "p-multiselect",
+        "p-spinner", "p-splitbutton", "p-inputswitch", "ui-autocomplete",
+        "ui-calendar", "ui-dropdown", "button-addon"
+    )):
+        return False
     tag = seletor.strip().split(":")[0].split("[")[0].split(".")[0].split(">")[0].strip()
     return tag in _TAGS_FRAGEIS
 
@@ -597,6 +604,41 @@ def _gerar_candidatos(
                 iframe_hint=iframe_hint,
                 descricao=f"dialog span '{label_curto}' em {_sel_dialog}",
             ))
+
+    # ── Candidato especial: PrimeNG composite widgets ─────────────────────────
+    # Quando o capture envia um seletor composto para widgets PrimeNG,
+    # ele já ancorou no componente correto e apontou para o sub-elemento.
+    if seletor_hint and any(p in seletor_hint for p in (
+        "p-autocomplete", "p-calendar", "p-dropdown", "p-multiselect",
+        "p-spinner", "p-splitbutton", "p-inputswitch", "p-chips", "p-fileupload",
+        "ui-autocomplete", "ui-calendar", "ui-dropdown", "button-addon"
+    )):
+        # 1. O próprio hint composto é a melhor aposta
+        candidatos.append(TentativaLocalizacao(
+            seletor=seletor_hint, iframe_hint=iframe_hint,
+            descricao=f"PrimeNG composite hint '{seletor_hint[:40]}'",
+        ))
+        
+        # 2. Fallback resiliente: tenta usar o sibling combinator (~) caso
+        # o DOM mude a estrutura pai-filho e o botão seja irmão do input
+        try:
+            partes = seletor_hint.split(" ", 1)
+            if len(partes) == 2:
+                ancora, sufixo = partes
+                match_name = re.search(r"\[name=['\"]([^'\"]+)['\"]\]", ancora)
+                match_id = re.search(r"\[id=['\"]([^'\"]+)['\"]\]", ancora)
+                if match_name:
+                    candidatos.append(TentativaLocalizacao(
+                        seletor=f"input[name='{match_name.group(1)}'] ~ {sufixo}", iframe_hint=iframe_hint,
+                        descricao=f"PrimeNG sibling fallback name",
+                    ))
+                elif match_id:
+                    candidatos.append(TentativaLocalizacao(
+                        seletor=f"input[id='{match_id.group(1)}'] ~ {sufixo}", iframe_hint=iframe_hint,
+                        descricao=f"PrimeNG sibling fallback id",
+                    ))
+        except Exception:
+            pass
 
     if label_curto and not is_tag_generica:
         if not eh_digitacao:
