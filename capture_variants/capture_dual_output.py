@@ -273,111 +273,86 @@ async def _injetar_em_contexto(contexto):
             return tag;
         };
 
-        // ── PrimeNG Composite Component Resolver ──────────────────────────────
-        // Identifica se el está dentro de um widget composto PrimeNG e retorna
-        // um seletor preciso que aponta para a SUB-PARTE correta (botão de busca,
-        // trigger de dropdown, ícone de calendário, etc.).
-        // Cobre tanto prefixo ui-* (PrimeNG v7/v8) quanto p-* (v9+).
         const resolvePrimeNGComponent = (el) => {
-            const HOST_MAP = [
-                { sel: 'p-autocomplete, .ui-autocomplete',       id: 'p-autocomplete'  },
-                { sel: 'p-calendar, .ui-calendar',               id: 'p-calendar'      },
-                { sel: 'p-dropdown, .ui-dropdown',               id: 'p-dropdown'      },
-                { sel: 'p-multiselect, .ui-multiselect',         id: 'p-multiselect'   },
-                { sel: 'p-spinner, .ui-spinner, p-inputnumber',  id: 'p-spinner'       },
-                { sel: 'p-splitbutton, .ui-splitbutton',         id: 'p-splitbutton'   },
-                { sel: 'p-inputswitch, .ui-inputswitch',         id: 'p-inputswitch'   },
-                { sel: 'p-chips, .ui-chips',                     id: 'p-chips'         },
-                { sel: 'p-fileupload, .ui-fileupload',           id: 'p-fileupload'    },
-                { sel: '.p-inputgroup, .ui-inputgroup',          id: 'p-inputgroup'    },
-            ];
-
-            let hostEl = null, hostId = null;
-            for (const { sel, id } of HOST_MAP) {
-                hostEl = el.closest(sel);
-                if (hostEl) { hostId = id; break; }
-            }
-            if (!hostEl) return null;
-
-            // Busca identificador estável: host ou input filho
-            let identifier = '';
-            const hostName = hostEl.getAttribute('name') || hostEl.getAttribute('formcontrolname');
-            const hostElId = hostEl.id && !hostEl.id.match(/(ng-|mat-|cdk-|^\d)/) ? hostEl.id : '';
-            const inputFilho = hostEl.querySelector('input:not([type="hidden"])');
-            const inputName = inputFilho ? inputFilho.getAttribute('name') : '';
-            const inputId   = inputFilho && inputFilho.id && !inputFilho.id.includes('autocomplete')
-                              && !inputFilho.id.match(/(ng-|mat-|cdk-)/) ? inputFilho.id : '';
-
-            if (hostName)          identifier = `[name='${hostName}']`;
-            else if (hostElId)     identifier = `#${hostElId}`;
-            else if (inputName)    identifier = `[name='${inputName}']`;
-            else if (inputId)      identifier = `[id='${inputId}']`;
-
-            // Identifica a sub-parte clicada
-            let suffix = '', partName = '';
-
-            if (hostId === 'p-autocomplete') {
-                if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, button.ui-button-icon-only')) {
-                    suffix = 'button.button-addon'; partName = 'search_button';
-                } else { suffix = 'input'; partName = 'input'; }
-
-            } else if (hostId === 'p-calendar') {
-                if (el.closest('button.ui-datepicker-trigger, .ui-datepicker-trigger, button[icon]')) {
-                    suffix = 'button.ui-datepicker-trigger'; partName = 'calendar_trigger';
-                } else { suffix = 'input'; partName = 'input'; }
-
-            } else if (hostId === 'p-dropdown') {
-                if (el.closest('.ui-dropdown-trigger, .p-dropdown-trigger')) {
-                    suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger';
-                } else if (el.closest('.ui-dropdown-label, .p-dropdown-label')) {
-                    suffix = '.ui-dropdown-label'; partName = 'label';
-                } else { suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger'; }
-
-            } else if (hostId === 'p-multiselect') {
-                if (el.closest('.ui-multiselect-trigger, .p-multiselect-trigger')) {
-                    suffix = '.ui-multiselect-trigger'; partName = 'trigger';
-                } else { suffix = '.ui-multiselect-trigger'; partName = 'trigger'; }
-
-            } else if (hostId === 'p-spinner') {
-                if (el.closest('.ui-spinner-up, .p-inputnumber-button-up')) {
-                    suffix = '.ui-spinner-up'; partName = 'increment';
-                } else if (el.closest('.ui-spinner-down, .p-inputnumber-button-down')) {
-                    suffix = '.ui-spinner-down'; partName = 'decrement';
-                } else { suffix = 'input'; partName = 'input'; }
-
-            } else if (hostId === 'p-splitbutton') {
-                if (el.closest('.ui-splitbutton-menubutton, .p-splitbutton-menubutton')) {
-                    suffix = '.ui-splitbutton-menubutton'; partName = 'menu_trigger';
-                } else { suffix = 'button:first-child'; partName = 'main_button'; }
-
-            } else if (hostId === 'p-inputswitch') {
-                suffix = '.ui-inputswitch-slider'; partName = 'slider';
-
-            } else if (hostId === 'p-chips') {
-                if (el.closest('.ui-chips-token-icon, .p-chips-token-icon')) {
-                    suffix = '.ui-chips-token-icon'; partName = 'remove_chip';
-                } else { suffix = 'input'; partName = 'input'; }
-
-            } else if (hostId === 'p-fileupload') {
-                if (el.closest('.ui-fileupload-choose, .p-fileupload-choose')) {
-                    suffix = '.ui-fileupload-choose'; partName = 'choose_button';
-                } else { suffix = 'input[type="file"]'; partName = 'file_input'; }
-
-            } else if (hostId === 'p-inputgroup') {
-                if (el.closest('button[pbutton], button.ui-button, button.button-addon')) {
-                    suffix = 'button.ui-button'; partName = 'addon_button';
-                } else { suffix = 'input'; partName = 'input'; }
+            // 1. Identifica se a sub-parte clicada é de um widget composto PrimeNG
+            let suffix = '', partName = '', hostId = '';
+            
+            if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, button.ui-button-icon-only, .ui-autocomplete-dropdown')) {
+                suffix = 'button.button-addon'; partName = 'search_button'; hostId = 'p-autocomplete';
+            } else if (el.closest('button.ui-datepicker-trigger, .ui-datepicker-trigger, button[icon*="calendar"]')) {
+                suffix = 'button.ui-datepicker-trigger'; partName = 'calendar_trigger'; hostId = 'p-calendar';
+            } else if (el.closest('.ui-dropdown-trigger, .p-dropdown-trigger')) {
+                suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger'; hostId = 'p-dropdown';
+            } else if (el.closest('.ui-dropdown-label, .p-dropdown-label')) {
+                suffix = '.ui-dropdown-label'; partName = 'label'; hostId = 'p-dropdown';
+            } else if (el.closest('.ui-multiselect-trigger, .p-multiselect-trigger')) {
+                suffix = '.ui-multiselect-trigger'; partName = 'trigger'; hostId = 'p-multiselect';
+            } else if (el.closest('.ui-spinner-up, .p-inputnumber-button-up')) {
+                suffix = '.ui-spinner-up'; partName = 'increment'; hostId = 'p-spinner';
+            } else if (el.closest('.ui-spinner-down, .p-inputnumber-button-down')) {
+                suffix = '.ui-spinner-down'; partName = 'decrement'; hostId = 'p-spinner';
+            } else if (el.closest('.ui-splitbutton-menubutton, .p-splitbutton-menubutton')) {
+                suffix = '.ui-splitbutton-menubutton'; partName = 'menu_trigger'; hostId = 'p-splitbutton';
+            } else if (el.closest('.ui-inputswitch-slider, .p-inputswitch-slider')) {
+                suffix = '.ui-inputswitch-slider'; partName = 'slider'; hostId = 'p-inputswitch';
+            } else if (el.closest('.ui-chips-token-icon, .p-chips-token-icon')) {
+                suffix = '.ui-chips-token-icon'; partName = 'remove_chip'; hostId = 'p-chips';
+            } else if (el.closest('.ui-fileupload-choose, .p-fileupload-choose')) {
+                suffix = '.ui-fileupload-choose'; partName = 'choose_button'; hostId = 'p-fileupload';
+            } else if (el.tagName.toLowerCase() === 'input' || el.closest('input')) {
+                // Para inputs, precisamos garantir que é um PrimeNG e não input solto
+                const primeHost = el.closest('p-autocomplete, .ui-autocomplete, p-calendar, .ui-calendar, p-spinner, .ui-spinner, p-chips, .ui-chips, .p-inputgroup, .ui-inputgroup, s-autocomplete');
+                if (primeHost) {
+                    suffix = 'input'; partName = 'input';
+                    hostId = primeHost.tagName.toLowerCase().includes('calendar') ? 'p-calendar' :
+                             primeHost.tagName.toLowerCase().includes('spinner') ? 'p-spinner' :
+                             primeHost.tagName.toLowerCase().includes('chips') ? 'p-chips' : 'p-autocomplete';
+                }
+            } else if (el.closest('button.ui-button, button[pbutton]')) {
+                // Botão genérico em inputgroup
+                const primeHost = el.closest('.p-inputgroup, .ui-inputgroup');
+                if (primeHost) {
+                    suffix = 'button.ui-button'; partName = 'addon_button'; hostId = 'p-inputgroup';
+                }
             }
 
             if (!suffix) return null;
 
-            // Gera seletor composto: âncora no hostId + identificador + sub-elemento
-            const seletor = identifier
-                ? `${hostId}${identifier} ${suffix}`
-                : `${hostId} ${suffix}`;
+            // 2. Encontrar o identificador (âncora)
+            let cur = el;
+            let identifier = '';
 
-            return { seletor, componentType: `${hostId}:${partName}`, partName, identifier };
+            for (let i = 0; i < 8; i++) {
+                if (!cur) break;
+                
+                const name = cur.getAttribute('name') || cur.getAttribute('formcontrolname');
+                const testid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
+                // Alterado \\d para evitar o SyntaxWarning do Python
+                const idAttr = cur.id && !cur.id.match(/(ng-|mat-|cdk-|^\\d)/) && !cur.id.includes('autocomplete') ? cur.id : null;
+                
+                if (name) { identifier = `[name='${name}']`; break; }
+                if (testid) { identifier = `[data-testid='${testid}']`; break; }
+                if (idAttr) { identifier = `#${idAttr}`; break; }
+                
+                cur = cur.parentElement;
+            }
+
+            if (identifier) {
+                let isSameElement = false;
+                try { isSameElement = cur.matches(suffix); } catch(e) {}
+                
+                if (isSameElement) {
+                    const tagPart = suffix.split('.')[0];
+                    const tag = ['input', 'button'].includes(tagPart) ? tagPart : cur.tagName.toLowerCase();
+                    return { seletor: `${tag}${identifier}`, componentType: `${hostId}:${partName}`, partName, identifier };
+                } else {
+                    return { seletor: `${identifier} ${suffix}`, componentType: `${hostId}:${partName}`, partName, identifier };
+                }
+            }
+
+            return { seletor: `${hostId} ${suffix}`, componentType: `${hostId}:${partName}`, partName, identifier: '' };
         };
+
 
         const getBestSelector = (el) => {
             const customCheckbox = el.closest('p-checkbox, mat-checkbox, [role="checkbox"], .ui-chkbox');
