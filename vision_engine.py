@@ -465,6 +465,44 @@ def _e_seletor_fragil(seletor: str) -> bool:
     return tag in _TAGS_FRAGEIS
 
 
+def _e_label_generico(label: str) -> bool:
+    """
+    Detecta se label_curto é genérico/cosmético e não deve ser priorizado.
+    
+    Retorna True se o label é genérico (tag HTML, texto PrimeNG cosmético, muito curto).
+    Retorna False se o label é específico e pode ser usado para localização.
+    
+    Validações:
+    - Tags HTML genéricas (button, input, span, div, etc.)
+    - Textos PrimeNG cosmético internos (ui-btn, ui-button-text, p-button, etc.)
+    - Textos muito curtos (< 3 caracteres) ou vazios
+    
+    Validates: Requirements 2.1, 2.4
+    """
+    if not label or not label.strip():
+        return True
+    
+    label_lower = label.strip().lower()
+    
+    # Tags HTML genéricas
+    if label_lower in _TAGS_FRAGEIS:
+        return True
+    
+    # Textos PrimeNG cosmético internos
+    TEXTOS_PRIMENG_COSMETICOS = {
+        "ui-btn", "ui-button", "ui-button-text", "ui-clickable",
+        "ui-widget", "ui-state-default", "p-button", "p-element"
+    }
+    if label_lower in TEXTOS_PRIMENG_COSMETICOS:
+        return True
+    
+    # Textos muito curtos ou genéricos
+    if len(label.strip()) < 3:
+        return True
+    
+    return False
+
+
 def _contem_indice_posicional(seletor: str) -> bool:
     """
     Detecta se um seletor CSS contém índice posicional instável.
@@ -639,6 +677,21 @@ def _gerar_candidatos(
                     ))
         except Exception:
             pass
+
+    # ── NOVO: Candidato de alta prioridade para seletor_hint ──────────────────
+    # Quando seletor_hint é válido, não-frágil, e label_curto é genérico,
+    # adiciona seletor_hint como candidato de alta prioridade
+    # Validates: Requirements 2.1, 2.2, 2.4, 3.1, 3.2, 3.3, 3.4
+    if (seletor_hint and 
+        not _e_seletor_fragil(seletor_hint) and 
+        _e_label_generico(label_curto)):
+        
+        logger.debug(f"[Sniper] Adicionando seletor_hint como alta prioridade: {seletor_hint[:60]}")
+        candidatos.append(TentativaLocalizacao(
+            seletor=seletor_hint,
+            iframe_hint=iframe_hint,
+            descricao=f"seletor_hint priority '{seletor_hint[:60]}'",
+        ))
 
     if label_curto and not is_tag_generica:
         if not eh_digitacao:
