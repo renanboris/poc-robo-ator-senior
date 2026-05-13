@@ -515,12 +515,83 @@ const getBestSelector = (el) => {
 };
 
 const getFrameId = () => {
+    // Estratégia de fingerprint estável para iframes.
+    // Problema: window.name e URL podem ser dinâmicos entre sessões.
+    // Solução: gerar um fingerprint baseado em atributos ESTÁVEIS do elemento
+    // <iframe> no DOM pai — na ordem de preferência:
+    //   1. name (se não for gerado automaticamente)
+    //   2. id (se não for gerado automaticamente)
+    //   3. src sem query string e sem hash (parte do path estável)
+    //   4. title
+    //   5. posição ordinal entre iframes irmãos (último recurso)
+    //
+    // O fingerprint é prefixado com "fp:" para que o executor saiba
+    // que deve usar a lógica de fingerprint, não busca por URL.
+
+    // Se estamos no frame principal, retorna marcador especial
+    if (window === window.top) return 'Pagina Principal';
+
+    try {
+        // Tenta acessar o elemento <iframe> no DOM do pai
+        const parentFrames = window.parent.document.querySelectorAll('iframe');
+        for (let i = 0; i < parentFrames.length; i++) {
+            const iframeEl = parentFrames[i];
+            try {
+                // Verifica se este iframe contém nossa janela
+                if (iframeEl.contentWindow === window) {
+                    // 1. name estável (não gerado por Angular/framework)
+                    const name = iframeEl.getAttribute('name');
+                    if (name && !name.match(/^(ng-|mat-|cdk-|\d)/)) {
+                        return `fp:name=${name}`;
+                    }
+                    // 2. id estável
+                    const id = iframeEl.getAttribute('id');
+                    if (id && !id.match(/^(ng-|mat-|cdk-|\d)/)) {
+                        return `fp:id=${id}`;
+                    }
+                    // 3. src sem query string (parte do path é estável)
+                    const src = iframeEl.getAttribute('src');
+                    if (src) {
+                        // Remove query string e hash, pega apenas o path
+                        const srcPath = src.split('?')[0].split('#')[0];
+                        // Pega os últimos 2 segmentos do path (mais específico)
+                        const parts = srcPath.split('/').filter(Boolean);
+                        const stableSrc = parts.slice(-2).join('/');
+                        if (stableSrc && stableSrc.length > 2) {
+                            return `fp:src=${stableSrc}`;
+                        }
+                    }
+                    // 4. title
+                    const title = iframeEl.getAttribute('title');
+                    if (title && title.length > 1) {
+                        return `fp:title=${title}`;
+                    }
+                    // 5. posição ordinal (último recurso — frágil mas melhor que nada)
+                    return `fp:index=${i}`;
+                }
+            } catch(e) {
+                // Cross-origin: não consegue acessar contentWindow
+                continue;
+            }
+        }
+    } catch(e) {
+        // Sem acesso ao DOM pai (cross-origin top-level)
+    }
+
+    // Fallback: usa window.name se disponível
     if (window.name) return window.name;
+
+    // Fallback final: fragmento da URL sem query string
     try {
         const href = window.location.href;
-        if (href && href !== window.top?.location?.href) return href.split('/').pop().split('?')[0] || 'iframe';
+        if (href && href !== window.top?.location?.href) {
+            const path = href.split('?')[0].split('#')[0];
+            const parts = path.split('/').filter(Boolean);
+            return parts.slice(-2).join('/') || 'iframe';
+        }
     } catch(e) {}
-    return 'Pagina Principal';
+
+    return 'iframe';
 };
 
 const getRectComFallback = (el) => {

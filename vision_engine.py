@@ -914,7 +914,58 @@ async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
     if not iframe_hint or iframe_hint in ("Pagina Principal", "Página Principal", "iframe-cross-origin"):
         return page
 
-    # Try frame_locator approach first to confirm iframe exists
+    # ── Fingerprint estável (formato "fp:tipo=valor") ─────────────────────
+    # Gerado pelo radar_script.js v2.2.0+ para iframes com atributos estáveis.
+    # Estratégias em ordem de preferência: name, id, src (path), title, index.
+    if iframe_hint.startswith("fp:"):
+        fp_type, _, fp_value = iframe_hint[3:].partition("=")
+
+        # Índice ordinal — usa diretamente
+        if fp_type == "index":
+            try:
+                idx = int(fp_value)
+                frames = page.frames
+                if idx < len(frames):
+                    return frames[idx]
+            except (ValueError, IndexError):
+                pass
+
+        # Atributos do elemento <iframe> no DOM
+        elif fp_type in ("name", "id", "title", "src"):
+            attr_map = {
+                "name":  f"iframe[name='{fp_value}']",
+                "id":    f"iframe[id='{fp_value}']",
+                "title": f"iframe[title='{fp_value}']",
+                "src":   f"iframe[src*='{fp_value}']",
+            }
+            seletor_iframe = attr_map[fp_type]
+            try:
+                fl = page.frame_locator(seletor_iframe)
+                await fl.locator("body").wait_for(state="attached", timeout=800)
+                # Encontra o Frame object correspondente
+                for frame in page.frames:
+                    try:
+                        frame_el = await frame.frame_element()
+                        attr_val = await frame_el.get_attribute(fp_type)
+                        if attr_val and fp_value in attr_val:
+                            return frame
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+            # Fallback: busca por URL/name do frame
+            for frame in page.frames:
+                try:
+                    if fp_value in (frame.name or "") or fp_value in (frame.url or ""):
+                        return frame
+                except Exception:
+                    continue
+
+        # Se fingerprint não resolveu, cai no fallback legado abaixo
+        logger.debug(f"[iframe] Fingerprint '{iframe_hint}' não resolveu — tentando fallback legado")
+
+    # ── Fallback legado: busca por name/url (formato antigo) ─────────────
     for seletor_iframe in [
         f"iframe[name='{iframe_hint}']", f"iframe[src*='{iframe_hint}']",
         f"iframe[id='{iframe_hint}']",   f"iframe[title*='{iframe_hint}']",
@@ -923,19 +974,16 @@ async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
             fl = page.frame_locator(seletor_iframe)
             await fl.locator("body").wait_for(state="attached", timeout=800)
 
-            # FIX (Task 3.1): After confirming iframe exists, find the actual Frame object
-            # FrameLocator doesn't have .url or .name attributes needed for coordinate adjustment
-            # We need to return the actual Frame object from page.frames
             for frame in page.frames:
                 try:
                     if iframe_hint in frame.url or iframe_hint in frame.name:
-                        return frame  # Return Frame, not FrameLocator
+                        return frame
                 except Exception:
                     continue
         except Exception:
             continue
 
-    # Fallback: iterate through frames directly
+    # Fallback final: itera frames diretamente
     try:
         for frame in page.frames:
             try:
