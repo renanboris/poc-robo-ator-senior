@@ -220,28 +220,244 @@ async def _validar_checkpoint(
 # OVERLAY HITL — Interface visual na janela do Chrome
 # ══════════════════════════════════════════════════════════════════════════════
 
-# JS do getBestSelector — extraído do capture.py para capturar cliques humanos
+# JS do getBestSelector — mesma lógica do radar_script.js (capture_dual_output)
+# Suporta: PrimeNG composites, checkboxes Angular, menus de contexto, modais,
+# calendários, seletores semânticos. Só cai em nth-child como último recurso.
 _JS_GET_BEST_SELECTOR = """
     (el) => {
+        // ── Escopo de modal ──────────────────────────────────────────────────
+        const modalAncestor = el.closest('p-dialog, ui-dialog, s-dialog, p-confirmdialog, [role="dialog"]');
+        const addModalScope = (seletor) => {
+            if (!modalAncestor) return seletor;
+            const modalScope = modalAncestor.getAttribute('role') === 'dialog'
+                ? '[role="dialog"]'
+                : modalAncestor.tagName.toLowerCase();
+            return modalScope + ' ' + seletor;
+        };
+
+        // ── SELETOR CONTEXTUAL DE LINHA (universal) ──────────────────────────
+        // Princípio: qualquer elemento dentro de uma linha de tabela/lista deve ser
+        // identificado pelo CONTEÚDO da linha, não pela posição.
+        // Funciona para: HTML tables, PrimeNG, Angular Material, AG Grid, listas genéricas.
+        const resolveRowContext = (el) => {
+            const ROW_SELECTORS = 'tr, [role="row"], li, [role="listitem"], .p-datatable-row, .mat-row, .ag-row, [class*="-row"]:not(input)';
+            const rowEl = el.closest(ROW_SELECTORS);
+            if (!rowEl || rowEl === el) return null;
+
+            const getRowIdentifier = (row) => {
+                const cells = Array.from(row.querySelectorAll('td, th, [role="cell"], [role="gridcell"]'));
+                const candidates = cells.length > 0 ? cells : Array.from(row.children);
+                for (const cell of candidates) {
+                    const hasOnlyButtons = Array.from(cell.children).every(
+                        c => c.tagName === 'BUTTON' || c.tagName === 'A' ||
+                             c.getAttribute('role') === 'button' ||
+                             c.classList.contains('ui-button') || c.classList.contains('p-button')
+                    );
+                    if (hasOnlyButtons && cell.children.length > 0) continue;
+                    const text = (cell.innerText || cell.textContent || '').replace(/\\s+/g, ' ').trim();
+                    if (text.length > 2 && !/^\\d+$/.test(text))
+                        return text.substring(0, 50).replace(/["\\\\]/g, '');
+                }
+                const fullText = (row.innerText || row.textContent || '').replace(/\\s+/g, ' ').trim();
+                return fullText.length > 2 ? fullText.substring(0, 50).replace(/["\\\\]/g, '') : null;
+            };
+
+            const rowText = getRowIdentifier(rowEl);
+            if (!rowText) return null;
+
+            const getElementSelector = (el) => {
+                let cur = el;
+                for (let i = 0; i < 5; i++) {
+                    if (!cur || cur === rowEl) break;
+                    const aria = cur.getAttribute('aria-label');
+                    if (aria) return '[aria-label="' + aria.replace(/"/g, '\\\\"') + '"]';
+                    const testid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
+                    if (testid) return '[data-testid="' + testid + '"]';
+                    const role = cur.getAttribute('role');
+                    if (role && role !== 'presentation' && role !== 'none') {
+                        const txt = (cur.innerText || '').trim().replace(/\\s+/g, ' ');
+                        if (txt && txt.length > 0 && txt.length < 40)
+                            return '[role="' + role + '"]:has-text("' + txt.replace(/"/g, '\\\\"') + '")';
+                        return '[role="' + role + '"]';
+                    }
+                    cur = cur.parentElement;
+                }
+                const txt = (el.innerText || '').trim().replace(/\\s+/g, ' ');
+                if (txt && txt.length > 0 && txt.length < 40)
+                    return 'text="' + txt.replace(/"/g, '\\\\"') + '"';
+                return el.tagName.toLowerCase();
+            };
+
+            let rowTag = rowEl.tagName.toLowerCase();
+            if (rowEl.getAttribute('role') === 'row') rowTag = '[role="row"]';
+            else if (rowEl.getAttribute('role') === 'listitem') rowTag = '[role="listitem"]';
+
+            return rowTag + ':has-text("' + rowText + '") ' + getElementSelector(el);
+        };
+
+        const _hasStableAttr = (el) => {
+            let cur = el;
+            for (let i = 0; i < 4; i++) {
+                if (!cur) break;
+                if (cur.getAttribute('data-testid') || cur.getAttribute('data-test')) return true;
+                if (cur.getAttribute('aria-label')) return true;
+                if (cur.getAttribute('name') && cur.getAttribute('name').length < 40) return true;
+                cur = cur.parentElement;
+            }
+            return false;
+        };
+
+        // Aplica contexto de linha quando o elemento está em tabela
+        // OU quando não tem atributo estável próprio (evita over-engineering)
+        const isInTable = !!el.closest('table, [role="grid"], [role="treegrid"], p-table, .p-datatable, .ui-datatable');
+        if (isInTable || !_hasStableAttr(el)) {
+            const rowContextSelector = resolveRowContext(el);
+            if (rowContextSelector) return addModalScope(rowContextSelector);
+        }
+
+        // ── Calendário PrimeNG: dia clicado ──────────────────────────────────
+        const calendarCell = el.closest('.ui-datepicker-calendar td, .p-datepicker-calendar td');
+        if (calendarCell || (el.tagName.toLowerCase() === 'a' && el.closest('.ui-datepicker, .p-datepicker'))) {
+            const dayText = (el.innerText || el.textContent || '').trim();
+            if (dayText && /^\\d{1,2}$/.test(dayText)) {
+                const calHost = el.closest('p-calendar, .ui-calendar, span.ui-calendar');
+                if (calHost) {
+                    const inp = calHost.querySelector('input:not([type="hidden"])');
+                    const iname = inp && (inp.getAttribute('name') || inp.getAttribute('formcontrolname'));
+                    if (iname) return addModalScope("span.ui-calendar:has([name='" + iname + "']) a:text-is('" + dayText + "')");
+                }
+                return addModalScope(".ui-datepicker a:text-is('" + dayText + "')");
+            }
+        }
+
+        // ── Checkbox Angular/PrimeNG ─────────────────────────────────────────
+        const customCheckbox = el.closest('p-checkbox, mat-checkbox, [role="checkbox"], .ui-chkbox');
+        if (customCheckbox) {
+            let cliqueInterno = customCheckbox.tagName.toLowerCase();
+            if (cliqueInterno === 'p-checkbox') cliqueInterno = 'p-checkbox .ui-chkbox-box';
+            else if (customCheckbox.classList.contains('ui-chkbox')) cliqueInterno = '.ui-chkbox .ui-chkbox-box';
+            const parentRow = customCheckbox.closest('tr, item, li, .ui-g, .list-item, .row');
+            if (parentRow) {
+                let text = (parentRow.textContent || '').replace(/\\s+/g, ' ').trim();
+                if (text.length > 2) {
+                    const cleanText = text.substring(0, 40).replace(/['"\\\\/]/g, '');
+                    let pTag = parentRow.tagName.toLowerCase();
+                    if (pTag === 'div' && parentRow.classList.contains('ui-g')) pTag = '.ui-g';
+                    return addModalScope(pTag + ':has-text("' + cleanText + '") ' + cliqueInterno);
+                }
+            }
+            const parentComId = customCheckbox.closest('[id]:not([id*="ng-"]):not([id*="mat-"])');
+            if (parentComId && parentComId.id)
+                return addModalScope(parentComId.tagName.toLowerCase() + '#' + parentComId.id + ' ' + cliqueInterno);
+        }
+
+        // ── PrimeNG composite components ─────────────────────────────────────
+        const resolvePrimeNG = (el) => {
+            let suffix = '', partName = '', hostId = '';
+            if (el.closest('.ui-datepicker-trigger, button[icon*="calendar"], p-calendar button, .ui-calendar button'))
+                { suffix = 'button'; partName = 'calendar_trigger'; hostId = 'p-calendar'; }
+            else if (el.closest('.ui-dropdown-trigger, .p-dropdown-trigger'))
+                { suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger'; hostId = 'p-dropdown'; }
+            else if (el.closest('.ui-dropdown-label, .p-dropdown-label'))
+                { suffix = '.ui-dropdown-label'; partName = 'label'; hostId = 'p-dropdown'; }
+            else if (el.closest('.ui-multiselect-trigger, .p-multiselect-trigger'))
+                { suffix = '.ui-multiselect-trigger'; partName = 'trigger'; hostId = 'p-multiselect'; }
+            else if (el.closest('.ui-spinner-up, .p-inputnumber-button-up'))
+                { suffix = '.ui-spinner-up'; partName = 'increment'; hostId = 'p-spinner'; }
+            else if (el.closest('.ui-spinner-down, .p-inputnumber-button-down'))
+                { suffix = '.ui-spinner-down'; partName = 'decrement'; hostId = 'p-spinner'; }
+            else if (el.closest('.ui-splitbutton-menubutton, .p-splitbutton-menubutton'))
+                { suffix = '.ui-splitbutton-menubutton'; partName = 'menu_trigger'; hostId = 'p-splitbutton'; }
+            else if (el.closest('.ui-inputswitch-slider, .p-inputswitch-slider'))
+                { suffix = '.ui-inputswitch-slider'; partName = 'slider'; hostId = 'p-inputswitch'; }
+            else if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, s-autocomplete button, .ui-autocomplete-dropdown'))
+                { suffix = 'button'; partName = 'search_button'; hostId = 'p-autocomplete'; }
+            else if (modalAncestor && (el.tagName.toLowerCase() === 'button' || el.closest('button')))
+                { suffix = 'button'; partName = 'modal_button'; hostId = 'p-dialog'; }
+            else if (el.tagName.toLowerCase() === 'input' || el.closest('input')) {
+                const primeHost = el.closest('p-autocomplete, .ui-autocomplete, p-calendar, .ui-calendar, p-spinner, .ui-spinner, p-chips, .ui-chips, .p-inputgroup, .ui-inputgroup, s-autocomplete');
+                if (primeHost) {
+                    suffix = 'input'; partName = 'input';
+                    hostId = primeHost.tagName.toLowerCase().includes('calendar') ? 'p-calendar' :
+                             primeHost.tagName.toLowerCase().includes('spinner') ? 'p-spinner' :
+                             primeHost.tagName.toLowerCase().includes('chips') ? 'p-chips' : 'p-autocomplete';
+                }
+            }
+            if (!suffix) return null;
+
+            let cur = el, identifier = '', borrowedFromInput = false;
+            for (let i = 0; i < 8; i++) {
+                if (!cur) break;
+                const name = cur.getAttribute('name') || cur.getAttribute('formcontrolname');
+                const testid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
+                const idAttr = cur.id && !cur.id.match(/(ng-|mat-|cdk-|^\\d)/) && !cur.id.includes('autocomplete') ? cur.id : null;
+                if (name) { identifier = "[name='" + name + "']"; break; }
+                if (testid) { identifier = "[data-testid='" + testid + "']"; break; }
+                if (idAttr) { identifier = '#' + idAttr; break; }
+                if (cur.tagName.toLowerCase().startsWith('p-') || cur.classList.contains('ui-calendar') || cur.classList.contains('ui-autocomplete') || cur.classList.contains('ui-dropdown') || cur.classList.contains('ui-multiselect') || cur.classList.contains('ui-inputgroup')) {
+                    const innerInput = cur.querySelector('input:not([type="hidden"])');
+                    if (innerInput && innerInput !== el) {
+                        const iname = innerInput.getAttribute('name') || innerInput.getAttribute('formcontrolname');
+                        if (iname) { identifier = "[name='" + iname + "']"; borrowedFromInput = true; break; }
+                        const itest = innerInput.getAttribute('data-testid') || innerInput.getAttribute('data-test');
+                        if (itest) { identifier = "[data-testid='" + itest + "']"; borrowedFromInput = true; break; }
+                        const iid = innerInput.id && !innerInput.id.match(/(ng-|mat-|cdk-|^\\d)/) && !innerInput.id.includes('autocomplete') ? innerInput.id : null;
+                        if (iid) { identifier = '#' + iid; borrowedFromInput = true; break; }
+                    }
+                }
+                cur = cur.parentElement;
+            }
+            if (identifier) {
+                if (borrowedFromInput) {
+                    const wrapperTag = cur.tagName.toLowerCase();
+                    let wrapperClass = '';
+                    const c = Array.from(cur.classList).find(cls => cls.startsWith('ui-') || cls.startsWith('p-'));
+                    if (c) wrapperClass = '.' + c;
+                    return addModalScope(wrapperTag + wrapperClass + ':has(' + identifier + ') ' + suffix);
+                }
+                let isSameElement = false;
+                try { isSameElement = (cur === el) || cur.matches(suffix); } catch(e) {}
+                if (isSameElement) {
+                    const tagPart = suffix.split('.')[0];
+                    const tag = ['input', 'button'].includes(tagPart) ? tagPart : cur.tagName.toLowerCase();
+                    return addModalScope(tag + identifier);
+                }
+                return addModalScope(identifier + ' ' + suffix);
+            }
+            return addModalScope(hostId + ' ' + suffix);
+        };
+
+        const primeResult = resolvePrimeNG(el);
+        if (primeResult) return primeResult;
+
+        // ── Fallback genérico: sobe 8 níveis buscando atributo estável ───────
         let cur = el;
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 8; i++) {
             if (!cur) break;
             const tid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
-            if (tid) return `[data-testid='${tid}']`;
+            if (tid) return addModalScope("[data-testid='" + tid + "']");
             const aria = cur.getAttribute('aria-label');
-            if (aria) return `[aria-label='${aria}']`;
+            if (aria) return addModalScope("[aria-label='" + aria + "']");
             const name = cur.getAttribute('name');
-            if (name && name.length < 40) return `[name='${name}']`;
+            if (name && name.length < 40) return addModalScope("[name='" + name + "']");
             if (cur.id && !cur.id.match(/^[\\d\\-_]/) && !cur.id.match(/ng-|mat-|cdk-/))
-                return `[id='${cur.id}']`;
+                return addModalScope("[id='" + cur.id + "']");
             cur = cur.parentElement;
         }
         const ph = el.getAttribute('placeholder');
-        if (ph) return `[placeholder='${ph}']`;
-        const txt = el.innerText?.trim() || '';
-        if (txt && txt.length > 1 && txt.length < 50) return `text="${txt}"`;
+        if (ph) return addModalScope("[placeholder='" + ph + "']");
+        const role = el.getAttribute('role');
+        if (role && role !== 'presentation') {
+            const t = (el.innerText || '').trim().replace(/\\n/g, ' ');
+            if (t && t.length < 50) return addModalScope("[role='" + role + "']:has-text('" + t + "')");
+        }
+        const txt = (el.innerText || '').trim().replace(/\\n/g, ' ');
+        if (txt && txt.length > 1 && txt.length < 50) return addModalScope('text="' + txt + '"');
+        const parentAria = el.closest('[aria-label]')?.getAttribute('aria-label');
+        if (parentAria) return addModalScope("[aria-label='" + parentAria + "'] " + el.tagName.toLowerCase());
+        // Último recurso: nth-child (frágil, mas melhor que nada)
         const siblings = Array.from(el.parentElement?.children || []);
-        return `${el.tagName.toLowerCase()}:nth-child(${siblings.indexOf(el) + 1})`;
+        return addModalScope(el.tagName.toLowerCase() + ':nth-child(' + (siblings.indexOf(el) + 1) + ')');
     }
 """
 

@@ -3,7 +3,7 @@
 // Extracted from capture_dual_output.py for better maintainability
 
 console.log('[RADAR] ========================================');
-console.log('[RADAR] Script loading - Version 2.1.3-MODAL-BUTTON-FIX');
+console.log('[RADAR] Script loading - Version 2.2.0-CONTEXTUAL-ROW-SELECTOR');
 console.log('[RADAR] Timestamp:', new Date().toISOString());
 console.log('[RADAR] ========================================');
 
@@ -12,7 +12,7 @@ if (window.__radarInjetado) {
     return;
 }
 window.__radarInjetado = true;
-window.__radarVersion = '2.1.3-MODAL-BUTTON-FIX';
+window.__radarVersion = '2.2.0-CONTEXTUAL-ROW-SELECTOR';
 console.log('[RADAR] Script injected successfully');
 
 if (window === window.top && !document.getElementById('senior-rec-widget')) {
@@ -274,7 +274,158 @@ const getBestSelector = (el) => {
         
         return `${modalScope} ${seletor}`;
     };
-    
+
+    // ── SELETOR CONTEXTUAL DE LINHA (universal) ──────────────────────────────
+    // Princípio: qualquer elemento dentro de uma linha de tabela/lista deve ser
+    // identificado pelo CONTEÚDO da linha, não pela posição.
+    //
+    // Funciona para: HTML tables, PrimeNG p-table, Angular Material mat-table,
+    // listas ul/ol, divs com role="row", e qualquer estrutura de lista genérica.
+    //
+    // Estratégia:
+    //   1. Detecta se o elemento está dentro de uma linha (tr, [role="row"], li, etc.)
+    //   2. Extrai o texto identificador da linha (primeiro campo não-vazio, max 50 chars)
+    //   3. Obtém o seletor do próprio elemento (aria-label, data-testid, texto, etc.)
+    //   4. Combina: rowSelector:has-text("texto") elementSelector
+    //
+    // Isso garante que "botão Ações da linha Aula SIGN 001" seja sempre encontrado
+    // independente de quantas linhas existam ou da ordem delas.
+    const resolveRowContext = (el) => {
+        // Detecta linha de tabela/lista — padrões universais
+        const ROW_SELECTORS = [
+            'tr',                          // HTML table row
+            '[role="row"]',                // ARIA table row (qualquer framework)
+            'li',                          // lista HTML
+            '[role="listitem"]',           // ARIA list item
+            '.ui-g[class*="row"]',         // PrimeNG grid row
+            '.p-datatable-row',            // PrimeNG DataTable row
+            '.mat-row',                    // Angular Material row
+            '.ag-row',                     // AG Grid row
+            '[class*="-row"]:not(input)',  // padrão genérico: qualquer elemento com "-row" na classe
+        ];
+
+        const rowEl = el.closest(ROW_SELECTORS.join(', '));
+        if (!rowEl) return null;
+
+        // Não aplica se o próprio elemento clicado É a linha (clique na linha inteira)
+        if (rowEl === el) return null;
+
+        // Extrai texto identificador da linha
+        // Estratégia: pega o texto de cada célula/filho direto, ignora ícones e botões,
+        // usa o primeiro texto com conteúdo semântico real (> 2 chars, não só números)
+        const getRowIdentifier = (row) => {
+            // Tenta células explícitas primeiro (td, th, [role="cell"], [role="gridcell"])
+            const cells = Array.from(row.querySelectorAll(
+                'td, th, [role="cell"], [role="gridcell"], .ui-g-cell, .p-datatable-cell'
+            ));
+
+            // Se não há células, usa filhos diretos
+            const candidates = cells.length > 0 ? cells : Array.from(row.children);
+
+            for (const cell of candidates) {
+                // Ignora células que contêm apenas botões/ícones (colunas de ação)
+                const hasOnlyButtons = Array.from(cell.children).every(
+                    c => c.tagName === 'BUTTON' || c.tagName === 'A' ||
+                         c.getAttribute('role') === 'button' ||
+                         c.classList.contains('ui-button') ||
+                         c.classList.contains('p-button')
+                );
+                if (hasOnlyButtons && cell.children.length > 0) continue;
+
+                // Pega o texto visível da célula, ignorando sub-elementos de ação
+                const text = (cell.innerText || cell.textContent || '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                // Texto válido: mais de 2 chars, não é só número, não é só ícone
+                if (text.length > 2 && !/^\d+$/.test(text)) {
+                    // Limita a 50 chars e escapa aspas
+                    return text.substring(0, 50).replace(/["\\]/g, '');
+                }
+            }
+
+            // Fallback: texto completo da linha (sem botões)
+            const fullText = (row.innerText || row.textContent || '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (fullText.length > 2) {
+                return fullText.substring(0, 50).replace(/["\\]/g, '');
+            }
+
+            return null;
+        };
+
+        const rowText = getRowIdentifier(rowEl);
+        if (!rowText) return null;
+
+        // Obtém o seletor do elemento dentro da linha
+        // Prioridade: aria-label > data-testid > texto > tag
+        const getElementSelector = (el) => {
+            // Sobe até 5 níveis buscando atributo estável (mas não sai da linha)
+            let cur = el;
+            for (let i = 0; i < 5; i++) {
+                if (!cur || cur === rowEl) break;
+                const aria = cur.getAttribute('aria-label');
+                if (aria) return `[aria-label="${aria.replace(/"/g, '\\"')}"]`;
+                const testid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
+                if (testid) return `[data-testid="${testid}"]`;
+                const role = cur.getAttribute('role');
+                if (role && role !== 'presentation' && role !== 'none') {
+                    const txt = (cur.innerText || '').trim().replace(/\s+/g, ' ');
+                    if (txt && txt.length > 0 && txt.length < 40) {
+                        return `[role="${role}"]:has-text("${txt.replace(/"/g, '\\"')}")`;
+                    }
+                    return `[role="${role}"]`;
+                }
+                cur = cur.parentElement;
+            }
+
+            // Texto do próprio elemento
+            const txt = (el.innerText || '').trim().replace(/\s+/g, ' ');
+            if (txt && txt.length > 0 && txt.length < 40) {
+                return `text="${txt.replace(/"/g, '\\"')}"`;
+            }
+
+            // Tag como último recurso dentro da linha
+            return el.tagName.toLowerCase();
+        };
+
+        const elSelector = getElementSelector(el);
+
+        // Determina o seletor da linha (tag ou role)
+        let rowTag = rowEl.tagName.toLowerCase();
+        if (rowEl.getAttribute('role') === 'row') rowTag = '[role="row"]';
+        else if (rowEl.getAttribute('role') === 'listitem') rowTag = '[role="listitem"]';
+
+        // Seletor final: linha com texto âncora > elemento
+        const contextualSelector = `${rowTag}:has-text("${rowText}") ${elSelector}`;
+
+        console.log(`[RADAR] Contextual row selector: ${contextualSelector}`);
+        return contextualSelector;
+    };
+
+    // Tenta seletor contextual de linha ANTES de qualquer outro fallback
+    // Só aplica se o elemento não tem atributo estável próprio (evita over-engineering)
+    const _hasStableAttr = (el) => {
+        let cur = el;
+        for (let i = 0; i < 4; i++) {
+            if (!cur) break;
+            if (cur.getAttribute('data-testid') || cur.getAttribute('data-test')) return true;
+            if (cur.getAttribute('aria-label')) return true;
+            if (cur.getAttribute('name') && cur.getAttribute('name').length < 40) return true;
+            cur = cur.parentElement;
+        }
+        return false;
+    };
+
+    // Aplica contexto de linha apenas quando o elemento não tem atributo estável próprio
+    // OU quando está em uma tabela (onde mesmo aria-label pode ser ambíguo entre linhas)
+    const isInTable = !!el.closest('table, [role="grid"], [role="treegrid"], p-table, .p-datatable, .ui-datatable');
+    if (isInTable || !_hasStableAttr(el)) {
+        const rowContextSelector = resolveRowContext(el);
+        if (rowContextSelector) return addModalScopeToFallback(rowContextSelector);
+    }
+
     // PADRÃO ESPECIAL: Dia de calendário PrimeNG/Angular
     // Quando o usuário clica em um dia dentro do datepicker aberto, o elemento é um <a>
     // com texto numérico (ex: "6") dentro de .ui-datepicker-calendar ou similar.

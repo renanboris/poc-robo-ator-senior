@@ -106,6 +106,8 @@ async def gerar_audio(
     # "X" avulso (palavra inteira, maiúsculo) → "Éks" — cobre Senior X, ERP X, etc.
     # Grafia fonética sem acento ambíguo: evita "êx" (prefixo) e problemas com ElevenLabs
     texto_falado = re.sub(r"\bX\b", "Éks", texto_falado)
+    # "template/templates" → pronúncia inglesa correta (evita "templáte" do Azure pt-BR)
+    texto_falado = re.sub(r"(?i)\btemplates?\b", lambda m: "têmpleits" if m.group().lower().endswith("s") else "têmpleit", texto_falado)
 
     # ── Pré-processamento anti-travada para edge-tts ─────────────────────────
     # Remove ou substitui caracteres que causam engasgos no Azure Neural TTS:
