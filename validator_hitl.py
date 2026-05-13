@@ -315,6 +315,39 @@ _JS_GET_BEST_SELECTOR = """
             if (rowContextSelector) return addModalScope(rowContextSelector);
         }
 
+        // ── ITEM DE MENU DE CONTEXTO (universal) ─────────────────────────────
+        // Seletor escopado ao container do menu para evitar ambiguidade.
+        // Funciona para: ngx-contextmenu, CDK overlay, PrimeNG, Bootstrap, Material.
+        const MENU_CONTAINER_SELECTORS = [
+            '.ngx-contextmenu', '.cdk-overlay-pane .ngx-contextmenu',
+            '[class*="ngx-contextmenu"]', '.p-contextmenu', '.p-menu',
+            '[role="menu"]', '.dropdown-menu', '.mat-menu-panel',
+            '.cdk-overlay-pane [role="menu"]',
+        ];
+        const menuContainer = el.closest(MENU_CONTAINER_SELECTORS.join(', '));
+        if (menuContainer) {
+            const menuItem = el.closest('li, [role="menuitem"], a');
+            const itemEl = menuItem || el;
+            const textoItem = Array.from(itemEl.childNodes)
+                .filter(n => n.nodeType === Node.TEXT_NODE ||
+                    (n.nodeType === Node.ELEMENT_NODE &&
+                     !['EM', 'I', 'SVG', 'SPAN', 'IMG'].includes(n.tagName)))
+                .map(n => (n.textContent || '').trim())
+                .join(' ').replace(/\\s+/g, ' ').trim();
+            const textoFinal = textoItem ||
+                (itemEl.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 50);
+            if (textoFinal && textoFinal.length > 1) {
+                let containerSel = '';
+                for (const sel of MENU_CONTAINER_SELECTORS) {
+                    try { if (menuContainer.matches(sel)) { containerSel = sel; break; } } catch(e) {}
+                }
+                if (!containerSel) containerSel = menuContainer.tagName.toLowerCase();
+                const itemTag = menuItem ? menuItem.tagName.toLowerCase() : el.tagName.toLowerCase();
+                const escapedText = textoFinal.replace(/["\\\\]/g, '\\\\$&');
+                return containerSel + ' ' + itemTag + ':has-text("' + escapedText + '")';
+            }
+        }
+
         // ── Calendário PrimeNG: dia clicado ──────────────────────────────────
         const calendarCell = el.closest('.ui-datepicker-calendar td, .p-datepicker-calendar td');
         if (calendarCell || (el.tagName.toLowerCase() === 'a' && el.closest('.ui-datepicker, .p-datepicker'))) {

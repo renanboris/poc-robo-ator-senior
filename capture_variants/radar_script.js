@@ -426,6 +426,62 @@ const getBestSelector = (el) => {
         if (rowContextSelector) return addModalScopeToFallback(rowContextSelector);
     }
 
+    // PADRÃO ESPECIAL: Menu de contexto (universal)
+    // Quando o elemento clicado está dentro de um menu de contexto (overlay CDK,
+    // ngx-contextmenu, PrimeNG p-contextmenu, dropdown-menu, etc.), o seletor
+    // deve incluir o escopo do container do menu para evitar ambiguidade.
+    //
+    // Sem escopo: text="Editar" → pode clicar no botão "Editar" da toolbar
+    // Com escopo: .ngx-contextmenu li:has-text("Editar") → sempre o item do menu
+    //
+    // Funciona para: ngx-contextmenu, CDK overlay, PrimeNG, Bootstrap dropdown,
+    // Material menu, e qualquer container com role="menu".
+    const MENU_CONTAINER_SELECTORS = [
+        '.ngx-contextmenu',
+        '.cdk-overlay-pane .ngx-contextmenu',
+        '[class*="ngx-contextmenu"]',
+        '.p-contextmenu',
+        '.p-menu',
+        '[role="menu"]',
+        '.dropdown-menu',
+        '.mat-menu-panel',
+        '.cdk-overlay-pane [role="menu"]',
+    ];
+    const menuContainer = el.closest(MENU_CONTAINER_SELECTORS.join(', '));
+    if (menuContainer) {
+        const menuItem = el.closest('li, [role="menuitem"], a');
+        const itemEl = menuItem || el;
+
+        // Texto limpo: ignora ícones internos (<em>, <i>, <svg>, <span>)
+        const textoItem = Array.from(itemEl.childNodes)
+            .filter(n => n.nodeType === Node.TEXT_NODE ||
+                (n.nodeType === Node.ELEMENT_NODE &&
+                 !['EM', 'I', 'SVG', 'SPAN', 'IMG'].includes(n.tagName)))
+            .map(n => (n.textContent || '').trim())
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const textoFinal = textoItem ||
+            (itemEl.innerText || '').replace(/\s+/g, ' ').trim().substring(0, 50);
+
+        if (textoFinal && textoFinal.length > 1) {
+            // Determina o seletor do container (mais específico possível)
+            let containerSel = '';
+            for (const sel of MENU_CONTAINER_SELECTORS) {
+                try {
+                    if (menuContainer.matches(sel)) { containerSel = sel; break; }
+                } catch(e) {}
+            }
+            if (!containerSel) containerSel = menuContainer.tagName.toLowerCase();
+
+            const itemTag = menuItem ? menuItem.tagName.toLowerCase() : el.tagName.toLowerCase();
+            const escapedText = textoFinal.replace(/["\\]/g, '\\$&');
+            console.log(`[RADAR] Context menu selector: ${containerSel} ${itemTag}:has-text("${escapedText}")`);
+            return `${containerSel} ${itemTag}:has-text("${escapedText}")`;
+        }
+    }
+
     // PADRÃO ESPECIAL: Dia de calendário PrimeNG/Angular
     // Quando o usuário clica em um dia dentro do datepicker aberto, o elemento é um <a>
     // com texto numérico (ex: "6") dentro de .ui-datepicker-calendar ou similar.
