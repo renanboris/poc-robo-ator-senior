@@ -9,9 +9,13 @@ Camadas de Resiliência:
   0.5  Menu de contexto ativo
   1    Foco nativo / active element (campos de digitação inline e novas pastas)
   1.5  Heurísticas Senior X (Ícones mudos como Home, Lixeira, etc)
-  2    Coordenadas capturadas da gravação (corrigidas por scroll) ← MOVIDO
+  1_T  Template Matching visual (screenshot_elemento vs tela atual)
   2_S  Sniper semântico — 15+ seletores Playwright nativos (getByRole, getByLabel…)
+       [FIX] Candidatos CSS posicionais verificam identidade com match exato
   3    Seletor hint original (se não for frágil)
+       [FIX] Verificação de identidade com match exato para seletores posicionais
+  3.5  Coordenadas capturadas da gravação (corrigidas por scroll) ← MOVIDO de Camada 2
+       [FIX] Match exato na verificação de identidade — elimina falsos positivos
   4    Busca em todos os frames da página (sem depender do hint de iframe)
   5    Gemini Vision — screenshot atual + referência da gravação
 
@@ -78,6 +82,45 @@ if not gemini_client:
 DB_PATH          = "brain.db"
 MAX_FALHAS_CACHE = 3
 
+# ── Última camada vencedora (para HITL overlay) ──────────────────────────────
+# Atualizado por _registrar_estrategia_vencedora() após cada localização bem-sucedida.
+# Permite que o validator_hitl consulte qual camada resolveu a última ação sem
+# precisar acessar o banco de dados.
+_ultima_camada_vencedora: str = ""
+
+
+def obter_ultima_camada_vencedora() -> str:
+    """Retorna o nome amigável da última camada que localizou um elemento com sucesso.
+
+    Mapeamento interno → nome exibido no overlay HITL:
+      0_brain             → Brain
+      0_brain_coords      → Brain (coords)
+      0.5_menu_ctx        → Menu Contexto
+      1_foco_nativo       → Foco Nativo
+      1.5_heuristica_seniorx → Heurística Senior X
+      1_template_matching → Template Matching
+      2_sniper            → Sniper
+      3_hint_original     → Seletor Hint
+      3.5_coords_capturadas → Coords Capturadas
+      4_todos_frames      → Busca Frames
+      5_gemini_vision     → Gemini Vision
+    """
+    global _ultima_camada_vencedora
+    mapa = {
+        "0_brain": "Brain",
+        "0_brain_coords": "Brain (coords)",
+        "0.5_menu_ctx": "Menu Contexto",
+        "1_foco_nativo": "Foco Nativo",
+        "1.5_heuristica_seniorx": "Heurística Senior X",
+        "1_template_matching": "Template Matching",
+        "2_sniper": "Sniper",
+        "3_hint_original": "Seletor Hint",
+        "3.5_coords_capturadas": "Coords Capturadas",
+        "4_todos_frames": "Busca Frames",
+        "5_gemini_vision": "Gemini Vision",
+    }
+    return mapa.get(_ultima_camada_vencedora, _ultima_camada_vencedora or "—")
+
 
 def _init_db():
     """Inicializa o banco de dados SQLite. Erro de permissao e logado, nao propagado."""
@@ -140,10 +183,31 @@ def _init_db():
                 "CREATE INDEX IF NOT EXISTS idx_tel_exec_camada ON telemetria_execucoes(camada)"
             )
             # TTL: remove memórias não usadas há mais de 90 dias (Fase 2.1)
+            # Memórias com hitl_corrigido=1 NUNCA são removidas pela limpeza automática
+            # (Requisito 7.4 — proteção de correções do analista)
             conn.execute("""
                 DELETE FROM memoria_semantica
                 WHERE ultima_atualizacao < datetime('now', '-90 days')
                   AND hits < 2
+                  AND (hitl_corrigido IS NULL OR hitl_corrigido = 0)
+            """)
+            # [FIX] Invalida seletores posicionais memorizados — eles causam falsos
+            # positivos porque :nth-child, :nth-of-type e IDs numéricos são frágeis
+            # e podem apontar para elementos diferentes em cada execução.
+            # Preserva a entrada (intencao, hits) mas limpa o seletor posicional,
+            # forçando o sistema a redescobrir um seletor semântico estável.
+            # Padrões: :nth-child(N), :nth-of-type(N), #word123 (exceto checkboxes PrimeNG)
+            conn.execute("""
+                UPDATE memoria_semantica
+                SET seletor = NULL
+                WHERE seletor IS NOT NULL
+                  AND (
+                    seletor LIKE '%:nth-child(%'
+                    OR seletor LIKE '%:nth-of-type(%'
+                  )
+                  AND seletor NOT LIKE '%.ui-chkbox%'
+                  AND seletor NOT LIKE '%p-checkbox%'
+                  AND (hitl_corrigido IS NULL OR hitl_corrigido = 0)
             """)
             # View unificada de telemetria — idempotente (CREATE VIEW IF NOT EXISTS)
             conn.execute("""
@@ -271,6 +335,9 @@ def _registrar_estrategia_vencedora(intencao: str, camada: str) -> None:
     self-healing futuro saiba qual camada resolveu a intenção mais recentemente.
     A operação é best-effort — falha silenciosa para não interromper a execução.
     """
+    global _ultima_camada_vencedora
+    _ultima_camada_vencedora = camada
+
     chave = _chave_cache(intencao)
     try:
         with sqlite3.connect(DB_PATH) as conn:
@@ -375,6 +442,7 @@ def _registrar_sucesso_cache(
     seletor: Optional[str] = None,
     coords: Optional[dict] = None,
     iframe: Optional[str] = None,
+    hitl_corrigido: bool = False,
 ):
     chave      = _chave_cache(intencao)
     coords_str = json.dumps(coords) if coords else None
@@ -383,6 +451,22 @@ def _registrar_sucesso_cache(
     _PREFIXOS_VALIDOS = ("text=", "[", "#", "button.", "p-", "mat-")
     if seletor and not seletor.startswith(_PREFIXOS_VALIDOS) and ":has-text(" not in seletor:
         seletor = None
+
+    # [FIX] Não memoriza seletores posicionais — eles são frágeis e causam falsos
+    # positivos no Brain em execuções futuras. Seletores com :nth-child, :nth-of-type
+    # ou IDs numéricos não devem ser reutilizados como memória de longo prazo.
+    if seletor and _contem_indice_posicional(seletor):
+        logger.debug(f"[Brain] Seletor posicional descartado (não memorizado): {seletor[:60]}")
+        seletor = None
+
+    # [FIX] Não memoriza seletores text= com texto muito curto (1-2 chars) ou puramente numérico.
+    # Ex: text="6", text="1", text="2" são ambíguos — encontram qualquer elemento com esse
+    # número na página (ex: "2026" contém "6"). O executor deve redescobrir via Sniper/Gemini.
+    if seletor and seletor.startswith("text="):
+        _texto_seletor = seletor[5:].strip('"').strip("'").strip()
+        if len(_texto_seletor) <= 2 or _texto_seletor.isdigit():
+            logger.debug(f"[Brain] Seletor text= com texto curto/numérico descartado (não memorizado): {seletor[:60]}")
+            seletor = None
 
     try:
         with sqlite3.connect(DB_PATH) as conn:
@@ -399,14 +483,16 @@ def _registrar_sucesso_cache(
                     query += ", coords = ?"; params.append(coords_str)
                 if iframe:
                     query += ", iframe = ?"; params.append(iframe)
+                if hitl_corrigido:
+                    query += ", hitl_corrigido = 1"; 
                 query += " WHERE hash_intencao = ?"; params.append(chave)
                 conn.execute(query, params)
             else:
                 conn.execute("""
                     INSERT INTO memoria_semantica
-                        (hash_intencao, intencao, seletor, coords, iframe, hits, falhas_consecutivas)
-                    VALUES (?, ?, ?, ?, ?, 1, 0)
-                """, (chave, intencao, seletor, coords_str, iframe))
+                        (hash_intencao, intencao, seletor, coords, iframe, hits, falhas_consecutivas, hitl_corrigido)
+                    VALUES (?, ?, ?, ?, ?, 1, 0, ?)
+                """, (chave, intencao, seletor, coords_str, iframe, 1 if hitl_corrigido else 0))
     except Exception as e:
         logger.error(f"Erro ao salvar no Brain DB: {e}")
 
@@ -415,6 +501,14 @@ def _registrar_falha_cache(intencao: str):
     chave = _chave_cache(intencao)
     try:
         with sqlite3.connect(DB_PATH) as conn:
+            # Proteção HITL: memórias corrigidas pelo analista nunca são invalidadas
+            row = conn.execute(
+                "SELECT hitl_corrigido FROM memoria_semantica WHERE hash_intencao = ?",
+                (chave,)
+            ).fetchone()
+            if row and row[0] == 1:
+                logger.debug(f"[Brain] Falha ignorada para memória HITL-corrigida: {intencao[:60]}")
+                return
             conn.execute(
                 "UPDATE memoria_semantica SET falhas_consecutivas = falhas_consecutivas + 1 WHERE hash_intencao = ?",
                 (chave,),
@@ -535,17 +629,42 @@ def _contem_indice_posicional(seletor: str) -> bool:
     return any(re.search(p, seletor) for p in padroes)
 
 
+def _e_candidato_posicional(cand: "TentativaLocalizacao") -> bool:
+    """
+    Retorna True se o candidato usa seletor CSS posicional instável.
+
+    Candidatos posicionais (`:nth-child`, `:nth-of-type`, `#id-numerico`) são
+    frágeis por natureza — podem apontar para o elemento errado quando o DOM
+    muda. O Sniper deve verificar identidade antes de aceitar esses candidatos.
+
+    Reutiliza `_contem_indice_posicional()` para detecção consistente.
+
+    [FIX] Usado na Task 4 para adicionar verificação de identidade no Sniper
+    para candidatos CSS posicionais.
+
+    Validates: Requirements 2.3 (bugfix.md coordenadas-capturadas-baixa-confiabilidade-fix)
+    """
+    return bool(cand.seletor and _contem_indice_posicional(cand.seletor))
+
+
 async def _verificar_identidade_elemento(locator, label_curto: str) -> bool:
     """
-    Verifica se o elemento (ou seu pai imediato) contém o texto do label_curto.
+    Verifica se o elemento (ou seu pai imediato) tem o texto EXATO do label_curto.
 
     Estratégia:
       1. Tenta inner_text() do próprio elemento.
       2. Se não bater, tenta inner_text() do elemento pai ("..").
-      3. Retorna True se qualquer um contiver label_curto (case-insensitive, strip).
+      3. Retorna True se qualquer um CORRESPONDER EXATAMENTE ao label_curto
+         (case-insensitive, strip). Match exato — não aceita substrings.
       4. Retorna True em caso de exceção APENAS se nenhum texto foi lido com sucesso
          (fail-open — não bloquear quando texto não é acessível, ex: checkboxes sem
          texto visível). Se o texto foi lido mas não bate, retorna False.
+
+    [FIX] Substituído substring matching (needle in texto) por match exato
+    (texto_norm == needle) para eliminar falsos positivos onde label_curto é
+    apenas parte de um texto maior (ex: "1" in "EMPRESA 1" → True era falso positivo).
+
+    Validates: Requirements 2.2, 2.3 (bugfix.md coordenadas-capturadas-baixa-confiabilidade-fix)
     """
     if not label_curto:
         return True
@@ -555,7 +674,8 @@ async def _verificar_identidade_elemento(locator, label_curto: str) -> bool:
     try:
         texto = await locator.inner_text(timeout=1000)
         texto_lido = True
-        if needle in texto.strip().lower():
+        # [FIX] Match exato — não aceita substrings
+        if texto.strip().lower() == needle:
             return True
     except Exception:
         return True  # fail-open: não conseguiu ler texto, não bloquear
@@ -564,7 +684,8 @@ async def _verificar_identidade_elemento(locator, label_curto: str) -> bool:
     try:
         texto_pai = await locator.locator("..").inner_text(timeout=1000)
         texto_lido = True
-        if needle in texto_pai.strip().lower():
+        # [FIX] Match exato no pai também
+        if texto_pai.strip().lower() == needle:
             return True
     except Exception:
         # Pai inacessível — se o elemento principal foi lido e não bateu, retorna False
@@ -1824,12 +1945,17 @@ async def _verificar_identidade_por_coordenadas(
         # Verificar identidade
         if elemento_info and elemento_info.get('innerText'):
             texto_elemento = elemento_info['innerText']
-            if label_curto.strip().lower() in texto_elemento.strip().lower():
-                return (True, False)  # Identidade confirmada
+            # [FIX] Match exato — não aceita substrings para evitar falsos positivos
+            # Ex: "1" in "EMPRESA 1" → True era falso positivo; agora "1" == "empresa 1" → False
+            texto_elem_norm = texto_elemento.strip().lower()
+            label_norm = label_curto.strip().lower()
+            if texto_elem_norm == label_norm:
+                return (True, False)  # Identidade confirmada — match exato
             else:
                 logger.warning(
                     f"   [Coords Capturadas] Identidade não confirmada: "
-                    f"esperado '{label_curto}', encontrado '{texto_elemento[:50]}' em ({x_ajustado}, {y_ajustado})"
+                    f"esperado '{label_curto}', encontrado '{texto_elemento[:50]}' "
+                    f"(match exato requerido) em ({x_ajustado}, {y_ajustado})"
                 )
                 return (False, False)  # Identidade NÃO confirmada
         else:
@@ -1928,16 +2054,60 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 )
                 # Não usar o Brain — deixar camada 0.5 tratar
             else:
+                # [FIX] Seletores text= do Brain devem usar match exato para evitar
+                # que "text=\"6\"" encontre "2026" (substring matching).
+                _brain_exact = cache.seletor.startswith("text=")
                 cand_cache = TentativaLocalizacao(
                     seletor=cache.seletor,
                     iframe_hint=cache.iframe_src or iframe_hint,
+                    exact=_brain_exact,
                     descricao="brain knowledge",
                 )
                 if await _tentar_candidato(page, cand_cache, acao, valor):
-                    _registrar_sucesso_cache(intencao)
-                    _registrar_telemetria("0_brain", True)
-                    _registrar_estrategia_vencedora(intencao, "0_brain")
-                    return True
+                    # [FIX] Verificação de identidade no Brain para seletores posicionais
+                    # Se o seletor memorizado é posicional, verificar identidade antes de aceitar.
+                    # Se label_curto é genérico/vazio, não há como confirmar → rejeitar e escalar.
+                    if _e_candidato_posicional(cand_cache):
+                        if not label_curto or _e_label_generico(label_curto):
+                            logger.warning(
+                                f"[Brain] Seletor posicional memorizado '{cache.seletor[:60]}' — "
+                                f"label genérico/vazio ('{label_curto}'), não é possível confirmar identidade. "
+                                f"Invalidando memória e escalando."
+                            )
+                            _registrar_falha_cache(intencao)
+                            _registrar_telemetria("0_brain", False)
+                            brain_registrou_falha = True
+                        else:
+                            try:
+                                ctx_brain = await _resolver_contexto(page, cand_cache.iframe_hint)
+                                locator_brain = ctx_brain.locator(cand_cache.seletor).first
+                                identidade_ok = await _verificar_identidade_elemento(locator_brain, label_curto)
+                                if not identidade_ok:
+                                    logger.warning(
+                                        f"[Brain] Seletor posicional memorizado '{cache.seletor[:60]}' — "
+                                        f"identidade não confirmada (label='{label_curto}'). "
+                                        f"Invalidando memória e escalando."
+                                    )
+                                    _registrar_falha_cache(intencao)
+                                    _registrar_telemetria("0_brain", False)
+                                    brain_registrou_falha = True
+                                else:
+                                    _registrar_sucesso_cache(intencao)
+                                    _registrar_telemetria("0_brain", True)
+                                    _registrar_estrategia_vencedora(intencao, "0_brain")
+                                    return True
+                            except Exception as exc_brain_verif:
+                                # Fail-open: se não conseguir verificar, aceitar
+                                logger.debug(f"[Brain] Verificação de identidade falhou (fail-open): {exc_brain_verif}")
+                                _registrar_sucesso_cache(intencao)
+                                _registrar_telemetria("0_brain", True)
+                                _registrar_estrategia_vencedora(intencao, "0_brain")
+                                return True
+                    else:
+                        _registrar_sucesso_cache(intencao)
+                        _registrar_telemetria("0_brain", True)
+                        _registrar_estrategia_vencedora(intencao, "0_brain")
+                        return True
                 else:
                     _registrar_falha_cache(intencao)
                     _registrar_telemetria("0_brain", False)
@@ -2167,6 +2337,37 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 _elapsed_ms = (time.monotonic() - _t0) * 1000
                 logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — {'OK' if _acertou else 'miss'}")
                 if _acertou:
+                    # [FIX] Verificação de identidade para candidatos CSS posicionais
+                    # Candidatos com :nth-child, :nth-of-type, #id-numerico são frágeis
+                    # e podem apontar para o elemento errado silenciosamente.
+                    # A verificação é aplicada SEMPRE que o seletor é posicional —
+                    # independentemente de label_curto ser genérico ou não.
+                    # Se label_curto é genérico/vazio, não há como confirmar identidade
+                    # → rejeitar o candidato posicional diretamente (não é seguro usar).
+                    if _e_candidato_posicional(cand):
+                        if not label_curto or _e_label_generico(label_curto):
+                            # Sem label para verificar identidade → candidato posicional rejeitado
+                            _elapsed_ms = (time.monotonic() - _t0) * 1000
+                            logger.warning(
+                                f"   [Sniper] Candidato posicional '{cand.descricao}' — "
+                                f"label genérico/vazio ('{label_curto}'), não é possível confirmar identidade. Rejeitando."
+                            )
+                            continue
+                        try:
+                            ctx_verif = await _resolver_contexto(page, cand.iframe_hint)
+                            locator_verif = ctx_verif.locator(cand.seletor).first
+                            identidade_ok = await _verificar_identidade_elemento(locator_verif, label_curto)
+                            if not identidade_ok:
+                                _elapsed_ms = (time.monotonic() - _t0) * 1000
+                                logger.warning(
+                                    f"   [Sniper] Candidato posicional '{cand.descricao}' — "
+                                    f"identidade não confirmada (label='{label_curto}'), rejeitando"
+                                )
+                                continue  # Rejeitar candidato posicional com identidade errada
+                        except Exception as exc_verif:
+                            # Fail-open: se não conseguir verificar, aceitar
+                            logger.debug(f"   [Sniper] Verificação de identidade posicional falhou (fail-open): {exc_verif}")
+
                     logger.info(f"   [Sniper] Acerto: {cand.descricao}")
                     # [BUG-2] FIX: passa apenas cand.seletor (None quando vazio, nao cand.descricao)
                     _registrar_sucesso_cache(
@@ -2178,13 +2379,60 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     _registrar_estrategia_vencedora(intencao, "2_sniper")
                     return True
 
-    # ── 2. Coordenadas Capturadas (gravação original) ────────────────────────
-    # Acionada APÓS o Sniper Semântico — coordenadas são menos confiáveis que
-    # seletores semânticos pois dependem de layout estável. Usada como fallback
-    # quando nenhum seletor semântico funcionou.
+    # ── Camada 3: Seletor hint original ──────────────────────────────────────
+    # Ativada quando o seletor hint não é frágil (não é tag genérica, não é posicional).
+    # Usa o seletor CSS capturado na gravação original como última tentativa semântica.
+    # [FIX] Movida para ANTES das coordenadas capturadas — seletores semânticos são
+    # mais confiáveis que posições absolutas que dependem de layout estável.
+    if seletor_hint and not _e_seletor_fragil(seletor_hint):
+        # [FIX] Verificação de identidade para seletores posicionais
+        # Se o seletor_hint é posicional, verificar identidade antes de executar.
+        # Se label_curto é genérico/vazio, não há como confirmar → descartar diretamente.
+        if _contem_indice_posicional(seletor_hint):
+            if not label_curto or _e_label_generico(label_curto):
+                logger.warning(
+                    f"[Hint] Seletor posicional '{seletor_hint[:60]}' com label genérico/vazio "
+                    f"('{label_curto}') — não é possível confirmar identidade. Descartando."
+                )
+                # Não tenta — escala para próxima camada
+            else:
+                logger.warning("[Hint] Seletor posicional detectado — validando identidade antes de executar")
+                locator = page.locator(seletor_hint).first
+                identidade_ok = await _verificar_identidade_elemento(locator, label_curto)
+                if not identidade_ok:
+                    logger.warning("[Hint] Identidade não confirmada — descartando seletor posicional, escalando")
+                else:
+                    cand_hint = TentativaLocalizacao(
+                        seletor=seletor_hint, iframe_hint=iframe_hint,
+                        descricao=f"hint original '{seletor_hint[:40]}'",
+                    )
+                    if await _tentar_candidato(page, cand_hint, acao, valor):
+                        logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
+                        _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
+                        _registrar_telemetria("3_hint_original", True)
+                        _registrar_estrategia_vencedora(intencao, "3_hint_original")
+                        return True
+        else:
+            cand_hint = TentativaLocalizacao(
+                seletor=seletor_hint, iframe_hint=iframe_hint,
+                descricao=f"hint original '{seletor_hint[:40]}'",
+            )
+            if await _tentar_candidato(page, cand_hint, acao, valor):
+                logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
+                _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
+                _registrar_telemetria("3_hint_original", True)
+                _registrar_estrategia_vencedora(intencao, "3_hint_original")
+                return True
+
+    # ── Camada 3.5: Coordenadas Capturadas (gravação original) ───────────────
+    # [FIX] Movida de Camada 2 para Camada 3.5 — coordenadas são menos confiáveis
+    # que seletores semânticos pois dependem de layout estável. Agora tentadas
+    # DEPOIS do seletor_hint original, como penúltima opção antes de Gemini Vision.
     #
     # [FIX] Bug de timing corrigido: Agora verifica identidade ANTES de clicar.
     # Ordem correta: (1) calcular coords → (2) verificar identidade → (3) clicar se OK
+    # [FIX] Match exato na verificação de identidade — elimina falsos positivos
+    # onde label_curto é substring de um texto maior (ex: "1" in "EMPRESA 1").
     if coords_relativas and coords_relativas.get("x_pct"):
         logger.info("   [Coords Capturadas] Tentando coordenadas relativas da gravação...")
         try:
@@ -2193,7 +2441,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             x = int(coords_relativas["x_pct"] * vp["width"])
             y = int(coords_relativas["y_pct"] * vp["height"])
 
-            # [FIX] Verificar identidade ANTES de executar o clique
+            # Verificar identidade ANTES de executar o clique
             identidade_confirmada, is_cross_origin = await _verificar_identidade_por_coordenadas(
                 page, x, y, label_curto, iframe_hint
             )
@@ -2204,16 +2452,16 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     logger.info(f"   [Coords Capturadas] Clique em ({x}, {y}) bem-sucedido.")
                     if is_cross_origin:
                         logger.warning(
-                            f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' "
+                            f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '3.5_coords_capturadas' "
                             f"(iframe cross-origin - fail-open aplicado)"
                         )
                     else:
                         logger.warning(
-                            f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '2_coords_capturadas' — "
+                            f"[Fallback] Ação '{intencao[:60]}' resolvida por camada '3.5_coords_capturadas' — "
                             f"verifique se o elemento correto foi atingido."
                         )
                     _registrar_telemetria("2_coords_capturadas", True)
-                    _registrar_estrategia_vencedora(intencao, "2_coords_capturadas")
+                    _registrar_estrategia_vencedora(intencao, "3.5_coords_capturadas")
                     return True
                 else:
                     # Clique falhou
@@ -2226,40 +2474,6 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
             logger.warning(f"   [Coords Capturadas] Falhou: {exc}")
 
         _registrar_telemetria("2_coords_capturadas", False)
-
-    # ── Camada 3: Seletor hint original ──────────────────────────────────────
-    # Ativada quando o seletor hint não é frágil (não é tag genérica, não é posicional).
-    # Usa o seletor CSS capturado na gravação original como última tentativa semântica.
-    if seletor_hint and not _e_seletor_fragil(seletor_hint):
-        # Verificação de identidade para seletores posicionais (fix bug item errado)
-        if _contem_indice_posicional(seletor_hint) and label_curto and not is_tag_generica:
-            logger.warning("[Hint] Seletor posicional detectado — validando identidade antes de executar")
-            locator = page.locator(seletor_hint).first
-            identidade_ok = await _verificar_identidade_elemento(locator, label_curto)
-            if not identidade_ok:
-                logger.warning("[Hint] Identidade não confirmada — descartando seletor posicional, escalando")
-            else:
-                cand_hint = TentativaLocalizacao(
-                    seletor=seletor_hint, iframe_hint=iframe_hint,
-                    descricao=f"hint original '{seletor_hint[:40]}'",
-                )
-                if await _tentar_candidato(page, cand_hint, acao, valor):
-                    logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
-                    _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
-                    _registrar_telemetria("3_hint_original", True)
-                    _registrar_estrategia_vencedora(intencao, "3_hint_original")
-                    return True
-        else:
-            cand_hint = TentativaLocalizacao(
-                seletor=seletor_hint, iframe_hint=iframe_hint,
-                descricao=f"hint original '{seletor_hint[:40]}'",
-            )
-            if await _tentar_candidato(page, cand_hint, acao, valor):
-                logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
-                _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
-                _registrar_telemetria("3_hint_original", True)
-                _registrar_estrategia_vencedora(intencao, "3_hint_original")
-                return True
 
     # ── Camada 4: Busca em todos os frames ───────────────────────────────────
     # Ativada quando o elemento pode estar em um iframe não identificado pelo hint.

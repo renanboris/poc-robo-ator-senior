@@ -27,7 +27,7 @@ The implementation follows a layered approach:
     - Implement LRU cache with configurable size (default 100 entries)
     - _Requirements: 7.1, 7.2, 7.3_
   
-  - [~] 2.2 Implement index building functionality
+  - [ ] 2.2 Implement index building functionality
     - Write `build_index()` to scan `roteiros_salvos/` directory
     - Parse each roteiro JSON and extract navigation paths
     - Populate SQLite index with navigation metadata
@@ -39,7 +39,7 @@ The implementation follows a layered approach:
     - **Validates: Requirements 7.1, 8.1**
     - For all valid roteiro files in a directory, building the index then querying for each roteiro's target element SHALL return at least one result
   
-  - [~] 2.4 Implement search functionality with ranking
+  - [ ] 2.4 Implement search functionality with ranking
     - Write `search()` method with query normalization
     - Implement FTS5 full-text search with score ranking
     - Add cache lookup before database query
@@ -51,7 +51,7 @@ The implementation follows a layered approach:
     - **Validates: Requirements 7.2, 7.5**
     - Searching for the same normalized query twice SHALL return results in the same order
   
-  - [~] 2.6 Implement incremental index updates
+  - [ ] 2.6 Implement incremental index updates
     - Write `update_index()` for single roteiro file updates
     - Implement cache invalidation for modified roteiros
     - Add file change detection logic
@@ -67,13 +67,13 @@ The implementation follows a layered approach:
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 4. Implement NavigationPathExtractor component
-  - [~] 4.1 Create NavigationPathExtractor class
+  - [ ] 4.1 Create NavigationPathExtractor class
     - Implement `extract_navigation_path()` to parse roteiro JSON
     - Write `_parse_step()` to extract navigation information from each passo
     - Handle `ancora`, `acao`, and `pedagogia.tooltip_dap` fields
     - _Requirements: 8.1, 8.2, 8.3_
   
-  - [~] 4.2 Implement breadcrumb generation
+  - [ ] 4.2 Implement breadcrumb generation
     - Write `_build_breadcrumb()` to create human-readable paths
     - Extract hierarchical navigation sequences (e.g., "Senior Flow > SIGN > Nova Gestão")
     - Handle edge cases (missing labels, empty steps)
@@ -84,7 +84,7 @@ The implementation follows a layered approach:
     - **Validates: Requirements 8.6**
     - For all valid roteiro files, parsing then reconstructing the navigation path SHALL preserve the original sequence
   
-  - [~] 4.4 Implement selector hint extraction
+  - [ ] 4.4 Implement selector hint extraction
     - Extract `seletor_css` and `elemento_alvo.seletor_hint` from actions
     - Build selector hint strings for each navigation step
     - Add coordinate extraction for fallback positioning
@@ -98,20 +98,20 @@ The implementation follows a layered approach:
     - _Requirements: 8.5_
 
 - [ ] 5. Implement GuidedNavigationExecutor component
-  - [~] 5.1 Create GuidedNavigationExecutor class
+  - [ ] 5.1 Create GuidedNavigationExecutor class
     - Implement `__init__()` with state tracking
     - Define navigation state machine (idle, executing, waiting, completed, failed)
     - Set up step execution tracking
     - _Requirements: 4.1, 4.2_
   
-  - [~] 5.2 Implement step-by-step navigation execution
+  - [ ] 5.2 Implement step-by-step navigation execution
     - Write `execute_navigation()` to orchestrate full navigation sequence
     - Implement `execute_step()` for single step execution
     - Add element highlighting via extension communication
     - Track completed steps and partial progress
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
   
-  - [~] 5.3 Implement DOM stabilization waiting
+  - [ ] 5.3 Implement DOM stabilization waiting
     - Write `_wait_for_dom_stabilization()` with configurable timeout
     - Detect DOM changes after interactions
     - Implement exponential backoff for DOM checks
@@ -122,7 +122,7 @@ The implementation follows a layered approach:
     - **Validates: Requirements 4.1, 4.6**
     - Navigation state SHALL only transition through valid paths (idle → executing → waiting → completed OR idle → executing → failed)
   
-  - [~] 5.5 Implement error handling and recovery
+  - [ ] 5.5 Implement error handling and recovery
     - Detect element not found errors
     - Handle timeout scenarios
     - Detect UI structure mismatches
@@ -140,20 +140,20 @@ The implementation follows a layered approach:
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 7. Implement NavigationFallbackEngine orchestrator
-  - [~] 7.1 Create NavigationFallbackEngine class
+  - [ ] 7.1 Create NavigationFallbackEngine class
     - Implement `__init__()` with component initialization
     - Wire together RoteiroIndexer, NavigationPathExtractor, and GuidedNavigationExecutor
     - Set up logging and metrics tracking
     - _Requirements: 9.1, 9.4_
   
-  - [~] 7.2 Implement invisible element handling
+  - [ ] 7.2 Implement invisible element handling
     - Write `handle_invisible_element()` as main entry point
     - Coordinate between indexer search and path extraction
     - Format conversational navigation offers
     - Return structured response with navigation path and confirmation requirement
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3_
   
-  - [~] 7.3 Implement guided navigation execution
+  - [ ] 7.3 Implement guided navigation execution
     - Write `execute_guided_navigation()` to handle user confirmation
     - Coordinate with GuidedNavigationExecutor for step execution
     - Track navigation success/failure metrics
@@ -173,7 +173,7 @@ The implementation follows a layered approach:
     - _Requirements: 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.5, 4.6_
 
 - [ ] 8. Integrate with existing DAP engine
-  - [~] 8.1 Implement element visibility check in dap_engine.py
+  - [ ] 8.1 Implement element visibility check in dap_engine.py
     - Write `_check_element_visibility()` function
     - Extract element keywords from user query
     - Search for keywords in DOM context
@@ -185,14 +185,14 @@ The implementation follows a layered approach:
     - **Validates: Requirements 1.4**
     - Element visibility check SHALL complete within 500ms for 95% of queries
   
-  - [~] 8.3 Modify analisar_tela_dap() for fallback activation
+  - [ ] 8.3 Modify analisar_tela_dap() for fallback activation
     - Add visibility check before existing direct highlight flow
     - Initialize NavigationFallbackEngine when element not visible
     - Call `handle_invisible_element()` for fallback strategy
     - Preserve existing direct highlight behavior for visible elements
     - _Requirements: 1.2, 1.3, 5.1, 5.2, 5.3, 9.1, 9.2_
   
-  - [~] 8.4 Format fallback responses for DAP contract
+  - [ ] 8.4 Format fallback responses for DAP contract
     - Return navigation path in DAP response format
     - Add `requires_confirmation` flag for user confirmation flow
     - Include confidence score and source reference for traceability
@@ -210,27 +210,27 @@ The implementation follows a layered approach:
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 10. Implement extension enhancements for visual feedback
-  - [~] 10.1 Create NavigationHighlighter class in extension
+  - [ ] 10.1 Create NavigationHighlighter class in extension
     - Create `extension/modules/navigation_highlighter.js`
     - Implement constructor with highlight style configuration
     - Define highlight border, shadow, and z-index styles
     - _Requirements: 4.2, 4.5_
   
-  - [~] 10.2 Implement step highlighting functionality
+  - [ ] 10.2 Implement step highlighting functionality
     - Write `highlightStep()` to highlight current navigation element
     - Support both CSS selector and data-aura-map ID lookup
     - Apply visual highlight styles to target element
     - Store current highlight reference for cleanup
     - _Requirements: 4.2, 4.5_
   
-  - [~] 10.3 Implement step tooltip display
+  - [ ] 10.3 Implement step tooltip display
     - Write `showStepTooltip()` to display step information
     - Position tooltip near highlighted element
     - Show breadcrumb path and step description
     - Auto-hide tooltip after configurable duration
     - _Requirements: 4.2_
   
-  - [~] 10.4 Implement highlight cleanup
+  - [ ] 10.4 Implement highlight cleanup
     - Write `clearHighlight()` to remove current highlight
     - Remove tooltip elements
     - Reset highlight state
@@ -243,19 +243,19 @@ The implementation follows a layered approach:
     - _Requirements: 4.2, 4.5_
 
 - [ ] 11. Implement file watching for incremental updates
-  - [~] 11.1 Add watchdog dependency for file monitoring
+  - [ ] 11.1 Add watchdog dependency for file monitoring
     - Add `watchdog` to project dependencies
     - Install and verify watchdog library
     - _Requirements: 7.4_
   
-  - [~] 11.2 Implement roteiro directory watcher
+  - [ ] 11.2 Implement roteiro directory watcher
     - Write `watch_roteiros_directory()` in RoteiroIndexer
     - Create FileSystemEventHandler for roteiro changes
     - Trigger incremental index updates on file modifications
     - Invalidate cache for modified roteiros
     - _Requirements: 7.4_
   
-  - [~] 11.3 Start file watcher on application startup
+  - [ ] 11.3 Start file watcher on application startup
     - Initialize file watcher in NavigationFallbackEngine
     - Start observer thread for background monitoring
     - Add graceful shutdown for observer thread
@@ -268,14 +268,14 @@ The implementation follows a layered approach:
     - _Requirements: 7.4_
 
 - [ ] 12. Implement performance optimizations
-  - [~] 12.1 Add query normalization for cache efficiency
+  - [ ] 12.1 Add query normalization for cache efficiency
     - Write `_normalize_query()` to standardize search queries
     - Convert to lowercase and remove accents
     - Remove stop words and apply stemming
     - Use normalized query as cache key
     - _Requirements: 7.3, 7.5_
   
-  - [~] 12.2 Implement parallel roteiro search
+  - [ ] 12.2 Implement parallel roteiro search
     - Write `search_parallel()` using asyncio.gather
     - Search multiple roteiros concurrently
     - Aggregate and rank results by confidence score
@@ -291,13 +291,13 @@ The implementation follows a layered approach:
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 14. Implement user confirmation flow handling
-  - [~] 14.1 Add confirmation response parsing
+  - [ ] 14.1 Add confirmation response parsing
     - Implement affirmative response detection ("sim", "yes", "pode", "quero", "vamos")
     - Implement negative response detection ("não", "no", "agora não", "depois")
     - Handle ambiguous responses with clarification request
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
   
-  - [~] 14.2 Integrate confirmation flow in DAP engine
+  - [ ] 14.2 Integrate confirmation flow in DAP engine
     - Track conversation state for pending navigation offers
     - Detect confirmation responses in follow-up messages
     - Trigger guided navigation on affirmative confirmation
@@ -312,28 +312,28 @@ The implementation follows a layered approach:
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
 - [ ] 15. Add logging and monitoring
-  - [~] 15.1 Implement navigation metrics tracking
+  - [ ] 15.1 Implement navigation metrics tracking
     - Add metrics for fallback activations
     - Track navigation success/failure counts
     - Measure average navigation time
     - Track cache hit rate and index size
     - _Requirements: 9.4_
   
-  - [~] 15.2 Add structured logging for navigation events
+  - [ ] 15.2 Add structured logging for navigation events
     - Log fallback activation with query and tenant_id
     - Log navigation path selection with confidence score
     - Log each navigation step execution
     - Log navigation failures with error details
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 9.4_
   
-  - [~] 15.3 Create monitoring dashboard endpoint
+  - [ ] 15.3 Create monitoring dashboard endpoint
     - Add `/api/navigation/metrics` endpoint in app.py
     - Return navigation metrics as JSON
     - Include cache statistics and index size
     - _Requirements: 9.4_
 
 - [ ] 16. Add configuration and deployment support
-  - [~] 16.1 Add configuration constants to .env.example
+  - [ ] 16.1 Add configuration constants to .env.example
     - Add `NAVIGATION_FALLBACK_ENABLED` flag
     - Add `ROTEIRO_INDEX_DB` path configuration
     - Add `ROTEIRO_INDEX_CACHE_SIZE` setting
@@ -341,28 +341,28 @@ The implementation follows a layered approach:
     - Add `ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS` setting
     - _Requirements: 1.4, 4.4, 7.1, 7.3_
   
-  - [~] 16.2 Implement database migration script
+  - [ ] 16.2 Implement database migration script
     - Write `migrate_to_navigation_index()` function
     - Create navigation index database on first run
     - Populate index from existing roteiros
     - Add migration logging
     - _Requirements: 7.1_
   
-  - [~] 16.3 Add feature flag support
+  - [ ] 16.3 Add feature flag support
     - Check `NAVIGATION_FALLBACK_ENABLED` before activation
     - Gracefully disable feature if flag is false
     - Log feature status on startup
     - _Requirements: 9.1_
 
 - [ ] 17. Final integration and wiring
-  - [~] 17.1 Initialize NavigationFallbackEngine on app startup
+  - [ ] 17.1 Initialize NavigationFallbackEngine on app startup
     - Create global NavigationFallbackEngine instance in dap_engine.py
     - Build initial index on startup
     - Start file watcher for incremental updates
     - Log initialization status
     - _Requirements: 7.1, 7.4, 9.1_
   
-  - [~] 17.2 Wire extension communication for highlights
+  - [ ] 17.2 Wire extension communication for highlights
     - Implement WebSocket or HTTP endpoint for highlight commands
     - Send highlight commands from GuidedNavigationExecutor to extension
     - Handle highlight acknowledgment from extension

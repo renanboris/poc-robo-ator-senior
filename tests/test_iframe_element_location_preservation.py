@@ -220,6 +220,7 @@ async def test_preservation_non_iframe_element_identity_verification():
                  patch.object(vision_engine, "_registrar_telemetria", side_effect=mock_registrar_telemetria), \
                  patch.object(vision_engine, "_registrar_estrategia_vencedora", return_value=None), \
                  patch.object(vision_engine, "_tentar_candidato", new=AsyncMock(return_value=False)), \
+                 patch.object(vision_engine, "_executar_acao", new=AsyncMock(side_effect=Exception("Sniper text= desativado para isolar coords"))), \
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)):
 
@@ -415,6 +416,7 @@ async def test_preservation_fail_open_exception():
                  patch.object(vision_engine, "_registrar_telemetria", side_effect=mock_registrar_telemetria), \
                  patch.object(vision_engine, "_registrar_estrategia_vencedora", return_value=None), \
                  patch.object(vision_engine, "_tentar_candidato", new=AsyncMock(return_value=False)), \
+                 patch.object(vision_engine, "_executar_acao", new=AsyncMock(side_effect=Exception("Sniper text= desativado para isolar coords"))), \
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)), \
                  patch.object(page, "evaluate", side_effect=mock_evaluate_with_exception):
@@ -601,6 +603,7 @@ async def test_preservation_fail_open_invalid_coordinates():
                  patch.object(vision_engine, "_registrar_telemetria", side_effect=mock_registrar_telemetria), \
                  patch.object(vision_engine, "_registrar_estrategia_vencedora", return_value=None), \
                  patch.object(vision_engine, "_tentar_candidato", new=AsyncMock(return_value=False)), \
+                 patch.object(vision_engine, "_executar_acao", new=AsyncMock(side_effect=Exception("Sniper text= desativado para isolar coords"))), \
                  patch.object(vision_engine, "_gemini_localizar_elemento", new=AsyncMock(return_value=None)), \
                  patch.object(vision_engine, "_detectar_menu_contexto_ativo", new=AsyncMock(return_value=None)):
 

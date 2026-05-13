@@ -533,6 +533,169 @@ def buscar_contexto(
 
 
 # =========================================================
+# MULTI-NAMESPACE SEARCH
+# Carrega namespaces ativos do Pinecone na inicialização e
+# busca em paralelo usando threads para minimizar latência.
+# =========================================================
+
+# Cache dos namespaces ativos (carregado uma vez na inicialização)
+_ACTIVE_NAMESPACES: list[str] = []
+_NAMESPACES_LOADED = False
+
+def _load_active_namespaces() -> list[str]:
+    """Carrega os namespaces ativos do índice Pinecone.
+    
+    Retorna lista de namespaces com vetores. Faz fallback para
+    lista hardcoded se o Pinecone não estiver disponível.
+    """
+    global _ACTIVE_NAMESPACES, _NAMESPACES_LOADED
+    if _NAMESPACES_LOADED:
+        return _ACTIVE_NAMESPACES
+
+    # Fallback: namespaces conhecidos do índice (atualizado em 2026-05)
+    _FALLBACK_NAMESPACES = [
+        "2020", "2021", "2022", "2023", "2024", "2025",
+        "arquitetura_basica", "assuntos_respondidos", "bpm",
+        "cidades_homologadas_para_envio_de_nfse",
+        "cidades_homologadas_para_recebimento_de_nfse",
+        "como_habilitar_e_usar", "diferencas_embarcado_completo",
+        "edocs", "erp", "faq", "fluxo_integracao", "ged",
+        "home_pcvv", "index", "licenca_vencida", "manual_do_usuario",
+        "notas_da_versao", "pcvv", "pcvv_gko_frete", "pcvv_seniorx",
+        "pcvv_tms_xt", "perguntas_frequentes", "senior_connect",
+        "senior_default", "senior_flow_manual", "senior_flow_notas",
+        "sign_studio",
+    ]
+
+    if not pinecone_index:
+        _ACTIVE_NAMESPACES = _FALLBACK_NAMESPACES
+        _NAMESPACES_LOADED = True
+        return _ACTIVE_NAMESPACES
+
+    try:
+        stats = pinecone_index.describe_index_stats()
+        namespaces = list(stats.get("namespaces", {}).keys())
+        if namespaces:
+            _ACTIVE_NAMESPACES = namespaces
+            logger.info(f"[Namespaces] {len(namespaces)} namespaces carregados do Pinecone: {namespaces}")
+        else:
+            _ACTIVE_NAMESPACES = _FALLBACK_NAMESPACES
+            logger.warning("[Namespaces] Nenhum namespace encontrado, usando fallback hardcoded.")
+    except Exception as e:
+        _ACTIVE_NAMESPACES = _FALLBACK_NAMESPACES
+        logger.warning(f"[Namespaces] Falha ao carregar namespaces do Pinecone ({e}), usando fallback.")
+
+    _NAMESPACES_LOADED = True
+    return _ACTIVE_NAMESPACES
+
+
+def buscar_contexto_multi_namespace(
+    prompt_usuario: str,
+    tenant_id: str = "senior_default",
+) -> dict | None:
+    """Busca contexto no Pinecone em todos os namespaces ativos em paralelo.
+    
+    Retorna o resultado com maior score entre todos os namespaces.
+    """
+    if not pinecone_index or not client_openai:
+        return None
+
+    namespaces = _load_active_namespaces()
+
+    # Gera o embedding uma única vez (compartilhado entre todas as buscas)
+    try:
+        query_embedding = gerar_embedding(prompt_usuario)
+    except Exception as e:
+        logger.error(f"[MultiNS] Falha ao gerar embedding: {e}")
+        return None
+
+    melhor_resultado: dict | None = None
+    melhor_score = 0.0
+    lock = threading.Lock()
+
+    def _buscar_namespace(ns: str) -> None:
+        nonlocal melhor_resultado, melhor_score
+        try:
+            resultados = pinecone_index.query(
+                vector=query_embedding,
+                top_k=TOP_K,
+                namespace=ns,
+                include_metadata=True,
+            )
+
+            contextos      = []
+            seletor        = None
+            score_ns       = 0.0
+            melhor_aula_ns = None
+            source_url_ns  = None
+
+            for match in resultados.matches:
+                if match.score < SCORE_THRESHOLD:
+                    continue
+                md = match.metadata
+
+                if md.get("aula"):
+                    contexto = (
+                        f"MANUAL: {md.get('aula')}\n"
+                        f"INSTRUCAO: {md.get('texto')}\n"
+                        f"DICA: {md.get('tooltip')}"
+                    )
+                elif md.get("url"):
+                    contexto = (
+                        f"DOCUMENTACAO: {md.get('titulo', 'Sem título')}\n"
+                        f"CONTEUDO: {md.get('text', '')}\n"
+                        f"FONTE: {md.get('url', '')}"
+                    )
+                    if match.score > score_ns and md.get("url"):
+                        source_url_ns = md.get("url")
+                else:
+                    contexto = f"CONTEUDO: {md.get('text', md.get('texto', ''))}"
+
+                if md.get("seletor"):
+                    contexto += f"\nSELETOR_EXATO: {md.get('seletor')}"
+                    if match.score > score_ns:
+                        score_ns       = match.score
+                        seletor        = md.get("seletor")
+                        melhor_aula_ns = md.get("aula")
+                elif match.score > score_ns:
+                    score_ns       = match.score
+                    melhor_aula_ns = md.get("aula") or md.get("titulo")
+
+                contextos.append(contexto)
+
+            if not contextos:
+                return
+
+            resultado_ns = {
+                "texto_rag":          "\n\n---\n\n".join(contextos),
+                "seletor_direto":     seletor,
+                "score":              score_ns,
+                "melhor_aula":        melhor_aula_ns,
+                "_namespace_origem":  ns,
+            }
+            if source_url_ns:
+                resultado_ns["source_url"] = source_url_ns
+
+            with lock:
+                nonlocal melhor_resultado, melhor_score
+                if score_ns > melhor_score:
+                    melhor_score     = score_ns
+                    melhor_resultado = resultado_ns
+
+        except Exception as e:
+            logger.debug(f"[MultiNS] Erro no namespace '{ns}': {e}")
+
+    # Executa buscas em paralelo
+    threads = [threading.Thread(target=_buscar_namespace, args=(ns,)) for ns in namespaces]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=5.0)  # Timeout de 5s por namespace
+
+    return melhor_resultado
+
+
+# =========================================================
 # SCHEMA DE RESPOSTA
 # =========================================================
 aura_schema = types.Schema(
@@ -598,7 +761,32 @@ def _analisar_sync(
 
     # 2. Busca RAG (Usa o histórico recente para dar contexto à busca vetorial)
     texto_busca_rag = f"{historico[-1]['texto']} {prompt_usuario}" if historico else prompt_usuario
-    busca_rag = buscar_contexto(texto_busca_rag, tenant_id)
+
+    # =========================================================
+    # MULTI-NAMESPACE SEARCH
+    # A documentação web é ingerida por módulo (bpm, ged, erp, etc.)
+    # enquanto os roteiros usam "senior_default".
+    # Buscamos em todos os namespaces ativos em paralelo e retornamos o melhor.
+    # =========================================================
+    busca_rag = buscar_contexto_multi_namespace(texto_busca_rag, tenant_id)
+
+    # =========================================================
+    # [RAG DEBUG] Log do resultado da busca no Pinecone
+    # =========================================================
+    if busca_rag:
+        logger.info(
+            f"[RAG DEBUG] ✅ Pinecone retornou contexto | "
+            f"namespace={busca_rag.get('_namespace_origem', '?')} | "
+            f"score={busca_rag['score']:.4f} | "
+            f"seletor={busca_rag['seletor_direto']} | "
+            f"aula={busca_rag.get('melhor_aula')} | "
+            f"ai_gate={'ATIVO' if busca_rag['score'] > 0.80 and busca_rag['seletor_direto'] else 'INATIVO'}"
+        )
+    else:
+        logger.warning(
+            f"[RAG DEBUG] ❌ Pinecone não retornou contexto relevante em nenhum namespace | "
+            f"query='{texto_busca_rag[:80]}...'"
+        )
 
     # =========================================================
     # 3. VECTOR STORE CONTENT RESTRICTION (FIXED)

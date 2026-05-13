@@ -253,20 +253,24 @@ class IngestionPipeline:
 
             # Stage 2-6: Process each URL
             all_vectors = []
+            total_urls = len(urls)
 
-            for url in urls:
+            for idx, url in enumerate(urls, 1):
+                # Progress display
+                pct = (idx / total_urls) * 100
+                short_url = url.split('/')[-1] if '/' in url else url
+                print(f"\r[{idx}/{total_urls}] ({pct:.0f}%) Processando: {short_url[:50]:<50}", end="", flush=True)
+
                 try:
                     # Stage 2: Extraction
-                    log_url_processing(url, "extraction", "processing")
                     content = self.extractor.extract_content(url)
 
                     if not content:
-                        log_url_processing(url, "extraction", "failed")
+                        print(f"\r[{idx}/{total_urls}] ❌ FALHOU (sem conteúdo): {short_url[:60]}")
                         failed_fetches += 1
                         continue
 
                     urls_fetched += 1
-                    log_url_processing(url, "extraction", "success")
 
                     # Check cache in incremental mode
                     if incremental and self._is_cached(url, content["markdown"]):
@@ -278,14 +282,12 @@ class IngestionPipeline:
                     is_valid, reason = self.validator.validate(content)
 
                     if not is_valid:
-                        log_url_processing(url, "validation", "failed")
-                        logger.warning(f"Validation failed for {url}: {reason}")
+                        print(f"\r[{idx}/{total_urls}] ⚠️  SKIP ({reason[:30]}): {short_url[:50]}")
                         failed_validations += 1
                         skipped_low_quality += 1
                         continue
 
                     urls_validated += 1
-                    log_url_processing(url, "validation", "success")
 
                     # Stage 4: Chunking
                     chunks = self.chunker.chunk_content(
@@ -300,7 +302,7 @@ class IngestionPipeline:
                     )
 
                     chunks_created += len(chunks)
-                    logger.info(f"Created {len(chunks)} chunks for {url}")
+                    print(f"\r[{idx}/{total_urls}] ✅ {content['titulo'][:40]} → {len(chunks)} chunks")
 
                     # Stage 5: Embedding
                     for chunk in chunks:
@@ -334,6 +336,7 @@ class IngestionPipeline:
 
                 except Exception as e:
                     failed_fetches += 1
+                    print(f"\r[{idx}/{total_urls}] 💥 ERRO: {str(e)[:60]}")
                     log_error(
                         message="URL processing failed",
                         stage="extraction",
@@ -341,8 +344,12 @@ class IngestionPipeline:
                         url=url
                     )
 
+            # Final newline after progress
+            print(f"\n\n📊 Extração concluída: {urls_validated} válidas, {failed_fetches} falhas, {skipped_low_quality} baixa qualidade")
+
             # Stage 6: Injection (batch)
             if all_vectors:
+                print(f"💉 Injetando {len(all_vectors)} vetores no Pinecone...")
                 logger.info(f"Injecting {len(all_vectors)} vectors to Pinecone")
 
                 injection_result = self.injector.inject_batch(

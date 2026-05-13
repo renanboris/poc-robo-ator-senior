@@ -1046,9 +1046,9 @@ async def get_metricas():
 
     Regras:
     - Retorna `null` para campos sem dados (nunca omite ou retorna zero quando não há dados).
-    - `horas_poupadas` = total_aulas * 2.5 horas por aula.
-    - `economia_estimada` = horas_poupadas * 100 reais.
-    - Se `total_aulas` for null, `horas_poupadas` e `economia_estimada` também são null.
+    - `horas_poupadas` = total_aulas * 6 horas por aula.
+    - `dinheiro_poupado` = horas_poupadas * R$150 (HH Consultor Senior).
+    - Se `total_aulas` for null, `horas_poupadas` e `dinheiro_poupado` também são null.
     - `self_healing_hits` = soma de acertos de todas as camadas em telemetria_camadas.
     - `camadas_vision` inclui taxa_sucesso por camada: acertos / (acertos + falhas) se total > 0, senão null.
     """
@@ -1063,12 +1063,13 @@ async def get_metricas():
     except Exception as e:
         logging.warning(f"[metricas] Não foi possível contar roteiros: {e}")
 
-    # ── horas_poupadas / economia_estimada ───────────────────────────────────
+    # ── horas_poupadas / dinheiro_poupado ───────────────────────────────────
+    # Fórmula: N_aulas × 6h × R$150/h (HH Consultor Senior)
     horas_poupadas: Optional[float] = None
-    economia_estimada: Optional[float] = None
+    dinheiro_poupado: Optional[float] = None
     if total_aulas is not None:
-        horas_poupadas = round(total_aulas * 2.5, 2)
-        economia_estimada = round(horas_poupadas * 100, 2)
+        horas_poupadas = round(total_aulas * 6, 2)
+        dinheiro_poupado = round(horas_poupadas * 150, 2)
 
     # ── Brain stats (total_memorizado, self_healing_hits, camadas_vision) ────
     total_memorizado: Optional[int] = None
@@ -1282,7 +1283,7 @@ async def get_metricas():
     return {
         "total_aulas":       total_aulas,
         "horas_poupadas":    horas_poupadas,
-        "economia_estimada": economia_estimada,
+        "dinheiro_poupado":  dinheiro_poupado,
         "total_memorizado":  total_memorizado,
         "self_healing_hits": self_healing_hits,
         "tamanho_cache_dap": tamanho_cache_dap,
@@ -1953,6 +1954,7 @@ async def marcar_hitl_validado(arquivo: str):
 
         dados.setdefault("metadata", {})
         dados["metadata"]["hitl_validado"] = True
+        dados["metadata"]["hitl_validado_em"] = datetime.now().isoformat()
         _atomic_write_json(caminho, dados)
 
         # Auto-rebuild em background — não bloqueia a resposta HTTP (Req 1.6.1)

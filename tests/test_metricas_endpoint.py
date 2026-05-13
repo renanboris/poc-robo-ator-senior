@@ -134,12 +134,12 @@ def _executar_logica_metricas(roteiros_dir: str, brain_db_path: str, aura_db_pat
     except Exception:
         pass
 
-    # ── horas_poupadas / economia_estimada ───────────────────────────────────
+    # ── horas_poupadas / dinheiro_poupado ───────────────────────────────────
     horas_poupadas: Optional[float] = None
-    economia_estimada: Optional[float] = None
+    dinheiro_poupado: Optional[float] = None
     if total_aulas is not None:
-        horas_poupadas = round(total_aulas * 2.5, 2)
-        economia_estimada = round(horas_poupadas * 100, 2)
+        horas_poupadas = round(total_aulas * 6, 2)
+        dinheiro_poupado = round(horas_poupadas * 150, 2)
 
     # ── Brain stats ──────────────────────────────────────────────────────────
     total_memorizado: Optional[int] = None
@@ -198,7 +198,7 @@ def _executar_logica_metricas(roteiros_dir: str, brain_db_path: str, aura_db_pat
     return {
         "total_aulas":       total_aulas,
         "horas_poupadas":    horas_poupadas,
-        "economia_estimada": economia_estimada,
+        "dinheiro_poupado":  dinheiro_poupado,
         "total_memorizado":  total_memorizado,
         "self_healing_hits": self_healing_hits,
         "tamanho_cache_dap": tamanho_cache_dap,
@@ -213,7 +213,7 @@ def _executar_logica_metricas(roteiros_dir: str, brain_db_path: str, aura_db_pat
 CAMPOS_OBRIGATORIOS = {
     "total_aulas",
     "horas_poupadas",
-    "economia_estimada",
+    "dinheiro_poupado",
     "total_memorizado",
     "self_healing_hits",
     "tamanho_cache_dap",
@@ -256,8 +256,8 @@ class TestMetricasLogica(unittest.TestCase):
                           "total_aulas deve ser null quando pasta não existe")
         self.assertIsNone(resultado["horas_poupadas"],
                           "horas_poupadas deve ser null quando total_aulas é null")
-        self.assertIsNone(resultado["economia_estimada"],
-                          "economia_estimada deve ser null quando total_aulas é null")
+        self.assertIsNone(resultado["dinheiro_poupado"],
+                          "dinheiro_poupado deve ser null quando total_aulas é null")
 
     def test_campos_null_quando_brain_db_nao_existe(self):
         """total_memorizado, self_healing_hits e camadas_vision devem ser null quando brain.db não existe."""
@@ -316,14 +316,14 @@ class TestMetricasLogica(unittest.TestCase):
 
         self.assertEqual(resultado["total_aulas"], 5)
         self.assertIsNotNone(resultado["horas_poupadas"])
-        self.assertIsNotNone(resultado["economia_estimada"])
+        self.assertIsNotNone(resultado["dinheiro_poupado"])
         self.assertIsNotNone(resultado["total_memorizado"])
         self.assertIsNotNone(resultado["self_healing_hits"])
         self.assertIsNotNone(resultado["tamanho_cache_dap"])
         self.assertIsNotNone(resultado["camadas_vision"])
 
     def test_calculo_horas_poupadas_e_economia(self):
-        """horas_poupadas = total_aulas * 2.5 e economia_estimada = horas_poupadas * 100."""
+        """horas_poupadas = total_aulas * 6 e dinheiro_poupado = horas_poupadas * 150."""
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             roteiros_dir = os.path.join(tmpdir, "roteiros")
             _criar_roteiros(roteiros_dir, 4)
@@ -337,8 +337,8 @@ class TestMetricasLogica(unittest.TestCase):
             )
 
         self.assertEqual(resultado["total_aulas"], 4)
-        self.assertAlmostEqual(resultado["horas_poupadas"], 4 * 2.5, places=2)
-        self.assertAlmostEqual(resultado["economia_estimada"], 4 * 2.5 * 100, places=2)
+        self.assertAlmostEqual(resultado["horas_poupadas"], 4 * 6, places=2)
+        self.assertAlmostEqual(resultado["dinheiro_poupado"], 4 * 6 * 150, places=2)
 
     def test_taxa_sucesso_calculada_por_camada(self):
         """taxa_sucesso de cada camada deve ser acertos / (acertos + falhas)."""
@@ -417,7 +417,7 @@ class TestMetricasLogica(unittest.TestCase):
             )
 
         campos_numericos = [
-            "total_aulas", "horas_poupadas", "economia_estimada",
+            "total_aulas", "horas_poupadas", "dinheiro_poupado",
             "total_memorizado", "self_healing_hits", "tamanho_cache_dap",
         ]
         for campo in campos_numericos:
@@ -471,8 +471,8 @@ class TestMetricasLogica(unittest.TestCase):
         self.assertIsNone(resultado["total_aulas"])
         self.assertIsNone(resultado["horas_poupadas"],
                           "horas_poupadas deve ser null quando total_aulas é null")
-        self.assertIsNone(resultado["economia_estimada"],
-                          "economia_estimada deve ser null quando total_aulas é null")
+        self.assertIsNone(resultado["dinheiro_poupado"],
+                          "dinheiro_poupado deve ser null quando total_aulas é null")
 
     def test_camadas_vision_null_quando_sem_telemetria(self):
         """camadas_vision deve ser null quando brain.db existe mas sem registros de telemetria."""

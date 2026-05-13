@@ -695,6 +695,8 @@ html.light #sidebar::before {
 .mb-scorm   { background: var(--violet-dim); color: var(--violet); }
 .mb-pdf     { background: var(--green-dim);  color: var(--green); }
 .mb-simlink { background: var(--cyan-dim);   color: var(--cyan); }
+.mb-ia-ok   { background: var(--green-dim);  color: var(--green); }
+.mb-ia-warn { background: var(--amber-dim);  color: var(--amber); }
 
 /* Studio main editor area */
 #studio-main {
@@ -800,6 +802,22 @@ html.light #sidebar::before {
   display: none;
 }
 .pipe-btn.pulse .notif { display: block; }
+
+/* HITL Validar → Gravar flow: primary/secondary states */
+.pipe-btn.hitl-primary {
+  border-color: var(--clr);
+  color: var(--clr);
+  background: color-mix(in srgb, var(--clr) 8%, transparent);
+  font-weight: 800;
+}
+.pipe-btn.hitl-primary .lbl { font-weight: 800; }
+
+.pipe-btn.hitl-secondary {
+  opacity: 0.6;
+  border-style: dashed;
+  font-size: 10px;
+}
+.pipe-btn.hitl-secondary:hover { opacity: 1; }
 
 .btn-icon {
   padding: 7px 10px; border-radius: var(--radius-xs);
@@ -2645,6 +2663,7 @@ function atualizarBotoesPipeline() {
   const cfg = cacheRoteiros.find(r => r.arquivo === arquivoAtual);
   if (!cfg) return;
 
+  const btnH = document.getElementById('btn-gen-hitl');
   const btnR = document.getElementById('btn-gen-robo');
   const btnV = document.getElementById('btn-gen-video');
   const btnS = document.getElementById('btn-gen-scorm');
@@ -2657,9 +2676,9 @@ function atualizarBotoesPipeline() {
   const btnDP = document.getElementById('btn-baixar-pdf');
   const btnDSL = document.getElementById('btn-preview-simlink');
 
-[btnR, btnV, btnS, btnP, btnSL, btnC].forEach(b => {
+[btnH, btnR, btnV, btnS, btnP, btnSL, btnC].forEach(b => {
       if(b) {
-          b.classList.remove('pulse');
+          b.classList.remove('pulse', 'hitl-primary', 'hitl-secondary');
           b.style.borderColor = '';
           b.style.color = '';
       }
@@ -2670,12 +2689,37 @@ function atualizarBotoesPipeline() {
       btnC.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 12 2.1 7.1"/></svg> <span class="lbl">5. Coach IA</span>`;
   }
 
+  // ─── HITL Validar → Gravar flow (Requirement 6) ───
+  if (cfg.hitl_validado) {
+    // Roteiro JÁ validado: "🎬 Gravar" é o botão principal, "🔍 Re-validar" é secundário
+    if (btnH) {
+      btnH.classList.add('hitl-secondary');
+      btnH.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg> <span class="lbl">🔍 Re-validar</span><div class="notif"></div>`;
+    }
+    if (btnR) {
+      btnR.classList.add('hitl-primary');
+      btnR.querySelector('.lbl').textContent = '🎬 Gravar';
+    }
+  } else {
+    // Roteiro NÃO validado: "🔍 Validar" é o botão principal, "🎬 Gravar" é secundário
+    if (btnH) {
+      btnH.classList.add('pulse', 'hitl-primary');
+      btnH.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg> <span class="lbl">🔍 Validar</span><div class="notif"></div>`;
+    }
+    if (btnR) {
+      btnR.classList.add('hitl-secondary');
+      btnR.querySelector('.lbl').textContent = '🎬 Gravar';
+    }
+  }
+
+  // ─── Pipeline progression (existing logic, skips HITL/Robô which are handled above) ───
   if (!cfg.tem_audio) {
-    btnR.classList.add('pulse');
-    btnR.querySelector('.lbl').textContent = '1. Executar Robô';
+    // Se não validado, o pulse já está no HITL; se validado, pulse no Robô
+    if (cfg.hitl_validado) {
+      btnR.classList.add('pulse');
+    }
   } else if (!cfg.tem_video) {
     btnV.classList.add('pulse');
-    btnR.querySelector('.lbl').textContent = '1. Refazer Robô';
     btnV.querySelector('.lbl').textContent = '2. Gerar Vídeo';
   } else if (!cfg.tem_scorm) {
     btnS.classList.add('pulse');
@@ -2767,7 +2811,7 @@ function renderizarPassos() {
     <div class="step-body" style="padding: 14px 16px;">
        <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
          <select class="field-select" style="max-width: 280px; font-weight: 600; cursor: pointer; color: ${configVoz === 'elevenlabs' ? 'var(--amber)' : 'var(--text)'};" onchange="mudarVozIA(this.value); this.style.color = this.value === 'elevenlabs' ? 'var(--amber)' : 'var(--text)';">
-            <option value="pt-BR-FranciscaNeural" ${configVoz !== 'elevenlabs' ? 'selected' : ''}>Rascunho (Edge TTS - Grátis)</option>
+            <option value="pt-BR-FranciscaNeural" ${!configVoz.startsWith('google:') && configVoz !== 'elevenlabs' ? 'selected' : ''}>Rascunho (Edge TTS - Grátis)</option>
             <option value="elevenlabs" ${configVoz === 'elevenlabs' ? 'selected' : ''}>Premium (ElevenLabs - Realista)</option>
          </select>
          <span style="font-size: 11px; color: var(--text-3); line-height: 1.4;">

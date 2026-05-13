@@ -190,7 +190,11 @@ class SemanticExtractor:
             raise
 
     def _extract_with_crawl4ai(self, url: str) -> tuple[str, str]:
-        """Extract content using Crawl4AI backend.
+        """Extract content using Playwright, handling MadCap Flare iframe structure.
+        
+        A documentação Senior usa MadCap Flare. O shell carrega o conteúdo
+        real em um iframe. O extractor detecta a URL real do iframe e acessa
+        diretamente para obter o artigo completo.
         
         Args:
             url: URL to extract from
@@ -198,53 +202,157 @@ class SemanticExtractor:
         Returns:
             Tuple of (markdown_content, page_title)
         """
-        # Temporary implementation using requests + BeautifulSoup
-        # TODO: Replace with actual Crawl4AI when library is integrated
-
         import html2text
-        import requests
+        from playwright.sync_api import sync_playwright
         from bs4 import BeautifulSoup
 
         try:
-            # Fetch HTML
-            response = requests.get(url, timeout=30, headers={
-                'User-Agent': 'Senior-Training-OS-Ingestion-Pipeline/1.0'
-            })
-            response.raise_for_status()
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
 
-            # Parse HTML
-            soup = BeautifulSoup(response.content, 'html.parser')
+                # -------------------------------------------------------
+                # Detecta se a URL é direta (sem shell MadCap) ou precisa
+                # de resolução via iframe
+                # -------------------------------------------------------
+                from urllib.parse import urlparse
+                parsed_url = urlparse(url)
 
-            # Extract title
-            title_tag = soup.find('title')
-            titulo = title_tag.get_text().strip() if title_tag else "Untitled"
+                # URLs com fragmento hash precisam de resolução especial
+                if parsed_url.fragment and parsed_url.fragment.endswith('.htm'):
+                    # Converte fragmento em path direto
+                    # Ex: .../erp/#financas/tesouraria.htm → .../erp/financas/tesouraria.htm
+                    base_url = url.split('#')[0].rstrip('/')
+                    target_url = f"{base_url}/{parsed_url.fragment}"
+                elif url.endswith('.htm') and '/manual-do-usuario/' in url:
+                    # URL direta para artigo — acessa sem shell
+                    target_url = url
+                else:
+                    # URL de shell — precisa descobrir o iframe
+                    target_url = None
 
-            # Remove unwanted elements
-            for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'aside']):
-                element.decompose()
+                if target_url:
+                    # Acesso direto ao artigo (sem shell)
+                    article_page = browser.new_page()
+                    article_page.goto(target_url, wait_until="networkidle", timeout=30000)
+                    html_content = article_page.content()
+                    titulo = article_page.title().split(' | ')[0].split(' - ')[0].strip()
+                    article_page.close()
+                else:
+                    # Precisa carregar o shell e descobrir o iframe
+                    shell_page = browser.new_page()
+                    shell_page.goto(url, wait_until="networkidle", timeout=30000)
 
-            # Try to find main content area
+                    content_url = None
+                    for frame in shell_page.frames:
+                        frame_url = frame.url
+                        if (frame_url != "about:blank" and
+                                frame_url != shell_page.url and
+                                "recaptcha" not in frame_url and
+                                "google.com" not in frame_url):
+                            try:
+                                if len(frame.content()) > 5000:
+                                    content_url = frame_url
+                                    break
+                            except Exception:
+                                pass
+
+                    shell_page.close()
+
+                    # Deriva a URL do artigo a partir do iframe
+                    if content_url and content_url.endswith('/home.htm'):
+                        original_path = urlparse(url).path
+                        filename = original_path.rstrip('/').split('/')[-1]
+                        if filename and filename != 'home.htm' and filename.endswith('.htm'):
+                            target_url = content_url.replace('/home.htm', f'/{filename}')
+                        else:
+                            target_url = content_url
+                    else:
+                        target_url = content_url if content_url else url
+
+                    article_page = browser.new_page()
+                    article_page.goto(target_url, wait_until="networkidle", timeout=30000)
+                    html_content = article_page.content()
+                    titulo = article_page.title().split(' | ')[0].split(' - ')[0].strip()
+                    article_page.close()
+
+                browser.close()
+
+            # -------------------------------------------------------
+            # PASSO 3: Extrai o conteúdo do HTML
+            # -------------------------------------------------------
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            # Remove elementos de navegação
+            for tag in soup.find_all(['script', 'style', 'nav', 'header',
+                                       'footer', 'aside', 'form', 'iframe']):
+                tag.decompose()
+
+            for tag in soup.find_all(attrs={'role': ['navigation', 'banner',
+                                                      'complementary', 'contentinfo',
+                                                      'dialog', 'search']}):
+                tag.decompose()
+
+            _NAV_CLASSES = [
+                'menu', 'sidebar', 'nav', 'navbar', 'breadcrumb', 'breadcrumbs',
+                'toc', 'table-of-contents', 'pagination', 'footer', 'header',
+                'topbar', 'toolbar', 'cookie', 'banner', 'modal', 'popup',
+                'overlay', 'dropdown', 'submenu', 'back-to-top', 'social',
+                'share', 'advertisement', 'widget', 'related',
+                # MadCap Flare specific
+                'MCBreadcrumbsBox', 'MCBreadcrumbsPrefix', 'navigation-links',
+                'topic-toolbar', 'footer-container', 'sidenav',
+                'MCTopicToolbar', 'MCRelationshipsProxy', 'buttons',
+            ]
+            # Coleta primeiro, depois decompõe (evita corrupção do tree durante iteração)
+            tags_to_remove = []
+            for tag in soup.find_all(True):
+                tag_classes = ' '.join(tag.get('class', [])).lower()
+                tag_id = (tag.get('id') or '').lower()
+                if any(nc.lower() in tag_classes or nc.lower() in tag_id
+                       for nc in _NAV_CLASSES):
+                    tags_to_remove.append(tag)
+            for tag in tags_to_remove:
+                tag.decompose()
+
+            # Seletores de conteúdo principal
             main_content = (
-                soup.find('main') or
+                soup.find('div', class_='topic-body') or
+                soup.find('div', id='mc-main-content') or
+                soup.find('div', class_='MCBody') or
                 soup.find('article') or
-                soup.find('div', class_='content') or
+                soup.find('main') or
+                soup.find(attrs={'role': 'main'}) or
+                soup.find('div', id='content') or
+                soup.find('div', id='main-content') or
                 soup.find('body')
             )
 
             if not main_content:
                 return ("", titulo)
 
-            # Convert to markdown
             h = html2text.HTML2Text()
             h.ignore_links = False
             h.ignore_images = True
             h.ignore_emphasis = False
-            h.body_width = 0  # Don't wrap lines
+            h.body_width = 0
+            h.unicode_snob = True
+            h.skip_internal_links = True
 
             markdown = h.handle(str(main_content))
 
-            # Clean up markdown
-            markdown = markdown.strip()
+            # Pós-processamento
+            lines = markdown.split('\n')
+            cleaned_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if re.match(r'^\[([^\]]+)\]\([^\)]+\)\s*$', stripped):
+                    continue
+                if re.match(r'^[_\-\*]{2,}$', stripped):
+                    continue
+                cleaned_lines.append(line)
+
+            markdown = '\n'.join(cleaned_lines).strip()
+            markdown = re.sub(r'\n{3,}', '\n\n', markdown)
 
             return (markdown, titulo)
 

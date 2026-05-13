@@ -42,6 +42,7 @@ import asyncio
 import json
 import logging
 import os
+import subprocess
 import sys
 from enum import Enum
 
@@ -56,6 +57,7 @@ from vision_engine import (
     _e_seletor_fragil,
     _registrar_sucesso_cache,
     encontrar_e_clicar,
+    obter_ultima_camada_vencedora,
 )
 
 load_dotenv()
@@ -491,6 +493,445 @@ async def _remover_highlight_hitl(page: Page, seletor: str) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# HIGHLIGHT DO ELEMENTO CLICADO (step-by-step)
+# Verde (#22c55e) = sucesso, Vermelho (#ef4444) = falha
+# Usa outline (não border) para não alterar layout
+# ══════════════════════════════════════════════════════════════════════════════
+
+_JS_HIGHLIGHT_STEP_ELEMENT = """
+(params) => {
+    const { selector, success } = params;
+
+    // Remove highlight anterior se existir
+    document.getElementById('hitl-step-highlight-style')?.remove();
+    document.querySelectorAll('[data-hitl-step-highlighted]').forEach(el => {
+        el.style.outline = el.getAttribute('data-hitl-step-prev-outline') || '';
+        el.style.outlineOffset = el.getAttribute('data-hitl-step-prev-offset') || '';
+        el.style.boxShadow = el.getAttribute('data-hitl-step-prev-shadow') || '';
+        el.removeAttribute('data-hitl-step-highlighted');
+        el.removeAttribute('data-hitl-step-prev-outline');
+        el.removeAttribute('data-hitl-step-prev-offset');
+        el.removeAttribute('data-hitl-step-prev-shadow');
+        el.classList.remove('hitl-step-highlight-pulse');
+    });
+
+    // Encontrar elemento pelo seletor
+    const el = document.querySelector(selector);
+    if (!el) return false;
+
+    // Scroll suave para o elemento
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Cores baseadas em sucesso/falha
+    const color = success ? '#22c55e' : '#ef4444';
+    const colorAlpha = success ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)';
+
+    // Salvar estilos anteriores
+    el.setAttribute('data-hitl-step-prev-outline', el.style.outline || '');
+    el.setAttribute('data-hitl-step-prev-offset', el.style.outlineOffset || '');
+    el.setAttribute('data-hitl-step-prev-shadow', el.style.boxShadow || '');
+    el.setAttribute('data-hitl-step-highlighted', '1');
+
+    // Injetar CSS de animação
+    const st = document.createElement('style');
+    st.id = 'hitl-step-highlight-style';
+    st.innerHTML = `
+        @keyframes hitl-step-highlight-pulse {
+            0%   { box-shadow: 0 0 0 0 ${colorAlpha}, 0 0 8px ${colorAlpha}; }
+            50%  { box-shadow: 0 0 0 6px transparent, 0 0 16px ${colorAlpha}; }
+            100% { box-shadow: 0 0 0 0 ${colorAlpha}, 0 0 8px ${colorAlpha}; }
+        }
+        .hitl-step-highlight-pulse {
+            animation: hitl-step-highlight-pulse 1.5s ease-in-out infinite;
+        }
+    `;
+    document.head.appendChild(st);
+
+    // Aplicar highlight
+    el.style.outline = `3px solid ${color}`;
+    el.style.outlineOffset = '2px';
+    el.classList.add('hitl-step-highlight-pulse');
+
+    return true;
+}
+"""
+
+_JS_REMOVE_STEP_HIGHLIGHT = """
+() => {
+    document.getElementById('hitl-step-highlight-style')?.remove();
+    document.querySelectorAll('[data-hitl-step-highlighted]').forEach(el => {
+        el.style.outline = el.getAttribute('data-hitl-step-prev-outline') || '';
+        el.style.outlineOffset = el.getAttribute('data-hitl-step-prev-offset') || '';
+        el.style.boxShadow = el.getAttribute('data-hitl-step-prev-shadow') || '';
+        el.removeAttribute('data-hitl-step-highlighted');
+        el.removeAttribute('data-hitl-step-prev-outline');
+        el.removeAttribute('data-hitl-step-prev-offset');
+        el.removeAttribute('data-hitl-step-prev-shadow');
+        el.classList.remove('hitl-step-highlight-pulse');
+    });
+}
+"""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OVERLAY STEP-BY-STEP (minimalista, canto inferior esquerdo)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_JS_STEP_OVERLAY = """
+(params) => {
+    const { passoAtual, passoTotal, acaoAtual, acaoTotal, descricao, sucesso, camada } = params;
+
+    // Remove overlay anterior
+    document.getElementById('hitl-step-overlay')?.remove();
+    document.getElementById('hitl-step-overlay-style')?.remove();
+
+    // CSS
+    const st = document.createElement('style');
+    st.id = 'hitl-step-overlay-style';
+    st.innerHTML = `
+        #hitl-step-overlay {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            max-width: 400px;
+            min-width: 320px;
+            z-index: 999999;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5),
+                        0 0 0 1px rgba(255, 255, 255, 0.05);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #f1f5f9;
+            overflow: hidden;
+            animation: hitl-step-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        @keyframes hitl-step-slide-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .hitl-step-header {
+            padding: 12px 16px 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .hitl-step-progress {
+            font-size: 12px;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 0.3px;
+        }
+        .hitl-step-status {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 99px;
+        }
+        .hitl-step-status-ok {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+        }
+        .hitl-step-status-fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+        }
+        .hitl-step-body {
+            padding: 4px 16px 12px 16px;
+        }
+        .hitl-step-desc {
+            font-size: 13px;
+            color: #e2e8f0;
+            line-height: 1.4;
+            margin-bottom: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .hitl-step-camada {
+            font-size: 11px;
+            font-weight: 600;
+            color: #7dd3fc;
+            opacity: 0.85;
+        }
+        .hitl-step-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .hitl-step-btn {
+            padding: 7px 12px;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .hitl-step-btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.1);
+        }
+        .hitl-step-btn:active {
+            transform: translateY(0);
+        }
+        .hitl-step-btn-ok {
+            background: #22c55e;
+            color: #000;
+        }
+        .hitl-step-btn-corrigir {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.3) !important;
+        }
+        .hitl-step-btn-auto {
+            background: rgba(99, 102, 241, 0.15);
+            color: #a5b4fc;
+            border: 1px solid rgba(99, 102, 241, 0.3) !important;
+        }
+        .hitl-step-btn-pular {
+            background: rgba(255, 255, 255, 0.06);
+            color: #94a3b8;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+    `;
+    document.head.appendChild(st);
+
+    // HTML
+    const ov = document.createElement('div');
+    ov.id = 'hitl-step-overlay';
+
+    const statusClass = sucesso ? 'hitl-step-status-ok' : 'hitl-step-status-fail';
+    const statusText = sucesso ? '✅ Sucesso' : '❌ Falhou';
+
+    ov.innerHTML = `
+        <div class="hitl-step-header">
+            <span class="hitl-step-progress">Passo ${passoAtual}/${passoTotal} — Ação ${acaoAtual}/${acaoTotal}</span>
+            <span class="hitl-step-status ${statusClass}">${statusText}</span>
+        </div>
+        <div class="hitl-step-body">
+            <div class="hitl-step-desc" title="${descricao}">${descricao} <span class="hitl-step-camada">via ${camada || '—'}</span></div>
+            <div class="hitl-step-buttons">
+                <button class="hitl-step-btn hitl-step-btn-ok" data-step-action="ok">✅ Ok</button>
+                <button class="hitl-step-btn hitl-step-btn-corrigir" data-step-action="corrigir">✏️ Corrigir</button>
+                <button class="hitl-step-btn hitl-step-btn-auto" data-step-action="auto_5">⏩ Auto 5</button>
+                <button class="hitl-step-btn hitl-step-btn-pular" data-step-action="pular">⏭ Pular</button>
+            </div>
+        </div>
+    `;
+    document.documentElement.appendChild(ov);
+
+    // Event listeners — envia decisão via binding
+    ov.querySelectorAll('[data-step-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const action = btn.getAttribute('data-step-action');
+            window.__hitl_captura__(JSON.stringify({ acao: 'step_' + action }));
+        });
+    });
+}
+"""
+
+_JS_REMOVE_STEP_OVERLAY = """
+() => {
+    document.getElementById('hitl-step-overlay')?.remove();
+    document.getElementById('hitl-step-overlay-style')?.remove();
+}
+"""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OVERLAY RELATÓRIO FINAL — Exibido ao término de todas as ações
+# ══════════════════════════════════════════════════════════════════════════════
+
+_JS_RELATORIO_FINAL = """
+(params) => {
+    const { totalAcoes, correcoes, acoesPuladas, taxaAcerto } = params;
+
+    // Remove overlays anteriores
+    document.getElementById('hitl-step-overlay')?.remove();
+    document.getElementById('hitl-step-overlay-style')?.remove();
+    document.getElementById('hitl-relatorio-final')?.remove();
+    document.getElementById('hitl-relatorio-final-style')?.remove();
+    document.getElementById('hitl-pause-btn')?.remove();
+    document.getElementById('hitl-pause-btn-style')?.remove();
+
+    // CSS
+    const st = document.createElement('style');
+    st.id = 'hitl-relatorio-final-style';
+    st.innerHTML = `
+        #hitl-relatorio-final {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 420px;
+            z-index: 2147483647;
+            background: rgba(15, 23, 42, 0.97);
+            border: 2px solid #22c55e;
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7),
+                        0 0 0 1px rgba(255, 255, 255, 0.05),
+                        0 0 40px rgba(34, 197, 94, 0.15);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #f1f5f9;
+            overflow: hidden;
+            animation: hitl-relatorio-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        @keyframes hitl-relatorio-in {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+        .hitl-rel-header {
+            background: rgba(34, 197, 94, 0.08);
+            border-bottom: 1px solid rgba(34, 197, 94, 0.2);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .hitl-rel-badge {
+            background: #22c55e;
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 99px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .hitl-rel-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .hitl-rel-body {
+            padding: 20px;
+        }
+        .hitl-rel-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .hitl-rel-stat {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 12px 14px;
+            text-align: center;
+        }
+        .hitl-rel-stat-value {
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.2;
+        }
+        .hitl-rel-stat-label {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+        .hitl-rel-stat-acerto .hitl-rel-stat-value {
+            color: #4ade80;
+        }
+        .hitl-rel-stat-correcoes .hitl-rel-stat-value {
+            color: #fbbf24;
+        }
+        .hitl-rel-stat-puladas .hitl-rel-stat-value {
+            color: #94a3b8;
+        }
+        .hitl-rel-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .hitl-rel-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s ease;
+            text-align: center;
+        }
+        .hitl-rel-btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.1);
+        }
+        .hitl-rel-btn:active {
+            transform: translateY(0);
+        }
+        .hitl-rel-btn-gravar {
+            background: #22c55e;
+            color: #000;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+        }
+        .hitl-rel-btn-fechar {
+            background: rgba(255, 255, 255, 0.08);
+            color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        }
+    `;
+    document.head.appendChild(st);
+
+    // HTML
+    const ov = document.createElement('div');
+    ov.id = 'hitl-relatorio-final';
+    ov.innerHTML = `
+        <div class="hitl-rel-header">
+            <span style="font-size:18px">📊</span>
+            <span class="hitl-rel-badge">Concluído</span>
+            <span class="hitl-rel-title">Relatório HITL</span>
+        </div>
+        <div class="hitl-rel-body">
+            <div class="hitl-rel-stats">
+                <div class="hitl-rel-stat">
+                    <div class="hitl-rel-stat-value">${totalAcoes}</div>
+                    <div class="hitl-rel-stat-label">Ações executadas</div>
+                </div>
+                <div class="hitl-rel-stat hitl-rel-stat-acerto">
+                    <div class="hitl-rel-stat-value">${taxaAcerto}%</div>
+                    <div class="hitl-rel-stat-label">Taxa de acerto</div>
+                </div>
+                <div class="hitl-rel-stat hitl-rel-stat-correcoes">
+                    <div class="hitl-rel-stat-value">${correcoes}</div>
+                    <div class="hitl-rel-stat-label">Correções feitas</div>
+                </div>
+                <div class="hitl-rel-stat hitl-rel-stat-puladas">
+                    <div class="hitl-rel-stat-value">${acoesPuladas}</div>
+                    <div class="hitl-rel-stat-label">Ações puladas</div>
+                </div>
+            </div>
+            <div class="hitl-rel-buttons">
+                <button class="hitl-rel-btn hitl-rel-btn-gravar" data-rel-action="gravar">🎬 Gravar agora</button>
+                <button class="hitl-rel-btn hitl-rel-btn-fechar" data-rel-action="fechar">Fechar</button>
+            </div>
+        </div>
+    `;
+    document.documentElement.appendChild(ov);
+
+    // Event listeners — envia decisão via binding
+    ov.querySelectorAll('[data-rel-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const action = btn.getAttribute('data-rel-action');
+            window.__hitl_captura__(JSON.stringify({ acao: 'relatorio_' + action }));
+        });
+    });
+}
+"""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # NOVOS COMPONENTES — HITL MELHORADO
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -498,7 +939,7 @@ class AutoPlayController:
     """Gerencia o modo de execução automática e controle de pausas."""
 
     def __init__(self):
-        self._is_auto_play: bool = True
+        self._is_auto_play: bool = False  # Step-by-step é o padrão
         self._pause_requested: bool = False
         self._current_step_index: int = 0
 
@@ -938,7 +1379,9 @@ class HitlValidator:
             "correcoes_salvas":     0,  # Renomeado de passos_corrigidos
             "pausas_manuais":       0,  # Novo
             "pausas_automaticas":   0,  # Novo
+            "passos_checkpoint":    0,  # Checkpoints com desvio detectado
             "intervencoes":         0,  # Mantido para compatibilidade
+            "acoes_puladas":        0,  # Ações puladas pelo analista
         }
         # Mapa intencao_semantica → seletor_corrigido
         # Usado ao final para reescrever o roteiro JSON
@@ -947,6 +1390,8 @@ class HitlValidator:
         self._desvio_anterior: bool = False
         # Referência ao passo anterior — usada na Falha Dura para oferecer "Refazer"
         self._passo_anterior: dict | None = None
+        # Step-by-step: contador de ações restantes em modo auto (0 = step-by-step)
+        self._modo_auto_restante: int = 0
 
         # Novos componentes HITL melhorado
         self._auto_play_controller: AutoPlayController | None = None
@@ -960,6 +1405,8 @@ class HitlValidator:
         self._current_step_index: int = 0
         self._total_steps: int = 0
         self._is_navigator_open: bool = False
+        # Decisão do analista no relatório final ('gravar' ou 'fechar')
+        self._decisao_relatorio: str = "fechar"
 
     # ─── Setup da captura de clique humano ────────────────────────────────────
 
@@ -994,6 +1441,10 @@ class HitlValidator:
                                   "prev_step", "next_step", "jump_to"]:
                         self._decisao_humana = dados
 
+                    # Ações do overlay step-by-step
+                    elif acao.startswith("step_"):
+                        self._decisao_humana = dados
+
                     # Outras ações (compatibilidade com sistema antigo)
                     else:
                         self._decisao_humana = dados
@@ -1017,15 +1468,20 @@ class HitlValidator:
         self._enhanced_radar_system = EnhancedRadarSystem(page)
         self._validation_engine = ValidationEngine(_gemini)
 
-        # Exibe botão de pausa sempre visível
-        await self._floating_pause_button.show_pause_button()
+        # Exibe botão de pausa apenas em modo silent (auto-play)
+        # Em step-by-step o controle é feito pelo overlay de cada ação
+        if getattr(self, "_silent", False):
+            await self._floating_pause_button.show_pause_button()
 
     async def _setup_persistent_pause_button(self, page: Page) -> None:
         """
         Configura listener para re-injetar o botão de pausa após cada navegação.
         Isso garante que o botão permaneça visível mesmo após page.goto() ou reloads.
+        Só ativo em modo silent (auto-play) — em step-by-step o overlay controla o fluxo.
         """
         async def on_load():
+            if not getattr(self, "_silent", False):
+                return
             if self._floating_pause_button and not self._is_navigator_open:
                 try:
                     await self._floating_pause_button.show_pause_button()
@@ -1111,6 +1567,403 @@ class HitlValidator:
             logger.warning(f"Timeout de {timeout}s atingido. Pulando passo.")
             self._decisao_humana = {"acao": "timeout"}
         return self._decisao_humana
+
+    # ─── Step-by-step: highlight do elemento clicado ─────────────────────────
+
+    async def _highlight_element(self, page: Page, selector: str, success: bool) -> None:
+        """
+        Destaca o elemento que foi clicado/interagido com outline colorido:
+          - Verde (#22c55e) = ação bem-sucedida
+          - Vermelho (#ef4444) = ação falhou
+
+        Usa CSS outline (não border) para não alterar layout.
+        Inclui animação de pulse/glow para chamar atenção do analista.
+        O highlight é removido quando o overlay é dispensado.
+        """
+        if not selector:
+            return
+        try:
+            await page.evaluate(_JS_HIGHLIGHT_STEP_ELEMENT, {
+                "selector": selector,
+                "success": success,
+            })
+        except Exception as e:
+            # Falha no highlight não deve interromper o fluxo
+            logger.debug(f"[STEP] Highlight falhou para '{selector}': {e}")
+
+    async def _remove_step_highlight(self, page: Page) -> None:
+        """Remove o highlight do elemento step-by-step."""
+        try:
+            await page.evaluate(_JS_REMOVE_STEP_HIGHLIGHT)
+        except Exception:
+            pass  # Falha na remoção não é crítica
+
+    # ─── Step-by-step: overlay e decisão após cada ação ───────────────────────
+
+    async def _mostrar_overlay_step(
+        self,
+        page: Page,
+        passo: dict | None,
+        acao_tec: dict,
+        resultado: bool,
+        camada: str = "",
+    ) -> None:
+        """
+        Exibe overlay minimalista step-by-step após executar uma ação.
+        Mostra progresso (Passo X/Y — Ação Z/W), descrição da ação,
+        camada que acertou e botões de decisão.
+        Injeta HTML/CSS no browser via page.evaluate().
+        """
+        # Calcular progresso
+        passo_atual = (self._current_step_index or 0) + 1
+        passo_total = self._total_steps or 1
+
+        # Calcular ação atual dentro do passo
+        acoes = (passo or {}).get("acoes_tecnicas", [])
+        acao_total = len(acoes) if acoes else 1
+        # Determinar índice da ação atual dentro do passo
+        acao_atual = 1
+        intencao_atual = acao_tec.get("intencao_semantica", "")
+        for i, a in enumerate(acoes):
+            if a.get("intencao_semantica") == intencao_atual:
+                acao_atual = i + 1
+                break
+
+        # Montar descrição
+        alvo = acao_tec.get("elemento_alvo", {})
+        label = alvo.get("label_curto", "")
+        acao_tipo = acao_tec.get("acao", "clique")
+        intencao = acao_tec.get("intencao_semantica", "")[:60]
+        descricao = f'"{acao_tipo} → {label}"' if label else f'"{intencao}"'
+
+        # Camada que acertou (ex: "via Brain", "via Sniper")
+        camada_display = camada if camada else "—"
+
+        # Destacar elemento clicado (verde=sucesso, vermelho=falha)
+        seletor_highlight = alvo.get("seletor_hint", "") or alvo.get("seletor_css", "")
+        if seletor_highlight:
+            await self._highlight_element(page, seletor_highlight, resultado)
+
+        # Remover overlay anterior e injetar novo
+        await page.evaluate(_JS_REMOVE_STEP_OVERLAY)
+        await page.evaluate(_JS_STEP_OVERLAY, {
+            "passoAtual": passo_atual,
+            "passoTotal": passo_total,
+            "acaoAtual": acao_atual,
+            "acaoTotal": acao_total,
+            "descricao": descricao,
+            "sucesso": resultado,
+            "camada": camada_display,
+        })
+
+        logger.info(
+            f"[STEP] {'✅' if resultado else '❌'} {acao_tipo} → {label} "
+            f"| Passo {passo_atual}/{passo_total} Ação {acao_atual}/{acao_total} "
+            f"| via {camada_display}"
+        )
+
+    async def _aguardar_decisao_step(self, timeout: int = 300) -> str:
+        """
+        Aguarda decisão do analista no overlay step-by-step.
+        Retorna uma string indicando a ação escolhida:
+          'ok'       — avançar (ação validada)
+          'corrigir' — ativar radar para corrigir seletor
+          'auto_N'   — ativar modo auto para N ações
+          'pular'    — pular sem registrar
+
+        Espera pelo evento __hitl_captura__ com payload step_*.
+        """
+        self._evento_humano.clear()
+        self._decisao_humana = {}
+
+        try:
+            await asyncio.wait_for(self._evento_humano.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            logger.warning(f"[STEP] Timeout de {timeout}s — auto-aprovando ação")
+            return "ok"
+
+        acao = self._decisao_humana.get("acao", "")
+
+        # Mapear ações do overlay step-by-step
+        if acao == "step_ok":
+            return "ok"
+        elif acao == "step_corrigir":
+            return "corrigir"
+        elif acao.startswith("step_auto_"):
+            # Extrai N de "step_auto_5"
+            try:
+                n = int(acao.replace("step_auto_", ""))
+                return f"auto_{n}"
+            except ValueError:
+                return "auto_5"
+        elif acao == "step_pular":
+            return "pular"
+        else:
+            # Compatibilidade com outros payloads
+            return "ok"
+
+    async def _ativar_radar_step(self, page: Page) -> str:
+        """
+        Ativa o radar para o analista clicar no elemento correto.
+        Retorna o seletor capturado ou string vazia se timeout/cancelado.
+
+        Fluxo:
+        1. Injeta JS do radar em TODOS os frames (main + iframes)
+        2. Mostra indicador visual "Radar ativo — clique no elemento correto"
+        3. Aguarda clique do analista (capturado via __hitl_captura__ binding)
+        4. Retorna o seletor capturado
+
+        IMPORTANTE: Senior X usa iframes extensivamente. O listener de clique
+        precisa ser injetado em cada frame, não só no principal.
+        """
+        logger.info("[STEP] Radar step ativado — aguardando clique do analista")
+
+        # Limpa estado anterior de captura
+        self._captura_seletor = ""
+        self._evento_humano.clear()
+        self._decisao_humana = {}
+
+        # 1. Mostra indicador visual no frame principal (overlay está lá)
+        # Injeta CSS de animação primeiro
+        await page.evaluate("""() => {
+            if (!document.getElementById('hitl-radar-pulse-style')) {
+                const st = document.createElement('style');
+                st.id = 'hitl-radar-pulse-style';
+                st.innerHTML = `
+                    @keyframes hitl-radar-pulse {
+                        0%,100% { opacity:1; } 50% { opacity:0.5; }
+                    }
+                    .hitl-radar-pulse-dot {
+                        display:inline-block; width:8px; height:8px;
+                        background:#ef4444; border-radius:50%;
+                        animation: hitl-radar-pulse 1.2s ease infinite;
+                    }
+                `;
+                document.head.appendChild(st);
+            }
+        }""")
+
+        # Agora injeta o indicador visual
+        await page.evaluate("""() => {
+            const overlay = document.getElementById('hitl-step-overlay');
+            if (!overlay) return;
+            
+            let radarMsg = document.getElementById('hitl-step-radar-msg');
+            if (!radarMsg) {
+                radarMsg = document.createElement('div');
+                radarMsg.id = 'hitl-step-radar-msg';
+                radarMsg.style.cssText = 'margin-top:8px;padding:8px 12px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:8px;text-align:center;color:#fca5a5;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;';
+                overlay.appendChild(radarMsg);
+            }
+            
+            radarMsg.innerHTML = '<span class="hitl-radar-pulse-dot"></span>'
+                + '<span id="hitl-radar-text">Radar ativo — clique no elemento correto</span>'
+                + '<span id="hitl-radar-countdown" style="font-weight:700;color:#f87171;">⏱ 120s</span>'
+                + '<button id="hitl-radar-cancel-btn" style="margin-left:8px;padding:4px 10px;border:1px solid rgba(239,68,68,0.5);border-radius:6px;background:rgba(239,68,68,0.2);color:#fca5a5;font-size:11px;font-weight:600;cursor:pointer;">❌ Cancelar</button>';
+            radarMsg.style.display = 'flex';
+            
+            // Cancel button handler
+            const cancelBtn = document.getElementById('hitl-radar-cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (window.__hitlRadarCountdownId) {
+                        clearInterval(window.__hitlRadarCountdownId);
+                        window.__hitlRadarCountdownId = null;
+                    }
+                    radarMsg.style.display = 'none';
+                    if (window.__hitl_captura__) {
+                        window.__hitl_captura__(JSON.stringify({ seletor: '', acao: 'radar_cancelado' }));
+                    }
+                };
+            }
+        }""")
+
+        # Countdown timer no frame principal (120s → 0)
+        await page.evaluate("""() => {
+            if (window.__hitlRadarCountdownId) clearInterval(window.__hitlRadarCountdownId);
+            let remaining = 120;
+            window.__hitlRadarCountdownId = setInterval(() => {
+                remaining--;
+                const countdownEl = document.getElementById('hitl-radar-countdown');
+                if (countdownEl) countdownEl.textContent = '⏱ ' + remaining + 's';
+                if (remaining <= 0) {
+                    clearInterval(window.__hitlRadarCountdownId);
+                    window.__hitlRadarCountdownId = null;
+                    const radarMsg = document.getElementById('hitl-step-radar-msg');
+                    if (radarMsg) radarMsg.style.display = 'none';
+                    if (window.__hitl_captura__) {
+                        window.__hitl_captura__(JSON.stringify({ seletor: '', acao: 'radar_cancelado' }));
+                    }
+                }
+            }, 1000);
+        }""")
+
+        # 2. Injeta listener de clique em TODOS os frames (main + iframes)
+        # IMPORTANTE: iframes não têm acesso ao binding expose_binding do contexto principal
+        # Solução: usar postMessage para comunicar do iframe com o frame principal
+        _radar_js = f"""() => {{
+            if (window.__hitlRadarStepAtivo) return;
+            window.__hitlRadarStepAtivo = true;
+
+            const getSelector = {_JS_GET_BEST_SELECTOR};
+
+            const handler = (e) => {{
+                // Não captura cliques nos overlays (só existem no frame principal)
+                if (e.target.closest('#hitl-step-overlay')) return;
+                if (e.target.closest('#hitl-overlay')) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                window.__hitlRadarStepAtivo = false;
+                document.removeEventListener('click', handler, true);
+
+                const seletor = getSelector(e.target);
+                const label   = e.target.innerText?.trim()?.substring(0, 60)
+                              || e.target.getAttribute('aria-label')
+                              || e.target.tagName.toLowerCase();
+
+                // Feedback visual imediato (cyan outline)
+                const prev = e.target.style.outline;
+                e.target.style.outline = '3px solid #00e5e5';
+                e.target.style.boxShadow = '0 0 16px #00e5e588';
+                setTimeout(() => {{
+                    e.target.style.outline = prev;
+                    e.target.style.boxShadow = '';
+                }}, 1200);
+
+                // Se estamos em um iframe, usa postMessage para comunicar com o frame principal
+                if (window.self !== window.top) {{
+                    window.top.postMessage({{
+                        type: '__hitl_radar_captura__',
+                        seletor: seletor,
+                        label: label
+                    }}, '*');
+                }} else {{
+                    // Frame principal — chama binding diretamente
+                    if (window.__hitl_captura__) {{
+                        window.__hitl_captura__(JSON.stringify({{ seletor, label }}));
+                    }}
+                }}
+            }};
+
+            document.addEventListener('click', handler, true);
+        }}"""
+
+        # Injeta no frame principal
+        try:
+            await page.evaluate(_radar_js)
+        except Exception as e:
+            logger.debug(f"[STEP] Radar inject main frame: {e}")
+
+        # Injeta em todos os iframes da página
+        for frame in page.frames:
+            if frame == page.main_frame:
+                continue
+            try:
+                await frame.evaluate(_radar_js)
+            except Exception as e:
+                logger.debug(f"[STEP] Radar inject iframe '{frame.url[:60]}': {e}")
+
+        # 3. Setup listener para postMessage (captura cliques de iframes)
+        await page.evaluate("""() => {
+            if (window.__hitlRadarPostMessageSetup) return;
+            window.__hitlRadarPostMessageSetup = true;
+
+            window.addEventListener('message', (e) => {
+                if (e.data && e.data.type === '__hitl_radar_captura__') {
+                    // Clique capturado em um iframe — repassa para o binding
+                    if (window.__hitl_captura__) {
+                        window.__hitl_captura__(JSON.stringify({
+                            seletor: e.data.seletor,
+                            label: e.data.label
+                        }));
+                    }
+                }
+            }, false);
+        }""")
+
+        # Aguarda captura do clique (timeout de 120s — analista pode precisar navegar)
+        try:
+            await asyncio.wait_for(self._evento_humano.wait(), timeout=120)
+        except asyncio.TimeoutError:
+            logger.warning("[STEP] Timeout de 120s no radar step — cancelando captura")
+            # Desativa radar em todos os frames + limpa countdown
+            _cleanup_js = """() => {
+                window.__hitlRadarStepAtivo = false;
+                if (window.__hitlRadarCountdownId) {
+                    clearInterval(window.__hitlRadarCountdownId);
+                    window.__hitlRadarCountdownId = null;
+                }
+                const radarMsg = document.getElementById('hitl-step-radar-msg');
+                if (radarMsg) radarMsg.style.display = 'none';
+            }"""
+            try:
+                await page.evaluate(_cleanup_js)
+            except Exception:
+                pass
+            for frame in page.frames:
+                if frame == page.main_frame:
+                    continue
+                try:
+                    await frame.evaluate("() => { window.__hitlRadarStepAtivo = false; }")
+                except Exception:
+                    pass
+            return ""
+
+        # Check if radar was cancelled by the analyst
+        if self._decisao_humana.get("acao") == "radar_cancelado":
+            logger.info("[STEP] Radar cancelado pelo analista")
+            # Limpa flag nos iframes
+            for frame in page.frames:
+                if frame == page.main_frame:
+                    continue
+                try:
+                    await frame.evaluate("() => { window.__hitlRadarStepAtivo = false; }")
+                except Exception:
+                    pass
+            return ""
+
+        # Extrai seletor capturado
+        seletor_capturado = self._decisao_humana.get("seletor", "")
+        if not seletor_capturado:
+            logger.warning("[STEP] Radar: nenhum seletor foi capturado")
+            return ""
+
+        logger.info(f"[STEP] Seletor capturado via radar: {seletor_capturado}")
+
+        # Limpa countdown no frame principal após captura bem-sucedida
+        try:
+            await page.evaluate("""() => {
+                if (window.__hitlRadarCountdownId) {
+                    clearInterval(window.__hitlRadarCountdownId);
+                    window.__hitlRadarCountdownId = null;
+                }
+                const radarMsg = document.getElementById('hitl-step-radar-msg');
+                if (radarMsg) {
+                    radarMsg.style.background = 'rgba(34,197,94,0.15)';
+                    radarMsg.style.borderColor = 'rgba(34,197,94,0.4)';
+                    const textEl = document.getElementById('hitl-radar-text');
+                    if (textEl) textEl.textContent = '✅ Seletor capturado!';
+                    const countdownEl = document.getElementById('hitl-radar-countdown');
+                    if (countdownEl) countdownEl.style.display = 'none';
+                    const cancelBtn = document.getElementById('hitl-radar-cancel-btn');
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                }
+            }""")
+        except Exception:
+            pass
+
+        # Desativa radar em todos os frames
+        for frame in page.frames:
+            try:
+                await frame.evaluate("() => { window.__hitlRadarStepAtivo = false; }")
+            except Exception:
+                pass
+
+        return seletor_capturado
 
     # ─── Pausa 🟡 PREVENTIVA (baixa confiança antes de clicar) ───────────────
 
@@ -1328,6 +2181,7 @@ class HitlValidator:
         """
         Persiste o seletor ensinado pelo analista no Brain DB e atualiza score_engine.
         Na próxima execução, o sistema vai direto nele (alta confiança).
+        Marca com hitl_corrigido=1 para proteger contra invalidação automática.
         """
         if not seletor_capturado:
             return
@@ -1335,9 +2189,11 @@ class HitlValidator:
         alvo     = acao_tec.get("elemento_alvo", {})
         iframe   = alvo.get("iframe_hint")
         if intencao:
-            # Atualiza brain.db — seletor aprendido pelo analista
-            _registrar_sucesso_cache(intencao, seletor=seletor_capturado, iframe=iframe)
-            logger.info(f"Brain atualizado: '{intencao[:60]}' → '{seletor_capturado}'")
+            # Atualiza brain.db — seletor aprendido pelo analista com hitl_corrigido=1
+            _registrar_sucesso_cache(
+                intencao, seletor=seletor_capturado, iframe=iframe, hitl_corrigido=True
+            )
+            logger.info(f"Brain atualizado (hitl_corrigido=1): '{intencao[:60]}' → '{seletor_capturado}'")
 
             # Atualiza scores.db — correção HITL equivale a execução bem-sucedida
             # com confiança máxima (analista confirmou o elemento correto)
@@ -1350,7 +2206,7 @@ class HitlValidator:
             except Exception as e:
                 logger.warning(f"score_engine não atualizado (não crítico): {e}")
 
-            self._stats["passos_corrigidos"] += 1
+            self._stats["correcoes_salvas"] += 1
             # Guarda também no mapa in-memory para reescrita do JSON
             self._correcoes_seletores[intencao] = seletor_capturado
 
@@ -1395,7 +2251,7 @@ class HitlValidator:
             await asyncio.sleep(2.0)
 
             # Re-injeta o botão de pausa após login (página foi recarregada)
-            if self._floating_pause_button:
+            if self._floating_pause_button and getattr(self, "_silent", False):
                 await self._floating_pause_button.show_pause_button()
 
             print("✅ Login OK.", flush=True)
@@ -1409,7 +2265,7 @@ class HitlValidator:
                 await asyncio.sleep(3.0)
 
                 # Re-injeta o botão de pausa após login manual
-                if self._floating_pause_button:
+                if self._floating_pause_button and getattr(self, "_silent", False):
                     await self._floating_pause_button.show_pause_button()
 
                 return True
@@ -1425,11 +2281,17 @@ class HitlValidator:
         acao_tec: dict,
         passo_anterior: dict | None = None,
         desvio_anterior: bool = False,
+        passo: dict | None = None,
     ) -> str:
         """
         Tenta executar uma ação usando vision_engine.
+        Modo step-by-step: pausa APÓS cada ação para o analista validar.
         Se confiança baixa → pausa preventiva (exceto em modo --silent).
         Se falha total → pausa falha dura com opções de navegação e refazer.
+
+        O modo auto (_modo_auto_restante > 0) permite pular N pausas
+        consecutivas quando o analista confia no fluxo. Se uma ação falha
+        durante modo auto, volta automaticamente para step-by-step.
 
         Retorna:
           'ok'            — ação executada com sucesso
@@ -1471,6 +2333,11 @@ class HitlValidator:
 
         # ── 🔴 Falha dura — todas as camadas esgotadas ───────────────────────
         if not sucesso:
+            # Se estava em modo auto, falha força volta ao step-by-step
+            if self._modo_auto_restante > 0:
+                self._modo_auto_restante = 0
+                logger.info("Falha em modo auto → voltando para step-by-step")
+
             resposta = await self._pausa_falha_dura(
                 page,
                 acao_tec,
@@ -1493,7 +2360,54 @@ class HitlValidator:
                 acao_corrigida["elemento_alvo"]["seletor_hint"] = self._captura_seletor
                 sucesso = await encontrar_e_clicar(page, acao_corrigida)
 
-        return "ok" if sucesso else "pulou"
+            return "ok" if sucesso else "pulou"
+
+        # ── Step-by-step: pausa após cada ação bem-sucedida ──────────────────
+        # Em modo --silent, não pausa (comportamento legado)
+        if not silent:
+            if self._modo_auto_restante > 0:
+                # Modo auto: decrementa e avança sem pausa
+                self._modo_auto_restante -= 1
+            else:
+                # Step-by-step (padrão): mostra overlay e aguarda decisão
+                camada_vencedora = obter_ultima_camada_vencedora() if sucesso else "—"
+                await self._mostrar_overlay_step(page, passo, acao_tec, sucesso, camada=camada_vencedora)
+                decisao = await self._aguardar_decisao_step()
+
+                # Remove overlay e highlight após decisão
+                # (exceto "corrigir" — o radar precisa do overlay para mostrar o cronômetro)
+                if decisao != "corrigir":
+                    await page.evaluate(_JS_REMOVE_STEP_OVERLAY)
+                await self._remove_step_highlight(page)
+
+                if decisao == "ok":
+                    # Reforçar memória no Brain — analista confirmou que ação está correta
+                    intencao = acao_tec.get("intencao_semantica", "")
+                    if intencao:
+                        _registrar_sucesso_cache(intencao)
+                elif decisao == "corrigir":
+                    seletor_corrigido = await self._ativar_radar_step(page)
+                    # Agora sim remove o overlay (radar já terminou)
+                    await page.evaluate(_JS_REMOVE_STEP_OVERLAY)
+                    if seletor_corrigido:
+                        self._salvar_correcao_no_brain(acao_tec, seletor_corrigido)
+                        # Executa o clique com o seletor corrigido — o analista
+                        # apontou o elemento certo, então o sistema deve clicar nele
+                        # imediatamente (sem precisar que o analista clique de novo)
+                        acao_corrigida = dict(acao_tec)
+                        if "elemento_alvo" not in acao_corrigida:
+                            acao_corrigida["elemento_alvo"] = {}
+                        acao_corrigida["elemento_alvo"]["seletor_hint"] = seletor_corrigido
+                        await encontrar_e_clicar(page, acao_corrigida)
+                elif decisao.startswith("auto_"):
+                    try:
+                        self._modo_auto_restante = int(decisao.split("_")[1])
+                    except (IndexError, ValueError):
+                        self._modo_auto_restante = 5  # fallback padrão
+                elif decisao == "pular":
+                    pass  # avança sem registrar sucesso
+
+        return "ok"
 
     # ─── Executar um passo completo com checkpoint ────────────────────────────
 
@@ -1522,7 +2436,7 @@ class HitlValidator:
 
         if is_fim:
             print(f"   [CONCLUSÃO] {ancora[:80]}", flush=True)
-            self._stats["passos_ok"] += 1
+            self._stats["passos_executados"] += 1
             self._desvio_anterior = False
             return "ok"
 
@@ -1534,6 +2448,7 @@ class HitlValidator:
                 acao_tec,
                 passo_anterior=self._passo_anterior,
                 desvio_anterior=self._desvio_anterior,
+                passo=passo,
             )
             label  = acao_tec.get("elemento_alvo", {}).get("label_curto", "?")
             status = "✅" if resultado == "ok" else ("↩" if resultado == "refazer_passo" else "⏭")
@@ -1551,8 +2466,10 @@ class HitlValidator:
             return "refazer_passo"
 
         # ── 🟠 Checkpoint: valida estado após o passo ─────────────────────────
-        # Em modo --silent, checkpoints são ignorados
-        if CHECKPOINT_HABILITADO and tooltip and not getattr(self, "_silent", False):
+        # Checkpoint só roda em modo --silent (auto-play).
+        # Em step-by-step o analista já valida cada ação individualmente.
+        silent = getattr(self, "_silent", False)
+        if CHECKPOINT_HABILITADO and tooltip and silent:
             # Extrai screenshot de referência da última ação do passo
             screenshot_ref = None
             for acao_tec in reversed(acoes):
@@ -1574,7 +2491,7 @@ class HitlValidator:
                     print(f"   ↩ Refazendo passo {id_p}...", flush=True)
                     self._desvio_anterior = False  # refazendo — limpa flag
                     for acao_tec in acoes:
-                        await self._executar_acao_com_hitl(page, acao_tec)
+                        await self._executar_acao_com_hitl(page, acao_tec, passo=passo)
                         await asyncio.sleep(0.6)
                     # Após refazer, limpa desvio
                     self._desvio_anterior = False
@@ -1588,27 +2505,76 @@ class HitlValidator:
             # Sem checkpoint — limpa flag de desvio
             self._desvio_anterior = False
 
-        self._stats["passos_ok"] += 1
+        self._stats["passos_executados"] += 1
         return "ok"
 
     # ─── Ponto de entrada principal ───────────────────────────────────────────
 
 
-    async def _exibir_relatorio_final(self) -> None:
-        """Exibe relatório final com estatísticas atualizadas."""
+    async def _exibir_relatorio_final(self, page: Page = None) -> str:
+        """
+        Exibe relatório final com estatísticas atualizadas.
+        Se page está disponível, injeta overlay no browser e aguarda decisão.
+        Retorna: 'gravar' ou 'fechar' (decisão do analista).
+        """
+        total = self._stats["passos_executados"]
+        correcoes = self._stats["correcoes_salvas"]
+        puladas = self._stats["acoes_puladas"]
+
+        # Calcular taxa de acerto: (total - correções - puladas) / total * 100
+        if total > 0:
+            taxa_acerto = round(((total - correcoes - puladas) / total) * 100, 1)
+        else:
+            taxa_acerto = 0.0
+
+        # Relatório no terminal
         print(f"\n{'═'*55}", flush=True)
         print("  RELATÓRIO HITL", flush=True)
         print(f"{'═'*55}", flush=True)
-        print(f"  Passos executados:     {self._stats['passos_executados']}", flush=True)
+        print(f"  Ações executadas:      {total}", flush=True)
+        print(f"  Correções feitas:      {correcoes}", flush=True)
+        print(f"  Ações puladas:         {puladas}", flush=True)
+        print(f"  Taxa de acerto:        {taxa_acerto}%", flush=True)
         print(f"  Passos com erro:       {self._stats['passos_com_erro']}", flush=True)
-        print(f"  Correções salvas:      {self._stats['correcoes_salvas']}", flush=True)
-        print(f"  Pausas manuais:        {self._stats['pausas_manuais']}", flush=True)
-        print(f"  Pausas automáticas:    {self._stats['pausas_automaticas']}", flush=True)
         print(f"{'═'*55}\n", flush=True)
 
-        if self._stats["correcoes_salvas"] > 0:
-            print(f"✅ {self._stats['correcoes_salvas']} correção(ões) salvas no Brain.", flush=True)
+        if correcoes > 0:
+            print(f"✅ {correcoes} correção(ões) salvas no Brain.", flush=True)
             print("   Próxima execução vai acertar sem precisar de ajuda.", flush=True)
+
+        # Overlay no browser (se page disponível)
+        decisao = "fechar"
+        if page:
+            try:
+                # Remove overlays anteriores (step, pause button)
+                await page.evaluate(_JS_REMOVE_STEP_OVERLAY)
+                await page.evaluate(_JS_REMOVE_STEP_HIGHLIGHT)
+
+                # Injeta overlay de relatório final
+                await page.evaluate(_JS_RELATORIO_FINAL, {
+                    "totalAcoes": total,
+                    "correcoes": correcoes,
+                    "acoesPuladas": puladas,
+                    "taxaAcerto": taxa_acerto,
+                })
+
+                # Aguarda decisão do analista (Gravar ou Fechar)
+                logger.info("[HITL] Relatório final exibido. Aguardando decisão do analista...")
+                resultado = await self._aguardar_decisao(timeout=300)  # 5 min timeout
+                acao = resultado.get("acao", "")
+
+                if acao == "relatorio_gravar":
+                    decisao = "gravar"
+                    print("🎬 Analista escolheu: Gravar agora", flush=True)
+                else:
+                    decisao = "fechar"
+                    print("✖ Analista escolheu: Fechar sem gravar", flush=True)
+
+            except Exception as e:
+                logger.warning(f"Overlay de relatório falhou (não crítico): {e}")
+                decisao = "fechar"
+
+        return decisao
 
     async def _marcar_hitl_validado(self, caminho_json: str) -> None:
         """Marca o roteiro como HITL validado no dashboard."""
@@ -1630,6 +2596,7 @@ class HitlValidator:
         """
         Persiste o seletor ensinado pelo analista no Brain DB e atualiza score_engine.
         Na próxima execução, o sistema vai direto nele (alta confiança).
+        Marca com hitl_corrigido=1 para proteger contra invalidação automática.
         """
         if not seletor_capturado:
             return
@@ -1637,9 +2604,11 @@ class HitlValidator:
         alvo     = acao_tec.get("elemento_alvo", {})
         iframe   = alvo.get("iframe_hint")
         if intencao:
-            # Atualiza brain.db — seletor aprendido pelo analista
-            _registrar_sucesso_cache(intencao, seletor=seletor_capturado, iframe=iframe)
-            logger.info(f"Brain atualizado: '{intencao[:60]}' → '{seletor_capturado}'")
+            # Atualiza brain.db — seletor aprendido pelo analista com hitl_corrigido=1
+            _registrar_sucesso_cache(
+                intencao, seletor=seletor_capturado, iframe=iframe, hitl_corrigido=True
+            )
+            logger.info(f"Brain atualizado (hitl_corrigido=1): '{intencao[:60]}' → '{seletor_capturado}'")
 
             # Atualiza scores.db — correção HITL equivale a execução bem-sucedida
             # com confiança máxima (analista confirmou o elemento correto)
@@ -1708,10 +2677,26 @@ class HitlValidator:
               flush=True)
 
         async with async_playwright() as pw:
+            # ── Detecta monitor auxiliar (mesmo padrão do main.py) ───────────
+            _window_x, _window_y = 0, 0
+            try:
+                from screeninfo import get_monitors
+                monitores = get_monitors()
+                monitor_aux = next((m for m in monitores if not m.is_primary), None)
+                if monitor_aux:
+                    _window_x = monitor_aux.x
+                    _window_y = monitor_aux.y
+                    print(f"[Monitor] Usando monitor auxiliar: {monitor_aux.name} {monitor_aux.width}x{monitor_aux.height} pos=({_window_x},{_window_y})", flush=True)
+                else:
+                    print("[Monitor] Monitor auxiliar não encontrado — usando monitor primário.", flush=True)
+            except Exception as e:
+                print(f"[Monitor] screeninfo falhou ({e}) — usando posição padrão.", flush=True)
+
             browser = await pw.chromium.launch(
                 headless=False,
                 args=[
-                    "--start-fullscreen",
+                    "--start-maximized",
+                    f"--window-position={_window_x},{_window_y}",
                     "--disable-infobars",
                     "--disable-features=Translate",
                     "--lang=pt-BR",
@@ -1719,8 +2704,33 @@ class HitlValidator:
                     "--no-default-browser-check",
                 ],
             )
-            context = await browser.new_context(no_viewport=True, locale="pt-BR")
+            context = await browser.new_context(
+                no_viewport=True,
+                locale="pt-BR",
+                bypass_csp=True,           # necessário para injetar JS em páginas com CSP restritivo
+                ignore_https_errors=True,  # evita falhas em ambientes com certificados self-signed
+            )
             page    = await context.new_page()
+
+            # ── Maximiza via CDP no monitor correto ──────────────────────────
+            # --start-maximized + --window-position falha no Windows em monitores
+            # não-primários. CDP Browser.setWindowBounds é a forma confiável.
+            try:
+                cdp = await context.new_cdp_session(page)
+                wid_resp = await cdp.send("Browser.getWindowForTarget")
+                window_id = wid_resp["windowId"]
+                await cdp.send("Browser.setWindowBounds", {
+                    "windowId": window_id,
+                    "bounds": {
+                        "left":        _window_x,
+                        "top":         _window_y,
+                        "windowState": "maximized",
+                    },
+                })
+                await cdp.detach()
+                print("[Monitor] Janela maximizada via CDP.", flush=True)
+            except Exception as e:
+                print(f"[Monitor] CDP maximize falhou ({e}) — continuando.", flush=True)
 
             # Instala cursor humanizado (visual de depuração)
             try:
@@ -1735,6 +2745,28 @@ class HitlValidator:
             # Configura listener para re-injetar botão após navegações de página
             await self._setup_persistent_pause_button(page)
 
+            # Re-injeta o binding __hitl_captura__ em novos frames dinamicamente
+            # (modais PrimeNG, menus de contexto, iframes carregados após o login)
+            # Mesmo padrão do capture_dual_output: frameattached + framenavigated
+            async def _reinjetar_binding_em_frame(frame):
+                """Garante que o binding está disponível em frames novos/navegados."""
+                for _ in range(3):  # até 3 tentativas com delay crescente
+                    try:
+                        if frame.is_detached():
+                            return
+                        await asyncio.sleep(0.15)
+                        if frame.is_detached():
+                            return
+                        # O expose_binding já foi registrado no context — só precisa
+                        # garantir que o frame não está em estado inválido
+                        await frame.evaluate("() => true")
+                        return
+                    except Exception:
+                        await asyncio.sleep(0.3)
+
+            page.on("frameattached",  lambda f: asyncio.create_task(_reinjetar_binding_em_frame(f)))
+            page.on("framenavigated", lambda f: asyncio.create_task(_reinjetar_binding_em_frame(f)))
+
             # Login
             ok = await self._fazer_login(page)
             if not ok:
@@ -1744,14 +2776,21 @@ class HitlValidator:
             await page.keyboard.press("Escape")
             await asyncio.sleep(0.3)
 
-            # NOVO: Execução com auto-play e controle de pausas
-            await self._execute_with_auto_play(page, passos)
+            # Execução: step-by-step (padrão) ou auto-play (--silent)
+            if silent:
+                # Modo silencioso: auto-play, só pausa em falha dura
+                await self._execute_with_auto_play(page, passos)
+            else:
+                # Modo padrão: step-by-step, pausa após cada ação
+                await self._execute_step_by_step(page, passos, total)
 
-            await asyncio.sleep(2.0)
+            await asyncio.sleep(1.0)
+
+            # Relatório final com overlay no browser (antes de fechar)
+            self._decisao_relatorio = await self._exibir_relatorio_final(page)
+
+            await asyncio.sleep(0.5)
             await browser.close()
-
-        # Relatório final (atualizado)
-        await self._exibir_relatorio_final()
 
         # Reescreve o roteiro JSON com os seletores corrigidos pelo analista
         if self._stats["correcoes_salvas"] > 0:
@@ -1762,9 +2801,44 @@ class HitlValidator:
         # Marca o roteiro como hitl_validado no servidor
         await self._marcar_hitl_validado(caminho_json)
 
+        # Dispara gravação se o analista escolheu "🎬 Gravar agora"
+        if self._decisao_relatorio == "gravar":
+            print("🎬 Iniciando gravação...", flush=True)
+            subprocess.Popen([sys.executable, "main.py", caminho_json, "--record"])
+
+    async def _execute_step_by_step(self, page: Page, passos: list[dict], total: int) -> None:
+        """
+        Loop principal step-by-step (PADRÃO).
+        Executa uma ação por vez, pausa após cada uma para o analista validar.
+        Usa _executar_passo → _executar_acao_com_hitl que respeita _modo_auto_restante.
+        """
+        idx = 0
+        while idx < len(passos):
+            passo = passos[idx]
+            self._current_step_index = idx
+            self._passo_anterior = passos[idx - 1] if idx > 0 else None
+
+            resultado = await self._executar_passo(page, passo, idx, total)
+
+            if resultado == "refazer_passo" and idx > 0:
+                # Volta ao passo anterior para corrigir a causa raiz
+                idx_refazer = idx - 1
+                passo_ant = passos[idx_refazer]
+                id_ant = passo_ant.get("id_passo", idx_refazer + 1)
+                print(f"\n   ↩ Refazendo passo {id_ant} (causa raiz)...", flush=True)
+                self._passo_anterior = passos[idx_refazer - 1] if idx_refazer > 0 else None
+                self._desvio_anterior = False
+                await self._executar_passo(page, passo_ant, idx_refazer, total)
+                await asyncio.sleep(0.8)
+                # Após refazer o anterior, tenta o passo atual novamente
+                self._passo_anterior = passo_ant
+            else:
+                idx += 1
+
     async def _execute_with_auto_play(self, page: Page, passos: list[dict]) -> None:
         """
-        Novo loop principal com auto-play por padrão e controle de pausas.
+        Loop auto-play (usado apenas em modo --silent).
+        Executa sem pausas, só para em falhas reais.
         """
         idx = 0
         while idx < len(passos):

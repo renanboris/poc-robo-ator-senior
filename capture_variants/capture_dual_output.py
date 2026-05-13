@@ -191,370 +191,127 @@ Analise o screenshot e responda com um JSON:
 
 
 async def _injetar_em_contexto(contexto):
-    script_radar = """() => {
-        if (window.__radarInjetado) return;
-        window.__radarInjetado = true;
-
-        if (window === window.top && !document.getElementById('senior-rec-widget')) {
-            const recWidget = document.createElement('div');
-            recWidget.id = 'senior-rec-widget';
-            recWidget.style.cssText = 'position:fixed;bottom:30px;right:30px;background:rgba(15,23,42,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:100px;padding:10px 20px;display:flex;align-items:center;gap:10px;z-index:2147483647;font-family:Segoe UI,sans-serif;box-shadow:0 10px 25px rgba(0,0,0,0.5);pointer-events:none;';
-            recWidget.innerHTML = '<div style="width:12px;height:12px;background:#ef4444;border-radius:50%;animation:pulse-red 1.5s infinite;"></div><div style="color:white;font-size:13px;font-weight:bold;letter-spacing:1px;">MAPEAMENTO ATIVO</div>';
-            if (!document.getElementById('senior-rec-styles')) {
-                const st = document.createElement('style'); st.id = 'senior-rec-styles';
-                st.innerHTML = '@keyframes pulse-red{0%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(239,68,68,0.7)}70%{transform:scale(1);box-shadow:0 0 0 10px rgba(239,68,68,0)}100%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(239,68,68,0)}}';
-                document.head.appendChild(st);
-            }
-            document.documentElement.appendChild(recWidget);
-        }
-
-        const getElementName = (el) => {
-            // HACK: textContent no lugar de innerText para varrer o DOM invisivel do Angular
-            const isCheckbox = el.closest('p-checkbox, mat-checkbox, [type="checkbox"], .ui-chkbox');
-            if (isCheckbox) {
-                const parentRow = el.closest('tr, item, li, .ui-g, .list-item, .row');
-                if (parentRow) {
-                    let text = parentRow.textContent || '';
-                    text = text.replace(/\\s+/g, ' ').trim();
-                    if (text.length > 2) {
-                        return `Checkbox de: ${text.substring(0, 40)}`;
-                    }
-                }
-                return 'Caixa de selecao Angular';
-            }
-
-            // Itens de menu de contexto (ngx-contextmenu, CDK overlay)
-            // O clique pode cair no <em> (ícone) dentro do <a> ou <li> do menu.
-            // Sobe para o item do menu e pega o texto visível.
-            const menuItem = el.closest('.ngx-contextmenu li, [class*="contextmenu"] li, .cdk-overlay-pane li, .dropdown-menu li');
-            if (menuItem) {
-                // Pega apenas o texto, ignorando ícones (<em>, <i>, <svg>)
-                const textoMenu = Array.from(menuItem.childNodes)
-                    .filter(n => n.nodeType === Node.TEXT_NODE || (n.nodeType === Node.ELEMENT_NODE && !['EM','I','SVG','SPAN'].includes(n.tagName)))
-                    .map(n => (n.textContent || '').trim())
-                    .join(' ').replace(/\\s+/g, ' ').trim();
-                if (textoMenu && textoMenu.length > 1) return textoMenu;
-                // Fallback: innerText do item inteiro sem ícones
-                const textoFull = (menuItem.innerText || menuItem.textContent || '').replace(/\\s+/g, ' ').trim();
-                if (textoFull && textoFull.length > 1 && textoFull.length < 60) return textoFull;
-            }
-            const tag = el.tagName.toLowerCase();
-            const isEditable = tag === 'input' || tag === 'textarea' || el.getAttribute('contenteditable') === 'true';
-            if (isEditable) {
-                // Filtra atributos Angular não resolvidos (name="undefined", placeholder="undefined")
-                const clean = (v) => (v && v !== 'undefined' && v !== 'null') ? v : '';
-                return clean(el.placeholder) || clean(el.name) || clean(el.title) || 'Campo de entrada';
-            }
-            const text = el.innerText?.trim().replace(/\\n/g, ' ') || '';
-            if (text && text.length > 0 && text.length < 100 && text !== 'undefined') return text;
-            let cur = el;
-            for (let i = 0; i < 6; i++) {
-                if (!cur) break;
-                if (cur.getAttribute('aria-label')) return cur.getAttribute('aria-label');
-                if (cur.getAttribute('title')) return cur.getAttribute('title');
-                // Tenta o id como label legível quando contém texto descritivo (ex: menu-item-Senior Flow)
-                const elId = cur.getAttribute('id') || '';
-                if (elId && !elId.match(/^(ng-|mat-|cdk-|\\d)/) && elId.includes('-') && elId.length < 60) {
-                    // Extrai a parte descritiva do id (ex: "menu-item-Senior Flow" → "Senior Flow")
-                    const partes = elId.split('-');
-                    const descritivo = partes.slice(2).join(' ').trim();
-                    if (descritivo && descritivo.length > 2) return descritivo;
-                }
-                // Tenta texto de filhos diretos (irmãos do ícone dentro do mesmo pai)
-                if (i === 0) {
-                    const irmaoTexto = Array.from(cur.parentElement?.children || [])
-                        .filter(c => c !== cur && c.tagName !== 'I' && c.tagName !== 'SVG')
-                        .map(c => (c.innerText || c.textContent || '').trim())
-                        .find(t => t && t.length > 1 && t.length < 80);
-                    if (irmaoTexto) return irmaoTexto;
-                }
-                cur = cur.parentElement;
-            }
-            return tag;
-        };
-
-        const resolvePrimeNGComponent = (el) => {
-            // 1. Identifica se a sub-parte clicada é de um widget composto PrimeNG
-            let suffix = '', partName = '', hostId = '';
-            
-            if (el.closest('.ui-datepicker-trigger, button[icon*="calendar"], p-calendar button, .ui-calendar button')) {
-                suffix = 'button'; partName = 'calendar_trigger'; hostId = 'p-calendar';
-            } else if (el.closest('.ui-dropdown-trigger, .p-dropdown-trigger')) {
-                suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger'; hostId = 'p-dropdown';
-            } else if (el.closest('.ui-dropdown-label, .p-dropdown-label')) {
-                suffix = '.ui-dropdown-label'; partName = 'label'; hostId = 'p-dropdown';
-            } else if (el.closest('.ui-multiselect-trigger, .p-multiselect-trigger')) {
-                suffix = '.ui-multiselect-trigger'; partName = 'trigger'; hostId = 'p-multiselect';
-            } else if (el.closest('.ui-spinner-up, .p-inputnumber-button-up')) {
-                suffix = '.ui-spinner-up'; partName = 'increment'; hostId = 'p-spinner';
-            } else if (el.closest('.ui-spinner-down, .p-inputnumber-button-down')) {
-                suffix = '.ui-spinner-down'; partName = 'decrement'; hostId = 'p-spinner';
-            } else if (el.closest('.ui-splitbutton-menubutton, .p-splitbutton-menubutton')) {
-                suffix = '.ui-splitbutton-menubutton'; partName = 'menu_trigger'; hostId = 'p-splitbutton';
-            } else if (el.closest('.ui-inputswitch-slider, .p-inputswitch-slider')) {
-                suffix = '.ui-inputswitch-slider'; partName = 'slider'; hostId = 'p-inputswitch';
-            } else if (el.closest('.ui-chips-token-icon, .p-chips-token-icon')) {
-                suffix = '.ui-chips-token-icon'; partName = 'remove_chip'; hostId = 'p-chips';
-            } else if (el.closest('.ui-fileupload-choose, .p-fileupload-choose')) {
-                suffix = '.ui-fileupload-choose'; partName = 'choose_button'; hostId = 'p-fileupload';
-            } else if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, s-autocomplete button, .ui-autocomplete-dropdown')) {
-                suffix = 'button'; partName = 'search_button'; hostId = 'p-autocomplete';
-            } else if (el.closest('button.ui-button-icon-only, button[pbutton]')) {
-                // Genérico em um inputgroup
-                const primeHost = el.closest('.p-inputgroup, .ui-inputgroup');
-                if (primeHost) {
-                    suffix = 'button'; partName = 'addon_button'; hostId = 'p-inputgroup';
-                }
-            } else if (el.tagName.toLowerCase() === 'input' || el.closest('input')) {
-                // Para inputs, verificamos parent
-                const primeHost = el.closest('p-autocomplete, .ui-autocomplete, p-calendar, .ui-calendar, p-spinner, .ui-spinner, p-chips, .ui-chips, .p-inputgroup, .ui-inputgroup, s-autocomplete');
-                if (primeHost) {
-                    suffix = 'input'; partName = 'input';
-                    hostId = primeHost.tagName.toLowerCase().includes('calendar') ? 'p-calendar' :
-                             primeHost.tagName.toLowerCase().includes('spinner') ? 'p-spinner' :
-                             primeHost.tagName.toLowerCase().includes('chips') ? 'p-chips' : 'p-autocomplete';
-                }
-            }
-
-            if (!suffix) return null;
-
-            // 2. Encontrar o identificador (âncora)
-            let cur = el;
-            let identifier = '';
-            let borrowedFromInput = false;
-
-            for (let i = 0; i < 8; i++) {
-                if (!cur) break;
-                
-                const name = cur.getAttribute('name') || cur.getAttribute('formcontrolname');
-                const testid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
-                // Alterado \\d para evitar o SyntaxWarning do Python
-                const idAttr = cur.id && !cur.id.match(/(ng-|mat-|cdk-|^\\d)/) && !cur.id.includes('autocomplete') ? cur.id : null;
-                
-                if (name) { identifier = `[name='${name}']`; break; }
-                if (testid) { identifier = `[data-testid='${testid}']`; break; }
-                if (idAttr) { identifier = `#${idAttr}`; break; }
-                
-                // NOVO: 'Roubar' o identificador do input interno se o wrapper for um componente PrimeNG conhecido
-                if (cur.tagName.toLowerCase().startsWith('p-') || cur.classList.contains('ui-calendar') || cur.classList.contains('ui-autocomplete') || cur.classList.contains('ui-dropdown') || cur.classList.contains('ui-multiselect') || cur.classList.contains('ui-inputgroup')) {
-                    const innerInput = cur.querySelector('input:not([type="hidden"])');
-                    if (innerInput && innerInput !== el) {
-                        const iname = innerInput.getAttribute('name') || innerInput.getAttribute('formcontrolname');
-                        if (iname) { identifier = `[name='${iname}']`; borrowedFromInput = true; break; }
-                        const itest = innerInput.getAttribute('data-testid') || innerInput.getAttribute('data-test');
-                        if (itest) { identifier = `[data-testid='${itest}']`; borrowedFromInput = true; break; }
-                        const iid = innerInput.id && !innerInput.id.match(/(ng-|mat-|cdk-|^\\d)/) && !innerInput.id.includes('autocomplete') ? innerInput.id : null;
-                        if (iid) { identifier = `#${iid}`; borrowedFromInput = true; break; }
-                    }
-                }
-                
-                cur = cur.parentElement;
-            }
-
-            if (identifier) {
-                if (borrowedFromInput) {
-                    const wrapperTag = cur.tagName.toLowerCase();
-                    let wrapperClass = '';
-                    if (cur.classList.length > 0) {
-                        const c = Array.from(cur.classList).find(cls => cls.startsWith('ui-') || cls.startsWith('p-'));
-                        if (c) wrapperClass = `.${c}`;
-                    }
-                    const wrapperSel = `${wrapperTag}${wrapperClass}`;
-                    return { seletor: `${wrapperSel}:has(${identifier}) ${suffix}`, componentType: `${hostId}:${partName}`, partName, identifier };
-                }
-
-                let isSameElement = false;
-                try { isSameElement = (cur === el) || cur.matches(suffix); } catch(e) {}
-                
-                if (isSameElement) {
-                    const tagPart = suffix.split('.')[0];
-                    const tag = ['input', 'button'].includes(tagPart) ? tagPart : cur.tagName.toLowerCase();
-                    return { seletor: `${tag}${identifier}`, componentType: `${hostId}:${partName}`, partName, identifier };
-                } else {
-                    return { seletor: `${identifier} ${suffix}`, componentType: `${hostId}:${partName}`, partName, identifier };
-                }
-            }
-
-            return { seletor: `${hostId} ${suffix}`, componentType: `${hostId}:${partName}`, partName, identifier: '' };
-        };
-
-
-        const getBestSelector = (el) => {
-            const customCheckbox = el.closest('p-checkbox, mat-checkbox, [role="checkbox"], .ui-chkbox');
-            if (customCheckbox) {
-                let tagCheck = customCheckbox.tagName.toLowerCase();
-                
-                // HACK: Direciona o clique para a caixa visual interna do PrimeNG
-                let cliqueInterno = tagCheck;
-                if (tagCheck === 'p-checkbox') {
-                    cliqueInterno = 'p-checkbox .ui-chkbox-box';
-                } else if (tagCheck === 'div' && customCheckbox.classList.contains('ui-chkbox')) {
-                    cliqueInterno = '.ui-chkbox .ui-chkbox-box';
-                }
-
-                // SELETOR SUPREMO: "Linha que tem este texto" > Checkbox
-                const parentRow = customCheckbox.closest('tr, item, li, .ui-g, .list-item, .row');
-                if (parentRow) {
-                    let text = parentRow.textContent || '';
-                    text = text.replace(/\\s+/g, ' ').trim();
-                    if (text.length > 2) {
-                        const cleanText = text.substring(0, 40).replace(/['"\\\\/]/g, '');
-                        let pTag = parentRow.tagName.toLowerCase();
-                        if (pTag === 'div' && parentRow.classList.contains('ui-g')) pTag = '.ui-g';
-                        return `${pTag}:has-text("${cleanText}") ${cliqueInterno}`;
-                    }
-                }
-
-                const parentComId = customCheckbox.closest('[id]:not([id*="ng-"]):not([id*="mat-"])');
-                if (parentComId && parentComId.id) {
-                    return `${parentComId.tagName.toLowerCase()}#${parentComId.id} ${cliqueInterno}`;
-                }
-            }
-
-            // PrimeNG composite component: resolve ANTES do fallback genérico
-            const _primeResult = resolvePrimeNGComponent(el);
-            if (_primeResult) return _primeResult.seletor;
-
-            // Fallback genérico: sobe na árvore DOM buscando atributo estável
-            // Profundidade aumentada para 8 para cobrir componentes aninhados
-            let cur = el;
-            for (let i = 0; i < 8; i++) {
-                if (!cur) break;
-                const tid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
-                if (tid) return `[data-testid='${tid}']`;
-                const aria = cur.getAttribute('aria-label');
-                if (aria) return `[aria-label='${aria}']`;
-                const name = cur.getAttribute('name');
-                if (name && name.length < 40) return `[name='${name}']`;
-                if (cur.id && !cur.id.match(/^[\\d\\-_]/) && !cur.id.match(/ng-|mat-|cdk-/)) return `[id='${cur.id}']`;
-                cur = cur.parentElement;
-            }
-            const ph = el.getAttribute('placeholder');
-            if (ph) return `[placeholder='${ph}']`;
-            const role = el.getAttribute('role');
-            if (role && role !== 'presentation') {
-                const t = el.innerText?.trim().replace(/\\n/g, ' ') || '';
-                if (t && t.length < 50) return `[role='${role}']:has-text('${t}')`;
-            }
-            const txt = el.innerText?.trim().replace(/\\n/g, ' ') || '';
-            if (txt && txt.length > 1 && txt.length < 50) return `text="${txt}"`;
-            const parentAria = el.closest('[aria-label]')?.getAttribute('aria-label');
-            if (parentAria) return `[aria-label='${parentAria}'] ${el.tagName.toLowerCase()}`;
-            const siblings = Array.from(el.parentElement?.children || []);
-            return `${el.tagName.toLowerCase()}:nth-child(${siblings.indexOf(el) + 1})`;
-        };
-
-        const getFrameId = () => {
-            if (window.name) return window.name;
-            try {
-                const href = window.location.href;
-                if (href && href !== window.top?.location?.href) return href.split('/').pop().split('?')[0] || 'iframe';
-            } catch(e) {}
-            return 'Pagina Principal';
-        };
-
-        const getRectComFallback = (el) => {
-            // Elementos Angular da sidebar (position:fixed, ng-star-inserted) podem retornar
-            // rect zerado se ainda estao em transicao de layout. Sobe na arvore ate achar
-            // um ancestral com dimensoes validas, ou usa o centro da viewport como ultimo recurso.
-            let cur = el;
-            for (let i = 0; i < 6; i++) {
-                if (!cur) break;
-                const r = cur.getBoundingClientRect();
-                if (r.width > 0 && r.height > 0) return r;
-                cur = cur.parentElement;
-            }
-            // Fallback: centro da viewport (melhor que zero para o cursor_engine)
-            return { x: window.innerWidth / 2, y: window.innerHeight / 2, width: 40, height: 20 };
-        };
-
-        const processarEvento = (target, acao, valor = '') => {
-            const rect = getRectComFallback(target);
-            // Resolve PrimeNG uma vez: reutiliza para seletor + metadado
-            const _pResult = resolvePrimeNGComponent(target);
-            const _seletor = _pResult ? _pResult.seletor : getBestSelector(target);
-            window.capturarElemento(JSON.stringify({
-                tag: target.tagName.toLowerCase(),
-                texto_encontrado: valor || getElementName(target),
-                seletor: _seletor,
-                primeng_component: _pResult ? _pResult.componentType : '',
-                iframe: getFrameId(), acao,
-                posicao_visual: `x:${Math.round(rect.x)},y:${Math.round(rect.y)},w:${Math.round(rect.width)},h:${Math.round(rect.height)}`,
-                html_snapshot: target.outerHTML.substring(0, 300)
-            }));
-            const orig = target.style.outline;
-            target.style.outline = '2px solid red';
-            setTimeout(() => target.style.outline = orig, 200);
-        };
-
-        let clickTimeout = null;
-        document.addEventListener('mousedown', (e) => {
-            if (e.button === 2) { processarEvento(e.target, 'clique_direito'); return; }
-            if (e.button === 0) {
-                if (clickTimeout !== null) { clearTimeout(clickTimeout); clickTimeout = null; return; }
-                clickTimeout = setTimeout(() => { processarEvento(e.target, 'clique'); clickTimeout = null; }, 250);
-            }
-        }, true);
-        document.addEventListener('dblclick', (e) => {
-            clearTimeout(clickTimeout); clickTimeout = null;
-            processarEvento(e.target, 'duplo_clique');
-        }, true);
-        let ultimoEnterTarget = null, ultimoEnterTime = 0;
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                ultimoEnterTarget = e.target; ultimoEnterTime = Date.now();
-                processarEvento(e.target, 'digitar_e_enter', e.target.value || e.target.innerText || '');
-            }
-        }, true);
-
-        // --- ANTI-FANTASMA: rastrear se o usuario realmente interagiu via teclado, mouse ou paste
-        document.addEventListener('input', (e) => {
-            if (e.isTrusted && e.target && e.target.tagName) {
-                const tag = e.target.tagName.toLowerCase();
-                if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) {
-                    e.target.dataset.userTyped = 'true';
-                }
-            }
-        }, true);
-
-        document.addEventListener('blur', (e) => {
-            if (!e.target || !e.target.tagName) return;
-            const tag = e.target.tagName.toLowerCase();
-            const tipo = (e.target.getAttribute('type') || '').toLowerCase();
-            // Ignora checkboxes e radios — nunca geram preencher_campo
-            // Ignora valores "undefined"/"null" que vazam de inputs ocultos do PrimeNG/Angular
-            if (tipo === 'checkbox' || tipo === 'radio') return;
-            const val = e.target.value || '';
-            if (!val.trim() || val === 'undefined' || val === 'null') return;
-            if (e.target === ultimoEnterTarget && Date.now() - ultimoEnterTime < 500) return;
-            
-            if ((tag === 'input' || tag === 'textarea' || e.target.isContentEditable) && e.target.value) {
-                // SÓ EMITE SE O USUARIO EFETIVAMENTE DIGITOU ALGO (isTrusted input)
-                if (e.target.dataset.userTyped === 'true') {
-                    processarEvento(e.target, 'preencher_campo', e.target.value);
-                    e.target.dataset.userTyped = 'false'; // Reseta após emitir
-                }
-            }
-        }, true);
-    }"""
+    """
+    Injeta o script radar no contexto do navegador.
+    O script JavaScript é carregado de um arquivo externo para melhor manutenibilidade.
+    """
+    from pathlib import Path
+    from datetime import datetime
+    
+    # Carrega o script JavaScript do arquivo externo
+    script_path = Path(__file__).parent / "radar_script.js"
+    try:
+        with open(script_path, 'r', encoding='utf-8') as f:
+            script_content = f.read()
+    except FileNotFoundError:
+        logger.error(f"[DEBUG] ERRO: Arquivo radar_script.js não encontrado em {script_path}")
+        return
+    except Exception as e:
+        logger.error(f"[DEBUG] ERRO ao ler radar_script.js: {e}")
+        return
+    
+    # CACHE BUSTER: Adiciona timestamp único para forçar reload
+    cache_buster = f"// CACHE BUSTER: {datetime.now().timestamp()}\n"
+    script_content = cache_buster + script_content
+    
+    # Envolve o conteúdo em uma função anônima para execução
+    script_radar = f"() => {{ {script_content} }}"
+    
     try:
         await contexto.evaluate(script_radar)
+        logger.debug("[DEBUG] Script radar injetado com sucesso")
     except PlaywrightError as e:
         if "Target closed" not in str(e) and "browser has been closed" not in str(e):
-            pass
-    except Exception:
-        pass
+            logger.error(f"[DEBUG] ERRO ao injetar script radar: {e}")
+    except Exception as e:
+        logger.error(f"[DEBUG] ERRO ao injetar script radar: {e}")
 
 async def injetar_radar_event_driven(page):
+    """
+    Injeta o script radar na página e em todos os frames.
+    Monitora novos frames e navegações para reinjetar o script.
+    
+    BUGFIX: Implementa retry logic robusto para frames dinâmicos (modais PrimeNG).
+    """
+    # Injeta na página principal
     await _injetar_em_contexto(page)
-    async def injetar_com_delay(frame):
-        try:
-            await asyncio.sleep(0.5)
-            await _injetar_em_contexto(frame)
-        except Exception:
-            pass
-    page.on("frameattached",  lambda frame: asyncio.create_task(injetar_com_delay(frame)))
-    page.on("framenavigated", lambda frame: asyncio.create_task(injetar_com_delay(frame)))
+    
+    # Verifica se o radar foi injetado com sucesso na página principal
+    try:
+        binding_check = await page.evaluate("""() => ({
+            hasWindowBinding: typeof window.capturarElemento === 'function',
+            hasGlobalBinding: typeof capturarElemento === 'function',
+            radarInjected: window.__radarInjetado === true
+        })""")
+        logger.info(f"[DEBUG] Main page binding verification: {binding_check}")
+        
+        if not binding_check.get('radarInjected'):
+            logger.error("[DEBUG] CRITICAL: Radar script NOT injected in main page!")
+    except Exception as e:
+        logger.warning(f"[DEBUG] Could not verify main page radar injection: {e}")
+    
+    # Injeta em todos os frames existentes
+    for frame in page.frames:
+        if frame != page.main_frame:
+            try:
+                await _injetar_em_contexto(frame)
+                logger.debug(f"[DEBUG] Radar injected in existing frame: {frame.url[:60]}")
+            except Exception as e:
+                logger.debug(f"[DEBUG] Could not inject in existing frame: {str(e)[:60]}")
+    
+    async def injetar_com_retry(frame, max_tentativas=3):
+        """
+        Injeta o radar em um frame com retry logic robusto.
+        
+        BUGFIX: Frames de modais PrimeNG podem ser destruídos rapidamente.
+        Esta função tenta injetar múltiplas vezes com delays crescentes.
+        """
+        for tentativa in range(max_tentativas):
+            try:
+                # Verifica se o frame ainda está válido antes de tentar injetar
+                if frame.is_detached():
+                    logger.debug(f"[DEBUG] Frame detached before injection attempt {tentativa + 1}")
+                    return
+                
+                # Delay crescente: 100ms, 300ms, 600ms
+                delay = 0.1 * (2 ** tentativa)
+                await asyncio.sleep(delay)
+                
+                # Verifica novamente após o delay
+                if frame.is_detached():
+                    logger.debug(f"[DEBUG] Frame detached after delay (attempt {tentativa + 1})")
+                    return
+                
+                # Tenta injetar
+                await _injetar_em_contexto(frame)
+                
+                # Verifica se a injeção foi bem-sucedida
+                try:
+                    injected = await frame.evaluate("() => window.__radarInjetado === true")
+                    if injected:
+                        logger.debug(f"[DEBUG] ✅ Radar injected successfully in frame: {frame.url[:60]}")
+                        return
+                    else:
+                        logger.debug(f"[DEBUG] ⚠️  Injection verification failed (attempt {tentativa + 1})")
+                except Exception:
+                    logger.debug(f"[DEBUG] ⚠️  Could not verify injection (attempt {tentativa + 1})")
+                
+            except PlaywrightError as e:
+                error_msg = str(e)
+                if "detached" in error_msg.lower() or "closed" in error_msg.lower():
+                    logger.debug(f"[DEBUG] Frame detached during injection (attempt {tentativa + 1})")
+                    return
+                else:
+                    logger.debug(f"[DEBUG] Playwright error in frame injection (attempt {tentativa + 1}): {error_msg[:60]}")
+            except Exception as e:
+                logger.debug(f"[DEBUG] Unexpected error in frame injection (attempt {tentativa + 1}): {str(e)[:60]}")
+        
+        # Todas as tentativas falharam
+        logger.debug(f"[DEBUG] ❌ Failed to inject radar in frame after {max_tentativas} attempts")
+    
+    # Monitora novos frames e navegações
+    page.on("frameattached",  lambda frame: asyncio.create_task(injetar_com_retry(frame)))
+    page.on("framenavigated", lambda frame: asyncio.create_task(injetar_com_retry(frame)))
 
 async def on_capturar_elemento(source, args):
     global _id_acao_global, _lock_id
@@ -810,7 +567,11 @@ async def capturar_cliques_na_tela():
             "--start-maximized",
             f"--window-position={_window_x},{_window_y}",
         ])
-        context = await browser.new_context(no_viewport=True)
+        context = await browser.new_context(
+            no_viewport=True,
+            bypass_csp=True,
+            ignore_https_errors=True
+        )
         page    = await context.new_page()
 
         await context.expose_binding("capturarElemento", on_capturar_elemento, handle=True)

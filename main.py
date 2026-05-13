@@ -103,7 +103,18 @@ async def gerar_audio(
     texto_falado = re.sub(r"\bGED\b", "gédi", texto_falado)
     texto_falado = re.sub(r"\bged\b", "gédi", texto_falado)
     texto_falado = re.sub(r"(?i)\bsenior\b", "Sênior", texto_falado)
-    texto_falado = texto_falado.replace("Sênior X", "Senior X")
+    # "X" avulso (palavra inteira, maiúsculo) → "Éks" — cobre Senior X, ERP X, etc.
+    # Grafia fonética sem acento ambíguo: evita "êx" (prefixo) e problemas com ElevenLabs
+    texto_falado = re.sub(r"\bX\b", "Éks", texto_falado)
+
+    # ── Pré-processamento anti-travada para edge-tts ─────────────────────────
+    # Remove ou substitui caracteres que causam engasgos no Azure Neural TTS:
+    # 1. Underscores viram espaço (IDs e nomes de campo tipo "nome_campo")
+    texto_falado = texto_falado.replace("_", " ")
+    # 2. Barras e pipes viram pausa natural
+    texto_falado = re.sub(r"\s*[|/]\s*", ", ", texto_falado)
+    # 3. Múltiplos espaços → um só
+    texto_falado = re.sub(r" {2,}", " ", texto_falado).strip()
 
     nome_pasta  = limpar_nome(id_treinamento)
     pasta_audio = os.path.join("audios_gerados", nome_pasta)
@@ -116,10 +127,10 @@ async def gerar_audio(
             api_key = os.getenv("ELEVENLABS_API_KEY")
             if not api_key:
                 print("⚠️  Chave ELEVENLABS_API_KEY não encontrada no .env! Fazendo fallback para a voz gratuita...", flush=True)
-                await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
+                await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
             else:
                 try:
-                    voice_id = "cjVigY5qzO86Huf0OWal"
+                    voice_id = "ErXwobaYiN019PkySvjV"
                     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
                     headers = {
@@ -132,8 +143,10 @@ async def gerar_audio(
                         "text": texto_falado,
                         "model_id": "eleven_multilingual_v2",
                         "voice_settings": {
-                            "stability": 0.5,
-                            "similarity_boost": 0.75
+                            "stability": 0.45,
+                            "similarity_boost": 0.85,
+                            "style": 0.35,
+                            "use_speaker_boost": True
                         }
                     }
 
@@ -145,12 +158,13 @@ async def gerar_audio(
                                     f.write(chunk)
                     else:
                         print(f"⚠️  Erro no ElevenLabs ({response.status_code}): {response.text}. Fallback gratuito ativado.", flush=True)
-                        await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
+                        await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
                 except Exception as e:
                     print(f"⚠️  Falha ao conectar no ElevenLabs: {e}. Fallback gratuito ativado.", flush=True)
-                    await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-12%").save(arquivo_mp3)
+                    await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
+
         else:
-            await edge_tts.Communicate(texto_falado, voz, rate="-12%").save(arquivo_mp3)
+            await edge_tts.Communicate(texto_falado, voz, rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
 
     async with _audio_manifest_lock:
         _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"

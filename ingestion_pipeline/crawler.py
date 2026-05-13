@@ -217,24 +217,14 @@ class SitemapCrawler:
     def discover_spa_urls_sync(self) -> List[str]:
         """Synchronous wrapper for SPA discovery.
         
-        Handles event loop detection and runs SPA discovery appropriately.
+        DISABLED: SPA discovery is too slow (hours) and unreliable.
+        The manual URL mapping in get_important_urls() already covers all needed URLs.
         
         Returns:
-            List[str]: List of discovered SPA URLs
+            List[str]: Empty list (SPA discovery disabled)
         """
-        try:
-            # Check if we're already in an event loop
-            try:
-                loop = asyncio.get_running_loop()
-                # We're in an event loop, skip SPA discovery for now
-                logger.warning("Already in event loop, skipping SPA discovery. Use discover_spa_urls() directly in async context.")
-                return []
-            except RuntimeError:
-                # No event loop, safe to use asyncio.run()
-                return asyncio.run(self.discover_spa_urls())
-        except Exception as e:
-            logger.error(f"SPA discovery failed: {e}")
-            return []
+        logger.info("SPA discovery DISABLED — using manual URL mapping instead (faster and more reliable)")
+        return []
 
     def get_important_urls(self) -> List[str]:
         """Get manually discovered important URLs including comprehensive ERP mapping.
@@ -530,8 +520,8 @@ class SitemapCrawler:
             "lgpd.htm",
         ]
 
-        # Construir URLs completas
-        erp_urls = [erp_base + "#" + fragment for fragment in erp_fragments]
+        # Construir URLs completas (sem fragmento hash - acesso direto ao artigo)
+        erp_urls = [erp_base + fragment for fragment in erp_fragments]
 
         logger.info(f"Generated {len(erp_urls)} ERP URLs from manual mapping")
         return erp_urls
