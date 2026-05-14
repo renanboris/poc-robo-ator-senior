@@ -2587,6 +2587,43 @@ class HitlValidator:
                 self._modo_auto_restante = 0
                 logger.info("Falha em modo auto → voltando para step-by-step")
 
+            # Em modo step-by-step (não-silent): usa o overlay step-by-step com ❌
+            # O analista pode corrigir, pular ou tentar refazer — sem o overlay vermelho antigo
+            if not silent:
+                camada_vencedora = "—"
+                await self._mostrar_overlay_step(page, passo, acao_tec, False, camada=camada_vencedora)
+                decisao = await self._aguardar_decisao_step()
+
+                if decisao != "corrigir":
+                    await page.evaluate(_JS_REMOVE_STEP_OVERLAY)
+                await self._remove_step_highlight(page)
+
+                if decisao == "ok":
+                    # Analista confirmou que está ok mesmo sem executar — avança
+                    return "ok"
+                elif decisao == "corrigir":
+                    seletor_corrigido = await self._ativar_radar_step(page)
+                    await page.evaluate(_JS_REMOVE_STEP_OVERLAY)
+                    if seletor_corrigido:
+                        self._salvar_correcao_no_brain(acao_tec, seletor_corrigido)
+                        acao_corrigida = dict(acao_tec)
+                        if "elemento_alvo" not in acao_corrigida:
+                            acao_corrigida["elemento_alvo"] = {}
+                        acao_corrigida["elemento_alvo"]["seletor_hint"] = seletor_corrigido
+                        await encontrar_e_clicar(page, acao_corrigida)
+                    return "ok"
+                elif decisao.startswith("auto_"):
+                    try:
+                        self._modo_auto_restante = int(decisao.split("_")[1])
+                    except (IndexError, ValueError):
+                        self._modo_auto_restante = 5
+                    self._stats["acoes_puladas"] += 1
+                    return "pulou"
+                else:  # "pular"
+                    self._stats["acoes_puladas"] += 1
+                    return "pulou"
+
+            # Em modo --silent: usa o overlay vermelho antigo (comportamento legado)
             resposta = await self._pausa_falha_dura(
                 page,
                 acao_tec,

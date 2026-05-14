@@ -516,8 +516,15 @@ class TestAutoModeResetsOnFailure:
             patch(
                 "validator_hitl.encontrar_e_clicar", new_callable=AsyncMock, return_value=False
             ),
+            # No modo step-by-step, falha usa overlay step (não _pausa_falha_dura)
             patch.object(
-                hitl_validator, "_pausa_falha_dura", new_callable=AsyncMock, return_value="pular"
+                hitl_validator, "_mostrar_overlay_step", new_callable=AsyncMock
+            ),
+            patch.object(
+                hitl_validator, "_aguardar_decisao_step", new_callable=AsyncMock, return_value="pular"
+            ),
+            patch.object(
+                hitl_validator, "_remove_step_highlight", new_callable=AsyncMock
             ),
         ):
             await hitl_validator._executar_acao_com_hitl(
@@ -530,7 +537,8 @@ class TestAutoModeResetsOnFailure:
     async def test_failure_calls_pausa_falha_dura(
         self, hitl_validator, mock_page, sample_passo, sample_acao_tec
     ):
-        """_pausa_falha_dura IS called when action fails during auto mode."""
+        """Em modo step-by-step, falha usa overlay step (não _pausa_falha_dura).
+        _pausa_falha_dura só é chamada em modo --silent."""
         hitl_validator._modo_auto_restante = 3
         hitl_validator._silent = False
 
@@ -543,6 +551,15 @@ class TestAutoModeResetsOnFailure:
                 "validator_hitl.encontrar_e_clicar", new_callable=AsyncMock, return_value=False
             ),
             patch.object(
+                hitl_validator, "_mostrar_overlay_step", new_callable=AsyncMock
+            ) as mock_overlay,
+            patch.object(
+                hitl_validator, "_aguardar_decisao_step", new_callable=AsyncMock, return_value="pular"
+            ),
+            patch.object(
+                hitl_validator, "_remove_step_highlight", new_callable=AsyncMock
+            ),
+            patch.object(
                 hitl_validator, "_pausa_falha_dura", new_callable=AsyncMock, return_value="pular"
             ) as mock_falha,
         ):
@@ -550,7 +567,9 @@ class TestAutoModeResetsOnFailure:
                 mock_page, sample_acao_tec, passo=sample_passo
             )
 
-            mock_falha.assert_called_once()
+            # No modo step-by-step: overlay step é chamado, não _pausa_falha_dura
+            mock_overlay.assert_called_once()
+            mock_falha.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_full_scenario_auto5_two_successes_then_failure(
@@ -582,7 +601,7 @@ class TestAutoModeResetsOnFailure:
             )
             assert hitl_validator._modo_auto_restante == 3
 
-        # Now failure
+        # Now failure — step-by-step overlay handles it
         with (
             patch(
                 "validator_hitl._nivel_confianca",
@@ -592,7 +611,13 @@ class TestAutoModeResetsOnFailure:
                 "validator_hitl.encontrar_e_clicar", new_callable=AsyncMock, return_value=False
             ),
             patch.object(
-                hitl_validator, "_pausa_falha_dura", new_callable=AsyncMock, return_value="pular"
+                hitl_validator, "_mostrar_overlay_step", new_callable=AsyncMock
+            ),
+            patch.object(
+                hitl_validator, "_aguardar_decisao_step", new_callable=AsyncMock, return_value="pular"
+            ),
+            patch.object(
+                hitl_validator, "_remove_step_highlight", new_callable=AsyncMock
             ),
         ):
             # Failure: counter resets to 0
