@@ -78,7 +78,7 @@ except ImportError:
     logger.warning("google-genai não instalado. Checkpoint Gemini desativado.")
 
 # ── Thresholds ─────────────────────────────────────────────────────────────────
-BRAIN_HITS_ALTA   = 2    # hits no Brain para considerar alta confiança (baixado de 3 → 2)
+BRAIN_HITS_ALTA   = 2    # hits no Brain para considerar alta confiança (baixado de 3 -> 2)
 TIMEOUT_HUMANO    = 180  # segundos esperando analista (3 minutos)
 CHECKPOINT_HABILITADO = _gemini is not None
 
@@ -109,11 +109,11 @@ def _nivel_confianca(acao_tec: dict) -> NivelConfianca:
     Combina: histórico no Brain + qualidade do seletor + confiança da captura.
 
     ORDEM DE PRIORIDADE:
-    1. Brain com hits sólidos → ALTA (ignora confianca_captura)
-    2. Brain com seletor mas sem hits suficientes → MEDIA
-    3. confianca_captura == "baixa" → BAIXA (sem histórico no Brain)
-    4. Seletor frágil → BAIXA
-    5. Seletor semântico sem histórico → MEDIA
+    1. Brain com hits sólidos -> ALTA (ignora confianca_captura)
+    2. Brain com seletor mas sem hits suficientes -> MEDIA
+    3. confianca_captura == "baixa" -> BAIXA (sem histórico no Brain)
+    4. Seletor frágil -> BAIXA
+    5. Seletor semântico sem histórico -> MEDIA
     """
     intencao  = acao_tec.get("intencao_semantica", "")
     alvo      = acao_tec.get("elemento_alvo", {})
@@ -220,279 +220,71 @@ async def _validar_checkpoint(
 # OVERLAY HITL — Interface visual na janela do Chrome
 # ══════════════════════════════════════════════════════════════════════════════
 
-# JS do getBestSelector — mesma lógica do radar_script.js (capture_dual_output)
-# Suporta: PrimeNG composites, checkboxes Angular, menus de contexto, modais,
-# calendários, seletores semânticos. Só cai em nth-child como último recurso.
-_JS_GET_BEST_SELECTOR = """
+# JS do getBestSelector — carregado diretamente do radar_script.js
+# Isso garante que qualquer melhoria no radar é automaticamente usada pelo HITL.
+# O radar_script.js define getBestSelector como variável global no escopo da IIFE.
+# Aqui extraímos apenas a função getBestSelector para uso no handler de clique do HITL.
+def _carregar_getBestSelector():
+    """Carrega a função getBestSelector do radar_script.js."""
+    from pathlib import Path
+    script_path = Path(__file__).parent / "capture_variants" / "radar_script.js"
+    try:
+        with open(script_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        # Extrai a função getBestSelector do radar_script.js
+        # A função começa com "const getBestSelector = (el) => {" e termina com "};"
+        start_marker = "const getBestSelector = (el) => {"
+        start_idx = content.find(start_marker)
+        if start_idx == -1:
+            logger.warning("[HITL] getBestSelector não encontrado no radar_script.js — usando fallback")
+            return _JS_GET_BEST_SELECTOR_FALLBACK
+        # Encontra o fim da função contando chaves
+        func_start = start_idx + len("const getBestSelector = ")
+        brace_count = 0
+        func_end = func_start
+        for i in range(func_start, len(content)):
+            if content[i] == '{':
+                brace_count += 1
+            elif content[i] == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    func_end = i + 1
+                    break
+        # Sanitiza caracteres não-ASCII que causam SyntaxError no browser
+        extracted = content[func_start:func_end]
+        extracted = extracted.replace('\u2192', '->').replace('\u2190', '<-').replace('\u21d2', '=>')
+        return extracted
+    except Exception as e:
+        logger.warning(f"[HITL] Erro ao carregar radar_script.js: {e} — usando fallback")
+        return _JS_GET_BEST_SELECTOR_FALLBACK
+
+# Fallback mínimo caso o radar_script.js não seja encontrado
+_JS_GET_BEST_SELECTOR_FALLBACK = """
     (el) => {
-        // ── Escopo de modal ──────────────────────────────────────────────────
-        const modalAncestor = el.closest('p-dialog, ui-dialog, s-dialog, p-confirmdialog, [role="dialog"]');
-        const addModalScope = (seletor) => {
-            if (!modalAncestor) return seletor;
-            const modalScope = modalAncestor.getAttribute('role') === 'dialog'
-                ? '[role="dialog"]'
-                : modalAncestor.tagName.toLowerCase();
-            return modalScope + ' ' + seletor;
-        };
-
-        // ── SELETOR CONTEXTUAL DE LINHA (universal) ──────────────────────────
-        // Princípio: qualquer elemento dentro de uma linha de tabela/lista deve ser
-        // identificado pelo CONTEÚDO da linha, não pela posição.
-        // Funciona para: HTML tables, PrimeNG, Angular Material, AG Grid, listas genéricas.
-        const resolveRowContext = (el) => {
-            const ROW_SELECTORS = 'tr, [role="row"], li, [role="listitem"], .p-datatable-row, .mat-row, .ag-row, [class*="-row"]:not(input)';
-            const rowEl = el.closest(ROW_SELECTORS);
-            if (!rowEl || rowEl === el) return null;
-
-            const getRowIdentifier = (row) => {
-                const cells = Array.from(row.querySelectorAll('td, th, [role="cell"], [role="gridcell"]'));
-                const candidates = cells.length > 0 ? cells : Array.from(row.children);
-                for (const cell of candidates) {
-                    const hasOnlyButtons = Array.from(cell.children).every(
-                        c => c.tagName === 'BUTTON' || c.tagName === 'A' ||
-                             c.getAttribute('role') === 'button' ||
-                             c.classList.contains('ui-button') || c.classList.contains('p-button')
-                    );
-                    if (hasOnlyButtons && cell.children.length > 0) continue;
-                    const text = (cell.innerText || cell.textContent || '').replace(/\\s+/g, ' ').trim();
-                    if (text.length > 2 && !/^\\d+$/.test(text))
-                        return text.substring(0, 50).replace(/["\\\\]/g, '');
-                }
-                const fullText = (row.innerText || row.textContent || '').replace(/\\s+/g, ' ').trim();
-                return fullText.length > 2 ? fullText.substring(0, 50).replace(/["\\\\]/g, '') : null;
-            };
-
-            const rowText = getRowIdentifier(rowEl);
-            if (!rowText) return null;
-
-            const getElementSelector = (el) => {
-                let cur = el;
-                for (let i = 0; i < 5; i++) {
-                    if (!cur || cur === rowEl) break;
-                    const aria = cur.getAttribute('aria-label');
-                    if (aria) return '[aria-label="' + aria.replace(/"/g, '\\\\"') + '"]';
-                    const testid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
-                    if (testid) return '[data-testid="' + testid + '"]';
-                    const role = cur.getAttribute('role');
-                    if (role && role !== 'presentation' && role !== 'none') {
-                        const txt = (cur.innerText || '').trim().replace(/\\s+/g, ' ');
-                        if (txt && txt.length > 0 && txt.length < 40)
-                            return '[role="' + role + '"]:has-text("' + txt.replace(/"/g, '\\\\"') + '")';
-                        return '[role="' + role + '"]';
-                    }
-                    cur = cur.parentElement;
-                }
-                const txt = (el.innerText || '').trim().replace(/\\s+/g, ' ');
-                if (txt && txt.length > 0 && txt.length < 40)
-                    return 'text="' + txt.replace(/"/g, '\\\\"') + '"';
-                return el.tagName.toLowerCase();
-            };
-
-            let rowTag = rowEl.tagName.toLowerCase();
-            if (rowEl.getAttribute('role') === 'row') rowTag = '[role="row"]';
-            else if (rowEl.getAttribute('role') === 'listitem') rowTag = '[role="listitem"]';
-
-            return rowTag + ':has-text("' + rowText + '") ' + getElementSelector(el);
-        };
-
-        const _hasStableAttr = (el) => {
-            let cur = el;
-            for (let i = 0; i < 4; i++) {
-                if (!cur) break;
-                if (cur.getAttribute('data-testid') || cur.getAttribute('data-test')) return true;
-                if (cur.getAttribute('aria-label')) return true;
-                if (cur.getAttribute('name') && cur.getAttribute('name').length < 40) return true;
-                cur = cur.parentElement;
-            }
-            return false;
-        };
-
-        // Aplica contexto de linha quando o elemento está em tabela
-        // OU quando não tem atributo estável próprio (evita over-engineering)
-        const isInTable = !!el.closest('table, [role="grid"], [role="treegrid"], p-table, .p-datatable, .ui-datatable');
-        if (isInTable || !_hasStableAttr(el)) {
-            const rowContextSelector = resolveRowContext(el);
-            if (rowContextSelector) return addModalScope(rowContextSelector);
-        }
-
-        // ── ITEM DE MENU DE CONTEXTO (universal) ─────────────────────────────
-        // Seletor escopado ao container do menu para evitar ambiguidade.
-        // Funciona para: ngx-contextmenu, CDK overlay, PrimeNG, Bootstrap, Material.
-        const MENU_CONTAINER_SELECTORS = [
-            '.ngx-contextmenu', '.cdk-overlay-pane .ngx-contextmenu',
-            '[class*="ngx-contextmenu"]', '.p-contextmenu', '.p-menu',
-            '[role="menu"]', '.dropdown-menu', '.mat-menu-panel',
-            '.cdk-overlay-pane [role="menu"]',
-        ];
-        const menuContainer = el.closest(MENU_CONTAINER_SELECTORS.join(', '));
-        if (menuContainer) {
-            const menuItem = el.closest('li, [role="menuitem"], a');
-            const itemEl = menuItem || el;
-            const textoItem = Array.from(itemEl.childNodes)
-                .filter(n => n.nodeType === Node.TEXT_NODE ||
-                    (n.nodeType === Node.ELEMENT_NODE &&
-                     !['EM', 'I', 'SVG', 'SPAN', 'IMG'].includes(n.tagName)))
-                .map(n => (n.textContent || '').trim())
-                .join(' ').replace(/\\s+/g, ' ').trim();
-            const textoFinal = textoItem ||
-                (itemEl.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 50);
-            if (textoFinal && textoFinal.length > 1) {
-                let containerSel = '';
-                for (const sel of MENU_CONTAINER_SELECTORS) {
-                    try { if (menuContainer.matches(sel)) { containerSel = sel; break; } } catch(e) {}
-                }
-                if (!containerSel) containerSel = menuContainer.tagName.toLowerCase();
-                const itemTag = menuItem ? menuItem.tagName.toLowerCase() : el.tagName.toLowerCase();
-                const escapedText = textoFinal.replace(/["\\\\]/g, '\\\\$&');
-                return containerSel + ' ' + itemTag + ':has-text("' + escapedText + '")';
-            }
-        }
-
-        // ── Calendário PrimeNG: dia clicado ──────────────────────────────────
-        const calendarCell = el.closest('.ui-datepicker-calendar td, .p-datepicker-calendar td');
-        if (calendarCell || (el.tagName.toLowerCase() === 'a' && el.closest('.ui-datepicker, .p-datepicker'))) {
-            const dayText = (el.innerText || el.textContent || '').trim();
-            if (dayText && /^\\d{1,2}$/.test(dayText)) {
-                const calHost = el.closest('p-calendar, .ui-calendar, span.ui-calendar');
-                if (calHost) {
-                    const inp = calHost.querySelector('input:not([type="hidden"])');
-                    const iname = inp && (inp.getAttribute('name') || inp.getAttribute('formcontrolname'));
-                    if (iname) return addModalScope("span.ui-calendar:has([name='" + iname + "']) a:text-is('" + dayText + "')");
-                }
-                return addModalScope(".ui-datepicker a:text-is('" + dayText + "')");
-            }
-        }
-
-        // ── Checkbox Angular/PrimeNG ─────────────────────────────────────────
-        const customCheckbox = el.closest('p-checkbox, mat-checkbox, [role="checkbox"], .ui-chkbox');
-        if (customCheckbox) {
-            let cliqueInterno = customCheckbox.tagName.toLowerCase();
-            if (cliqueInterno === 'p-checkbox') cliqueInterno = 'p-checkbox .ui-chkbox-box';
-            else if (customCheckbox.classList.contains('ui-chkbox')) cliqueInterno = '.ui-chkbox .ui-chkbox-box';
-            const parentRow = customCheckbox.closest('tr, item, li, .ui-g, .list-item, .row');
-            if (parentRow) {
-                let text = (parentRow.textContent || '').replace(/\\s+/g, ' ').trim();
-                if (text.length > 2) {
-                    const cleanText = text.substring(0, 40).replace(/['"\\\\/]/g, '');
-                    let pTag = parentRow.tagName.toLowerCase();
-                    if (pTag === 'div' && parentRow.classList.contains('ui-g')) pTag = '.ui-g';
-                    return addModalScope(pTag + ':has-text("' + cleanText + '") ' + cliqueInterno);
-                }
-            }
-            const parentComId = customCheckbox.closest('[id]:not([id*="ng-"]):not([id*="mat-"])');
-            if (parentComId && parentComId.id)
-                return addModalScope(parentComId.tagName.toLowerCase() + '#' + parentComId.id + ' ' + cliqueInterno);
-        }
-
-        // ── PrimeNG composite components ─────────────────────────────────────
-        const resolvePrimeNG = (el) => {
-            let suffix = '', partName = '', hostId = '';
-            if (el.closest('.ui-datepicker-trigger, button[icon*="calendar"], p-calendar button, .ui-calendar button'))
-                { suffix = 'button'; partName = 'calendar_trigger'; hostId = 'p-calendar'; }
-            else if (el.closest('.ui-dropdown-trigger, .p-dropdown-trigger'))
-                { suffix = '.ui-dropdown-trigger'; partName = 'dropdown_trigger'; hostId = 'p-dropdown'; }
-            else if (el.closest('.ui-dropdown-label, .p-dropdown-label'))
-                { suffix = '.ui-dropdown-label'; partName = 'label'; hostId = 'p-dropdown'; }
-            else if (el.closest('.ui-multiselect-trigger, .p-multiselect-trigger'))
-                { suffix = '.ui-multiselect-trigger'; partName = 'trigger'; hostId = 'p-multiselect'; }
-            else if (el.closest('.ui-spinner-up, .p-inputnumber-button-up'))
-                { suffix = '.ui-spinner-up'; partName = 'increment'; hostId = 'p-spinner'; }
-            else if (el.closest('.ui-spinner-down, .p-inputnumber-button-down'))
-                { suffix = '.ui-spinner-down'; partName = 'decrement'; hostId = 'p-spinner'; }
-            else if (el.closest('.ui-splitbutton-menubutton, .p-splitbutton-menubutton'))
-                { suffix = '.ui-splitbutton-menubutton'; partName = 'menu_trigger'; hostId = 'p-splitbutton'; }
-            else if (el.closest('.ui-inputswitch-slider, .p-inputswitch-slider'))
-                { suffix = '.ui-inputswitch-slider'; partName = 'slider'; hostId = 'p-inputswitch'; }
-            else if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, s-autocomplete button, .ui-autocomplete-dropdown'))
-                { suffix = 'button'; partName = 'search_button'; hostId = 'p-autocomplete'; }
-            else if (modalAncestor && (el.tagName.toLowerCase() === 'button' || el.closest('button')))
-                { suffix = 'button'; partName = 'modal_button'; hostId = 'p-dialog'; }
-            else if (el.tagName.toLowerCase() === 'input' || el.closest('input')) {
-                const primeHost = el.closest('p-autocomplete, .ui-autocomplete, p-calendar, .ui-calendar, p-spinner, .ui-spinner, p-chips, .ui-chips, .p-inputgroup, .ui-inputgroup, s-autocomplete');
-                if (primeHost) {
-                    suffix = 'input'; partName = 'input';
-                    hostId = primeHost.tagName.toLowerCase().includes('calendar') ? 'p-calendar' :
-                             primeHost.tagName.toLowerCase().includes('spinner') ? 'p-spinner' :
-                             primeHost.tagName.toLowerCase().includes('chips') ? 'p-chips' : 'p-autocomplete';
-                }
-            }
-            if (!suffix) return null;
-
-            let cur = el, identifier = '', borrowedFromInput = false;
-            for (let i = 0; i < 8; i++) {
-                if (!cur) break;
-                const name = cur.getAttribute('name') || cur.getAttribute('formcontrolname');
-                const testid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
-                const idAttr = cur.id && !cur.id.match(/(ng-|mat-|cdk-|^\\d)/) && !cur.id.includes('autocomplete') ? cur.id : null;
-                if (name) { identifier = "[name='" + name + "']"; break; }
-                if (testid) { identifier = "[data-testid='" + testid + "']"; break; }
-                if (idAttr) { identifier = '#' + idAttr; break; }
-                if (cur.tagName.toLowerCase().startsWith('p-') || cur.classList.contains('ui-calendar') || cur.classList.contains('ui-autocomplete') || cur.classList.contains('ui-dropdown') || cur.classList.contains('ui-multiselect') || cur.classList.contains('ui-inputgroup')) {
-                    const innerInput = cur.querySelector('input:not([type="hidden"])');
-                    if (innerInput && innerInput !== el) {
-                        const iname = innerInput.getAttribute('name') || innerInput.getAttribute('formcontrolname');
-                        if (iname) { identifier = "[name='" + iname + "']"; borrowedFromInput = true; break; }
-                        const itest = innerInput.getAttribute('data-testid') || innerInput.getAttribute('data-test');
-                        if (itest) { identifier = "[data-testid='" + itest + "']"; borrowedFromInput = true; break; }
-                        const iid = innerInput.id && !innerInput.id.match(/(ng-|mat-|cdk-|^\\d)/) && !innerInput.id.includes('autocomplete') ? innerInput.id : null;
-                        if (iid) { identifier = '#' + iid; borrowedFromInput = true; break; }
-                    }
-                }
-                cur = cur.parentElement;
-            }
-            if (identifier) {
-                if (borrowedFromInput) {
-                    const wrapperTag = cur.tagName.toLowerCase();
-                    let wrapperClass = '';
-                    const c = Array.from(cur.classList).find(cls => cls.startsWith('ui-') || cls.startsWith('p-'));
-                    if (c) wrapperClass = '.' + c;
-                    return addModalScope(wrapperTag + wrapperClass + ':has(' + identifier + ') ' + suffix);
-                }
-                let isSameElement = false;
-                try { isSameElement = (cur === el) || cur.matches(suffix); } catch(e) {}
-                if (isSameElement) {
-                    const tagPart = suffix.split('.')[0];
-                    const tag = ['input', 'button'].includes(tagPart) ? tagPart : cur.tagName.toLowerCase();
-                    return addModalScope(tag + identifier);
-                }
-                return addModalScope(identifier + ' ' + suffix);
-            }
-            return addModalScope(hostId + ' ' + suffix);
-        };
-
-        const primeResult = resolvePrimeNG(el);
-        if (primeResult) return primeResult;
-
-        // ── Fallback genérico: sobe 8 níveis buscando atributo estável ───────
         let cur = el;
         for (let i = 0; i < 8; i++) {
             if (!cur) break;
             const tid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
-            if (tid) return addModalScope("[data-testid='" + tid + "']");
+            if (tid) return '[data-testid=\"' + tid + '\"]';
             const aria = cur.getAttribute('aria-label');
-            if (aria) return addModalScope("[aria-label='" + aria + "']");
+            if (aria) return '[aria-label=\"' + aria + '\"]';
             const name = cur.getAttribute('name');
-            if (name && name.length < 40) return addModalScope("[name='" + name + "']");
+            if (name && name.length < 40) return '[name=\"' + name + '\"]';
             if (cur.id && !cur.id.match(/^[\\d\\-_]/) && !cur.id.match(/ng-|mat-|cdk-/))
-                return addModalScope("[id='" + cur.id + "']");
+                return '[id=\"' + cur.id + '\"]';
             cur = cur.parentElement;
         }
-        const ph = el.getAttribute('placeholder');
-        if (ph) return addModalScope("[placeholder='" + ph + "']");
-        const role = el.getAttribute('role');
-        if (role && role !== 'presentation') {
-            const t = (el.innerText || '').trim().replace(/\\n/g, ' ');
-            if (t && t.length < 50) return addModalScope("[role='" + role + "']:has-text('" + t + "')");
-        }
-        const txt = (el.innerText || '').trim().replace(/\\n/g, ' ');
-        if (txt && txt.length > 1 && txt.length < 50) return addModalScope('text="' + txt + '"');
-        const parentAria = el.closest('[aria-label]')?.getAttribute('aria-label');
-        if (parentAria) return addModalScope("[aria-label='" + parentAria + "'] " + el.tagName.toLowerCase());
-        // Último recurso: nth-child (frágil, mas melhor que nada)
+        const txt = (el.innerText || '').trim();
+        if (txt && txt.length > 1 && txt.length < 50) return 'text=\"' + txt + '\"';
         const siblings = Array.from(el.parentElement?.children || []);
-        return addModalScope(el.tagName.toLowerCase() + ':nth-child(' + (siblings.indexOf(el) + 1) + ')');
+        return el.tagName.toLowerCase() + ':nth-child(' + (siblings.indexOf(el) + 1) + ')';
     }
 """
+
+# Carrega o getBestSelector do radar_script.js na inicialização
+_JS_GET_BEST_SELECTOR = _carregar_getBestSelector()
+logger.info(f"[HITL] getBestSelector carregado ({len(_JS_GET_BEST_SELECTOR)} chars)")
+
 
 _JS_OVERLAY = """
 (params) => {
@@ -634,7 +426,7 @@ _JS_OVERLAY = """
         </div>
         <div class="hitl-body">
             <div class="hitl-msg">${mensagem}</div>
-            ${nomeAcao ? `<div class="hitl-acao-tag">→ ${nomeAcao}</div>` : ''}
+            ${nomeAcao ? `<div class="hitl-acao-tag">-> ${nomeAcao}</div>` : ''}
             <div class="hitl-instrucao">⟶ ${instrucao}</div>
             <div class="hitl-btns" id="hitl-btns-container"></div>
             <div class="hitl-radar-msg" id="hitl-radar-msg">
@@ -1497,9 +1289,7 @@ class EnhancedRadarSystem:
                 // Não captura cliques nos overlays do HITL
                 if (e.target.closest('#hitl-overlay') || e.target.closest('#hitl-navigator')) return;
 
-                e.preventDefault();
-                e.stopPropagation();
-
+                // NÃO cancela o evento — deixa o clique acontecer normalmente
                 window.__hitlRadarAtivo = false;
                 document.removeEventListener('click', handler, true);
 
@@ -1632,7 +1422,7 @@ class HitlValidator:
             "intervencoes":         0,  # Mantido para compatibilidade
             "acoes_puladas":        0,  # Ações puladas pelo analista
         }
-        # Mapa intencao_semantica → seletor_corrigido
+        # Mapa intencao_semantica -> seletor_corrigido
         # Usado ao final para reescrever o roteiro JSON
         self._correcoes_seletores: dict = {}
         # Flag de desvio de estado — propagada do checkpoint para o próximo passo
@@ -1656,6 +1446,10 @@ class HitlValidator:
         self._is_navigator_open: bool = False
         # Decisão do analista no relatório final ('gravar' ou 'fechar')
         self._decisao_relatorio: str = "fechar"
+        # Flag para controlar injeção de radar em frames dinâmicos
+        self._radar_frame_handler_active: bool = False
+        # Script dormant — injetado em todos os frames para captura de clique
+        self._dormant_script: str = ""
 
     # ─── Setup da captura de clique humano ────────────────────────────────────
 
@@ -1669,6 +1463,7 @@ class HitlValidator:
             try:
                 payload = await args.json_value()
                 dados   = json.loads(payload) if isinstance(payload, str) else payload
+                logger.info(f"[HITL] _on_captura recebeu: {str(dados)[:200]}")
 
                 # Captura de seletor (radar ativo)
                 if "seletor" in dados:
@@ -1703,12 +1498,25 @@ class HitlValidator:
             except Exception as e:
                 logger.warning(f"Captura humana falhou: {e}")
 
-        # Expõe o binding no contexto do browser
+        # Expõe o binding principal (handle=True) — usado pelos botões do overlay
         await page.context.expose_binding(
             "__hitl_captura__",
             _on_captura,
             handle=True,
         )
+
+        # Expõe binding SIMPLES para o radar (sem handle=True)
+        # expose_function é mais confiável em iframes — recebe o valor diretamente
+        async def _on_radar_captura(seletor: str, label: str):
+            try:
+                logger.info(f"[HITL] _on_radar_captura recebeu: seletor={seletor[:80]}")
+                self._captura_seletor = seletor
+                self._decisao_humana = {"acao": "capturou", "seletor": seletor, "label": label}
+                self._evento_humano.set()
+            except Exception as e:
+                logger.warning(f"[HITL] _on_radar_captura falhou: {e}")
+
+        await page.context.expose_function("__hitl_radar__", _on_radar_captura)
 
         # Inicializa componentes novos
         self._auto_play_controller = AutoPlayController()
@@ -1755,9 +1563,7 @@ class HitlValidator:
                 // Não captura cliques nos botões do próprio overlay
                 if (e.target.closest('#hitl-overlay')) return;
 
-                e.preventDefault();
-                e.stopPropagation();
-
+                // NÃO cancela o evento — deixa o clique acontecer normalmente
                 window.__hitlRadarAtivo = false;
                 document.removeEventListener('click', handler, true);
 
@@ -1883,7 +1689,7 @@ class HitlValidator:
         label = alvo.get("label_curto", "")
         acao_tipo = acao_tec.get("acao", "clique")
         intencao = acao_tec.get("intencao_semantica", "")[:60]
-        descricao = f'"{acao_tipo} → {label}"' if label else f'"{intencao}"'
+        descricao = f'"{acao_tipo} -> {label}"' if label else f'"{intencao}"'
 
         # Camada que acertou (ex: "via Brain", "via Sniper")
         camada_display = camada if camada else "—"
@@ -1906,7 +1712,7 @@ class HitlValidator:
         })
 
         logger.info(
-            f"[STEP] {'✅' if resultado else '❌'} {acao_tipo} → {label} "
+            f"[STEP] {'✅' if resultado else '❌'} {acao_tipo} -> {label} "
             f"| Passo {passo_atual}/{passo_total} Ação {acao_atual}/{acao_total} "
             f"| via {camada_display}"
         )
@@ -1972,6 +1778,38 @@ class HitlValidator:
         self._evento_humano.clear()
         self._decisao_humana = {}
 
+        # Canal de comunicação alternativo via console.log
+        # Funciona em TODOS os frames (Playwright captura console de iframes)
+        # Se o binding falhar, o handler faz console.log com prefixo especial
+        def _on_console_radar(msg):
+            text = msg.text
+            if text.startswith('__HITL_RADAR_CAPTURA__:'):
+                try:
+                    json_str = text[len('__HITL_RADAR_CAPTURA__:'):]
+                    dados = json.loads(json_str)
+                    logger.info(f"[STEP] Radar capturou via console fallback: {dados.get('seletor', '')[:80]}")
+                    self._captura_seletor = dados.get("seletor", "")
+                    self._decisao_humana = {"acao": "capturou", "seletor": self._captura_seletor}
+                    self._evento_humano.set()
+                except Exception as ex:
+                    logger.warning(f"[STEP] Erro parsing console radar: {ex}")
+
+        page.on("console", _on_console_radar)
+
+        # RESET: Limpa flag __hitlRadarStepAtivo em TODOS os frames antes de re-injetar
+        # Isso garante que o radar pode ser ativado múltiplas vezes sem ficar travado
+        try:
+            await page.evaluate("() => { window.__hitlRadarStepAtivo = false; }")
+        except Exception:
+            pass
+        for frame in page.frames:
+            if frame == page.main_frame:
+                continue
+            try:
+                await frame.evaluate("() => { window.__hitlRadarStepAtivo = false; }")
+            except Exception:
+                pass
+
         # 1. Mostra indicador visual no frame principal (overlay está lá)
         # Injeta CSS de animação primeiro
         await page.evaluate("""() => {
@@ -2029,7 +1867,7 @@ class HitlValidator:
             }
         }""")
 
-        # Countdown timer no frame principal (120s → 0)
+        # Countdown timer no frame principal (120s -> 0)
         await page.evaluate("""() => {
             if (window.__hitlRadarCountdownId) clearInterval(window.__hitlRadarCountdownId);
             let remaining = 120;
@@ -2050,8 +1888,8 @@ class HitlValidator:
         }""")
 
         # 2. Injeta listener de clique em TODOS os frames (main + iframes)
-        # IMPORTANTE: iframes não têm acesso ao binding expose_binding do contexto principal
-        # Solução: usar postMessage para comunicar do iframe com o frame principal
+        # Usa mousedown (mesmo que radar_script.js) com preventDefault para
+        # interceptar antes que o PrimeNG processe. postMessage é o canal primário.
         _radar_js = f"""() => {{
             if (window.__hitlRadarStepAtivo) return;
             window.__hitlRadarStepAtivo = true;
@@ -2059,62 +1897,131 @@ class HitlValidator:
             const getSelector = {_JS_GET_BEST_SELECTOR};
 
             const handler = (e) => {{
-                // Não captura cliques nos overlays (só existem no frame principal)
-                if (e.target.closest('#hitl-step-overlay')) return;
-                if (e.target.closest('#hitl-overlay')) return;
+                // Não captura cliques nos overlays
+                if (e.target.closest && (
+                    e.target.closest('#hitl-step-overlay') ||
+                    e.target.closest('#hitl-overlay') ||
+                    e.target.closest('#hitl-step-radar-msg')
+                )) return;
+                if (e.target.id === 'hitl-radar-cancel-btn') return;
 
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
 
                 window.__hitlRadarStepAtivo = false;
-                document.removeEventListener('click', handler, true);
+                document.removeEventListener('mousedown', handler, true);
 
                 const seletor = getSelector(e.target);
-                const label   = e.target.innerText?.trim()?.substring(0, 60)
+                const label   = (e.target.innerText || '').trim().substring(0, 60)
                               || e.target.getAttribute('aria-label')
                               || e.target.tagName.toLowerCase();
 
-                // Feedback visual imediato (cyan outline)
+                // Feedback visual
                 const prev = e.target.style.outline;
                 e.target.style.outline = '3px solid #00e5e5';
                 e.target.style.boxShadow = '0 0 16px #00e5e588';
-                setTimeout(() => {{
-                    e.target.style.outline = prev;
-                    e.target.style.boxShadow = '';
-                }}, 1200);
+                setTimeout(() => {{ e.target.style.outline = prev; e.target.style.boxShadow = ''; }}, 1200);
 
-                // Se estamos em um iframe, usa postMessage para comunicar com o frame principal
+                // Canal 1: postMessage (síncrono, sobrevive à navegação do iframe)
                 if (window.self !== window.top) {{
-                    window.top.postMessage({{
-                        type: '__hitl_radar_captura__',
-                        seletor: seletor,
-                        label: label
-                    }}, '*');
-                }} else {{
-                    // Frame principal — chama binding diretamente
-                    if (window.__hitl_captura__) {{
-                        window.__hitl_captura__(JSON.stringify({{ seletor, label }}));
-                    }}
+                    window.top.postMessage({{ type: '__hitl_radar_captura__', seletor, label }}, '*');
+                }}
+
+                // Canal 2: __hitl_radar__ expose_function
+                if (typeof __hitl_radar__ === 'function') {{
+                    try {{ __hitl_radar__(seletor, label); }} catch(ex) {{}}
+                }} else if (window.__hitl_radar__) {{
+                    try {{ window.__hitl_radar__(seletor, label); }} catch(ex) {{}}
+                }}
+
+                // Canal 3: binding original
+                const binding = window.__hitl_captura__ || (typeof __hitl_captura__ === 'function' ? __hitl_captura__ : null);
+                if (binding) {{
+                    try {{ binding(JSON.stringify({{ seletor, label }})); }} catch(ex) {{}}
                 }}
             }};
 
-            document.addEventListener('click', handler, true);
+            document.addEventListener('mousedown', handler, true);
         }}"""
 
         # Injeta no frame principal
         try:
             await page.evaluate(_radar_js)
+            logger.info("[STEP] Radar injetado no frame principal")
         except Exception as e:
-            logger.debug(f"[STEP] Radar inject main frame: {e}")
+            logger.warning(f"[STEP] Radar inject main frame FALHOU: {e}")
 
         # Injeta em todos os iframes da página
+        frames_injetados = 0
+        frames_falha = 0
         for frame in page.frames:
             if frame == page.main_frame:
                 continue
             try:
+                # Verifica se o frame está acessível antes de injetar
+                await frame.evaluate("() => true")
                 await frame.evaluate(_radar_js)
+                frames_injetados += 1
             except Exception as e:
-                logger.debug(f"[STEP] Radar inject iframe '{frame.url[:60]}': {e}")
+                frames_falha += 1
+                logger.debug(f"[STEP] Radar inject iframe '{frame.name or frame.url[:40]}': {e}")
+
+        logger.info(f"[STEP] Radar: {frames_injetados} iframe(s) OK, {frames_falha} falha(s) de {len(page.frames) - 1} total")
+
+        # Diagnóstico: lista todos os frames e verifica se o handler está ativo
+        for frame in page.frames:
+            try:
+                is_main = frame == page.main_frame
+                ativo = await frame.evaluate("() => window.__hitlRadarStepAtivo === true")
+                dormant = await frame.evaluate("() => window.__hitlRadarDormantInstalled === true")
+                radar_fn = await frame.evaluate("() => typeof __hitl_radar__ === 'function' || typeof window.__hitl_radar__ === 'function'")
+                logger.info(f"[STEP] Frame {'[MAIN]' if is_main else frame.name or frame.url[:40]}: ativo={ativo}, dormant={dormant}, __hitl_radar__={radar_fn}")
+            except Exception as ex:
+                logger.debug(f"[STEP] Frame diagnóstico falhou: {ex}")
+
+        # FALLBACK CRÍTICO: Ativa o listener dormant (instalado via add_init_script)
+        # em TODOS os frames, incluindo os que falharam na injeção do radar completo.
+        # O listener dormant usa um getBestSelector simplificado mas funciona.
+        for frame in page.frames:
+            try:
+                # Seta a flag que ativa o listener dormant + injeta getBestSelector completo
+                await frame.evaluate(f"""() => {{
+                    window.__hitlRadarStepAtivo = true;
+                    if (!window.__hitlGetBestSelector) {{
+                        window.__hitlGetBestSelector = {_JS_GET_BEST_SELECTOR};
+                    }}
+                }}""")
+            except Exception:
+                pass
+
+        # Injeta radar em frames que aparecem DURANTE a sessão do radar
+        # (modais PrimeNG, iframes dinâmicos carregados após ativação)
+        self._radar_frame_handler_active = True
+
+        # Usa um único listener persistente que verifica a flag antes de injetar
+        # Evita empilhar múltiplos listeners em chamadas repetidas de "Corrigir"
+        if not getattr(self, '_radar_frame_listeners_installed', False):
+            self._radar_frame_listeners_installed = True
+            self._radar_js_current = _radar_js  # Referência ao JS atual
+
+            async def _inject_radar_in_new_frame(frame):
+                if not self._radar_frame_handler_active:
+                    return
+                try:
+                    await asyncio.sleep(0.3)  # Aguarda frame estabilizar
+                    if frame.is_detached():
+                        return
+                    await frame.evaluate(self._radar_js_current)
+                    logger.debug(f"[STEP] Radar injetado em novo frame: {frame.url[:60]}")
+                except Exception:
+                    pass
+
+            page.on("frameattached", lambda f: asyncio.create_task(_inject_radar_in_new_frame(f)))
+            page.on("framenavigated", lambda f: asyncio.create_task(_inject_radar_in_new_frame(f)) if f != page.main_frame else None)
+        else:
+            # Atualiza referência ao JS do radar (pode ter mudado se getBestSelector foi recarregado)
+            self._radar_js_current = _radar_js
 
         # 3. Setup listener para postMessage (captura cliques de iframes)
         await page.evaluate("""() => {
@@ -2123,12 +2030,18 @@ class HitlValidator:
 
             window.addEventListener('message', (e) => {
                 if (e.data && e.data.type === '__hitl_radar_captura__') {
-                    // Clique capturado em um iframe — repassa para o binding
-                    if (window.__hitl_captura__) {
-                        window.__hitl_captura__(JSON.stringify({
-                            seletor: e.data.seletor,
-                            label: e.data.label
-                        }));
+                    const { seletor, label } = e.data;
+                    console.log('[HITL Radar] postMessage recebido, seletor:', seletor);
+                    // Canal 1: __hitl_radar__ (expose_function simples)
+                    if (typeof __hitl_radar__ === 'function') {
+                        try { __hitl_radar__(seletor, label || ''); } catch(ex) {}
+                    } else if (window.__hitl_radar__) {
+                        try { window.__hitl_radar__(seletor, label || ''); } catch(ex) {}
+                    }
+                    // Canal 2: binding original
+                    const binding = window.__hitl_captura__ || (typeof __hitl_captura__ === 'function' ? __hitl_captura__ : null);
+                    if (binding) {
+                        try { binding(JSON.stringify({ seletor, label })); } catch(ex) {}
                     }
                 }
             }, false);
@@ -2139,6 +2052,8 @@ class HitlValidator:
             await asyncio.wait_for(self._evento_humano.wait(), timeout=120)
         except asyncio.TimeoutError:
             logger.warning("[STEP] Timeout de 120s no radar step — cancelando captura")
+            self._radar_frame_handler_active = False
+            page.remove_listener("console", _on_console_radar)
             # Desativa radar em todos os frames + limpa countdown
             _cleanup_js = """() => {
                 window.__hitlRadarStepAtivo = false;
@@ -2162,9 +2077,13 @@ class HitlValidator:
                     pass
             return ""
 
+        # Remove listener de console (já não precisa mais)
+        page.remove_listener("console", _on_console_radar)
+
         # Check if radar was cancelled by the analyst
         if self._decisao_humana.get("acao") == "radar_cancelado":
             logger.info("[STEP] Radar cancelado pelo analista")
+            self._radar_frame_handler_active = False
             # Limpa flag nos iframes
             for frame in page.frames:
                 if frame == page.main_frame:
@@ -2179,9 +2098,11 @@ class HitlValidator:
         seletor_capturado = self._decisao_humana.get("seletor", "")
         if not seletor_capturado:
             logger.warning("[STEP] Radar: nenhum seletor foi capturado")
+            self._radar_frame_handler_active = False
             return ""
 
         logger.info(f"[STEP] Seletor capturado via radar: {seletor_capturado}")
+        self._radar_frame_handler_active = False
 
         # Limpa countdown no frame principal após captura bem-sucedida
         try:
@@ -2442,7 +2363,7 @@ class HitlValidator:
             _registrar_sucesso_cache(
                 intencao, seletor=seletor_capturado, iframe=iframe, hitl_corrigido=True
             )
-            logger.info(f"Brain atualizado (hitl_corrigido=1): '{intencao[:60]}' → '{seletor_capturado}'")
+            logger.info(f"Brain atualizado (hitl_corrigido=1): '{intencao[:60]}' -> '{seletor_capturado}'")
 
             # Atualiza scores.db — correção HITL equivale a execução bem-sucedida
             # com confiança máxima (analista confirmou o elemento correto)
@@ -2535,8 +2456,8 @@ class HitlValidator:
         """
         Tenta executar uma ação usando vision_engine.
         Modo step-by-step: pausa APÓS cada ação para o analista validar.
-        Se confiança baixa → pausa preventiva (exceto em modo --silent).
-        Se falha total → pausa falha dura com opções de navegação e refazer.
+        Se confiança baixa -> pausa preventiva (exceto em modo --silent).
+        Se falha total -> pausa falha dura com opções de navegação e refazer.
 
         O modo auto (_modo_auto_restante > 0) permite pular N pausas
         consecutivas quando o analista confia no fluxo. Se uma ação falha
@@ -2575,7 +2496,7 @@ class HitlValidator:
                 sucesso = await encontrar_e_clicar(page, acao_corrigida)
                 return "ok" if sucesso else "pulou"
 
-            # 'confirmar' → tenta normalmente
+            # 'confirmar' -> tenta normalmente
 
         # ── Execução via vision_engine (todas as 7 camadas) ──────────────────
         sucesso = await encontrar_e_clicar(page, acao_tec)
@@ -2585,7 +2506,7 @@ class HitlValidator:
             # Se estava em modo auto, falha força volta ao step-by-step
             if self._modo_auto_restante > 0:
                 self._modo_auto_restante = 0
-                logger.info("Falha em modo auto → voltando para step-by-step")
+                logger.info("Falha em modo auto -> voltando para step-by-step")
 
             # Em modo step-by-step (não-silent): usa o overlay step-by-step com ❌
             # O analista pode corrigir, pular ou tentar refazer — sem o overlay vermelho antigo
@@ -2738,7 +2659,7 @@ class HitlValidator:
             )
             label  = acao_tec.get("elemento_alvo", {}).get("label_curto", "?")
             status = "✅" if resultado == "ok" else ("↩" if resultado == "refazer_passo" else "⏭")
-            print(f"   {status} {acao_tec.get('acao','?')} → {label}", flush=True)
+            print(f"   {status} {acao_tec.get('acao','?')} -> {label}", flush=True)
 
             if resultado == "refazer_passo":
                 pediu_refazer = True
@@ -2894,7 +2815,7 @@ class HitlValidator:
             _registrar_sucesso_cache(
                 intencao, seletor=seletor_capturado, iframe=iframe, hitl_corrigido=True
             )
-            logger.info(f"Brain atualizado (hitl_corrigido=1): '{intencao[:60]}' → '{seletor_capturado}'")
+            logger.info(f"Brain atualizado (hitl_corrigido=1): '{intencao[:60]}' -> '{seletor_capturado}'")
 
             # Atualiza scores.db — correção HITL equivale a execução bem-sucedida
             # com confiança máxima (analista confirmou o elemento correto)
@@ -3028,6 +2949,133 @@ class HitlValidator:
             # Configura captura de clique humano (binding Python ↔ JS) e inicializa componentes
             await self._setup_captura_humana(page)
 
+            # Instala listener de radar "dormant" em TODOS os frames via context
+            # context.add_init_script é executado em CADA frame (incluindo iframes)
+            # que carregar durante a sessão. Fica inativo até __hitlRadarStepAtivo = true.
+            await page.context.add_init_script("""
+                (() => {
+                    if (window.__hitlRadarDormantInstalled) return;
+                    window.__hitlRadarDormantInstalled = true;
+                    window.__hitlRadarStepAtivo = false;
+
+                    document.addEventListener('pointerdown', (e) => {
+                        if (!window.__hitlRadarStepAtivo) return;
+
+                        // Não captura cliques nos overlays
+                        if (e.target.closest && e.target.closest('#hitl-step-overlay, #hitl-overlay, #hitl-step-radar-msg')) return;
+                        if (e.target.id === 'hitl-radar-cancel-btn') return;
+
+                        // NÃO cancela o evento — deixa o clique acontecer normalmente na tela.
+                        // O radar só observa e captura o seletor, sem interferir na ação.
+
+                        // Gera seletor básico (fallback — o getBestSelector completo é injetado sob demanda)
+                        let seletor = '';
+                        if (window.__hitlGetBestSelector) {
+                            seletor = window.__hitlGetBestSelector(e.target);
+                        } else {
+                            // Fallback mínimo
+                            let cur = e.target;
+                            for (let i = 0; i < 8; i++) {
+                                if (!cur) break;
+                                const tid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
+                                if (tid) { seletor = '[data-testid=\"' + tid + '\"]'; break; }
+                                const aria = cur.getAttribute('aria-label');
+                                if (aria) { seletor = '[aria-label=\"' + aria + '\"]'; break; }
+                                const name = cur.getAttribute('name');
+                                if (name && name.length < 40) { seletor = '[name=\"' + name + '\"]'; break; }
+                                if (cur.id && !cur.id.match(/^[\\d\\-_]/) && !cur.id.match(/ng-|mat-|cdk-/))
+                                    { seletor = '[id=\"' + cur.id + '\"]'; break; }
+                                cur = cur.parentElement;
+                            }
+                            if (!seletor) {
+                                const txt = (e.target.innerText || '').trim();
+                                if (txt && txt.length > 1 && txt.length < 50) seletor = 'text=\"' + txt + '\"';
+                                else seletor = e.target.tagName.toLowerCase();
+                            }
+                        }
+
+                        const label = e.target.innerText?.trim()?.substring(0, 60)
+                                    || e.target.getAttribute('aria-label')
+                                    || e.target.tagName.toLowerCase();
+
+                        // Feedback visual
+                        const prev = e.target.style.outline;
+                        e.target.style.outline = '3px solid #00e5e5';
+                        e.target.style.boxShadow = '0 0 16px #00e5e588';
+                        setTimeout(() => { e.target.style.outline = prev; e.target.style.boxShadow = ''; }, 1200);
+
+                        // Envia via TODOS os canais
+                        const payload = JSON.stringify({ seletor, label });
+
+                        // Canal 1: __hitl_radar__ — expose_function simples, funciona em todos os frames
+                        if (typeof __hitl_radar__ === 'function') {
+                            try { __hitl_radar__(seletor, label); } catch(ex) {}
+                        } else if (window.__hitl_radar__) {
+                            try { window.__hitl_radar__(seletor, label); } catch(ex) {}
+                        }
+
+                        // Canal 2: binding original (para compatibilidade)
+                        const binding = window.__hitl_captura__ || (typeof __hitl_captura__ === 'function' ? __hitl_captura__ : null);
+                        if (binding) { try { binding(payload); } catch(ex) {} }
+
+                        // Canal 3: postMessage para frame principal
+                        if (window.self !== window.top) {
+                            try { window.top.postMessage({ type: '__hitl_radar_captura__', seletor, label }, '*'); } catch(ex) {}
+                        }
+
+                        window.__hitlRadarStepAtivo = false;
+                    }, true);
+                })();
+            """)
+
+            # add_init_script só roda em frames que carregam DEPOIS do registro.
+            # Injeta o script dormant também em todos os frames JÁ existentes.
+            self._dormant_script = """() => {
+                if (window.__hitlRadarDormantInstalled) return;
+                window.__hitlRadarDormantInstalled = true;
+                window.__hitlRadarStepAtivo = false;
+                document.addEventListener('pointerdown', (e) => {
+                    if (!window.__hitlRadarStepAtivo) return;
+                    if (e.target.closest && e.target.closest('#hitl-step-overlay, #hitl-overlay, #hitl-step-radar-msg')) return;
+                    if (e.target.id === 'hitl-radar-cancel-btn') return;
+                    // NÃO cancela o evento — deixa o clique acontecer normalmente na tela.
+                    let seletor = '';
+                    if (window.__hitlGetBestSelector) { seletor = window.__hitlGetBestSelector(e.target); }
+                    else {
+                        let cur = e.target;
+                        for (let i = 0; i < 8; i++) {
+                            if (!cur) break;
+                            const tid = cur.getAttribute('data-testid') || cur.getAttribute('data-test');
+                            if (tid) { seletor = '[data-testid="' + tid + '"]'; break; }
+                            const aria = cur.getAttribute('aria-label');
+                            if (aria) { seletor = '[aria-label="' + aria + '"]'; break; }
+                            const name = cur.getAttribute('name');
+                            if (name && name.length < 40) { seletor = '[name="' + name + '"]'; break; }
+                            if (cur.id && !cur.id.match(/^[\\d\\-_]/) && !cur.id.match(/ng-|mat-|cdk-/))
+                                { seletor = '[id="' + cur.id + '"]'; break; }
+                            cur = cur.parentElement;
+                        }
+                        if (!seletor) { const txt = (e.target.innerText||'').trim(); seletor = (txt&&txt.length>1&&txt.length<50) ? 'text="'+txt+'"' : e.target.tagName.toLowerCase(); }
+                    }
+                    const label = e.target.innerText?.trim()?.substring(0,60) || e.target.getAttribute('aria-label') || e.target.tagName.toLowerCase();
+                    const prev = e.target.style.outline;
+                    e.target.style.outline = '3px solid #00e5e5';
+                    e.target.style.boxShadow = '0 0 16px #00e5e588';
+                    setTimeout(() => { e.target.style.outline = prev; e.target.style.boxShadow = ''; }, 1200);
+                    if (typeof __hitl_radar__ === 'function') { try { __hitl_radar__(seletor, label); } catch(ex) {} }
+                    else if (window.__hitl_radar__) { try { window.__hitl_radar__(seletor, label); } catch(ex) {} }
+                    const binding = window.__hitl_captura__ || (typeof __hitl_captura__ === 'function' ? __hitl_captura__ : null);
+                    if (binding) { try { binding(JSON.stringify({seletor, label})); } catch(ex) {} }
+                    if (window.self !== window.top) { try { window.top.postMessage({type:'__hitl_radar_captura__',seletor,label},'*'); } catch(ex) {} }
+                    window.__hitlRadarStepAtivo = false;
+                }, true);
+            for frame in page.frames:
+                try:
+                    await frame.evaluate(self._dormant_script)
+                    logger.debug(f"[HITL] Dormant listener injetado em frame existente: {frame.name or frame.url[:40]}")
+                except Exception:
+                    pass
+
             # Configura listener para re-injetar botão após navegações de página
             await self._setup_persistent_pause_button(page)
 
@@ -3036,6 +3084,7 @@ class HitlValidator:
             # Mesmo padrão do capture_dual_output: frameattached + framenavigated
             async def _reinjetar_binding_em_frame(frame):
                 """Garante que o binding está disponível em frames novos/navegados."""
+                logger.info(f"[HITL] Novo frame detectado: {frame.name or frame.url[:60]}")
                 for _ in range(3):  # até 3 tentativas com delay crescente
                     try:
                         if frame.is_detached():
@@ -3043,9 +3092,17 @@ class HitlValidator:
                         await asyncio.sleep(0.15)
                         if frame.is_detached():
                             return
-                        # O expose_binding já foi registrado no context — só precisa
-                        # garantir que o frame não está em estado inválido
-                        await frame.evaluate("() => true")
+                        # Injeta o script dormant no novo frame
+                        await frame.evaluate(self._dormant_script)
+                        # Se o radar estiver ativo, ativa também neste frame
+                        if self._radar_frame_handler_active:
+                            await frame.evaluate(f"""() => {{
+                                window.__hitlRadarStepAtivo = true;
+                                if (!window.__hitlGetBestSelector) {{
+                                    window.__hitlGetBestSelector = {_JS_GET_BEST_SELECTOR};
+                                }}
+                            }}""")
+                            logger.info(f"[HITL] Radar ativado em novo frame: {frame.name or frame.url[:40]}")
                         return
                     except Exception:
                         await asyncio.sleep(0.3)
@@ -3096,7 +3153,7 @@ class HitlValidator:
         """
         Loop principal step-by-step (PADRÃO).
         Executa uma ação por vez, pausa após cada uma para o analista validar.
-        Usa _executar_passo → _executar_acao_com_hitl que respeita _modo_auto_restante.
+        Usa _executar_passo -> _executar_acao_com_hitl que respeita _modo_auto_restante.
         """
         idx = 0
         while idx < len(passos):
@@ -3280,7 +3337,7 @@ class HitlValidator:
             resultado = await self._executar_acao_auto_play(page, acao_tec)
             label  = acao_tec.get("elemento_alvo", {}).get("label_curto", "?")
             status = "✅" if resultado == "ok" else ("❌" if resultado == "error" else "⏭")
-            print(f"   {status} {acao_tec.get('acao','?')} → {label}", flush=True)
+            print(f"   {status} {acao_tec.get('acao','?')} -> {label}", flush=True)
 
             if resultado == "error":
                 # Falha real - pausa automática

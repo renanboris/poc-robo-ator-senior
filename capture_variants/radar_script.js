@@ -75,7 +75,7 @@ const getElementName = (el) => {
         // Tenta o id como label legível quando contém texto descritivo (ex: menu-item-Senior Flow)
         const elId = cur.getAttribute('id') || '';
         if (elId && !elId.match(/^(ng-|mat-|cdk-|\d)/) && elId.includes('-') && elId.length < 60) {
-            // Extrai a parte descritiva do id (ex: "menu-item-Senior Flow" → "Senior Flow")
+            // Extrai a parte descritiva do id (ex: "menu-item-Senior Flow" -> "Senior Flow")
             const partes = elId.split('-');
             const descritivo = partes.slice(2).join(' ').trim();
             if (descritivo && descritivo.length > 2) return descritivo;
@@ -170,6 +170,46 @@ const resolvePrimeNGComponent = (el) => {
         suffix = '.ui-fileupload-choose'; partName = 'choose_button'; hostId = 'p-fileupload';
     } else if (el.closest('button.button-addon, button.ui-autocomplete-dropdown, s-autocomplete button, .ui-autocomplete-dropdown')) {
         suffix = 'button'; partName = 'search_button'; hostId = 'p-autocomplete';
+        // SENIOR X: botão de lupa dentro de s-lookup — tenta usar o name do input interno como âncora
+        // Estrutura: s-lookup > div.inputgroup > p-autocomplete > input[name='e070emp'] + button.button-addon
+        // O seletor correto é: [name='e070emp'] ~ button.button-addon (irmão do input com esse name)
+        const sLookup = el.closest('s-lookup');
+        if (sLookup) {
+            // Estratégia 1: roubar o name do input interno do p-autocomplete
+            const innerInput = sLookup.querySelector('input[name]:not([type="hidden"])');
+            if (innerInput) {
+                const inputName = innerInput.getAttribute('name') || innerInput.getAttribute('formcontrolname');
+                if (inputName) {
+                    return {
+                        seletor: addModalScope(`[name='${inputName}'] ~ button.button-addon`),
+                        componentType: 's-lookup:search_button',
+                        partName: 'search_button',
+                        identifier: `[name='${inputName}']`
+                    };
+                }
+            }
+            // Estratégia 2: tooltipposition do s-lookup
+            const tooltip = sLookup.getAttribute('tooltipposition') || sLookup.getAttribute('tooltip');
+            if (tooltip) {
+                return {
+                    seletor: addModalScope(`s-lookup[tooltipposition="${tooltip}"] button.button-addon`),
+                    componentType: 's-lookup:search_button',
+                    partName: 'search_button',
+                    identifier: `[tooltipposition="${tooltip}"]`
+                };
+            }
+            // Estratégia 3: posição ordinal (último recurso)
+            const allLookups = Array.from(document.querySelectorAll('s-lookup'));
+            const idx = allLookups.indexOf(sLookup);
+            if (idx >= 0) {
+                return {
+                    seletor: addModalScope(`s-lookup:nth-of-type(${idx + 1}) button.button-addon`),
+                    componentType: 's-lookup:search_button',
+                    partName: 'search_button',
+                    identifier: `:nth-of-type(${idx + 1})`
+                };
+            }
+        }
     } else if (el.closest('button.ui-button-icon-only, button[pbutton]')) {
         // Genérico em um inputgroup
         const primeHost = el.closest('.p-inputgroup, .ui-inputgroup');
@@ -431,8 +471,8 @@ const getBestSelector = (el) => {
     // ngx-contextmenu, PrimeNG p-contextmenu, dropdown-menu, etc.), o seletor
     // deve incluir o escopo do container do menu para evitar ambiguidade.
     //
-    // Sem escopo: text="Editar" → pode clicar no botão "Editar" da toolbar
-    // Com escopo: .ngx-contextmenu li:has-text("Editar") → sempre o item do menu
+    // Sem escopo: text="Editar" -> pode clicar no botão "Editar" da toolbar
+    // Com escopo: .ngx-contextmenu li:has-text("Editar") -> sempre o item do menu
     //
     // Funciona para: ngx-contextmenu, CDK overlay, PrimeNG, Bootstrap dropdown,
     // Material menu, e qualquer container com role="menu".

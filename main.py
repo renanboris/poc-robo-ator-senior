@@ -364,6 +364,7 @@ def renderizar_video_final(
 
         mp4_path = os.path.join("videos_prontos", f"{nome_arquivo_base}.mp4")
         srt_path = os.path.join("videos_prontos", f"{nome_arquivo_base}.srt")
+        temp_audio_path = os.path.join("videos_prontos", f"{nome_arquivo_base}_TEMP_audio.mp4")
 
         video.write_videofile(
             mp4_path,
@@ -372,6 +373,7 @@ def renderizar_video_final(
             fps=30,
             preset="medium",
             ffmpeg_params=["-crf", "18", "-pix_fmt", "yuv420p"],
+            temp_audiofile=temp_audio_path,
             logger=CustomRenderLogger(),
         )
         gerar_arquivo_srt(timeline, srt_path)
@@ -382,6 +384,10 @@ def renderizar_video_final(
     finally:
         if video:
             try: video.close()
+            except: pass
+        # Remove arquivo de áudio temporário do moviepy, se sobrar
+        if 'temp_audio_path' in locals() and os.path.exists(temp_audio_path):
+            try: os.remove(temp_audio_path)
             except: pass
 
         for clipe in clipes_audio:
