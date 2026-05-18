@@ -1,5 +1,6 @@
 """Pipeline orchestration for the ingestion pipeline."""
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -189,7 +190,7 @@ class IngestionPipeline:
             )
             raise
 
-    def run(
+    async def run(
         self,
         sitemap_url: str,
         incremental: bool = False,
@@ -208,20 +209,13 @@ class IngestionPipeline:
         start_time = datetime.now()
 
         # Initialize metrics
-        urls_discovered = 0
-        urls_fetched = 0
-        urls_validated = 0
-        chunks_created = 0
-        embeddings_generated = 0
-        vectors_injected = 0
-
-        failed_fetches = 0
-        failed_validations = 0
-        failed_embeddings = 0
-        failed_upserts = 0
-        skipped_low_quality = 0
-        urls_skipped_cached = 0
-        urls_skipped_module_filter = 0
+        metrics = {
+            "urls_discovered": 0, "urls_fetched": 0, "urls_validated": 0,
+            "chunks_created": 0, "embeddings_generated": 0, "vectors_injected": 0,
+            "failed_fetches": 0, "failed_validations": 0, "failed_embeddings": 0,
+            "failed_upserts": 0, "skipped_low_quality": 0, "urls_skipped_cached": 0,
+            "urls_skipped_module_filter": 0, "processed_count": 0
+        }
 
         # Load cache if incremental mode
         if incremental:
@@ -232,8 +226,8 @@ class IngestionPipeline:
             logger.info(f"Starting pipeline for sitemap: {sitemap_url}")
             self.crawler = SitemapCrawler(sitemap_url)
             urls = self.crawler.crawl()  # Call directly without run_stage
-            urls_discovered = len(urls)
-            logger.info(f"Discovery completed: {urls_discovered} URLs found")
+            metrics["urls_discovered"] = len(urls)
+            logger.info(f"Discovery completed: {metrics['urls_discovered']} URLs found")
 
             # Apply module filter if specified
             if module_filter:
@@ -243,122 +237,154 @@ class IngestionPipeline:
                     # Extract nivel_2 from URL to check if it matches the filter
                     breadcrumbs = self.extractor.extract_breadcrumbs(url)
 
-                    if breadcrumbs["nivel_2"] == module_filter.lower():
+                    if module_filter.lower() in url.lower():
                         filtered_urls.append(url)
                     else:
-                        urls_skipped_module_filter += 1
+                        metrics["urls_skipped_module_filter"] += 1
 
                 urls = filtered_urls
                 logger.info(f"Module filter applied: {len(urls)} URLs match module '{module_filter}'")
 
-            # Stage 2-6: Process each URL
+            # Stage 2-6: Process each URL asynchronously
             all_vectors = []
             total_urls = len(urls)
+            
+            semaphore = asyncio.Semaphore(5)  # Limite de 5 browsers simultâneos para não explodir memória
+            print_lock = asyncio.Lock()
 
-            for idx, url in enumerate(urls, 1):
-                # Progress display
-                pct = (idx / total_urls) * 100
-                short_url = url.split('/')[-1] if '/' in url else url
-                print(f"\r[{idx}/{total_urls}] ({pct:.0f}%) Processando: {short_url[:50]:<50}", end="", flush=True)
+            async def process_url(idx: int, url: str):
+                async with semaphore:
+                    short_url = url.split('/')[-1] if '/' in url else url
+                    
+                    try:
+                        # Stage 2: Extraction (async)
+                        content = await self.extractor.extract_content(url)
 
-                try:
-                    # Stage 2: Extraction
-                    content = self.extractor.extract_content(url)
+                        if not content:
+                            async with print_lock:
+                                metrics["processed_count"] += 1
+                                pct = (metrics["processed_count"] / total_urls) * 100
+                                print(f"\r[{metrics['processed_count']}/{total_urls}] ({pct:.0f}%) ❌ FALHOU (sem conteúdo): {short_url[:50]:<50}", end="", flush=True)
+                            metrics["failed_fetches"] += 1
+                            return None
 
-                    if not content:
-                        print(f"\r[{idx}/{total_urls}] ❌ FALHOU (sem conteúdo): {short_url[:60]}")
-                        failed_fetches += 1
-                        continue
+                        metrics["urls_fetched"] += 1
 
-                    urls_fetched += 1
+                        # Check cache in incremental mode
+                        if incremental and self._is_cached(url, content["markdown"]):
+                            log_url_processing(url, "cache", "skipped")
+                            async with print_lock:
+                                metrics["processed_count"] += 1
+                                pct = (metrics["processed_count"] / total_urls) * 100
+                                print(f"\r[{metrics['processed_count']}/{total_urls}] ({pct:.0f}%) ⏭️  CACHE SKIP: {short_url[:50]:<50}", end="", flush=True)
+                            metrics["urls_skipped_cached"] += 1
+                            return None
 
-                    # Check cache in incremental mode
-                    if incremental and self._is_cached(url, content["markdown"]):
-                        log_url_processing(url, "cache", "skipped")
-                        urls_skipped_cached += 1
-                        continue
+                        # Stage 3: Validation (sync -> thread)
+                        is_valid, reason = await asyncio.to_thread(self.validator.validate, content)
 
-                    # Stage 3: Validation
-                    is_valid, reason = self.validator.validate(content)
+                        if not is_valid:
+                            async with print_lock:
+                                metrics["processed_count"] += 1
+                                pct = (metrics["processed_count"] / total_urls) * 100
+                                print(f"\r[{metrics['processed_count']}/{total_urls}] ({pct:.0f}%) ⚠️  SKIP ({reason[:20]}): {short_url[:40]:<40}", end="", flush=True)
+                            metrics["failed_validations"] += 1
+                            metrics["skipped_low_quality"] += 1
+                            return None
 
-                    if not is_valid:
-                        print(f"\r[{idx}/{total_urls}] ⚠️  SKIP ({reason[:30]}): {short_url[:50]}")
-                        failed_validations += 1
-                        skipped_low_quality += 1
-                        continue
+                        metrics["urls_validated"] += 1
 
-                    urls_validated += 1
+                        # Stage 4: Chunking (sync -> thread)
+                        chunks = await asyncio.to_thread(
+                            self.chunker.chunk_content,
+                            markdown=content["markdown"],
+                            metadata={
+                                "url": content["url"],
+                                "titulo": content["titulo"],
+                                "nivel_1": content["nivel_1"],
+                                "nivel_2": content["nivel_2"],
+                                "nivel_3": content.get("nivel_3", ""),
+                            }
+                        )
 
-                    # Stage 4: Chunking
-                    chunks = self.chunker.chunk_content(
-                        markdown=content["markdown"],
-                        metadata={
-                            "url": content["url"],
-                            "titulo": content["titulo"],
-                            "nivel_1": content["nivel_1"],
-                            "nivel_2": content["nivel_2"],
-                            "nivel_3": content.get("nivel_3", ""),
-                        }
-                    )
+                        metrics["chunks_created"] += len(chunks)
+                        
+                        async with print_lock:
+                            metrics["processed_count"] += 1
+                            pct = (metrics["processed_count"] / total_urls) * 100
+                            print(f"\r[{metrics['processed_count']}/{total_urls}] ({pct:.0f}%) ✅ {content['titulo'][:30]} → {len(chunks)} chunks".ljust(80), end="", flush=True)
 
-                    chunks_created += len(chunks)
-                    print(f"\r[{idx}/{total_urls}] ✅ {content['titulo'][:40]} → {len(chunks)} chunks")
+                        # Stage 5: Embedding
+                        url_vectors = []
+                        for chunk in chunks:
+                            try:
+                                embedding = await asyncio.to_thread(self.embedder.generate_embedding, chunk.text)
+                                metrics["embeddings_generated"] += 1
 
-                    # Stage 5: Embedding
-                    for chunk in chunks:
-                        try:
-                            embedding = self.embedder.generate_embedding(chunk.text)
-                            embeddings_generated += 1
+                                url_vectors.append({
+                                    "embedding": embedding,
+                                    "metadata": {
+                                        **chunk.metadata,
+                                        "text": chunk.text
+                                    },
+                                    "chunk_index": chunk.chunk_index
+                                })
 
-                            # Prepare vector data for batch injection
-                            all_vectors.append({
-                                "embedding": embedding,
-                                "metadata": {
-                                    **chunk.metadata,
-                                    "text": chunk.text
-                                },
-                                "chunk_index": chunk.chunk_index
-                            })
+                            except Exception as e:
+                                metrics["failed_embeddings"] += 1
+                                log_error(
+                                    message="Embedding generation failed",
+                                    stage="embedding",
+                                    error=e,
+                                    url=url,
+                                    chunk_index=chunk.chunk_index
+                                )
 
-                        except Exception as e:
-                            failed_embeddings += 1
-                            log_error(
-                                message="Embedding generation failed",
-                                stage="embedding",
-                                error=e,
-                                url=url,
-                                chunk_index=chunk.chunk_index
-                            )
+                        # Update cache
+                        if incremental:
+                            self._update_cache(url, content["markdown"], len(chunks))
+                            
+                        return url_vectors
 
-                    # Update cache
-                    if incremental:
-                        self._update_cache(url, content["markdown"], len(chunks))
+                    except Exception as e:
+                        metrics["failed_fetches"] += 1
+                        async with print_lock:
+                            metrics["processed_count"] += 1
+                            pct = (metrics["processed_count"] / total_urls) * 100
+                            print(f"\r[{metrics['processed_count']}/{total_urls}] ({pct:.0f}%) 💥 ERRO: {str(e)[:40]:<40}", end="", flush=True)
+                        log_error(
+                            message="URL processing failed",
+                            stage="extraction",
+                            error=e,
+                            url=url
+                        )
+                        return None
 
-                except Exception as e:
-                    failed_fetches += 1
-                    print(f"\r[{idx}/{total_urls}] 💥 ERRO: {str(e)[:60]}")
-                    log_error(
-                        message="URL processing failed",
-                        stage="extraction",
-                        error=e,
-                        url=url
-                    )
+            # Execute tasks concurrently
+            tasks = [process_url(idx, url) for idx, url in enumerate(urls, 1)]
+            results = await asyncio.gather(*tasks)
+            
+            # Aggregate vectors
+            for res in results:
+                if res:
+                    all_vectors.extend(res)
 
             # Final newline after progress
-            print(f"\n\n📊 Extração concluída: {urls_validated} válidas, {failed_fetches} falhas, {skipped_low_quality} baixa qualidade")
+            print(f"\n\n📊 Extração concluída: {metrics['urls_validated']} válidas, {metrics['failed_fetches']} falhas, {metrics['skipped_low_quality']} baixa qualidade")
 
             # Stage 6: Injection (batch)
             if all_vectors:
                 print(f"💉 Injetando {len(all_vectors)} vetores no Pinecone...")
                 logger.info(f"Injecting {len(all_vectors)} vectors to Pinecone")
 
-                injection_result = self.injector.inject_batch(
+                injection_result = await asyncio.to_thread(
+                    self.injector.inject_batch,
                     vectors=all_vectors,
                     batch_size=self.config.batch_size
                 )
 
-                vectors_injected = injection_result["success"]
-                failed_upserts = injection_result["failed"]
+                metrics["vectors_injected"] = injection_result["success"]
+                metrics["failed_upserts"] = injection_result["failed"]
 
             # Save cache if incremental mode
             if incremental:
@@ -377,19 +403,19 @@ class IngestionPipeline:
                 start_time=start_time,
                 end_time=end_time,
                 duration_seconds=duration,
-                urls_discovered=urls_discovered,
-                urls_fetched=urls_fetched,
-                urls_validated=urls_validated,
-                chunks_created=chunks_created,
-                embeddings_generated=embeddings_generated,
-                vectors_injected=vectors_injected,
-                failed_fetches=failed_fetches,
-                failed_validations=failed_validations,
-                failed_embeddings=failed_embeddings,
-                failed_upserts=failed_upserts,
-                skipped_low_quality=skipped_low_quality,
-                urls_skipped_cached=urls_skipped_cached,
-                urls_skipped_module_filter=urls_skipped_module_filter
+                urls_discovered=metrics["urls_discovered"],
+                urls_fetched=metrics["urls_fetched"],
+                urls_validated=metrics["urls_validated"],
+                chunks_created=metrics["chunks_created"],
+                embeddings_generated=metrics["embeddings_generated"],
+                vectors_injected=metrics["vectors_injected"],
+                failed_fetches=metrics["failed_fetches"],
+                failed_validations=metrics["failed_validations"],
+                failed_embeddings=metrics["failed_embeddings"],
+                failed_upserts=metrics["failed_upserts"],
+                skipped_low_quality=metrics["skipped_low_quality"],
+                urls_skipped_cached=metrics["urls_skipped_cached"],
+                urls_skipped_module_filter=metrics["urls_skipped_module_filter"]
             )
 
             return report

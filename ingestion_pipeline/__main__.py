@@ -7,6 +7,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# Ensure utf-8 output for emojis in console
+if sys.stdout.encoding.lower() != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -191,11 +198,12 @@ def run_pipeline(args) -> int:
 
         # Execute pipeline
         print("\nStarting pipeline execution...\n")
-        report = pipeline.run(
+        import asyncio
+        report = asyncio.run(pipeline.run(
             sitemap_url=args.sitemap_url,
             incremental=args.incremental,
             module_filter=args.module
-        )
+        ))
 
         # Print summary report
         print("\n")

@@ -127,7 +127,7 @@ class SemanticExtractor:
                 "Install it with: pip install firecrawl-py"
             ) from e
 
-    def extract_content(self, url: str) -> Dict[str, Any]:
+    async def extract_content(self, url: str) -> Dict[str, Any]:
         """Extract content from URL and return structured data.
         
         Fetches HTML page, converts to clean Markdown, extracts title and
@@ -161,9 +161,9 @@ class SemanticExtractor:
             # For now, return a placeholder structure
 
             if self.extraction_backend == "crawl4ai":
-                markdown, titulo = self._extract_with_crawl4ai(url)
+                markdown, titulo = await self._extract_with_crawl4ai(url)
             elif self.extraction_backend == "firecrawl":
-                markdown, titulo = self._extract_with_firecrawl(url)
+                markdown, titulo = await self._extract_with_firecrawl(url)
             else:
                 raise ValueError(f"Unknown backend: {self.extraction_backend}")
 
@@ -189,7 +189,7 @@ class SemanticExtractor:
             logger.error(f"Failed to extract content from {url}: {e}")
             raise
 
-    def _extract_with_crawl4ai(self, url: str) -> tuple[str, str]:
+    async def _extract_with_crawl4ai(self, url: str) -> tuple[str, str]:
         """Extract content using Playwright, handling MadCap Flare iframe structure.
         
         A documentação Senior usa MadCap Flare. O shell carrega o conteúdo
@@ -203,12 +203,12 @@ class SemanticExtractor:
             Tuple of (markdown_content, page_title)
         """
         import html2text
-        from playwright.sync_api import sync_playwright
+        from playwright.async_api import async_playwright
         from bs4 import BeautifulSoup
 
         try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
 
                 # -------------------------------------------------------
                 # Detecta se a URL é direta (sem shell MadCap) ou precisa
@@ -232,15 +232,16 @@ class SemanticExtractor:
 
                 if target_url:
                     # Acesso direto ao artigo (sem shell)
-                    article_page = browser.new_page()
-                    article_page.goto(target_url, wait_until="networkidle", timeout=30000)
-                    html_content = article_page.content()
-                    titulo = article_page.title().split(' | ')[0].split(' - ')[0].strip()
-                    article_page.close()
+                    article_page = await browser.new_page()
+                    await article_page.goto(target_url, wait_until="networkidle", timeout=30000)
+                    html_content = await article_page.content()
+                    title = await article_page.title()
+                    titulo = title.split(' | ')[0].split(' - ')[0].strip()
+                    await article_page.close()
                 else:
                     # Precisa carregar o shell e descobrir o iframe
-                    shell_page = browser.new_page()
-                    shell_page.goto(url, wait_until="networkidle", timeout=30000)
+                    shell_page = await browser.new_page()
+                    await shell_page.goto(url, wait_until="networkidle", timeout=30000)
 
                     content_url = None
                     for frame in shell_page.frames:
@@ -250,13 +251,14 @@ class SemanticExtractor:
                                 "recaptcha" not in frame_url and
                                 "google.com" not in frame_url):
                             try:
-                                if len(frame.content()) > 5000:
+                                frame_content = await frame.content()
+                                if len(frame_content) > 5000:
                                     content_url = frame_url
                                     break
                             except Exception:
                                 pass
 
-                    shell_page.close()
+                    await shell_page.close()
 
                     # Deriva a URL do artigo a partir do iframe
                     if content_url and content_url.endswith('/home.htm'):
@@ -269,13 +271,14 @@ class SemanticExtractor:
                     else:
                         target_url = content_url if content_url else url
 
-                    article_page = browser.new_page()
-                    article_page.goto(target_url, wait_until="networkidle", timeout=30000)
-                    html_content = article_page.content()
-                    titulo = article_page.title().split(' | ')[0].split(' - ')[0].strip()
-                    article_page.close()
+                    article_page = await browser.new_page()
+                    await article_page.goto(target_url, wait_until="networkidle", timeout=30000)
+                    html_content = await article_page.content()
+                    title = await article_page.title()
+                    titulo = title.split(' | ')[0].split(' - ')[0].strip()
+                    await article_page.close()
 
-                browser.close()
+                await browser.close()
 
             # -------------------------------------------------------
             # PASSO 3: Extrai o conteúdo do HTML
@@ -360,7 +363,7 @@ class SemanticExtractor:
             logger.error(f"Failed to extract content from {url}: {e}")
             return ("", "Error")
 
-    def _extract_with_firecrawl(self, url: str) -> tuple[str, str]:
+    async def _extract_with_firecrawl(self, url: str) -> tuple[str, str]:
         """Extract content using Firecrawl API backend.
         
         Args:
@@ -373,7 +376,7 @@ class SemanticExtractor:
         # This is a placeholder that will be replaced with real implementation
 
         # Example implementation:
-        # result = self._backend.scrape(url, formats=["markdown"])
+        # result = await self._backend.scrape(url, formats=["markdown"])
         # markdown = result.markdown
         # titulo = result.metadata.get("title") or self._extract_title_from_markdown(markdown)
 
