@@ -656,18 +656,44 @@ async def capturar_cliques_na_tela():
             await asyncio.sleep(0.5)
             await page.keyboard.press("Enter")
 
-            print("Login efetuado. A aguardar carregamento do painel...", flush=True)
-            await page.wait_for_load_state("load", timeout=30_000)
+            print("Login efetuado. Aguardando redirecionamentos do SSO...", flush=True)
+            
+            # 1. Aguarda ativamente a URL mudar para a raiz do painel (escapando de /login e /auth)
+            try:
+                # Espera chegar na plataforma (independente de ser homologx, dev ou prod)
+                await page.wait_for_url("**/platform/senior-x/**", timeout=30_000)
+            except Exception:
+                # Fallback genérico caso a URL seja diferente
+                for _ in range(15):
+                    if "login" not in page.url.lower() and "auth" not in page.url.lower():
+                        break
+                    await asyncio.sleep(1.0)
+                
+            print("Carregando o painel principal da plataforma...", flush=True)
+            # 2. Aguarda o DOM principal estabilizar (com timeout agressivo caso haja polling infinito)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15_000)
+            except Exception:
+                pass 
+                
             await asyncio.sleep(2.0)
 
         except Exception as e:
             logger.warning(f"O auto-login falhou/travou: {e}")
             print("AVISO: O robô não conseguiu fazer o login automático. Por favor, conclua o login manualmente na janela do Chrome!", flush=True)
             try:
-                await page.wait_for_load_state("networkidle", timeout=60000)
+                # Aguarda até 2 minutos para o usuário logar e a URL mudar para o painel principal
+                await page.wait_for_url("**/platform/senior-x/**", timeout=120_000)
+                
+                print("Carregando o painel principal da plataforma (Login Manual)...", flush=True)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15_000)
+                except Exception:
+                    pass
+                    
                 await asyncio.sleep(3.0)
             except Exception:
-                print("ERRO FATAL: Tempo esgotado para login manual.", flush=True)
+                print("ERRO FATAL: Tempo esgotado para login manual ou URL inesperada.", flush=True)
                 await browser.close()
                 return
 
