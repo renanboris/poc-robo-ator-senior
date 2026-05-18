@@ -828,7 +828,8 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
 
     lista_para_ia = []
     for a in log_mapeador:
-        alvo_sem_foto = {k: v for k, v in a["elemento_alvo"].items() if k != "screenshot_referencia"}
+        campos_ignorados = {"screenshot_referencia", "screenshot_som_b64", "html_hint", "ax_node"}
+        alvo_sem_foto = {k: v for k, v in a["elemento_alvo"].items() if k not in campos_ignorados}
         lista_para_ia.append({
             "id_acao": a["id_acao"], "acao": a["acao"],
             "intencao_semantica": a["intencao_semantica"],
