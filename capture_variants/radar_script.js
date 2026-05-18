@@ -112,7 +112,12 @@ const getElementName = (el) => {
         const btn = tag === 'button' ? el : el.closest('button');
         
         // Tenta extrair contexto do ícone PrimeNG/FontAwesome/Material
-        const icon = btn.querySelector('i, svg, .pi, .fa, .material-icons, [class*="icon"]');
+        // BUGFIX: Verifica se o próprio elemento clicado é o ícone (span, i, etc.)
+        let icon = btn.querySelector('i, svg, span.pi, span.fa, span.material-icons, [class*="icon"]');
+        if (!icon && (el.classList.contains('fa') || el.classList.contains('pi') || el.classList.contains('material-icons'))) {
+            icon = el;  // O próprio elemento clicado é o ícone
+        }
+        
         if (icon) {
             const iconClass = icon.className || '';
             
