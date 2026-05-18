@@ -111,15 +111,27 @@ const getElementName = (el) => {
     if (tag === 'button' || el.closest('button')) {
         const btn = tag === 'button' ? el : el.closest('button');
         
+        console.log('[RADAR DEBUG] Botão detectado:', {
+            tag: el.tagName,
+            elClasses: el.className,
+            btnClasses: btn.className
+        });
+        
         // Tenta extrair contexto do ícone PrimeNG/FontAwesome/Material
         // BUGFIX: Verifica se o próprio elemento clicado é o ícone (span, i, etc.)
         let icon = btn.querySelector('i, svg, span.pi, span.fa, span.material-icons, [class*="icon"]');
         if (!icon && (el.classList.contains('fa') || el.classList.contains('pi') || el.classList.contains('material-icons'))) {
             icon = el;  // O próprio elemento clicado é o ícone
+            console.log('[RADAR DEBUG] Elemento clicado É o ícone:', el.className);
         }
         
         if (icon) {
             const iconClass = icon.className || '';
+            console.log('[RADAR DEBUG] Ícone encontrado:', {
+                iconTag: icon.tagName,
+                iconClass: iconClass,
+                iconHTML: icon.outerHTML.substring(0, 150)
+            });
             
             // [FIX] Task 1 & 2: Detecção de FontAwesome com espaço (fa fa-{nome})
             // Problema: FontAwesome usa "fa fa-search" (com espaço), não "fa-search" (com hífen)
@@ -165,6 +177,13 @@ const getElementName = (el) => {
             
             // Task 3: Tenta FontAwesome com espaço PRIMEIRO (fa fa-search)
             const faMatch = iconClass.match(/fa\s+fa-(\w+)/);
+            console.log('[RADAR DEBUG] FontAwesome match:', {
+                iconClass: iconClass,
+                faMatch: faMatch,
+                matchedIcon: faMatch ? faMatch[1] : null,
+                hasMappedLabel: faMatch ? !!ICON_MAP_FA[faMatch[1]] : false
+            });
+            
             if (faMatch && ICON_MAP_FA[faMatch[1]]) {
                 const iconName = faMatch[1];
                 const label = ICON_MAP_FA[iconName];
