@@ -155,23 +155,43 @@ async def _validar_checkpoint(
     screenshot_ref_b64: str | None = None,
 ) -> tuple[bool, str]:
     """
-    Tira screenshot e pede ao Gemini Vision para avaliar se a tela atual
-    corresponde ao estado esperado descrito no roteiro.
-
-    Fase 3.3: se screenshot_ref_b64 estiver disponível (gravação original),
-    envia ambas as imagens para comparação visual direta.
-
-    Retorna (estado_ok: bool, observacao: str).
+    Fase 3: Verificação de Pós-Condição Leve.
+    Avalia se a tela atual corresponde ao estado esperado após um passo.
+    Tenta primeiro heurísticas locais (URL, presença de texto no DOM).
+    Só escala para o Gemini Vision se a heurística falhar ou for inconclusiva.
     """
-    if not CHECKPOINT_HABILITADO or not tooltip_dap:
-        return True, "Checkpoint desabilitado."
+    if not tooltip_dap:
+        return True, "Sem descrição de pós-condição."
+
+    # 1. Heurística Local (DOM/URL)
+    try:
+        # Verifica se o tooltip (texto esperado) aparece em algum lugar da tela
+        # Essa é uma checagem extremamente rápida em JS
+        texto_limpo = tooltip_dap.replace('"', '').replace("'", "")
+        achou_texto = await page.evaluate(f'''() => {{
+            return document.body.innerText.includes("{texto_limpo}") || 
+                   document.title.includes("{texto_limpo}");
+        }}''')
+        
+        if achou_texto:
+            return True, f"Texto '{tooltip_dap}' encontrado no DOM localmente."
+            
+        # Verifica se a URL mudou para algo esperado (se houver dica na âncora)
+        if ancora and ancora.startswith("http") and ancora in page.url:
+            return True, "URL local bate com o destino esperado."
+    except Exception as e:
+        logger.debug(f"Heurística local falhou: {e}")
+
+    # 2. Fallback para Gemini Vision apenas se necessário
+    if not CHECKPOINT_HABILITADO:
+        return True, "Heurística falhou e Gemini desabilitado. Assumindo OK."
 
     try:
+        logger.info(f"   [GEMINI] Heurística local inconclusiva. Chamando Vision para validar tela...")
         screenshot_atual = await page.screenshot(type="jpeg", quality=60, full_page=False)
 
         contents = []
 
-        # Fase 3.3: inclui screenshot de referência se disponível
         if screenshot_ref_b64:
             try:
                 import base64
@@ -180,7 +200,7 @@ async def _validar_checkpoint(
                 contents.append(gtypes.Part.from_bytes(data=ref_bytes, mime_type="image/jpeg"))
                 contents.append("IMAGEM 2 — TELA ATUAL (estado após executar o passo):")
             except Exception:
-                pass  # referência inválida — continua sem ela
+                pass
 
         contents.append(gtypes.Part.from_bytes(data=screenshot_atual, mime_type="image/jpeg"))
 

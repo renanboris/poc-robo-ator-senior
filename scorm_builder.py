@@ -110,6 +110,23 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                 alvo = acao.get("elemento_alvo", {}) or {}
                 coords = alvo.get("coordenadas_relativas", {}) or {}
 
+                # Nova precisão geométrica com SoM
+                som_box = alvo.get("som_box_clicada")
+                vp_w = acao.get("_vp_w", 1920)
+                vp_h = acao.get("_vp_h", 1080)
+                
+                if som_box and vp_w > 0 and vp_h > 0:
+                    # SoM guarda coordenadas absolutas, convertemos para percentuais exatos
+                    x_pct = (som_box["x"] + som_box["w"] / 2) / vp_w
+                    y_pct = (som_box["y"] + som_box["h"] / 2) / vp_h
+                    w_pct = som_box["w"] / vp_w
+                    h_pct = som_box["h"] / vp_h
+                else:
+                    x_pct = coords.get("x_pct", 0.5)
+                    y_pct = coords.get("y_pct", 0.5)
+                    w_pct = coords.get("w_pct", 0.05)
+                    h_pct = coords.get("h_pct", 0.05)
+
                 slides.append({
                     "tipo": "interacao",
                     "scene_id": id_p,
@@ -126,10 +143,10 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                     "label": alvo.get("label_curto", ""),
                     "audio_id": f"{id_p}_micro_{i}",
                     "imagem_b64": alvo.get("screenshot_referencia", "") or "",
-                    "x_pct": coords.get("x_pct", 0.5),
-                    "y_pct": coords.get("y_pct", 0.5),
-                    "w_pct": coords.get("w_pct", 0.05),
-                    "h_pct": coords.get("h_pct", 0.05),
+                    "x_pct": x_pct,
+                    "y_pct": y_pct,
+                    "w_pct": w_pct,
+                    "h_pct": h_pct,
                     "ramificacoes": passo.get("ramificacoes", []),
                 })
 

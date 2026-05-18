@@ -65,6 +65,7 @@ from google import genai
 from google.genai import types
 from PIL import Image as _PILImage
 from playwright.async_api import Frame, Page
+from som_annotator import get_som_boxes
 
 load_dotenv()
 
@@ -2015,7 +2016,40 @@ async def _verificar_identidade_por_coordenadas(
         logger.warning(f"   [Coords Capturadas] Verificação de identidade falhou (fail-open): {exc_verify}")
         return (True, False)
 
+async def _som_vision_matching(page: Page, alvo: dict, label_curto: str) -> Optional[dict]:
+    """
+    Camada 3.4: SoM Vision Matching
+    Obtém as Bounding Boxes do Set-of-Marks e cruza com os dados do AXTree ou índice
+    capturados na gravação para encontrar as coordenadas exatas do elemento na tela atual.
+    """
+    try:
+        ax_node = alvo.get("ax_node")
+        ax_name = ax_node.get("ax_name", "").strip().lower() if ax_node else ""
+        som_idx_clicado = alvo.get("som_idx_clicado")
+        
+        if not ax_name and som_idx_clicado is None:
+            return None
 
+        boxes = await get_som_boxes(page)
+        if not boxes:
+            return None
+
+        if ax_name:
+            for box in boxes:
+                if box.get("label", "").strip().lower() == ax_name:
+                    return {"x": box["x"] + box["w"] // 2, "y": box["y"] + box["h"] // 2, "match_type": "ax_name"}
+
+        if som_idx_clicado is not None:
+            for box in boxes:
+                if box.get("idx") == som_idx_clicado:
+                    box_label = box.get("label", "").strip().lower()
+                    if label_curto and label_curto.lower() in box_label or not label_curto:
+                        return {"x": box["x"] + box["w"] // 2, "y": box["y"] + box["h"] // 2, "match_type": "som_idx"}
+                    
+        return None
+    except Exception as exc:
+        logger.warning(f"Erro em _som_vision_matching: {exc}")
+        return None
 # ──────────────────────────────────────────────────────────────
 # ORQUESTRADOR PRINCIPAL (A MAQUINA DE DECISAO)
 # ──────────────────────────────────────────────────────────────
@@ -2471,6 +2505,22 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 _registrar_telemetria("3_hint_original", True)
                 _registrar_estrategia_vencedora(intencao, "3_hint_original")
                 return True
+
+    # ── Camada 3.4: SoM Vision Matching ──────────────────────────────────────
+    # Ativada se tivermos os dados de AXTree ou Set-of-Marks vindos da gravação.
+    # Evita adivinhar por coordenadas. Em vez disso, pede para o JS recalcular as Bounding
+    # Boxes (SoM) atuais, e tenta fazer o match exato do AX Name ou fallback pelo índice numérico.
+    match_som = await _som_vision_matching(page, alvo, label_curto)
+    if match_som:
+        logger.info(f"   [SoM Matching] Encontrado via {match_som['match_type']}. Tentando clique em {match_som['x']},{match_som['y']}...")
+        if await _clicar_por_coordenadas(page, {"x": match_som["x"], "y": match_som["y"]}, acao, valor):
+            logger.info("   [SoM Matching] Clique executado com sucesso.")
+            _registrar_sucesso_cache(intencao, coords={"x_pct": match_som["x"]/page.viewport_size["width"] if page.viewport_size else 0, "y_pct": match_som["y"]/page.viewport_size["height"] if page.viewport_size else 0})
+            _registrar_telemetria("3.4_som_matching", True)
+            _registrar_estrategia_vencedora(intencao, "3.4_som_matching")
+            return True
+        else:
+            _registrar_telemetria("3.4_som_matching", False)
 
     # ── Camada 3.5: Coordenadas Capturadas (gravação original) ───────────────
     # [FIX] Movida de Camada 2 para Camada 3.5 — coordenadas são menos confiáveis

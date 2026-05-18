@@ -36,6 +36,8 @@ from shadow_builder import (
     inferir_acao_semantica,
 )
 from utils import limpar_nome
+from cdp_enricher import enriquecer_com_ax
+from som_annotator import get_som_boxes, anotar_imagem, identificar_box_clicada
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -149,17 +151,35 @@ def _extrair_coordenadas_relativas(posicao_str: str, viewport_w: int, viewport_h
     except Exception:
         return {"x_pct": 0.5, "y_pct": 0.5, "w_pct": 0.05, "h_pct": 0.05}
 
-async def _analisar_elemento_com_gemini(screenshot_bytes: bytes, html_snapshot: str, label_capturado: str, coords: dict, acao: str) -> dict:
+async def _analisar_elemento_com_gemini(
+    screenshot_bytes: bytes,
+    html_snapshot: str,
+    label_capturado: str,
+    coords: dict,
+    acao: str,
+    ax_node: dict = None,
+    som_idx: int = None,
+    som_total: int = 0
+) -> dict:
     fallback = {
         "intencao": f"{acao.capitalize()} em '{label_capturado}'",
         "descricao_visual": f"Elemento '{label_capturado}'",
         "contexto_tela": "Desconhecido", "tipo_elemento": "button", "confianca": "baixa",
     }
     if not gemini_client: return fallback
+    
+    ax_info = ""
+    if ax_node:
+        ax_info = f"\nAX Role/Name: {ax_node.get('ax_role','')} / {ax_node.get('ax_name','')}"
+        
+    som_info = ""
+    if som_idx is not None:
+        som_info = f"\nElemento SoM: box #{som_idx} de {som_total} interativos na tela. A imagem enviada tem bounding boxes numeradas em vermelho sobre os elementos interativos. O elemento clicado é o de número {som_idx}."
+
     prompt = f"""Voce e um analista de UX documentando uma sessao de uso do sistema Senior X.
 O usuario realizou a acao '{acao}' no elemento com label: '{label_capturado}'.
 HTML do elemento clicado: {html_snapshot[:250]}
-Posicao relativa na tela: x={coords.get('x_pct','?')}, y={coords.get('y_pct','?')}
+Posicao relativa na tela: x={coords.get('x_pct','?')}, y={coords.get('y_pct','?')}{ax_info}{som_info}
 
 Analise o screenshot e responda com um JSON:
 {{
@@ -179,13 +199,13 @@ Analise o screenshot e responda com um JSON:
 
         resposta = await asyncio.to_thread(_retry_com_backoff, _chamar_gemini, max_tentativas=3, delay_inicial=1)
         resultado = json.loads(resposta.text)
-        resultado.setdefault("intencao", fallback["intencao"])
+        # Compatibility with POC response format ("intencao_semantica")
+        intencao = resultado.get("intencao_semantica") or resultado.get("intencao")
+        resultado["intencao"] = intencao or fallback["intencao"]
         resultado.setdefault("descricao_visual", fallback["descricao_visual"])
         resultado.setdefault("contexto_tela", "Desconhecido")
         return resultado
     except Exception as e:
-        # Gemini falhou na análise de screenshot — usar fallback básico
-        # Não tentamos OpenAI aqui porque análise de imagem requer vision API (mais cara)
         logger.warning(f"⚠️  Gemini vision falhou para elemento '{label_capturado}': {str(e)[:80]}")
         return fallback
 
@@ -360,31 +380,61 @@ async def on_capturar_elemento(source, args):
         if coords.get("x_pct") == 0.5 and coords.get("y_pct") == 0.5:
             logger.warning(f"[FOTO {meu_id_acao}] Coordenadas padrão (0.5/0.5) — fallback de viewport usado para '{label}'.")
 
-        # ── Evento_Bruto: apenas dados mecânicos, sem chamada Gemini ─────────
-        # O enriquecimento semântico (Gemini Vision) ocorre APÓS o encerramento
-        # da sessão, via enriquecer_eventos_com_gemini(). Isso garante que a
-        # captura não seja bloqueada por latência ou falha da API.
+        # Extrai (x, y) absolutos para as chamadas SoM/CDP
+        abs_x, abs_y = 0, 0
+        try:
+            abs_pos = dict(p.split(":") for p in dados.get("posicao_visual", "").split(","))
+            abs_x = int(float(abs_pos.get("x", 0)) + float(abs_pos.get("w", 0)) / 2)
+            abs_y = int(float(abs_pos.get("y", 0)) + float(abs_pos.get("h", 0)) / 2)
+        except Exception:
+            pass
+
+        # ── Enriquecimento CDP (AXTree) e SoM ────────────────────────────────
+        ax_node = {}
+        som_total = 0
+        som_idx_clicado = None
+        screenshot_som_b64 = None
+
+        if page_ref and screenshot_bytes:
+            try:
+                # Dispara CDP (AXTree) e SoM em paralelo
+                ax_node, boxes = await asyncio.gather(
+                    enriquecer_com_ax(page_ref, abs_x, abs_y),
+                    get_som_boxes(page_ref)
+                )
+                
+                som_total = len(boxes)
+                som_idx_clicado = identificar_box_clicada(boxes, abs_x, abs_y)
+                
+                clicked_box = None
+                if som_idx_clicado is not None:
+                    clicked_box = next((b for b in boxes if b["idx"] == som_idx_clicado), None)
+                
+                # Anota imagem em background para não bloquear o event loop
+                annotated_bytes = await asyncio.to_thread(anotar_imagem, screenshot_bytes, boxes)
+                screenshot_som_b64 = base64.b64encode(annotated_bytes).decode('utf-8')
+            except Exception as e:
+                logger.warning(f"Falha ao gerar SoM/AXTree: {e}")
+
+        # ── Evento_Bruto: dados mecânicos, sem chamada Gemini ────────────────
         iframe_id = dados.get("iframe", "Pagina Principal")
         valor_input = dados["texto_encontrado"] if acao in ["digitar_e_enter", "preencher_campo"] else ""
 
-        # ── Flag de item de menu de contexto ─────────────────────────────────
-        # Se a ação anterior foi clique_direito, este clique é um item do menu
-        # de contexto que foi aberto. Marca para que o executor saiba buscar
-        # dentro do overlay do menu em vez de varrer o DOM geral.
+        # Flag de item de menu de contexto
         _ultima_acao = cliques_capturados[-1].get("acao", "") if cliques_capturados else ""
         _is_context_menu_item = (acao == "clique" and _ultima_acao == "clique_direito")
 
         evento_base = {
             "id_acao":            meu_id_acao,
             "acao":               acao,
-            "intencao_semantica": "",          # preenchido em enriquecer_eventos_com_gemini()
-            "semantic_action":    "",          # preenchido em enriquecer_eventos_com_gemini()
-            "is_context_menu_item": _is_context_menu_item,  # flag para o executor
+            "intencao_semantica": "",          
+            "semantic_action":    "",          
+            "is_context_menu_item": _is_context_menu_item,
             "elemento_alvo": {
-                "descricao_visual":      "",   # preenchido em enriquecer_eventos_com_gemini()
-                "contexto_tela":         "",   # preenchido em enriquecer_eventos_com_gemini()
+                "descricao_visual":      "",   
+                "contexto_tela":         "",   
                 "tipo_elemento":         dados.get("tag", "button"),
-                "confianca_captura":     "media",  # padrão antes do enriquecimento
+                "confianca_captura":     "media",  
                 "label_curto":           label,
                 "coordenadas_relativas": coords,
                 "seletor_hint":          dados["seletor"],
@@ -392,9 +442,13 @@ async def on_capturar_elemento(source, args):
                 "iframe_hint":           iframe_id if iframe_id != "Pagina Principal" else None,
                 "html_hint":             dados.get("html_snapshot", "")[:300],
                 "screenshot_referencia": screenshot_b64,
+                "screenshot_som_b64":    screenshot_som_b64,
+                "ax_node":               ax_node,
+                "som_idx_clicado":       som_idx_clicado,
+                "som_box_clicada":       clicked_box,
+                "som_total_boxes":       som_total,
             },
             "valor_input": valor_input,
-            # Metadados de contexto para enriquecimento posterior
             "_page_title":  page_title,
             "_page_url":    page_url,
             "_vp_w":        vp_w,
@@ -492,7 +546,7 @@ async def enriquecer_eventos_com_gemini(eventos_brutos: list[dict]) -> list[dict
 
         analise = None
         if _precisa_gemini(evento):
-            screenshot_b64   = alvo.get("screenshot_referencia")
+            screenshot_b64   = alvo.get("screenshot_som_b64") or alvo.get("screenshot_referencia")
             screenshot_bytes = base64.b64decode(screenshot_b64) if screenshot_b64 else None
             try:
                 analise = await _analisar_elemento_com_gemini(
@@ -501,6 +555,9 @@ async def enriquecer_eventos_com_gemini(eventos_brutos: list[dict]) -> list[dict
                     label,
                     alvo.get("coordenadas_relativas", {}),
                     acao,
+                    ax_node=alvo.get("ax_node"),
+                    som_idx=alvo.get("som_idx_clicado"),
+                    som_total=alvo.get("som_total_boxes", 0)
                 )
             except Exception as e:
                 logger.warning(f"[Enriquecimento] Gemini falhou para id_acao={id_acao}: {str(e)[:80]}")
