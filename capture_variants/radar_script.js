@@ -65,6 +65,62 @@ const getElementName = (el) => {
         const clean = (v) => (v && v !== 'undefined' && v !== 'null') ? v : '';
         return clean(el.placeholder) || clean(el.name) || clean(el.title) || 'Campo de entrada';
     }
+    // [FIX CRÍTICO] Detecção de ícones FontAwesome ANTES de qualquer outra lógica
+    // Problema: Quando o usuário clica no <span> do ícone (não no botão pai),
+    // o código nunca chegava na lógica de detecção de ícones porque:
+    // 1. innerText retornava "ui-btn" (texto oculto CSS)
+    // 2. Loop de aria-label/title não encontrava nada
+    // 3. Verificação de botão falhava (el.closest('button') retornava null em alguns casos)
+    // Solução: Detecta ícones FontAwesome PRIMEIRO, independente do contexto
+    const elClasses = el.className || '';
+    const faMatch = elClasses.match(/fa\s+fa-(\w+)/);
+    if (faMatch) {
+        const ICON_MAP_FA = {
+            'search': 'Pesquisar',
+            'trash': 'Excluir',
+            'edit': 'Editar',
+            'save': 'Salvar',
+            'plus': 'Adicionar',
+            'minus': 'Remover',
+            'download': 'Baixar',
+            'upload': 'Enviar',
+            'eye': 'Visualizar',
+            'cog': 'Configurações',
+            'ellipsis-v': 'Ações',
+            'bars': 'Menu',
+            'refresh': 'Atualizar',
+            'filter': 'Filtrar',
+            'print': 'Imprimir',
+            'copy': 'Copiar',
+            'calendar': 'Calendário',
+            'user': 'Usuário',
+            'lock': 'Bloquear',
+            'unlock': 'Desbloquear',
+            'times': 'Fechar',
+            'check': 'Confirmar',
+            'pencil': 'Editar',
+            'file': 'Arquivo',
+            'folder': 'Pasta',
+            'clock': 'Horário',
+            'users': 'Usuários',
+            'sign-in': 'Entrar',
+            'sign-out': 'Sair',
+            'arrow-left': 'Voltar',
+            'arrow-right': 'Avançar',
+            'chevron-left': 'Anterior',
+            'chevron-right': 'Próximo',
+            'info-circle': 'Informações',
+            'exclamation-triangle': 'Aviso',
+            'question-circle': 'Ajuda'
+        };
+        
+        const iconName = faMatch[1];
+        if (ICON_MAP_FA[iconName]) {
+            console.log(`[RADAR] FontAwesome detectado EARLY: fa fa-${iconName} → ${ICON_MAP_FA[iconName]}`);
+            return ICON_MAP_FA[iconName];  // ✅ "Pesquisar" em vez de "ui-btn"
+        }
+    }
+    
     // [FIX] Solução 1: Filtra textos genéricos de classes CSS PrimeNG/Angular
     // Problema: botões PrimeNG com ícone retornam "ui-btn" (texto oculto CSS)
     // Solução: ignora textos genéricos e força busca de atributos semânticos
