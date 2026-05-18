@@ -115,7 +115,59 @@ const getElementName = (el) => {
         const icon = btn.querySelector('i, svg, .pi, .fa, .material-icons, [class*="icon"]');
         if (icon) {
             const iconClass = icon.className || '';
-            // Mapeia classes de ícone para ações semânticas
+            
+            // [FIX] Task 1 & 2: Detecção de FontAwesome com espaço (fa fa-{nome})
+            // Problema: FontAwesome usa "fa fa-search" (com espaço), não "fa-search" (com hífen)
+            // Solução: regex para capturar padrão "fa fa-{nome}" antes do loop do ICON_MAP
+            const ICON_MAP_FA = {
+                'search': 'Pesquisar',
+                'trash': 'Excluir',
+                'edit': 'Editar',
+                'save': 'Salvar',
+                'plus': 'Adicionar',
+                'minus': 'Remover',
+                'download': 'Baixar',
+                'upload': 'Enviar',
+                'eye': 'Visualizar',
+                'cog': 'Configurações',
+                'ellipsis-v': 'Ações',
+                'bars': 'Menu',
+                'refresh': 'Atualizar',
+                'filter': 'Filtrar',
+                'print': 'Imprimir',
+                'copy': 'Copiar',
+                'calendar': 'Calendário',
+                'user': 'Usuário',
+                'lock': 'Bloquear',
+                'unlock': 'Desbloquear',
+                'times': 'Fechar',
+                'check': 'Confirmar',
+                'pencil': 'Editar',
+                'file': 'Arquivo',
+                'folder': 'Pasta',
+                'clock': 'Horário',
+                'users': 'Usuários',
+                'sign-in': 'Entrar',
+                'sign-out': 'Sair',
+                'arrow-left': 'Voltar',
+                'arrow-right': 'Avançar',
+                'chevron-left': 'Anterior',
+                'chevron-right': 'Próximo',
+                'info-circle': 'Informações',
+                'exclamation-triangle': 'Aviso',
+                'question-circle': 'Ajuda'
+            };
+            
+            // Task 3: Tenta FontAwesome com espaço PRIMEIRO (fa fa-search)
+            const faMatch = iconClass.match(/fa\s+fa-(\w+)/);
+            if (faMatch && ICON_MAP_FA[faMatch[1]]) {
+                const iconName = faMatch[1];
+                const label = ICON_MAP_FA[iconName];
+                console.log(`[RADAR] FontAwesome com espaço detectado: fa fa-${iconName} → ${label}`);
+                return label;  // ✅ "Pesquisar" em vez de "ui-btn"
+            }
+            
+            // Mapeia classes de ícone para ações semânticas (fallback para outros padrões)
             const ICON_MAP = {
                 'pi-save': 'Salvar',
                 'pi-check': 'Confirmar',
