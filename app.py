@@ -2183,7 +2183,7 @@ async def get_gps_roteiro(
         return JSONResponse(status_code=422, content={"erro": "objetivo é obrigatório"})
 
     # 1. Busca no Pinecone pelo roteiro mais relevante
-    busca = await asyncio.to_thread(dap_engine.buscar_contexto, objetivo.strip(), tenant_id)
+    busca = await asyncio.to_thread(dap_engine.buscar_contexto_multi_namespace, objetivo.strip(), tenant_id)
     if not busca or busca.get("score", 0) < 0.45:
         return {"status": "nao_encontrado", "passos": []}
 
@@ -3072,7 +3072,7 @@ async def listar_roteiros_por_url(url: str = ""):
     if dap_engine.pinecone_index and dap_engine.client_openai:
         try:
             busca = await asyncio.to_thread(
-                dap_engine.buscar_contexto, url, "senior_default"
+                dap_engine.buscar_contexto_multi_namespace, url, "senior_default"
             )
             melhor_aula = busca.get("melhor_aula") if busca else None
 
