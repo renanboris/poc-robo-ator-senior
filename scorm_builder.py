@@ -112,8 +112,8 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
 
                 # Nova precisão geométrica com SoM
                 som_box = alvo.get("som_box_clicada")
-                vp_w = acao.get("_vp_w", 1920)
-                vp_h = acao.get("_vp_h", 1080)
+                vp_w = alvo.get("_vp_w", 1920)
+                vp_h = alvo.get("_vp_h", 1080)
                 
                 if som_box and vp_w > 0 and vp_h > 0:
                     # SoM guarda coordenadas absolutas, convertemos para percentuais exatos

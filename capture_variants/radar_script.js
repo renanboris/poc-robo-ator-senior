@@ -3,7 +3,7 @@
 // Extracted from capture_dual_output.py for better maintainability
 
 console.log('[RADAR] ========================================');
-console.log('[RADAR] Script loading - Version 2.2.0-CONTEXTUAL-ROW-SELECTOR');
+console.log('[RADAR] Script loading - Version 2.3.0-SMART-ICON-MAPPING');
 console.log('[RADAR] Timestamp:', new Date().toISOString());
 console.log('[RADAR] ========================================');
 
@@ -12,7 +12,7 @@ if (window.__radarInjetado) {
     return;
 }
 window.__radarInjetado = true;
-window.__radarVersion = '2.2.0-CONTEXTUAL-ROW-SELECTOR';
+window.__radarVersion = '2.3.0-SMART-ICON-MAPPING';
 console.log('[RADAR] Script injected successfully');
 
 if (window === window.top && !document.getElementById('senior-rec-widget')) {
@@ -65,8 +65,22 @@ const getElementName = (el) => {
         const clean = (v) => (v && v !== 'undefined' && v !== 'null') ? v : '';
         return clean(el.placeholder) || clean(el.name) || clean(el.title) || 'Campo de entrada';
     }
+    // [FIX] Solução 1: Filtra textos genéricos de classes CSS PrimeNG/Angular
+    // Problema: botões PrimeNG com ícone retornam "ui-btn" (texto oculto CSS)
+    // Solução: ignora textos genéricos e força busca de atributos semânticos
     const text = el.innerText?.trim().replace(/\n/g, ' ') || '';
-    if (text && text.length > 0 && text.length < 100 && text !== 'undefined') return text;
+    if (text && text.length > 0 && text.length < 100 && text !== 'undefined') {
+        const TEXTOS_GENERICOS_PRIMENG = [
+            'ui-btn', 'ui-button', 'p-button', 'ui-button-text', 'p-button-label',
+            'ui-clickable', 'ui-widget', 'ui-state-default', 'p-element',
+            'button', 'span', 'div'  // tags HTML genéricas
+        ];
+        if (!TEXTOS_GENERICOS_PRIMENG.includes(text.toLowerCase())) {
+            return text;  // ✅ Só retorna se não for genérico
+        }
+        // Se for genérico, continua para buscar aria-label/title/ícone
+    }
+    
     let cur = el;
     for (let i = 0; i < 6; i++) {
         if (!cur) break;
@@ -90,6 +104,111 @@ const getElementName = (el) => {
         }
         cur = cur.parentElement;
     }
+    
+    // [FIX] Solução 2: Fallback inteligente para botões sem atributos
+    // Problema: botões sem aria-label/title retornam tag genérica
+    // Solução: mapeia ícones PrimeNG → ações semânticas
+    if (tag === 'button' || el.closest('button')) {
+        const btn = tag === 'button' ? el : el.closest('button');
+        
+        // Tenta extrair contexto do ícone PrimeNG/FontAwesome/Material
+        const icon = btn.querySelector('i, svg, .pi, .fa, .material-icons, [class*="icon"]');
+        if (icon) {
+            const iconClass = icon.className || '';
+            // Mapeia classes de ícone para ações semânticas
+            const ICON_MAP = {
+                'pi-save': 'Salvar',
+                'pi-check': 'Confirmar',
+                'pi-times': 'Cancelar',
+                'pi-trash': 'Excluir',
+                'pi-pencil': 'Editar',
+                'pi-search': 'Pesquisar',
+                'pi-plus': 'Adicionar',
+                'pi-minus': 'Remover',
+                'pi-download': 'Baixar',
+                'pi-upload': 'Enviar',
+                'pi-eye': 'Visualizar',
+                'pi-eye-slash': 'Ocultar',
+                'pi-cog': 'Configurações',
+                'pi-ellipsis-v': 'Ações',
+                'pi-ellipsis-h': 'Mais opções',
+                'pi-bars': 'Menu',
+                'pi-refresh': 'Atualizar',
+                'pi-filter': 'Filtrar',
+                'pi-sort': 'Ordenar',
+                'pi-print': 'Imprimir',
+                'pi-copy': 'Copiar',
+                'pi-file': 'Arquivo',
+                'pi-folder': 'Pasta',
+                'pi-calendar': 'Calendário',
+                'pi-clock': 'Horário',
+                'pi-user': 'Usuário',
+                'pi-users': 'Usuários',
+                'pi-lock': 'Bloquear',
+                'pi-unlock': 'Desbloquear',
+                'pi-sign-in': 'Entrar',
+                'pi-sign-out': 'Sair',
+                'pi-arrow-left': 'Voltar',
+                'pi-arrow-right': 'Avançar',
+                'pi-arrow-up': 'Subir',
+                'pi-arrow-down': 'Descer',
+                'pi-chevron-left': 'Anterior',
+                'pi-chevron-right': 'Próximo',
+                'pi-chevron-up': 'Expandir',
+                'pi-chevron-down': 'Recolher',
+                'pi-info-circle': 'Informações',
+                'pi-exclamation-triangle': 'Aviso',
+                'pi-question-circle': 'Ajuda',
+                // FontAwesome
+                'fa-save': 'Salvar',
+                'fa-trash': 'Excluir',
+                'fa-edit': 'Editar',
+                'fa-search': 'Pesquisar',
+                'fa-plus': 'Adicionar',
+                'fa-download': 'Baixar',
+                'fa-upload': 'Enviar',
+                'fa-eye': 'Visualizar',
+                'fa-cog': 'Configurações',
+                'fa-ellipsis-v': 'Ações',
+                // Material Icons
+                'save': 'Salvar',
+                'delete': 'Excluir',
+                'edit': 'Editar',
+                'search': 'Pesquisar',
+                'add': 'Adicionar',
+                'remove': 'Remover',
+                'download': 'Baixar',
+                'upload': 'Enviar',
+                'visibility': 'Visualizar',
+                'settings': 'Configurações',
+                'more_vert': 'Ações',
+                'more_horiz': 'Mais opções',
+            };
+            
+            for (const [iconKey, label] of Object.entries(ICON_MAP)) {
+                if (iconClass.includes(iconKey)) {
+                    console.log(`[RADAR] Ícone mapeado: ${iconKey} → ${label}`);
+                    return label;  // ✅ "Salvar" em vez de "ui-btn"
+                }
+            }
+        }
+        
+        // Tenta extrair do tooltip PrimeNG (pTooltip, tooltipPosition)
+        const tooltip = btn.getAttribute('ptooltip') || 
+                       btn.getAttribute('ng-reflect-text') ||
+                       btn.getAttribute('mattooltip') ||
+                       btn.getAttribute('title');
+        if (tooltip && tooltip !== 'undefined' && tooltip.length > 1 && tooltip.length < 60) {
+            console.log(`[RADAR] Tooltip encontrado: ${tooltip}`);
+            return tooltip;
+        }
+        
+        // Último recurso para botões: "Botão de ação"
+        console.log('[RADAR] Botão sem label identificável, usando fallback genérico');
+        return 'Botão de ação';
+    }
+    
+    // Fallback final para outros elementos
     return tag;
 };
 

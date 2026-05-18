@@ -942,6 +942,8 @@ def _invocar_aura_sync(nome_aula: str, objetivo_aula: str, log_mapeador: list, c
                         "micro_narracao": micro_narracoes[i] if i < len(micro_narracoes) else "",
                         "is_context_menu_item": acao_bruta.get("is_context_menu_item", False),
                         "_capture_meta": capture_meta,
+                        "_vp_w": acao_bruta.get("_vp_w", 1920),
+                        "_vp_h": acao_bruta.get("_vp_h", 1080),
                     })
             if passo_mesclado["is_conclusao"]:
                 passo_mesclado["acoes_tecnicas"].append({"acao": "concluir_video"})
