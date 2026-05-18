@@ -1,5 +1,6 @@
 import io
 import logging
+import math
 from typing import List, Optional, Dict
 from PIL import Image, ImageDraw, ImageFont
 from playwright.async_api import Page
@@ -156,17 +157,62 @@ def anotar_imagem(screenshot_bytes: bytes, boxes: List[Dict]) -> bytes:
 def identificar_box_clicada(boxes: List[Dict], x: int, y: int) -> Optional[int]:
     """
     Dado o (x, y) do clique e a lista de boxes, retorna o idx da box.
-    Em caso de overlap, retorna a menor (mais específica).
+    
+    Usa uma estratégia de três fases:
+    1. Matching estrito: verifica se o clique está dentro dos boundaries da box
+    2. Matching com tolerância: encontra a box mais próxima dentro de uma tolerância dinâmica
+    3. Fallback: retorna None se nenhuma box estiver dentro da tolerância
+    
+    Em caso de overlap ou múltiplos candidatos, retorna a menor (mais específica).
     """
-    contains = []
+    # Phase 1: Preserve strict matching (existing behavior)
+    # If click is within box boundaries, return immediately (prioritize smallest box if multiple matches)
+    strict_matches = []
     for box in boxes:
         bx, by, bw, bh = box["x"], box["y"], box["w"], box["h"]
         if bx <= x <= bx + bw and by <= y <= by + bh:
-            contains.append(box)
-            
-    if not contains:
-        return None
+            strict_matches.append(box)
+    
+    if strict_matches:
+        # Sort by area (w * h) ascending to get the most specific
+        strict_matches.sort(key=lambda b: b["w"] * b["h"])
+        return strict_matches[0]["idx"]
+    
+    # Phase 2: Add tolerance-based matching (new behavior)
+    # For each box, calculate distance to center and check if within tolerance
+    tolerance_candidates = []
+    for box in boxes:
+        bx, by, bw, bh = box["x"], box["y"], box["w"], box["h"]
         
-    # Sort by area (w * h) ascending to get the most specific
-    contains.sort(key=lambda b: b["w"] * b["h"])
-    return contains[0]["idx"]
+        # Calculate distance to center
+        center_x = bx + bw / 2
+        center_y = by + bh / 2
+        distance = math.sqrt((x - center_x)**2 + (y - center_y)**2)
+        
+        # Calculate dynamic tolerance: 30% of largest dimension
+        tolerance = max(bw, bh) * 0.3
+        
+        # Collect boxes where distance <= tolerance as candidates
+        if distance <= tolerance:
+            tolerance_candidates.append({
+                "box": box,
+                "distance": distance,
+                "area": bw * bh
+            })
+    
+    if tolerance_candidates:
+        # Sort candidates by distance (ascending), then by area (ascending) for tie-breaking
+        tolerance_candidates.sort(key=lambda c: (c["distance"], c["area"]))
+        
+        # Return idx of closest box (smallest distance, smallest area if tied)
+        matched_box = tolerance_candidates[0]["box"]
+        matched_distance = tolerance_candidates[0]["distance"]
+        
+        # Add informative logging when tolerance matching is used
+        logger.info(f"SoM tolerance match: click ({x}, {y}) matched box #{matched_box['idx']} at distance {matched_distance:.1f}px")
+        
+        return matched_box["idx"]
+    
+    # Phase 3: Fallback to None (preserved behavior)
+    # If no candidates within tolerance, return None
+    return None
