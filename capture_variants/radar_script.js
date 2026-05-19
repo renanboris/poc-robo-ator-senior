@@ -963,7 +963,23 @@ const processarEvento = (target, acao, valor = '') => {
         className: target.className
     });
     
-    const rect = getRectComFallback(target);
+    // [FIX CRÍTICO] Se o elemento clicado for um ícone (span/i com fa fa-*),
+    // sobe para o elemento pai clicável (button, a, etc) para capturar
+    // as coordenadas corretas para o SoM matching
+    let elementoParaRect = target;
+    const elClasses = target.className || '';
+    const isFontAwesomeIcon = /fa\s+fa-/.test(elClasses);
+    
+    if (isFontAwesomeIcon && target.tagName.toLowerCase() === 'span') {
+        // Sobe para o botão/link pai
+        const clickableParent = target.closest('button, a, [role="button"]');
+        if (clickableParent) {
+            console.log('[RADAR] Ícone FontAwesome detectado, usando coordenadas do pai:', clickableParent.tagName);
+            elementoParaRect = clickableParent;
+        }
+    }
+    
+    const rect = getRectComFallback(elementoParaRect);
     // Resolve PrimeNG uma vez: reutiliza para seletor + metadado
     const _pResult = resolvePrimeNGComponent(target);
     console.log('[RADAR] PrimeNG result:', _pResult);
