@@ -1418,7 +1418,17 @@ def _parse_coords(coords):
 
 async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> bool:
     try:
-        x, y = _parse_coords(coords)
+        # [FIX] Detecta se coordenadas são relativas (x_pct/y_pct) ou absolutas (x/y)
+        if isinstance(coords, dict) and "x_pct" in coords and "y_pct" in coords:
+            # Coordenadas relativas do Brain - converte para absolutas
+            vp = page.viewport_size or {"width": 1920, "height": 1080}
+            x = int(coords["x_pct"] * vp["width"])
+            y = int(coords["y_pct"] * vp["height"])
+            logger.debug(f"[Coords] Convertendo relativas para absolutas: {coords['x_pct']:.4f}, {coords['y_pct']:.4f} → {x}, {y}")
+        else:
+            # Coordenadas absolutas (legado ou Gemini Vision)
+            x, y = _parse_coords(coords)
+        
         if x <= 0 or y <= 0:
             raise ValueError(f"Coordenadas invalidas: x={x}, y={y}")
 
@@ -2618,6 +2628,15 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     # [Fase 2.3] Tenta aprender o seletor DOM após acerto por coordenada
                     try:
                         x_ia, y_ia = _parse_coords(coords_ia)
+                        
+                        # [FIX] Converte coordenadas absolutas para relativas antes de salvar no Brain
+                        vp_w = vp.get("width", 1920)
+                        vp_h = vp.get("height", 1080)
+                        coords_relativas = {
+                            "x_pct": round(x_ia / vp_w, 4),
+                            "y_pct": round(y_ia / vp_h, 4)
+                        }
+                        
                         seletor_aprendido = await page.evaluate(
                             """([x, y]) => {
                                 const el = document.elementFromPoint(x, y);
@@ -2633,11 +2652,19 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                             }""",
                             [x_ia, y_ia]
                         )
-                        _registrar_sucesso_cache(intencao, coords=coords_ia, seletor=seletor_aprendido)
+                        _registrar_sucesso_cache(intencao, coords=coords_relativas, seletor=seletor_aprendido)
                         if seletor_aprendido:
                             logger.info(f"   [Vision] Seletor aprendido após coordenada: {seletor_aprendido}")
                     except Exception:
-                        _registrar_sucesso_cache(intencao, coords=coords_ia)
+                        # [FIX] Converte coordenadas absolutas para relativas antes de salvar no Brain
+                        x_ia, y_ia = _parse_coords(coords_ia)
+                        vp_w = vp.get("width", 1920)
+                        vp_h = vp.get("height", 1080)
+                        coords_relativas = {
+                            "x_pct": round(x_ia / vp_w, 4),
+                            "y_pct": round(y_ia / vp_h, 4)
+                        }
+                        _registrar_sucesso_cache(intencao, coords=coords_relativas)
                     _registrar_telemetria("5_gemini_vision", True)
                     _registrar_estrategia_vencedora(intencao, "5_gemini_vision")
                     return True
