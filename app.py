@@ -340,7 +340,7 @@ def _set_estado(**kwargs):
             logging.error(f"Erro ao disparar broadcast via WebSocket: {e}")
 
 
-def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = None):
+def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = None, extra_env: dict = None):
     global processo_atual
     _set_estado(ocupado=True, mensagem=msg_executando, progresso=None, erro="", sucesso="", shadow_path=None)
 
@@ -350,6 +350,9 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = Non
     try:
         env_vars = os.environ.copy()
         env_vars["PYTHONIOENCODING"] = "utf-8"
+        # Injeta variáveis extras (ex: sistema alvo genérico) sem alterar o .env
+        if extra_env:
+            env_vars.update(extra_env)
 
         with _estado_lock:
             processo_atual = subprocess.Popen(
@@ -581,6 +584,16 @@ class RoteiroBase(BaseModel):
 class NovaAulaReq(BaseModel):
     nome_aula: str
     objetivo:  str
+    # Campos opcionais para seletor de sistema alvo (Dashboard)
+    sistema_alvo:          Optional[str] = "senior_x"   # "senior_x" ou "generic"
+    target_url:            Optional[str] = None
+    target_system_name:    Optional[str] = None
+    login_required:        Optional[bool] = False
+    login_user:            Optional[str] = None
+    login_pass:            Optional[str] = None
+    login_selector_user:   Optional[str] = None
+    login_selector_pass:   Optional[str] = None
+    login_selector_submit: Optional[str] = None
 
 class RenomearReq(BaseModel):
     novo_nome: str
@@ -1575,22 +1588,43 @@ async def excluir_roteiro(arquivo: str):
         return {"status": "sucesso"}
     return JSONResponse(status_code=404, content={"erro": "Arquivo não encontrado"})
 
-def _iniciar_bg(comando, msg_exec, msg_ok, tipo="processo", tenant_id="senior_default"):
+def _iniciar_bg(comando, msg_exec, msg_ok, tipo="processo", tenant_id="senior_default", extra_env: dict = None):
     with _estado_lock:
         if estado_servidor["ocupado"]:
             return None
     job_id = job_registry.criar_job(tipo, tenant_id)
-    threading.Thread(target=executar_processo_bg, args=(comando, msg_exec, msg_ok, job_id), daemon=True).start()
+    threading.Thread(target=executar_processo_bg, args=(comando, msg_exec, msg_ok, job_id, extra_env), daemon=True).start()
     return job_id
 
 @app.post("/api/gravar")
 async def gravar_aula(req: NovaAulaReq):
     tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
+
+    # Monta variáveis de ambiente extras para o subprocess (sem alterar .env)
+    extra_env = None
+    if req.sistema_alvo == "generic":
+        if not req.target_url:
+            raise HTTPException(status_code=422, detail="target_url é obrigatório quando sistema_alvo='generic'")
+        if not (req.target_url.startswith("http://") or req.target_url.startswith("https://")):
+            raise HTTPException(status_code=422, detail="target_url deve iniciar com http:// ou https://")
+        extra_env = {
+            "CAPTURE_ADAPTER": "generic",
+            "TARGET_URL": req.target_url,
+            "TARGET_SYSTEM_NAME": req.target_system_name or "Site Genérico",
+            "LOGIN_REQUIRED": "true" if req.login_required else "false",
+        }
+        if req.login_required:
+            extra_env["LOGIN_USER"] = req.login_user or ""
+            extra_env["LOGIN_PASS"] = req.login_pass or ""
+            extra_env["LOGIN_SELECTOR_USER"] = req.login_selector_user or ""
+            extra_env["LOGIN_SELECTOR_PASS"] = req.login_selector_pass or ""
+            extra_env["LOGIN_SELECTOR_SUBMIT"] = req.login_selector_submit or ""
+
     job_id = _iniciar_bg(
         [sys.executable, "capture_variants/capture_dual_output.py", req.nome_aula, req.objetivo, "--auto"],
         "🔍 Captura Dual ativa — gerando roteiro + shadow semântico...",
         "🎯 Captura dual concluída. Roteiro e shadow JSONL prontos.",
-        tipo="captura", tenant_id=tenant
+        tipo="captura", tenant_id=tenant, extra_env=extra_env
     )
     if job_id is None:
         return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})

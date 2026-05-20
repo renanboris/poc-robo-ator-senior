@@ -418,7 +418,7 @@ const MAX_SESSIONS = 20;
 
 // ─── Estado ──────────────────────────────────────────────────────────
 let appState     = 'IDLE';
-let session      = { titulo: '', produto: '', objetivo: '', arquivoJson: '' };
+let session      = { titulo: '', produto: '', objetivo: '', arquivoJson: '', sistemaAlvo: 'senior_x', targetUrl: '', targetSystemName: '', loginRequired: false, loginUser: '', loginPass: '', loginSelectorUser: '', loginSelectorPass: '', loginSelectorSubmit: '' };
 let apiOnline    = false;
 let _nomeUsuario = 'Operador';
 
@@ -762,6 +762,91 @@ function addConfirmCard() {
         <div class="card-row"><label>Título</label><span>${safe(session.titulo)}</span></div>
         <div class="card-row"><label>Produto</label><span>${safe(session.produto)}</span></div>
         <div class="card-row"><label>Objetivo</label><span>${safe(session.objetivo)}</span></div>
+        <div class="card-row" style="flex-direction:column;align-items:stretch;gap:8px">
+          <label>Sistema Alvo</label>
+          <select id="select-sistema-alvo" onchange="onSistemaAlvoChange(this.value)" style="
+            width:100%;padding:8px 12px;border-radius:8px;
+            background:var(--bg);border:1px solid var(--border-2);
+            color:var(--text);font-size:13px;font-family:inherit;
+            outline:none;cursor:pointer;transition:border-color .15s;
+          ">
+            <option value="senior_x" ${session.sistemaAlvo==='senior_x'?'selected':''}>Senior X</option>
+            <option value="generic" ${session.sistemaAlvo==='generic'?'selected':''}>Site Genérico</option>
+          </select>
+        </div>
+        <div id="generic-fields" style="display:${session.sistemaAlvo==='generic'?'block':'none'}">
+          <div class="card-row" style="flex-direction:column;align-items:stretch;gap:6px">
+            <label>URL do site <span style="color:var(--danger)">*</span></label>
+            <input id="generic-url" type="url" placeholder="https://exemplo.com" value="${safe(session.targetUrl)}" style="
+              width:100%;padding:8px 12px;border-radius:8px;
+              background:var(--bg);border:1px solid var(--border-2);
+              color:var(--text);font-size:13px;font-family:inherit;
+              outline:none;box-sizing:border-box;
+            ">
+          </div>
+          <div class="card-row" style="flex-direction:column;align-items:stretch;gap:6px">
+            <label>Nome do sistema</label>
+            <input id="generic-name" type="text" placeholder="Site Genérico" value="${safe(session.targetSystemName)}" style="
+              width:100%;padding:8px 12px;border-radius:8px;
+              background:var(--bg);border:1px solid var(--border-2);
+              color:var(--text);font-size:13px;font-family:inherit;
+              outline:none;box-sizing:border-box;
+            ">
+          </div>
+          <div class="card-row" style="align-items:center;gap:8px">
+            <label style="flex:1">Login necessário?</label>
+            <input id="generic-login-check" type="checkbox" ${session.loginRequired?'checked':''} onchange="onLoginCheckChange(this.checked)" style="
+              width:16px;height:16px;accent-color:var(--accent);cursor:pointer;
+            ">
+          </div>
+          <div id="generic-login-fields" style="display:${session.loginRequired?'block':'none'}">
+            <div class="card-row" style="flex-direction:column;align-items:stretch;gap:6px">
+              <label>Usuário</label>
+              <input id="generic-login-user" type="text" placeholder="usuario@email.com" value="${safe(session.loginUser)}" style="
+                width:100%;padding:8px 12px;border-radius:8px;
+                background:var(--bg);border:1px solid var(--border-2);
+                color:var(--text);font-size:13px;font-family:inherit;
+                outline:none;box-sizing:border-box;
+              ">
+            </div>
+            <div class="card-row" style="flex-direction:column;align-items:stretch;gap:6px">
+              <label>Senha</label>
+              <input id="generic-login-pass" type="password" placeholder="••••••••" value="${safe(session.loginPass)}" style="
+                width:100%;padding:8px 12px;border-radius:8px;
+                background:var(--bg);border:1px solid var(--border-2);
+                color:var(--text);font-size:13px;font-family:inherit;
+                outline:none;box-sizing:border-box;
+              ">
+            </div>
+            <div class="card-row" style="flex-direction:column;align-items:stretch;gap:6px">
+              <label>Seletor CSS — campo usuário</label>
+              <input id="generic-sel-user" type="text" placeholder="input[name='email']" value="${safe(session.loginSelectorUser)}" style="
+                width:100%;padding:8px 12px;border-radius:8px;
+                background:var(--bg);border:1px solid var(--border-2);
+                color:var(--text);font-size:13px;font-family:var(--font-mono);
+                outline:none;box-sizing:border-box;font-size:12px;
+              ">
+            </div>
+            <div class="card-row" style="flex-direction:column;align-items:stretch;gap:6px">
+              <label>Seletor CSS — campo senha</label>
+              <input id="generic-sel-pass" type="text" placeholder="input[type='password']" value="${safe(session.loginSelectorPass)}" style="
+                width:100%;padding:8px 12px;border-radius:8px;
+                background:var(--bg);border:1px solid var(--border-2);
+                color:var(--text);font-size:13px;font-family:var(--font-mono);
+                outline:none;box-sizing:border-box;font-size:12px;
+              ">
+            </div>
+            <div class="card-row" style="flex-direction:column;align-items:stretch;gap:6px">
+              <label>Seletor CSS — botão submit</label>
+              <input id="generic-sel-submit" type="text" placeholder="button[type='submit']" value="${safe(session.loginSelectorSubmit)}" style="
+                width:100%;padding:8px 12px;border-radius:8px;
+                background:var(--bg);border:1px solid var(--border-2);
+                color:var(--text);font-size:13px;font-family:var(--font-mono);
+                outline:none;box-sizing:border-box;font-size:12px;
+              ">
+            </div>
+          </div>
+        </div>
         <div class="card-actions">
           <button class="btn-confirm" onclick="confirmarInicio()">
             Confirmar e iniciar mapeamento
@@ -1088,13 +1173,65 @@ function chipClick(action, label = '', payload = '') {
 window.chipClick = chipClick;
 
 function editarSessao() {
-  session = { titulo: '', produto: '', objetivo: '', arquivoJson: '' };
+  session = { titulo: '', produto: '', objetivo: '', arquivoJson: '', sistemaAlvo: 'senior_x', targetUrl: '', targetSystemName: '', loginRequired: false, loginUser: '', loginPass: '', loginSelectorUser: '', loginSelectorPass: '', loginSelectorSubmit: '' };
   appState = 'TITLE';
   addAgent('Tudo bem, vamos recomeçar. Qual será o título?');
 }
 
+// ─── Helpers: Sistema Alvo ─────────────────────────────────
+function onSistemaAlvoChange(value) {
+  session.sistemaAlvo = value;
+  const fields = document.getElementById('generic-fields');
+  if (fields) fields.style.display = value === 'generic' ? 'block' : 'none';
+}
+
+function onLoginCheckChange(checked) {
+  session.loginRequired = checked;
+  const loginFields = document.getElementById('generic-login-fields');
+  if (loginFields) loginFields.style.display = checked ? 'block' : 'none';
+}
+
+function _coletarCamposGeneric() {
+  // Lê os valores dos campos genéricos do card antes de submeter
+  const url = (document.getElementById('generic-url') || {}).value || '';
+  const name = (document.getElementById('generic-name') || {}).value || '';
+  const loginCheck = (document.getElementById('generic-login-check') || {}).checked || false;
+  const loginUser = (document.getElementById('generic-login-user') || {}).value || '';
+  const loginPass = (document.getElementById('generic-login-pass') || {}).value || '';
+  const selUser = (document.getElementById('generic-sel-user') || {}).value || '';
+  const selPass = (document.getElementById('generic-sel-pass') || {}).value || '';
+  const selSubmit = (document.getElementById('generic-sel-submit') || {}).value || '';
+  const sistema = (document.getElementById('select-sistema-alvo') || {}).value || 'senior_x';
+
+  session.sistemaAlvo = sistema;
+  session.targetUrl = url;
+  session.targetSystemName = name;
+  session.loginRequired = loginCheck;
+  session.loginUser = loginUser;
+  session.loginPass = loginPass;
+  session.loginSelectorUser = selUser;
+  session.loginSelectorPass = selPass;
+  session.loginSelectorSubmit = selSubmit;
+}
+
 // ─── TRAVA 1: Mapeamento ──────────────────────────────────
 async function confirmarInicio() {
+  // Coleta campos do sistema alvo antes de remover o card
+  _coletarCamposGeneric();
+
+  // Validação frontend: URL obrigatória para site genérico
+  if (session.sistemaAlvo === 'generic') {
+    const url = session.targetUrl.trim();
+    if (!url) {
+      addNotice('A **URL do site** é obrigatória para o modo Site Genérico.');
+      return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      addNotice('A URL deve começar com **http://** ou **https://**.');
+      return;
+    }
+  }
+
   document.querySelectorAll('.card').forEach(c => c.closest('.msg')?.remove());
   addUser('Confirmar e iniciar mapeamento');
   appState = 'RUNNING';
@@ -1122,10 +1259,30 @@ async function confirmarInicio() {
     
     const tituloCompleto = `${session.produto} - ${session.titulo}`;
 
+    // Monta o body com campos do sistema alvo
+    const body = {
+      nome_aula: tituloCompleto,
+      objetivo: session.objetivo,
+      sistema_alvo: session.sistemaAlvo,
+    };
+
+    if (session.sistemaAlvo === 'generic') {
+      body.target_url = session.targetUrl;
+      body.target_system_name = session.targetSystemName || '';
+      body.login_required = session.loginRequired;
+      if (session.loginRequired) {
+        body.login_user = session.loginUser;
+        body.login_pass = session.loginPass;
+        body.login_selector_user = session.loginSelectorUser;
+        body.login_selector_pass = session.loginSelectorPass;
+        body.login_selector_submit = session.loginSelectorSubmit;
+      }
+    }
+
     const res = await fetch(`${API}/api/gravar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome_aula: tituloCompleto, objetivo: session.objetivo }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error('A API rejeitou o comando de gravação.');
 
@@ -1223,7 +1380,7 @@ const chipHandlers = {
 };
 
 function newSession() {
-  session                = { titulo: '', produto: '', objetivo: '', arquivoJson: '' };
+  session                = { titulo: '', produto: '', objetivo: '', arquivoJson: '', sistemaAlvo: 'senior_x', targetUrl: '', targetSystemName: '', loginRequired: false, loginUser: '', loginPass: '', loginSelectorUser: '', loginSelectorPass: '', loginSelectorSubmit: '' };
   appState               = 'IDLE';
   _activeRenderStepEl    = null;
   document.getElementById('chat-content').innerHTML = '';
