@@ -1665,13 +1665,47 @@ async def gravar_aula_hybrid(req: NovaAulaReq):
 # FIX Bug #APP-01: Rota /api/gerar-ia duplicada removida aqui.
 # A implementação correta (com tenant_id e validação) está abaixo (~linha 604).
 
+class ExecutarRoboReq(BaseModel):
+    sistema_alvo: Optional[str] = "senior_x"
+    target_url: Optional[str] = None
+    target_system_name: Optional[str] = None
+    login_required: Optional[bool] = False
+    login_user: Optional[str] = None
+    login_pass: Optional[str] = None
+    login_selector_user: Optional[str] = None
+    login_selector_pass: Optional[str] = None
+    login_selector_submit: Optional[str] = None
+
 @app.post("/api/executar-robo/{arquivo}")
-async def executar_robo(arquivo: str):
+async def executar_robo(arquivo: str, req: Optional[ExecutarRoboReq] = None):
     caminho = _validar_caminho(arquivo, ROTEIROS_DIR)
     tenant = os.getenv("DEFAULT_TENANT_ID", "senior_default")
-    job_id = _iniciar_bg([sys.executable, "main.py", caminho, "--record"],
-                     "🎬 Contratando o locutor da IA...", "🎞️ Cenas gravadas. Ilha de edição, é com vocês!",
-                     tipo="render", tenant_id=tenant)
+
+    # Monta variáveis de ambiente extras para o subprocess (sem alterar o .env)
+    extra_env = None
+    if req and req.sistema_alvo == "generic":
+        if not req.target_url:
+            raise HTTPException(status_code=422, detail="target_url é obrigatório quando sistema_alvo='generic'")
+        if not (req.target_url.startswith("http://") or req.target_url.startswith("https://")):
+            raise HTTPException(status_code=422, detail="target_url deve iniciar com http:// ou https://")
+        extra_env = {
+            "CAPTURE_ADAPTER": "generic",
+            "TARGET_URL": req.target_url,
+            "TARGET_SYSTEM_NAME": req.target_system_name or "Site Genérico",
+            "LOGIN_REQUIRED": "true" if req.login_required else "false",
+        }
+        if req.login_required:
+            extra_env["LOGIN_USER"] = req.login_user or ""
+            extra_env["LOGIN_PASS"] = req.login_pass or ""
+            extra_env["LOGIN_SELECTOR_USER"] = req.login_selector_user or ""
+            extra_env["LOGIN_SELECTOR_PASS"] = req.login_selector_pass or ""
+            extra_env["LOGIN_SELECTOR_SUBMIT"] = req.login_selector_submit or ""
+
+    job_id = _iniciar_bg(
+        [sys.executable, "main.py", caminho, "--record"],
+        "🎬 Contratando o locutor da IA...", "🎞️ Cenas gravadas. Ilha de edição, é com vocês!",
+        tipo="render", tenant_id=tenant, extra_env=extra_env
+    )
     if job_id is None:
         return JSONResponse(status_code=400, content={"erro": "Sistema ocupado"})
     return {"status": "iniciado", "job_id": job_id}

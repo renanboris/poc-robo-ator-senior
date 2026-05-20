@@ -1322,7 +1322,27 @@ async function iniciarRobo() {
     const arquivoJson = session.arquivoJson || formatarNomeArquivo(`${session.produto} - ${session.titulo}`);
 
     await fetch(`${API}/api/limpar-status`, { method: 'POST' }).catch(() => {});
-    const res = await fetch(`${API}/api/executar-robo/${arquivoJson}`, { method: 'POST' });
+
+    // Monta body com sistema alvo (preserva Senior X como padrão)
+    const body = { sistema_alvo: session.sistemaAlvo || 'senior_x' };
+    if (session.sistemaAlvo === 'generic') {
+      body.target_url = session.targetUrl || '';
+      body.target_system_name = session.targetSystemName || '';
+      body.login_required = session.loginRequired || false;
+      if (session.loginRequired) {
+        body.login_user = session.loginUser || '';
+        body.login_pass = session.loginPass || '';
+        body.login_selector_user = session.loginSelectorUser || '';
+        body.login_selector_pass = session.loginSelectorPass || '';
+        body.login_selector_submit = session.loginSelectorSubmit || '';
+      }
+    }
+
+    const res = await fetch(`${API}/api/executar-robo/${arquivoJson}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
     
     if (!res.ok) throw new Error('Falha ao acionar o endpoint do Robô.');
 
