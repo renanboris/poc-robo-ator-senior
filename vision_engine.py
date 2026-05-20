@@ -1047,19 +1047,10 @@ async def _scroll_para_area_esperada(
                 delta_total  = scroll_alvo - scroll_atual
 
                 if abs(delta_total) > 10:
-                    # [FIX SCROLL SUAVE] Move o cursor para o centro da tela antes de scrollar,
-                    # depois executa o scroll em passos graduais via mouse.wheel().
-                    # Isso elimina o "corte seco" no vídeo — o scroll aparece animado e natural.
-                    try:
-                        from cursor_engine import mover_cursor_humanizado
-                        cx = vp["width"] / 2
-                        cy = vp["height"] / 2
-                        await mover_cursor_humanizado(page, cx, cy, duracao_ms=400)
-                    except Exception:
-                        pass
-
                     # Scroll em passos de ~120px (equivale a ~1 tick de roda do mouse)
                     # com pausa entre cada passo para suavidade visual no vídeo.
+                    # NOTA: mouse.wheel() não requer posição específica do cursor —
+                    # o cursor permanece no último clique e só se move ao próximo alvo.
                     passo_px   = 120
                     n_passos   = max(1, abs(delta_total) // passo_px)
                     delta_passo = int(delta_total / n_passos)
