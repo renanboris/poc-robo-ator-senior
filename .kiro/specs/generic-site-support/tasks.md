@@ -6,15 +6,15 @@ Implementação do suporte a sites genéricos no pipeline Senior Training OS. O 
 
 ## Tasks
 
-- [ ] 1. Implementar GenericAdapter e atualizar factory
-  - [ ] 1.1 Criar classe `GenericAdapter` em `contracts/capture_adapter.py`
+- [x] 1. Implementar GenericAdapter e atualizar factory
+  - [x] 1.1 Criar classe `GenericAdapter` em `contracts/capture_adapter.py`
     - Implementar todos os métodos do protocolo `CaptureAdapter`: `nome_sistema`, `url_base`, `obter_credenciais()`, `obter_seletores_login()`, `obter_configuracao_browser()`
     - Adicionar método `login_requerido()` que retorna `True` se `LOGIN_REQUIRED=true` (case-insensitive), default `False`
     - Implementar `validar_configuracao()` no `__init__` com fail-fast: valida `TARGET_URL` (obrigatória, deve iniciar com `http://` ou `https://`), `LOGIN_REQUIRED` (deve ser `true` ou `false`), e seletores/credenciais quando login requerido
     - Usar `sys.exit(1)` com mensagem descritiva listando todas as variáveis inválidas/ausentes
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 6.1, 6.6, 6.7_
 
-  - [ ] 1.2 Atualizar `get_capture_adapter()` para reconhecer `CAPTURE_ADAPTER=generic`
+  - [x] 1.2 Atualizar `get_capture_adapter()` para reconhecer `CAPTURE_ADAPTER=generic`
     - Adicionar branch na factory: `if adapter_name in ("generic", "generico"): return GenericAdapter()`
     - Preservar fallback para `SeniorXAdapter` com WARNING no log para valores não reconhecidos
     - _Requirements: 1.2, 9.1, 9.2, 9.3_
@@ -29,11 +29,11 @@ Implementação do suporte a sites genéricos no pipeline Senior Training OS. O 
     - **Property 18: Variáveis SENIOR_* ausentes não causam erros no modo genérico**
     - **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.8, 6.1, 6.4, 6.5, 6.6, 9.3**
 
-- [ ] 2. Checkpoint - Validar adapter isolado
+- [-] 2. Checkpoint - Validar adapter isolado
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 3. Desacoplar login em `capture_variants/capture_dual_output.py`
-  - [ ] 3.1 Refatorar `capturar_cliques_na_tela()` para usar adapter
+- [x] 3. Desacoplar login em `capture_variants/capture_dual_output.py`
+  - [x] 3.1 Refatorar `capturar_cliques_na_tela()` para usar adapter
     - Substituir leitura direta de `SENIOR_URL`, `SENIOR_USER_CAPTURE`, `SENIOR_PASS_CAPTURE` por chamadas ao adapter via `get_capture_adapter()`
     - Implementar bloco condicional: se `GenericAdapter` com `login_requerido()=False`, navegar direto para `adapter.url_base` e injetar radar sem login
     - Se `GenericAdapter` com `login_requerido()=True`, usar seletores de `adapter.obter_seletores_login()` para login genérico
@@ -48,8 +48,8 @@ Implementação do suporte a sites genéricos no pipeline Senior Training OS. O 
     - **Property 14: Log de login genérico contém seletores mas não credenciais**
     - **Validates: Requirements 1.7, 2.2, 2.4, 2.8, 6.3, 8.3**
 
-- [ ] 4. Desacoplar login em `main.py`
-  - [ ] 4.1 Refatorar `executar_roteiro()` para usar adapter
+- [x] 4. Desacoplar login em `main.py`
+  - [x] 4.1 Refatorar `executar_roteiro()` para usar adapter
     - Substituir leitura direta de `SENIOR_URL`, `SENIOR_USER_EXECUTE`, `SENIOR_PASS_EXECUTE` por chamadas ao adapter via `get_capture_adapter()`
     - Implementar bloco condicional: se `GenericAdapter` com `login_requerido()=False`, navegar direto e exibir overlay "Pronto para gravar?"
     - Se `GenericAdapter` com `login_requerido()=True`, usar seletores do adapter para login
@@ -62,11 +62,11 @@ Implementação do suporte a sites genéricos no pipeline Senior Training OS. O 
     - **Property 7: Fallback manual ativado para qualquer adapter em caso de falha de login**
     - **Validates: Requirements 2.6, 3.6**
 
-- [ ] 5. Checkpoint - Validar captura e execução desacoplados
+- [x] 5. Checkpoint - Validar captura e execução desacoplados
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Condicionar camada 1.5 do vision_engine ao adapter ativo
-  - [ ] 6.1 Refatorar `vision_engine.py` para pular camada 1.5 quando adapter não é SeniorX
+- [x] 6. Condicionar camada 1.5 do vision_engine ao adapter ativo
+  - [x] 6.1 Refatorar `vision_engine.py` para pular camada 1.5 quando adapter não é SeniorX
     - Importar `get_capture_adapter` e `SeniorXAdapter` de `contracts.capture_adapter`
     - Cachear resultado de `get_capture_adapter()` em variável de módulo para evitar overhead de I/O repetido
     - No início da camada 1.5 dentro de `encontrar_e_clicar()`, verificar `isinstance(_adapter_ativo, SeniorXAdapter)` — se False, pular camada 1.5
@@ -78,15 +78,15 @@ Implementação do suporte a sites genéricos no pipeline Senior Training OS. O 
     - **Property 10: Camadas 0, 2, 3, 4, 5 preservadas para qualquer adapter**
     - **Validates: Requirements 4.2, 4.3, 4.5**
 
-- [ ] 7. Parametrizar prompts de IA pelo sistema alvo
-  - [ ] 7.1 Implementar `_adaptar_prompt_sistema()` em `generator_engine.py`
+- [x] 7. Parametrizar prompts de IA pelo sistema alvo
+  - [x] 7.1 Implementar `_adaptar_prompt_sistema()` em `generator_engine.py`
     - Criar função que substitui "Senior X" e "ERP" (case-insensitive) por `TARGET_SYSTEM_NAME` no prompt quando adapter não é `SeniorXAdapter`
     - Preservar prompt original sem substituição quando `SeniorXAdapter` ativo ou `TARGET_SYSTEM_NAME` vazio
     - Implementar try/except defensivo: em caso de erro, retornar prompt original com log WARNING
     - Aplicar substituição ao `prompt_usuario` antes de enviar ao Gemini
     - _Requirements: 5.1, 5.3, 5.4, 5.5_
 
-  - [ ] 7.2 Incluir contexto do sistema alvo no prompt de captura em `capture_dual_output.py`
+  - [x] 7.2 Incluir contexto do sistema alvo no prompt de captura em `capture_dual_output.py`
     - Adicionar `adapter.nome_sistema` como campo de contexto nomeado no prompt enviado ao Gemini durante análise de elementos
     - _Requirements: 5.2_
 
@@ -94,8 +94,8 @@ Implementação do suporte a sites genéricos no pipeline Senior Training OS. O 
     - **Property 11: Substituição de nome de sistema no prompt é completa e não afeta SeniorX**
     - **Validates: Requirements 5.1, 5.3**
 
-- [ ] 8. Atualizar `.env.example` com novas variáveis
-  - [ ] 8.1 Adicionar bloco de configuração para sites genéricos no `.env.example`
+- [x] 8. Atualizar `.env.example` com novas variáveis
+  - [x] 8.1 Adicionar bloco de configuração para sites genéricos no `.env.example`
     - Incluir variáveis: `CAPTURE_ADAPTER`, `TARGET_URL`, `TARGET_SYSTEM_NAME`, `LOGIN_REQUIRED`, `LOGIN_USER`, `LOGIN_PASS`, `LOGIN_SELECTOR_USER`, `LOGIN_SELECTOR_PASS`, `LOGIN_SELECTOR_SUBMIT`
     - Adicionar comentários explicativos em português para cada variável
     - Incluir valores de exemplo realistas
@@ -114,7 +114,7 @@ Implementação do suporte a sites genéricos no pipeline Senior Training OS. O 
     - Verificar que credenciais `SENIOR_USER_*` são lidas corretamente
     - _Requirements: 9.1, 9.2, 9.4, 9.5_
 
-- [ ] 10. Final checkpoint - Validação completa
+- [x] 10. Final checkpoint - Validação completa
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

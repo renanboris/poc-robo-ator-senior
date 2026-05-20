@@ -61,6 +61,18 @@ shadow_capturado: list = []
 _id_acao_global: int    = 0
 _lock_id: asyncio.Lock  = None
 
+# Cache do nome do sistema alvo para uso nos prompts Gemini (evita instanciar adapter por elemento)
+_nome_sistema_cache: str | None = None
+
+
+def _get_nome_sistema_cache() -> str:
+    """Retorna o nome do sistema alvo, cacheado após a primeira chamada."""
+    global _nome_sistema_cache
+    if _nome_sistema_cache is None:
+        from contracts.capture_adapter import get_capture_adapter
+        _nome_sistema_cache = get_capture_adapter().nome_sistema
+    return _nome_sistema_cache
+
 
 def _retry_com_backoff(func, max_tentativas=5, delay_inicial=2):
     """
@@ -176,10 +188,14 @@ async def _analisar_elemento_com_gemini(
     if som_idx is not None:
         som_info = f"\nElemento SoM: box #{som_idx} de {som_total} interativos na tela. A imagem enviada tem bounding boxes numeradas em vermelho sobre os elementos interativos. O elemento clicado é o de número {som_idx}."
 
-    prompt = f"""Voce e um analista de UX documentando uma sessao de uso do sistema Senior X.
+    # Contexto do sistema alvo para o prompt (usa cache de módulo para evitar overhead)
+    sistema_alvo = _get_nome_sistema_cache()
+    sistema_context = f"\nSistema alvo: {sistema_alvo}"
+
+    prompt = f"""Voce e um analista de UX documentando uma sessao de uso do sistema {sistema_alvo}.
 O usuario realizou a acao '{acao}' no elemento com label: '{label_capturado}'.
 HTML do elemento clicado: {html_snapshot[:250]}
-Posicao relativa na tela: x={coords.get('x_pct','?')}, y={coords.get('y_pct','?')}{ax_info}{som_info}
+Posicao relativa na tela: x={coords.get('x_pct','?')}, y={coords.get('y_pct','?')}{ax_info}{som_info}{sistema_context}
 
 Analise o screenshot e responda com um JSON:
 {{
@@ -600,13 +616,28 @@ async def capturar_cliques_na_tela():
     cliques_capturados.clear()
     shadow_capturado.clear()
 
-    SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario    = os.getenv("SENIOR_USER_CAPTURE")
-    senha      = os.getenv("SENIOR_PASS_CAPTURE")
+    # ── Adapter: obtém URL, credenciais e seletores via contrato ─────────────
+    from contracts.capture_adapter import get_capture_adapter, GenericAdapter, SeniorXAdapter
+    adapter = get_capture_adapter()
+    logger.info(f"[Pipeline] Adapter ativo: {type(adapter).__name__} | Sistema: {adapter.nome_sistema}")
 
-    if not usuario or not senha:
-        print("ERRO FATAL: Credenciais de captura ausentes no .env (SENIOR_USER_CAPTURE / SENIOR_PASS_CAPTURE).", flush=True)
-        return
+    url_alvo   = adapter.url_base
+    creds      = adapter.obter_credenciais()
+    usuario    = creds["usuario"]
+    senha      = creds["senha"]
+    seletores  = adapter.obter_seletores_login()
+
+    # Validação de credenciais conforme adapter ativo
+    _modo_sem_login = isinstance(adapter, GenericAdapter) and not adapter.login_requerido()
+
+    if isinstance(adapter, SeniorXAdapter):
+        if not usuario or not senha:
+            print("ERRO FATAL: Credenciais de captura ausentes no .env (SENIOR_USER_CAPTURE / SENIOR_PASS_CAPTURE).", flush=True)
+            return
+    elif isinstance(adapter, GenericAdapter) and adapter.login_requerido():
+        if not usuario or not senha:
+            print("ERRO FATAL: LOGIN_REQUIRED=true mas LOGIN_USER/LOGIN_PASS ausentes no .env.", flush=True)
+            return
 
     async with async_playwright() as p:
         # ── Detecta monitor auxiliar para abrir captura em fullHD ────────────
@@ -632,70 +663,133 @@ async def capturar_cliques_na_tela():
         page    = await context.new_page()
 
         await context.expose_binding("capturarElemento", on_capturar_elemento, handle=True)
-        logger.info("Abrindo Senior X para Mapeamento...")
+        logger.info(f"Abrindo {adapter.nome_sistema} para Mapeamento...")
         print("A iniciar o navegador e a tentar login...", flush=True)
 
-        try:
-            await page.goto(SENIOR_URL)
-            await asyncio.sleep(2.0)
-            await page.keyboard.press("Escape")
-
-            campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
-            await campo_usr.wait_for(state="visible", timeout=10000)
-            await campo_usr.fill(usuario)
-            await asyncio.sleep(0.5)
-
+        # ── Modo sem login (GenericAdapter com LOGIN_REQUIRED=false) ─────────
+        if _modo_sem_login:
+            logger.info(f"[Adapter] Modo sem login ativo. Navegando para: {url_alvo}")
             try:
-                await page.locator("button:has-text('Próximo'), button:has-text('Proximo'), button:has-text('Continuar')").first.click(timeout=3000)
-            except Exception:
+                await page.goto(url_alvo)
+                await page.wait_for_load_state("load", timeout=30_000)
+                await asyncio.sleep(1.0)
+            except Exception as e:
+                logger.warning(f"Falha ao navegar para {url_alvo}: {e}")
+                print(f"AVISO: Não foi possível carregar {url_alvo}. Verifique a URL e tente novamente.", flush=True)
+                await browser.close()
+                return
+
+        # ── Modo com login (SeniorXAdapter ou GenericAdapter com LOGIN_REQUIRED=true) ──
+        elif isinstance(adapter, SeniorXAdapter):
+            # Fluxo Senior X original preservado integralmente
+            try:
+                await page.goto(url_alvo)
+                await asyncio.sleep(2.0)
+                await page.keyboard.press("Escape")
+
+                campo_usr = page.locator(seletores["campo_usuario"]).first
+                await campo_usr.wait_for(state="visible", timeout=10000)
+                await campo_usr.fill(usuario)
+                await asyncio.sleep(0.5)
+
+                try:
+                    await page.locator(seletores["botao_proximo"]).first.click(timeout=3000)
+                except Exception:
+                    await page.keyboard.press("Enter")
+
+                campo_senha = page.locator(seletores["campo_senha"]).first
+                await campo_senha.wait_for(state="visible", timeout=10000)
+                await campo_senha.fill(senha)
+                await asyncio.sleep(0.5)
                 await page.keyboard.press("Enter")
 
-            campo_senha = page.locator("input[type='password']").first
-            await campo_senha.wait_for(state="visible", timeout=10000)
-            await campo_senha.fill(senha)
-            await asyncio.sleep(0.5)
-            await page.keyboard.press("Enter")
+                print("Login efetuado. Aguardando redirecionamentos do SSO...", flush=True)
 
-            print("Login efetuado. Aguardando redirecionamentos do SSO...", flush=True)
-            
-            # 1. Aguarda ativamente a URL mudar para a raiz do painel (escapando de /login e /auth)
-            try:
-                # Espera chegar na plataforma (independente de ser homologx, dev ou prod)
-                await page.wait_for_url("**/platform/senior-x/**", timeout=30_000)
-            except Exception:
-                # Fallback genérico caso a URL seja diferente
-                for _ in range(15):
-                    if "login" not in page.url.lower() and "auth" not in page.url.lower():
-                        break
-                    await asyncio.sleep(1.0)
-                
-            print("Carregando o painel principal da plataforma...", flush=True)
-            # 2. Aguarda o DOM principal estabilizar (com timeout agressivo caso haja polling infinito)
-            try:
-                await page.wait_for_load_state("networkidle", timeout=15_000)
-            except Exception:
-                pass 
-                
-            await asyncio.sleep(2.0)
+                # 1. Aguarda ativamente a URL mudar para a raiz do painel (escapando de /login e /auth)
+                try:
+                    await page.wait_for_url("**/platform/senior-x/**", timeout=30_000)
+                except Exception:
+                    for _ in range(15):
+                        if "login" not in page.url.lower() and "auth" not in page.url.lower():
+                            break
+                        await asyncio.sleep(1.0)
 
-        except Exception as e:
-            logger.warning(f"O auto-login falhou/travou: {e}")
-            print("AVISO: O robô não conseguiu fazer o login automático. Por favor, conclua o login manualmente na janela do Chrome!", flush=True)
-            try:
-                # Aguarda até 2 minutos para o usuário logar e a URL mudar para o painel principal
-                await page.wait_for_url("**/platform/senior-x/**", timeout=120_000)
-                
-                print("Carregando o painel principal da plataforma (Login Manual)...", flush=True)
+                print("Carregando o painel principal da plataforma...", flush=True)
                 try:
                     await page.wait_for_load_state("networkidle", timeout=15_000)
                 except Exception:
                     pass
-                    
-                await asyncio.sleep(3.0)
-            except Exception:
-                print("ERRO FATAL: Tempo esgotado para login manual ou URL inesperada.", flush=True)
-                await browser.close()
-                return
+
+                await asyncio.sleep(2.0)
+
+            except Exception as e:
+                logger.warning(f"O auto-login falhou/travou: {e}")
+                print("AVISO: O robô não conseguiu fazer o login automático. Por favor, conclua o login manualmente na janela do Chrome!", flush=True)
+                try:
+                    await page.wait_for_url("**/platform/senior-x/**", timeout=120_000)
+
+                    print("Carregando o painel principal da plataforma (Login Manual)...", flush=True)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=15_000)
+                    except Exception:
+                        pass
+
+                    await asyncio.sleep(3.0)
+                except Exception:
+                    print("ERRO FATAL: Tempo esgotado para login manual ou URL inesperada.", flush=True)
+                    await browser.close()
+                    return
+
+        else:
+            # Fluxo de login genérico (GenericAdapter com LOGIN_REQUIRED=true)
+            logger.info(
+                f"[Adapter] Login genérico ativo. Seletores: "
+                f"user={seletores['campo_usuario']}, pass={seletores['campo_senha']}, "
+                f"submit={seletores['botao_proximo']}"
+            )
+            try:
+                await page.goto(url_alvo)
+                await asyncio.sleep(2.0)
+
+                campo_usr = page.locator(seletores["campo_usuario"]).first
+                await campo_usr.wait_for(state="visible", timeout=10000)
+                await campo_usr.fill(usuario)
+                await asyncio.sleep(0.5)
+
+                campo_senha = page.locator(seletores["campo_senha"]).first
+                await campo_senha.wait_for(state="visible", timeout=10000)
+                await campo_senha.fill(senha)
+                await asyncio.sleep(0.5)
+
+                await page.locator(seletores["botao_proximo"]).first.click(timeout=10000)
+
+                print("Login efetuado. Aguardando navegação pós-login...", flush=True)
+
+                # Aguarda navegação pós-login (URL sair de /login ou /auth)
+                for _ in range(30):
+                    if "login" not in page.url.lower() and "auth" not in page.url.lower():
+                        break
+                    await asyncio.sleep(1.0)
+
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15_000)
+                except Exception:
+                    pass
+
+                await asyncio.sleep(2.0)
+
+            except Exception as e:
+                logger.warning(f"O auto-login genérico falhou/travou: {e}")
+                logger.error(f"[Adapter] Seletor que falhou ou erro Playwright: {e}")
+                print("AVISO: O robô não conseguiu fazer o login automático. Por favor, conclua o login manualmente na janela do Chrome!", flush=True)
+                try:
+                    # Aguarda até 2 minutos para o usuário logar manualmente
+                    await page.wait_for_load_state("networkidle", timeout=120_000)
+                    await asyncio.sleep(3.0)
+                except Exception:
+                    print("ERRO FATAL: Tempo esgotado para login manual.", flush=True)
+                    await browser.close()
+                    return
 
         await injetar_radar_event_driven(page)
 

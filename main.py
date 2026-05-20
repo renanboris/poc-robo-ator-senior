@@ -418,13 +418,32 @@ async def clicar_com_animacao(page, acao_tec: dict) -> bool:
 # MOTOR DE EXECUCAO PRINCIPAL
 # ==============================================================
 async def executar_roteiro(caminho_json: str) -> None:
-    SENIOR_URL = os.getenv("SENIOR_URL", "https://platform-homologx.senior.com.br/tecnologia/platform/senior-x/")
-    usuario    = os.getenv("SENIOR_USER_EXECUTE")
-    senha      = os.getenv("SENIOR_PASS_EXECUTE")
+    from contracts.capture_adapter import get_capture_adapter, GenericAdapter, SeniorXAdapter
 
-    if not usuario or not senha:
-        print("ERRO: Credenciais de execução ausentes no .env (SENIOR_USER_EXECUTE / SENIOR_PASS_EXECUTE)")
-        sys.exit(1)
+    adapter    = get_capture_adapter()
+    logging.info(f"[Pipeline] Adapter ativo: {type(adapter).__name__} | Sistema: {adapter.nome_sistema}")
+
+    SENIOR_URL = adapter.url_base
+    seletores  = adapter.obter_seletores_login()
+
+    # Credenciais: SeniorXAdapter usa variáveis de execução; GenericAdapter usa adapter
+    if isinstance(adapter, SeniorXAdapter):
+        usuario = os.getenv("SENIOR_USER_EXECUTE", "")
+        senha   = os.getenv("SENIOR_PASS_EXECUTE", "")
+    else:
+        creds   = adapter.obter_credenciais()
+        usuario = creds["usuario"]
+        senha   = creds["senha"]
+
+    # Validação de credenciais adaptada ao adapter ativo
+    if isinstance(adapter, SeniorXAdapter):
+        if not usuario or not senha:
+            print("ERRO: Credenciais de execução ausentes no .env (SENIOR_USER_EXECUTE / SENIOR_PASS_EXECUTE)")
+            sys.exit(1)
+    elif isinstance(adapter, GenericAdapter) and adapter.login_requerido():
+        if not usuario or not senha:
+            print("ERRO: LOGIN_REQUIRED=true mas LOGIN_USER/LOGIN_PASS ausentes no .env.")
+            sys.exit(1)
 
     with open(caminho_json, "r", encoding="utf-8") as f:
         roteiro = json.load(f)
@@ -549,35 +568,43 @@ async def executar_roteiro(caminho_json: str) -> None:
         except Exception as e:
             print(f"[Monitor] CDP maximize falhou ({e}) — continuando.", flush=True)
 
-        print("A iniciar o robô e a tentar login no Senior X...", flush=True)
+        print(f"A iniciar o robô — adapter: {type(adapter).__name__}...", flush=True)
         try:
-            await page.goto(SENIOR_URL)
-            await asyncio.sleep(2.0)
-            await page.keyboard.press("Escape")
+            if isinstance(adapter, GenericAdapter) and not adapter.login_requerido():
+                # ── Modo sem login: navega direto para a URL alvo ─────────────
+                logging.info(f"[Adapter] Modo sem login ativo. Navegando para: {adapter.url_base}")
+                await page.goto(SENIOR_URL)
+                await page.wait_for_load_state("load", timeout=30_000)
+                await asyncio.sleep(2.0)
+            else:
+                # ── Fluxo de login (SeniorXAdapter ou GenericAdapter com login) ──
+                await page.goto(SENIOR_URL)
+                await asyncio.sleep(2.0)
+                await page.keyboard.press("Escape")
 
-            campo_usr = page.locator("input[type='text'], input[type='email'], [placeholder*='usuario']").first
-            await campo_usr.wait_for(state="visible", timeout=10000)
+                campo_usr = page.locator(seletores["campo_usuario"]).first
+                await campo_usr.wait_for(state="visible", timeout=10000)
 
-            # 🟢 A MÁGICA 2: Digitação Humanizada no Login
-            await campo_usr.press_sequentially(usuario, delay=85)
-            await asyncio.sleep(0.5)
+                # 🟢 Digitação Humanizada no Login
+                await campo_usr.press_sequentially(usuario, delay=85)
+                await asyncio.sleep(0.5)
 
-            try:
-                await page.locator("button:has-text('Próximo'), button:has-text('Proximo'), button:has-text('Continuar')").first.click(timeout=3000)
-            except Exception:
+                try:
+                    await page.locator(seletores["botao_proximo"]).first.click(timeout=3000)
+                except Exception:
+                    await page.keyboard.press("Enter")
+
+                campo_senha = page.locator(seletores["campo_senha"]).first
+                await campo_senha.wait_for(state="visible", timeout=10000)
+
+                # 🟢 Digitação Humanizada na Senha
+                await campo_senha.press_sequentially(senha, delay=85)
+                await asyncio.sleep(0.5)
                 await page.keyboard.press("Enter")
 
-            campo_senha = page.locator("input[type='password']").first
-            await campo_senha.wait_for(state="visible", timeout=10000)
-
-            # 🟢 A MÁGICA 2: Digitação Humanizada na Senha
-            await campo_senha.press_sequentially(senha, delay=85)
-            await asyncio.sleep(0.5)
-            await page.keyboard.press("Enter")
-
-            print("Login efetuado. A aguardar carregamento do painel para gravar...", flush=True)
-            await page.wait_for_load_state("load", timeout=30_000)
-            await asyncio.sleep(2.0)
+                print("Login efetuado. A aguardar carregamento do painel para gravar...", flush=True)
+                await page.wait_for_load_state("load", timeout=30_000)
+                await asyncio.sleep(2.0)
 
         except Exception as e:
             logging.warning(f"O auto-login do Robô falhou: {e}")

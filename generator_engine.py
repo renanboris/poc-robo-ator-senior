@@ -1,12 +1,14 @@
 import json
 import logging
 import os
+import re
 import time
 from typing import Optional
 
 from google.genai import types
 
 import dap_engine
+from contracts.capture_adapter import get_capture_adapter, SeniorXAdapter
 from utils import limpar_nome, safe_write_json, validar_roteiro_ia
 
 logger = logging.getLogger("generator_engine")
@@ -56,6 +58,28 @@ def _validar_estrutura_roteiro(roteiro: dict) -> str | None:
     if not isinstance(roteiro["passos"], list) or len(roteiro["passos"]) == 0:
         return "Campo 'passos' está vazio ou não é uma lista."
     return None
+
+def _adaptar_prompt_sistema(texto: str) -> str:
+    """Substitui referências ao Senior X/ERP pelo sistema alvo no prompt.
+
+    - Se o adapter ativo for SeniorXAdapter, preserva o prompt original.
+    - Se TARGET_SYSTEM_NAME estiver vazio ou ausente, preserva o prompt original.
+    - Em caso de qualquer erro, retorna o prompt original com log WARNING (fail-safe).
+    """
+    try:
+        adapter = get_capture_adapter()
+        if isinstance(adapter, SeniorXAdapter):
+            return texto  # preserva prompt original para Senior X
+        target_name = os.getenv("TARGET_SYSTEM_NAME", "").strip()
+        if not target_name:
+            return texto  # sem substituição se nome não definido
+        return re.sub(r"(?i)\b(Senior\s*X|ERP)\b", target_name, texto)
+    except Exception as e:
+        logger.warning(
+            f"[Prompt] Falha na substituição de nome de sistema: {e}. Usando prompt original."
+        )
+        return texto  # fail-safe: retorna prompt original
+
 
 def gerar_roteiro_ia_sync(nome_aula: str, objetivo: str, tenant_id: str = "senior_default") -> dict:
     if not dap_engine.gemini_client:
@@ -185,6 +209,9 @@ Gere o JSON seguindo EXATAMENTE esta estrutura (NÃO INCLUA COMENTÁRIOS NO JSON
 }}
 """
     # ── 4. Chamada Gemini ───────────────────
+    # Adaptar prompt ao sistema alvo (substitui "Senior X"/"ERP" por TARGET_SYSTEM_NAME)
+    prompt_usuario = _adaptar_prompt_sistema(prompt_usuario)
+
     ultimo_erro = None
     for tentativa in range(1, _MAX_TENTATIVAS + 1):
         try:

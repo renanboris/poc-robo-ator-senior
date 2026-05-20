@@ -67,9 +67,25 @@ from PIL import Image as _PILImage
 from playwright.async_api import Frame, Page
 from som_annotator import get_som_boxes
 
+from contracts.capture_adapter import get_capture_adapter, SeniorXAdapter
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# ── Cache do adapter ativo (lazy init na primeira chamada) ────────────────
+# Evita overhead de I/O repetido em get_capture_adapter() a cada passo.
+_adapter_cache: object = None  # será preenchido na primeira chamada
+_adapter_logado: bool = False  # flag para logar apenas uma vez por sessão
+
+
+def _obter_adapter_cached():
+    """Retorna o adapter ativo, cacheando na primeira chamada."""
+    global _adapter_cache
+    if _adapter_cache is None:
+        _adapter_cache = get_capture_adapter()
+    return _adapter_cache
+
 
 # [BUG-1] FIX: guard de chave ausente
 _g_key = os.getenv("GOOGLE_API_KEY")
@@ -998,8 +1014,30 @@ async def _resolver_contexto(page: Page, iframe_hint: Optional[str]):
     return page
 
 
-async def _scroll_para_area_esperada(page: Page, coords_relativas: Optional[dict]) -> int:
+async def _scroll_para_area_esperada(
+    page: Page,
+    coords_relativas: Optional[dict],
+    tipo_elemento: str = "",
+    seletor_hint: str = "",
+) -> int:
     try:
+        # [FIX] Não faz scroll para elementos de navegação/menu/sidebar.
+        # Esses elementos são sempre visíveis independente do scroll da página.
+        # Coordenadas capturadas para menus frequentemente apontam para o centro
+        # da tela (erro de captura), causando scroll desnecessário que quebra a execução.
+        _TIPOS_SEM_SCROLL = {"menu_item", "navigation", "nav", "sidebar", "tab"}
+        if tipo_elemento and tipo_elemento.lower() in _TIPOS_SEM_SCROLL:
+            scroll_y = await page.evaluate("() => window.scrollY") or 0
+            return int(scroll_y)
+
+        # [FIX] Não faz scroll quando o seletor hint é um aria-label de menu
+        # (ex: [aria-label='Grupo de menus GED']) — esses elementos são fixos na UI.
+        if seletor_hint and "aria-label" in seletor_hint and any(
+            kw in seletor_hint.lower() for kw in ("menu", "nav", "sidebar", "grupo")
+        ):
+            scroll_y = await page.evaluate("() => window.scrollY") or 0
+            return int(scroll_y)
+
         if coords_relativas and coords_relativas.get("y_pct"):
             vp            = page.viewport_size or {"width": 1920, "height": 1080}
             altura_est    = coords_relativas["y_pct"] * vp["height"] * 2
@@ -2081,6 +2119,16 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     html_hint:       str           = alvo.get("html_hint", "")
     coords_relativas: Optional[dict] = alvo.get("coordenadas_relativas")
 
+    # ── Log do adapter ativo (apenas uma vez por sessão) ─────────────────────
+    global _adapter_logado
+    if not _adapter_logado:
+        _adapter_inst = _obter_adapter_cached()
+        logger.info(
+            f"[Pipeline] Adapter ativo: {type(_adapter_inst).__name__} | "
+            f"Sistema: {_adapter_inst.nome_sistema}"
+        )
+        _adapter_logado = True
+
     # ── Atalho: item de menu de contexto ─────────────────────────────────────
     # Quando is_context_menu_item=True, a ação é um item do menu de contexto
     # que foi aberto por um clique_direito anterior. Vai direto para o menu
@@ -2121,7 +2169,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         )
 
     logger.info(f"\n   Executando: {intencao[:80]}")
-    scroll_y = await _scroll_para_area_esperada(page, coords_relativas)
+    scroll_y = await _scroll_para_area_esperada(page, coords_relativas, tipo_elemento, seletor_hint)
 
     # ── Camada 0: Brain (Memória SQLite permanente) ──────────────────────────
     # Ativada apenas quando intencao_semantica está preenchida. Consulta memória
@@ -2250,7 +2298,8 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     coords_ia = resultado_gemini.get("coordenadas")
                     if coords_ia and await _clicar_por_coordenadas(page, coords_ia, acao, valor):
                         logger.info("[MENU-CTX] Gemini Vision resolveu o item de menu.")
-                        _registrar_sucesso_cache(intencao, coords=coords_ia)
+                        # [POLICY] Não salva coordenadas puras no Brain - são frágeis
+                        # Menu de contexto é efêmero e não deve ser memorizado
                         _registrar_telemetria("5_gemini_vision", True)
                         _registrar_estrategia_vencedora(intencao, "5_gemini_vision")
                         return True
@@ -2283,8 +2332,12 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # ── Camada 1.5: Heurísticas Senior X ─────────────────────────────────────
     # Ativada para ícones mudos (Home, Lixeira, etc.) sem label semântico.
     # Usa seletores específicos do Senior X para ícones conhecidos.
+    # Pulada quando adapter ativo NÃO é SeniorXAdapter (sites genéricos não têm esses ícones).
+    _adapter_ativo = _obter_adapter_cached()
+    _usar_heuristica_seniorx = isinstance(_adapter_ativo, SeniorXAdapter)
+
     is_tag_generica = label_curto.lower() in _TAGS_FRAGEIS
-    if is_tag_generica or not label_curto:
+    if _usar_heuristica_seniorx and (is_tag_generica or not label_curto):
         intencao_low          = intencao.lower()
         contexto_heuristica   = await _resolver_contexto(page, iframe_hint)
 
@@ -2477,6 +2530,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # [FIX] Movida para ANTES das coordenadas capturadas — seletores semânticos são
     # mais confiáveis que posições absolutas que dependem de layout estável.
     if seletor_hint and not _e_seletor_fragil(seletor_hint):
+        logger.info(f"   [Hint] Tentando seletor original: {seletor_hint[:60]}")
         # [FIX] Verificação de identidade para seletores posicionais
         # Se o seletor_hint é posicional, verificar identidade antes de executar.
         # Se label_curto é genérico/vazio, não há como confirmar → descartar diretamente.
@@ -2629,14 +2683,6 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     try:
                         x_ia, y_ia = _parse_coords(coords_ia)
                         
-                        # [FIX] Converte coordenadas absolutas para relativas antes de salvar no Brain
-                        vp_w = vp.get("width", 1920)
-                        vp_h = vp.get("height", 1080)
-                        coords_relativas = {
-                            "x_pct": round(x_ia / vp_w, 4),
-                            "y_pct": round(y_ia / vp_h, 4)
-                        }
-                        
                         seletor_aprendido = await page.evaluate(
                             """([x, y]) => {
                                 const el = document.elementFromPoint(x, y);
@@ -2652,19 +2698,16 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                             }""",
                             [x_ia, y_ia]
                         )
-                        _registrar_sucesso_cache(intencao, coords=coords_relativas, seletor=seletor_aprendido)
+                        
+                        # [POLICY] Só salva no Brain se conseguiu aprender um seletor estável
+                        # Coordenadas puras do Gemini Vision são frágeis e não devem ser memorizadas
                         if seletor_aprendido:
                             logger.info(f"   [Vision] Seletor aprendido após coordenada: {seletor_aprendido}")
-                    except Exception:
-                        # [FIX] Converte coordenadas absolutas para relativas antes de salvar no Brain
-                        x_ia, y_ia = _parse_coords(coords_ia)
-                        vp_w = vp.get("width", 1920)
-                        vp_h = vp.get("height", 1080)
-                        coords_relativas = {
-                            "x_pct": round(x_ia / vp_w, 4),
-                            "y_pct": round(y_ia / vp_h, 4)
-                        }
-                        _registrar_sucesso_cache(intencao, coords=coords_relativas)
+                            _registrar_sucesso_cache(intencao, seletor=seletor_aprendido)
+                        else:
+                            logger.debug(f"   [Vision] Nenhum seletor estável encontrado - não memorizado no Brain")
+                    except Exception as e:
+                        logger.debug(f"   [Vision] Falha ao aprender seletor: {e}")
                     _registrar_telemetria("5_gemini_vision", True)
                     _registrar_estrategia_vencedora(intencao, "5_gemini_vision")
                     return True
