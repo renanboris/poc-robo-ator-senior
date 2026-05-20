@@ -1039,11 +1039,40 @@ async def _scroll_para_area_esperada(
             return int(scroll_y)
 
         if coords_relativas and coords_relativas.get("y_pct"):
-            vp            = page.viewport_size or {"width": 1920, "height": 1080}
-            altura_est    = coords_relativas["y_pct"] * vp["height"] * 2
+            vp         = page.viewport_size or {"width": 1920, "height": 1080}
+            altura_est = coords_relativas["y_pct"] * vp["height"] * 2
             if altura_est > vp["height"] * 0.8:
-                await page.evaluate(f"window.scrollTo(0, {max(0, int(altura_est - 300))})")
-                await asyncio.sleep(0.3)
+                scroll_atual = await page.evaluate("() => window.scrollY") or 0
+                scroll_alvo  = max(0, int(altura_est - 300))
+                delta_total  = scroll_alvo - scroll_atual
+
+                if abs(delta_total) > 10:
+                    # [FIX SCROLL SUAVE] Move o cursor para o centro da tela antes de scrollar,
+                    # depois executa o scroll em passos graduais via mouse.wheel().
+                    # Isso elimina o "corte seco" no vídeo — o scroll aparece animado e natural.
+                    try:
+                        from cursor_engine import mover_cursor_humanizado
+                        cx = vp["width"] / 2
+                        cy = vp["height"] / 2
+                        await mover_cursor_humanizado(page, cx, cy, duracao_ms=400)
+                    except Exception:
+                        pass
+
+                    # Scroll em passos de ~120px (equivale a ~1 tick de roda do mouse)
+                    # com pausa entre cada passo para suavidade visual no vídeo.
+                    passo_px   = 120
+                    n_passos   = max(1, abs(delta_total) // passo_px)
+                    delta_passo = int(delta_total / n_passos)
+                    for _ in range(n_passos):
+                        await page.mouse.wheel(0, delta_passo)
+                        await asyncio.sleep(0.06)
+                    # Passo residual para acertar o alvo exato
+                    scroll_pos = await page.evaluate("() => window.scrollY") or 0
+                    residual   = scroll_alvo - scroll_pos
+                    if abs(residual) > 5:
+                        await page.mouse.wheel(0, residual)
+                    await asyncio.sleep(0.2)
+
         scroll_y = await page.evaluate("() => window.scrollY") or 0
         return int(scroll_y)
     except Exception:
