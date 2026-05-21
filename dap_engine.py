@@ -13,6 +13,7 @@ import base64
 import json
 import logging
 import os
+import re
 import threading
 import time
 from functools import wraps
@@ -48,12 +49,136 @@ SCORE_THRESHOLD     = 0.45
 ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS = int(os.getenv("ELEMENT_VISIBILITY_CHECK_TIMEOUT_MS", "500"))
 
 # =========================================================
+# MODULE ALIASES & QUERY NORMALIZATION
+# =========================================================
+_MODULE_ALIASES = {
+    "hcm": "HCM Gestão de Pessoas Human Capital Management",
+    "bpm": "BPM Business Process Management gestão processos",
+    "ged": "GED Gestão Eletrônica de Documentos",
+    "konviva": "Konviva plataforma educação corporativa LMS",
+    "lms": "LMS Learning Management System plataforma aprendizagem",
+    "erp": "ERP Enterprise Resource Planning sistema integrado gestão",
+    "rh": "RH Recursos Humanos gestão pessoas",
+    "dp": "DP Departamento Pessoal folha pagamento",
+    "ti": "TI Tecnologia da Informação suporte sistemas",
+    "scm": "SCM Supply Chain Management cadeia suprimentos",
+    "crm": "CRM Customer Relationship Management relacionamento cliente",
+    "bi": "BI Business Intelligence análise dados relatórios",
+    "wms": "WMS Warehouse Management System gestão armazém",
+    "tms": "TMS Transportation Management System gestão transporte",
+}
+
+_INFORMAL_MARKERS = {"vc", "q ", "pq", "tb", "oq", "td", "mt", "cmg", "blz"}
+
+
+def _normalizar_query(prompt: str) -> str:
+    """Normalize informal/abbreviated queries by expanding known terms.
+
+    This function is ADDITIVE ONLY — it never removes or replaces
+    the user's original words. It appends expanded context to improve
+    embedding similarity against formally-indexed content.
+
+    Returns the original text unchanged if no abbreviations or
+    informal markers are found.
+    """
+    prompt_lower = prompt.lower()
+    expansions = []
+
+    # Check for known module abbreviations
+    for abbr, expanded in _MODULE_ALIASES.items():
+        # Match abbreviation as a word boundary (not inside other words)
+        if re.search(rf'\b{re.escape(abbr)}\b', prompt_lower):
+            expansions.append(expanded)
+
+    # Check for informal markers (indicates informal phrasing)
+    has_informal = any(marker in prompt_lower for marker in _INFORMAL_MARKERS)
+
+    if not expansions and not has_informal:
+        return prompt  # No normalization needed
+
+    # Build normalized text: original + expansions
+    normalized = prompt
+    if expansions:
+        normalized = normalized + " " + " ".join(expansions)
+
+    return normalized
+
+# =========================================================
 # CACHE PERSISTENTE (SQLite) - SPRINT 3
 # =========================================================
 _CACHE_TTL_SEGUNDOS = 2592000  # 30 DIAS (30 * 24 * 60 * 60)
 _CACHE_MAX_REGISTOS = 5000     # Limite de segurança de tamanho
 _DB_CACHE_FILE = "aura_cache.db"
 _cache_lock = threading.Lock()
+
+# =========================================================
+# IDENTITY DETECTION — Short-circuit for meta/identity questions
+# =========================================================
+_IDENTITY_PATTERNS = [
+    "quem é vc", "quem é você", "quem e voce", "qual seu nome",
+    "qual é seu nome", "qual o seu nome", "o que vc faz",
+    "o que você faz", "o que voce faz", "quem te criou",
+    "como vc se chama", "como você se chama", "vc é quem",
+    "me fala sobre vc", "se apresenta", "se apresente",
+]
+
+_IDENTITY_RESPONSE = {
+    "mensagem": (
+        "Olá{user_greeting}! Eu sou a **Aura**, sua assistente virtual inteligente "
+        "do ecossistema Senior X. Estou aqui para te ajudar a navegar pelo sistema, "
+        "tirar dúvidas sobre módulos e te guiar nos processos. "
+        "Como posso te ajudar agora?"
+    ),
+    "elemento_id": None,
+    "seletor_css": None,
+    "sugestoes": [
+        "O que você pode fazer?",
+        "Me ajuda a navegar",
+        "Quais módulos você conhece?",
+    ],
+    "confidence_score": 1.0,
+    "source_reference": "identity_detector",
+}
+
+
+def _is_identity_question(prompt: str) -> bool:
+    """Detect identity/meta questions about Aura (name, purpose, creator)."""
+    normalized = prompt.lower().strip().rstrip("?!.")
+    return any(pattern in normalized for pattern in _IDENTITY_PATTERNS)
+
+
+# =========================================================
+# GREETING DETECTION — Short-circuit for simple greetings
+# =========================================================
+_GREETING_PATTERNS = {
+    "oi", "olá", "ola", "hey", "eai", "e ai", "e aí",
+    "bom dia", "boa tarde", "boa noite", "fala", "salve",
+    "hello", "hi", "opa", "oie", "oii", "oiii",
+}
+
+
+def _is_simple_greeting(prompt: str) -> bool:
+    """Detect simple greetings that don't need the full RAG pipeline."""
+    normalized = prompt.lower().strip().rstrip("?!.,")
+    return normalized in _GREETING_PATTERNS
+
+
+_GREETING_RESPONSE = {
+    "mensagem": (
+        "Olá{user_greeting}! Estou aqui para te ajudar. "
+        "O que precisa fazer no sistema hoje?"
+    ),
+    "elemento_id": None,
+    "seletor_css": None,
+    "sugestoes": [
+        "Me ajuda a navegar",
+        "Tenho uma dúvida",
+        "O que você pode fazer?",
+    ],
+    "confidence_score": 1.0,
+    "source_reference": "greeting_detector",
+}
+
 
 def _init_db_cache():
     """Cria a tabela de cache no SQLite se não existir."""
@@ -759,8 +884,55 @@ def _analisar_sync(
         logger.info("Aura: Resposta servida via Cache!")
         return cached
 
+    # =========================================================
+    # 1.5 IDENTITY DETECTOR: Short-circuit for identity/meta questions
+    # Avoids expensive pipeline (embedding + Pinecone + Vision) for
+    # trivially-answerable questions about Aura's identity.
+    # =========================================================
+    if _is_identity_question(prompt_usuario):
+        logger.info(f"🪪 Identity detector: interceptando pergunta de identidade | prompt='{prompt_usuario}'")
+        user_greeting = f", {user_name}" if user_name else ""
+        identity_result = {
+            "mensagem": _IDENTITY_RESPONSE["mensagem"].format(user_greeting=user_greeting),
+            "elemento_id": _IDENTITY_RESPONSE["elemento_id"],
+            "seletor_css": _IDENTITY_RESPONSE["seletor_css"],
+            "sugestoes": _IDENTITY_RESPONSE["sugestoes"],
+            "confidence_score": _IDENTITY_RESPONSE["confidence_score"],
+            "source_reference": _IDENTITY_RESPONSE["source_reference"],
+        }
+        _cache_set(cache_key, identity_result)
+        return identity_result
+
+    # =========================================================
+    # 1.6 GREETING DETECTOR: Short-circuit for simple greetings
+    # Avoids expensive pipeline for "Oi", "Olá", "Bom dia", etc.
+    # =========================================================
+    if _is_simple_greeting(prompt_usuario):
+        logger.info(f"👋 Greeting detector: interceptando saudação simples | prompt='{prompt_usuario}'")
+        user_greeting = f", {user_name}" if user_name else ""
+        greeting_result = {
+            "mensagem": _GREETING_RESPONSE["mensagem"].format(user_greeting=user_greeting),
+            "elemento_id": _GREETING_RESPONSE["elemento_id"],
+            "seletor_css": _GREETING_RESPONSE["seletor_css"],
+            "sugestoes": _GREETING_RESPONSE["sugestoes"],
+            "confidence_score": _GREETING_RESPONSE["confidence_score"],
+            "source_reference": _GREETING_RESPONSE["source_reference"],
+        }
+        _cache_set(cache_key, greeting_result)
+        return greeting_result
+
     # 2. Busca RAG (Usa o histórico recente para dar contexto à busca vetorial)
     texto_busca_rag = f"{historico[-1]['texto']} {prompt_usuario}" if historico else prompt_usuario
+
+    # =========================================================
+    # 1.7 QUERY NORMALIZATION: Expand abbreviations before embedding
+    # Improves embedding similarity against formally-indexed content.
+    # Additive only — never removes original query words.
+    # =========================================================
+    texto_busca_normalizado = _normalizar_query(texto_busca_rag)
+    if texto_busca_normalizado != texto_busca_rag:
+        logger.info(f"📝 Query normalizada: '{texto_busca_rag}' → '{texto_busca_normalizado}'")
+        texto_busca_rag = texto_busca_normalizado
 
     # =========================================================
     # MULTI-NAMESPACE SEARCH
