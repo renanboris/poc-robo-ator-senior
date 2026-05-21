@@ -2780,13 +2780,75 @@ function mudarVozIA(valor) {
       voz_ia: "pt-BR-FranciscaNeural"
     };
   }
+
+  const valorAnterior = roteiroAtual.configuracao_gravacao.voz_ia || 'pt-BR-FranciscaNeural';
   roteiroAtual.configuracao_gravacao.voz_ia = valor;
-  salvarRoteiro(false);
-  
-  if (valor === 'elevenlabs') {
-    toast('🎙️ Voz Premium ativada! (Pode consumir créditos da API)', 'success');
-  } else {
-    toast('🎙️ Voz de Rascunho ativada! (Modo Gratuito)', 'info');
+
+  // Toggle premium cost notice
+  const notice = document.getElementById('premium-cost-notice');
+  if (notice) {
+    notice.style.display = (valor === 'en-US-AvaMultilingualNeural') ? 'block' : 'none';
+  }
+
+  salvarRoteiro(false).then(() => {
+    if (valor === 'en-US-AvaMultilingualNeural') {
+      toast('🎙️ Voz Premium Azure ativada! (Requer AZURE_TTS_KEY no .env)', 'success');
+    } else if (valor === 'elevenlabs') {
+      toast('🎙️ Voz ElevenLabs ativada! (Pode consumir créditos da API)', 'success');
+    } else {
+      toast('🎙️ Voz atualizada com sucesso!', 'info');
+    }
+  }).catch(() => {
+    // Revert on failure
+    const sel = document.getElementById('voz-ia-select');
+    if (sel) sel.value = valorAnterior;
+    roteiroAtual.configuracao_gravacao.voz_ia = valorAnterior;
+    if (notice) {
+      notice.style.display = (valorAnterior === 'en-US-AvaMultilingualNeural') ? 'block' : 'none';
+    }
+    toast('❌ Falha ao salvar voz. Revertido.', 'error');
+  });
+}
+
+
+async function previewVoz() {
+  const sel = document.getElementById('voz-ia-select');
+  const btn = document.getElementById('btn-voice-preview');
+  const audio = document.getElementById('voice-preview-audio');
+  if (!sel || !btn) return;
+
+  const voiceId = sel.value;
+  btn.disabled = true;
+  btn.innerHTML = '<span style="animation:spin-icon 0.9s linear infinite;display:inline-block;">⏳</span> Gerando...';
+
+  try {
+    const resp = await fetch('/api/voice-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voice_id: voiceId }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.erro || `HTTP ${resp.status}`);
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+
+    if (audio) {
+      audio.src = url;
+      audio.play();
+      audio.onended = () => URL.revokeObjectURL(url);
+    }
+
+    btn.innerHTML = '<span>▶</span> Preview';
+    toast('🎧 Reproduzindo preview da voz', 'info');
+  } catch (e) {
+    btn.innerHTML = '<span>▶</span> Preview';
+    toast('❌ Falha no preview: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -2810,17 +2872,46 @@ function renderizarPassos() {
     </div>
     <div class="step-body" style="padding: 14px 16px;">
        <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
-         <select class="field-select" style="max-width: 280px; font-weight: 600; cursor: pointer; color: ${configVoz === 'elevenlabs' ? 'var(--amber)' : 'var(--text)'};" onchange="mudarVozIA(this.value); this.style.color = this.value === 'elevenlabs' ? 'var(--amber)' : 'var(--text)';">
-            <option value="pt-BR-FranciscaNeural" ${!configVoz.startsWith('google:') && configVoz !== 'elevenlabs' ? 'selected' : ''}>Rascunho (Edge TTS - Grátis)</option>
-            <option value="elevenlabs" ${configVoz === 'elevenlabs' ? 'selected' : ''}>Premium (ElevenLabs - Realista)</option>
+         <select class="field-select" id="voz-ia-select" style="max-width:320px;" onchange="mudarVozIA(this.value)">
+           <optgroup label="Gratuito">
+             <option value="pt-BR-FranciscaNeural">Francisca (pt-BR) — Gratuito</option>
+             <option value="pt-BR-BrendaNeural">Brenda (pt-BR) — Gratuito</option>
+             <option value="pt-BR-AntonioNeural">Antônio (pt-BR) — Gratuito</option>
+             <option value="en-US-AndrewMultilingualNeural">Andrew Multilingual (en-US) — Gratuito</option>
+           </optgroup>
+           <optgroup label="Premium Azure">
+             <option value="en-US-AvaMultilingualNeural">Ava Multilingual (en-US) — Premium Azure</option>
+           </optgroup>
          </select>
-         <span style="font-size: 11px; color: var(--text-3); line-height: 1.4;">
-           <strong>Dica:</strong> Use o <i>Rascunho</i> para validar a gravação e mude para <i>Premium</i> apenas antes de gerar o Vídeo Final.
-         </span>
+         <button type="button" id="btn-voice-preview" onclick="previewVoz()" style="display:flex; align-items:center; gap:5px; padding:7px 12px; border-radius:var(--radius-xs); border:1px solid var(--border-2); background:var(--surface); color:var(--text-2); font-family:var(--font-ui); font-size:11px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--border-2)';this.style.color='var(--text-2)'">
+           <span>▶</span> Preview
+         </button>
+         <audio id="voice-preview-audio" style="display:none;"></audio>
+         <div id="premium-cost-notice" style="display:none; margin-top:8px; font-size:11px; color:var(--amber); background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:6px; padding:6px 10px;">
+           ⚠️ Esta voz requer uma chave Azure Cognitive Services (<code>AZURE_TTS_KEY</code> e <code>AZURE_TTS_REGION</code> no <code>.env</code>). Pode gerar custos de uso.
+         </div>
        </div>
     </div>
   `;
   container.appendChild(cfgDiv);
+
+  // 🟢 Inicialização do seletor de voz a partir do roteiro carregado
+  const selVoz = document.getElementById('voz-ia-select');
+  if (selVoz) {
+    // Se o valor armazenado não existe nas opções, fallback para FranciscaNeural
+    const opcaoExiste = Array.from(selVoz.options).some(o => o.value === configVoz);
+    selVoz.value = opcaoExiste ? configVoz : 'pt-BR-FranciscaNeural';
+    // Se fez fallback, atualizar o roteiro para manter consistência
+    if (!opcaoExiste && roteiroAtual.configuracao_gravacao) {
+      roteiroAtual.configuracao_gravacao.voz_ia = 'pt-BR-FranciscaNeural';
+    }
+  }
+  // Toggle premium cost notice baseado no valor inicial
+  const noticeInit = document.getElementById('premium-cost-notice');
+  if (noticeInit) {
+    const vozAtual = selVoz ? selVoz.value : configVoz;
+    noticeInit.style.display = (vozAtual === 'en-US-AvaMultilingualNeural') ? 'block' : 'none';
+  }
 
   // Renderiza os passos normais
   roteiroAtual.passos.forEach((passo, pi) => {

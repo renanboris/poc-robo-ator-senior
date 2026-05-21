@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 
 import edge_tts
@@ -42,9 +43,11 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
 import moviepy.audio.fx.all as afx
-from moviepy.editor import AudioFileClip, CompositeAudioClip, VideoFileClip
+from moviepy.editor import AudioFileClip, CompositeAudioClip, VideoFileClip, concatenate_audioclips
 
 from utils import limpar_nome
+from ssml_builder import build_ssml, segment_sentences
+from voice_catalog import VoiceEntry, lookup_voice, validate_catalog_entry, ConfigurationError
 
 load_dotenv()
 
@@ -90,6 +93,78 @@ def salvar_manifesto_audio(id_treinamento: str) -> None:
     logging.info(f"Manifesto de audio salvo: {caminho} ({len(_audio_manifest)} entradas)")
 
 # ==============================================================
+# CONCATENACAO DE SEGMENTOS MP3
+# ==============================================================
+def concatenate_mp3(segments: list[str], output_path: str) -> None:
+    """
+    Merges a list of MP3 file paths into a single MP3 at output_path.
+    For a single segment, copies directly for efficiency.
+    For multiple segments, uses moviepy AudioFileClip concatenation.
+    Cleans up clips after writing.
+    """
+    if not segments:
+        return
+
+    if len(segments) == 1:
+        shutil.copy2(segments[0], output_path)
+        return
+
+    clips = []
+    try:
+        for seg in segments:
+            clips.append(AudioFileClip(seg))
+        final = concatenate_audioclips(clips)
+        final.write_audiofile(output_path, logger=None)
+        final.close()
+    finally:
+        for c in clips:
+            try:
+                c.close()
+            except Exception:
+                pass
+
+# ==============================================================
+# AZURE PREMIUM TTS (REST API)
+# ==============================================================
+async def _azure_premium_synthesize(
+    text: str, entry: VoiceEntry, output_path: str
+) -> bool:
+    """Returns True on success, False on failure (caller falls back)."""
+    key = os.getenv("AZURE_TTS_KEY", "")
+    region = os.getenv("AZURE_TTS_REGION", "")
+    if not key or not region:
+        logging.warning(
+            "[audio] AZURE_TTS_KEY or AZURE_TTS_REGION missing. "
+            "Falling back to pt-BR-FranciscaNeural."
+        )
+        return False
+    try:
+        ssml = build_ssml(text, entry)
+        url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+        headers = {
+            "Ocp-Apim-Subscription-Key": key,
+            "Content-Type": "application/ssml+xml",
+            "X-Microsoft-OutputFormat": "audio-16khz-128kbitrate-mono-mp3",
+        }
+        resp = requests.post(url, data=ssml.encode("utf-8"), headers=headers, timeout=30)
+        if resp.status_code == 200:
+            with open(output_path, "wb") as f:
+                f.write(resp.content)
+            return True
+        else:
+            logging.error(
+                f"[audio] Azure premium TTS failed: HTTP {resp.status_code}. "
+                "Falling back to pt-BR-FranciscaNeural."
+            )
+            return False
+    except Exception as e:
+        logging.error(
+            f"[audio] Azure premium TTS exception: {type(e).__name__}. "
+            "Falling back to pt-BR-FranciscaNeural."
+        )
+        return False
+
+# ==============================================================
 # AUDIO (TTS e ELEVENLABS)
 # ==============================================================
 async def gerar_audio(
@@ -98,79 +173,170 @@ async def gerar_audio(
     if not texto or not texto.strip():
         return None
 
-    # Correções de pronúncia
-    texto_falado = re.sub(r"(?i)\becm_ged\b", "E C M gédi", texto)
-    texto_falado = re.sub(r"\bGED\b", "gédi", texto_falado)
-    texto_falado = re.sub(r"\bged\b", "gédi", texto_falado)
-    texto_falado = re.sub(r"(?i)\bsenior\b", "Sênior", texto_falado)
-    # "X" avulso (palavra inteira, maiúsculo) → "Éks" — cobre Senior X, ERP X, etc.
-    # Grafia fonética sem acento ambíguo: evita "êx" (prefixo) e problemas com ElevenLabs
-    texto_falado = re.sub(r"\bX\b", "Éks", texto_falado)
-    # "template/templates" → pronúncia inglesa correta (evita "templáte" do Azure pt-BR)
-    texto_falado = re.sub(r"(?i)\btemplates?\b", lambda m: "têmpleits" if m.group().lower().endswith("s") else "têmpleit", texto_falado)
-
-    # ── Pré-processamento anti-travada para edge-tts ─────────────────────────
-    # Remove ou substitui caracteres que causam engasgos no Azure Neural TTS:
-    # 1. Underscores viram espaço (IDs e nomes de campo tipo "nome_campo")
-    texto_falado = texto_falado.replace("_", " ")
-    # 2. Barras e pipes viram pausa natural
-    texto_falado = re.sub(r"\s*[|/]\s*", ", ", texto_falado)
-    # 3. Múltiplos espaços → um só
-    texto_falado = re.sub(r" {2,}", " ", texto_falado).strip()
-
     nome_pasta  = limpar_nome(id_treinamento)
     pasta_audio = os.path.join("audios_gerados", nome_pasta)
     os.makedirs(pasta_audio, exist_ok=True)
 
     arquivo_mp3 = os.path.join(pasta_audio, f"audio_{id_unico}.mp3")
 
-    if not os.path.exists(arquivo_mp3):
-        if voz == "elevenlabs":
-            api_key = os.getenv("ELEVENLABS_API_KEY")
-            if not api_key:
-                print("⚠️  Chave ELEVENLABS_API_KEY não encontrada no .env! Fazendo fallback para a voz gratuita...", flush=True)
-                await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
-            else:
-                try:
-                    voice_id = "ErXwobaYiN019PkySvjV"
-                    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    # ── Audio cache check: skip generation if MP3 already exists ─────────────
+    if os.path.exists(arquivo_mp3):
+        async with _audio_manifest_lock:
+            _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"
+        return arquivo_mp3
 
-                    headers = {
-                        "Accept": "audio/mpeg",
-                        "Content-Type": "application/json",
-                        "xi-api-key": api_key
-                    }
+    # ── Pronunciation preprocessing ──────────────────────────────────────────
+    try:
+        # Correções de pronúncia
+        texto_falado = re.sub(r"(?i)\becm_ged\b", "E C M gédi", texto)
+        texto_falado = re.sub(r"\bGED\b", "gédi", texto_falado)
+        texto_falado = re.sub(r"\bged\b", "gédi", texto_falado)
+        texto_falado = re.sub(r"(?i)\bsenior\b", "Sênior", texto_falado)
+        # "X" avulso (palavra inteira, maiúsculo) → "Éks" — cobre Senior X, ERP X, etc.
+        texto_falado = re.sub(r"\bX\b", "Éks", texto_falado)
+        # "template/templates" → pronúncia inglesa correta (evita "templáte" do Azure pt-BR)
+        texto_falado = re.sub(r"(?i)\btemplates?\b", lambda m: "têmpleits" if m.group().lower().endswith("s") else "têmpleit", texto_falado)
 
-                    data = {
-                        "text": texto_falado,
-                        "model_id": "eleven_multilingual_v2",
-                        "voice_settings": {
-                            "stability": 0.45,
-                            "similarity_boost": 0.85,
-                            "style": 0.35,
-                            "use_speaker_boost": True
-                        }
-                    }
+        # ── Pré-processamento anti-travada para edge-tts ─────────────────────
+        # 1. Underscores viram espaço (IDs e nomes de campo tipo "nome_campo")
+        texto_falado = texto_falado.replace("_", " ")
+        # 2. Barras e pipes viram pausa natural
+        texto_falado = re.sub(r"\s*[|/]\s*", ", ", texto_falado)
+        # 3. Múltiplos espaços → um só
+        texto_falado = re.sub(r" {2,}", " ", texto_falado).strip()
+    except Exception as e:
+        logging.error(f"[audio] Preprocessing failed for text: '{texto[:80]}' — {e}")
+        return None
 
-                    response = requests.post(url, json=data, headers=headers)
-                    if response.status_code == 200:
-                        with open(arquivo_mp3, 'wb') as f:
-                            for chunk in response.iter_content(chunk_size=1024):
-                                if chunk:
-                                    f.write(chunk)
-                    else:
-                        print(f"⚠️  Erro no ElevenLabs ({response.status_code}): {response.text}. Fallback gratuito ativado.", flush=True)
-                        await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
-                except Exception as e:
-                    print(f"⚠️  Falha ao conectar no ElevenLabs: {e}. Fallback gratuito ativado.", flush=True)
-                    await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
-
+    # ── Dispatch logic ───────────────────────────────────────────────────────
+    if voz == "elevenlabs":
+        api_key = os.getenv("ELEVENLABS_API_KEY")
+        if not api_key:
+            print("⚠️  Chave ELEVENLABS_API_KEY não encontrada no .env! Fazendo fallback para a voz gratuita...", flush=True)
+            await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
         else:
-            await edge_tts.Communicate(texto_falado, voz, rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
+            try:
+                voice_id = "EXAVITQu4vr4xnSDxMaL"
+                url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+
+                headers = {
+                    "Accept": "audio/mpeg",
+                    "Content-Type": "application/json",
+                    "xi-api-key": api_key
+                }
+
+                data = {
+                    "text": texto_falado,
+                    "model_id": "eleven_multilingual_v2",
+                    "voice_settings": {
+                        "stability": 0.45,
+                        "similarity_boost": 0.85,
+                        "style": 0.35,
+                        "use_speaker_boost": True
+                    }
+                }
+
+                response = requests.post(url, json=data, headers=headers)
+                if response.status_code == 200:
+                    with open(arquivo_mp3, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=1024):
+                            if chunk:
+                                f.write(chunk)
+                else:
+                    print(f"⚠️  Erro no ElevenLabs ({response.status_code}): {response.text}. Fallback gratuito ativado.", flush=True)
+                    await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
+            except Exception as e:
+                print(f"⚠️  Falha ao conectar no ElevenLabs: {e}. Fallback gratuito ativado.", flush=True)
+                await edge_tts.Communicate(texto_falado, "pt-BR-FranciscaNeural", rate="-8%", pitch="-5Hz", volume="+8%").save(arquivo_mp3)
+
+    elif lookup_voice(voz) is not None:
+        entry = lookup_voice(voz)
+        validate_catalog_entry(entry)
+
+        sentences = segment_sentences(texto_falado)
+        if not sentences:
+            sentences = [texto_falado]
+
+        if entry.tier == "premium":
+            success = await _azure_premium_synthesize(texto_falado, entry, arquivo_mp3)
+            if not success:
+                # Fallback to FranciscaNeural free path
+                fallback_entry = lookup_voice("pt-BR-FranciscaNeural")
+                fallback_sentences = segment_sentences(texto_falado)
+                if not fallback_sentences:
+                    fallback_sentences = [texto_falado]
+                await _azure_free_synthesize(fallback_sentences, fallback_entry, arquivo_mp3)
+        else:
+            await _azure_free_synthesize(sentences, entry, arquivo_mp3)
+
+    else:
+        logging.warning(f"Unknown voz_ia '{voz}', falling back to pt-BR-FranciscaNeural")
+        entry = lookup_voice("pt-BR-FranciscaNeural")
+        sentences = segment_sentences(texto_falado)
+        if not sentences:
+            sentences = [texto_falado]
+        await _azure_free_synthesize(sentences, entry, arquivo_mp3)
 
     async with _audio_manifest_lock:
         _audio_manifest[id_unico] = f"audios/audio_{id_unico}.mp3"
     return arquivo_mp3
+
+async def _azure_free_synthesize(
+    sentences: list[str], entry: VoiceEntry, output_path: str
+) -> None:
+    """Synthesize narration using edge-tts (free Azure Neural voices).
+
+    Uses edge_tts.Communicate with native parameters (text, voice, rate, pitch).
+    Does NOT pass raw SSML — edge_tts generates its own SSML internally.
+
+    For a single sentence, synthesizes directly to output_path.
+    For multiple sentences, synthesizes each to a temp MP3 segment, then
+    concatenates them into the final output. Failed segments are logged
+    and skipped; remaining segments are still concatenated.
+    """
+    # Convert catalog rate/pitch to edge_tts relative format
+    # Catalog uses absolute "93%" → edge_tts needs relative "-7%" (100 - 93 = 7, so -7%)
+    # Catalog uses "0%" → edge_tts needs "+0%"
+    def _rate_to_edge(rate_str: str) -> str:
+        try:
+            val = int(rate_str.replace("%", ""))
+            delta = val - 100
+            return f"{delta:+d}%"
+        except (ValueError, AttributeError):
+            return "-5%"
+
+    def _pitch_to_edge(pitch_str: str) -> str:
+        try:
+            val = int(pitch_str.replace("%", ""))
+            return f"{val:+d}Hz"
+        except (ValueError, AttributeError):
+            return "+0Hz"
+
+    rate = _rate_to_edge(entry.default_rate)
+    pitch = _pitch_to_edge(entry.default_pitch)
+
+    if len(sentences) == 1:
+        await edge_tts.Communicate(
+            sentences[0], entry.voice_id, rate=rate, pitch=pitch
+        ).save(output_path)
+        return
+
+    tmp_dir = tempfile.mkdtemp()
+    segment_paths: list[str] = []
+    try:
+        for i, sentence in enumerate(sentences):
+            try:
+                seg_path = os.path.join(tmp_dir, f"seg_{i}.mp3")
+                await edge_tts.Communicate(
+                    sentence, entry.voice_id, rate=rate, pitch=pitch
+                ).save(seg_path)
+                segment_paths.append(seg_path)
+            except Exception as e:
+                logging.error(f"[audio] Segment {i} failed: '{sentence[:40]}' — {e}")
+        if segment_paths:
+            concatenate_mp3(segment_paths, output_path)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 def iniciar_reproducao_audio(arquivo_mp3: str) -> None:
     if arquivo_mp3 and os.path.exists(arquivo_mp3):

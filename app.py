@@ -45,6 +45,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 import dap_engine
+import edge_tts
 import generator_engine
 import job_registry
 import lego_builder
@@ -519,7 +520,7 @@ def executar_processo_bg(comando, msg_executando, msg_sucesso, job_id: str = Non
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", context={"request": request})
 
 # ==============================================================
 # MODELOS DE DADOS (PYDANTIC)
@@ -1041,15 +1042,15 @@ def obter_detalhes_missao(mission_id: str):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def pagina_dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    return templates.TemplateResponse("dashboard.html", context={"request": request})
 
 @app.get("/v2", response_class=HTMLResponse)
 async def index_v2(request: Request):
-    return templates.TemplateResponse("index_v2.html", {"request": request})
+    return templates.TemplateResponse("index_v2.html", context={"request": request})
 
 @app.get("/dashboard/v2", response_class=HTMLResponse)
 async def dashboard_v2(request: Request):
-    return templates.TemplateResponse("dashboard_v2.html", {"request": request})
+    return templates.TemplateResponse("dashboard_v2.html", context={"request": request})
 
 @app.get("/api/metricas")
 async def get_metricas():
@@ -1463,6 +1464,107 @@ async def websocket_status(websocket: WebSocket):
 async def limpar_status():
     _set_estado(erro="", sucesso="")
     return {"status": "ok"}
+
+
+@app.post("/api/voice-preview")
+async def voice_preview(request: Request):
+    """Gera um preview de áudio curto para a voz selecionada.
+
+    Recebe JSON: {"voice_id": "pt-BR-BrendaNeural"}
+    Retorna: audio/mpeg stream com um trecho de demonstração.
+    """
+    import io
+    from starlette.responses import StreamingResponse
+
+    body = await request.json()
+    voice_id = body.get("voice_id", "pt-BR-FranciscaNeural")
+
+    from voice_catalog import lookup_voice
+
+    entry = lookup_voice(voice_id)
+    if entry is None:
+        return JSONResponse(status_code=400, content={"erro": f"Voz desconhecida: {voice_id}"})
+
+    # Texto de preview curto e natural
+    preview_texts = {
+        "pt-BR": "Olá! Esta é uma demonstração da minha voz. Vamos criar treinamentos incríveis juntos.",
+        "en-US": "Hello! This is a demonstration of my voice. Let's create amazing training together.",
+    }
+    texto = preview_texts.get(entry.locale, preview_texts["pt-BR"])
+
+    # Gera áudio em memória via tempfile
+    import tempfile
+
+    tmp_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    tmp_path = tmp_file.name
+    tmp_file.close()
+
+    try:
+        if entry.tier == "premium":
+            # Tenta Azure REST, fallback para Francisca
+            from main import _azure_premium_synthesize
+            success = await _azure_premium_synthesize(texto, entry, tmp_path)
+            if not success:
+                entry = lookup_voice("pt-BR-FranciscaNeural")
+                # Fallback: gera com edge_tts
+                def _rate_to_edge(rate_str):
+                    try:
+                        val = int(rate_str.replace("%", ""))
+                        return f"{val - 100:+d}%"
+                    except (ValueError, AttributeError):
+                        return "-5%"
+
+                def _pitch_to_edge(pitch_str):
+                    try:
+                        val = int(pitch_str.replace("%", ""))
+                        return f"{val:+d}Hz"
+                    except (ValueError, AttributeError):
+                        return "+0Hz"
+
+                await edge_tts.Communicate(
+                    texto, entry.voice_id,
+                    rate=_rate_to_edge(entry.default_rate),
+                    pitch=_pitch_to_edge(entry.default_pitch),
+                ).save(tmp_path)
+        else:
+            # Free voice: usa edge_tts diretamente
+            def _rate_to_edge(rate_str):
+                try:
+                    val = int(rate_str.replace("%", ""))
+                    return f"{val - 100:+d}%"
+                except (ValueError, AttributeError):
+                    return "-5%"
+
+            def _pitch_to_edge(pitch_str):
+                try:
+                    val = int(pitch_str.replace("%", ""))
+                    return f"{val:+d}Hz"
+                except (ValueError, AttributeError):
+                    return "+0Hz"
+
+            await edge_tts.Communicate(
+                texto, entry.voice_id,
+                rate=_rate_to_edge(entry.default_rate),
+                pitch=_pitch_to_edge(entry.default_pitch),
+            ).save(tmp_path)
+
+        # Lê o MP3 e retorna como stream
+        with open(tmp_path, "rb") as f:
+            audio_bytes = f.read()
+
+        return StreamingResponse(
+            io.BytesIO(audio_bytes),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": f"inline; filename=preview_{voice_id}.mp3"},
+        )
+    except Exception as e:
+        logging.error(f"[voice-preview] Falha ao gerar preview para '{voice_id}': {e}")
+        return JSONResponse(status_code=500, content={"erro": f"Falha ao gerar preview: {str(e)}"})
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
 @app.post("/api/cancelar")
 async def cancelar_processo():
