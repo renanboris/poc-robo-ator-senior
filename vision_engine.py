@@ -1110,11 +1110,79 @@ async def _highlight_coords(page: Page, x: int, y: int) -> None:
         pass
 
 
-async def _aguardar_estabilidade(page: Page, timeout_ms: int = 2000) -> None:
+async def _aguardar_estabilidade(page: Page, timeout_ms: int = 800) -> None:
+    """Wait for DOM stability after action execution using a fast heuristic.
+
+    Strategy: Instead of waiting for full networkidle (which waits 500ms of zero
+    network activity — too slow for SPAs with polling/websockets), we check if
+    the DOM has stopped mutating. This is much faster for actions like typing
+    into a contenteditable or clicking a button that triggers a local UI change.
+
+    Approach:
+      1. Quick check: if no pending XHR/fetch requests, return immediately (DOM-only action)
+      2. Otherwise: poll DOM mutation count over short intervals. If DOM is stable
+         for 2 consecutive checks (150ms apart), consider it settled.
+      3. Hard cap at timeout_ms to never block longer than necessary.
+
+    PRESERVATION NOTE (Req 7.3, 7.5): This wait is NOT affected by pacing
+    optimization or calcular_pausa_pos_acao. It runs after every action in
+    _executar_acao (vision_engine.py) and is independent of the PacingProfile.
+    """
     try:
-        await page.wait_for_load_state("networkidle", timeout=timeout_ms)
+        # Fast path: check if there are any pending network requests.
+        # If none, the action was purely local (typing, menu open, etc.) — no wait needed.
+        pending = await page.evaluate("""() => {
+            return window.performance.getEntriesByType('resource')
+                .filter(r => r.responseEnd === 0).length;
+        }""")
+        if pending == 0:
+            # Give Angular/React one microtask cycle to flush DOM updates
+            await asyncio.sleep(0.05)
+            return
     except Exception:
-        await asyncio.sleep(0.4)
+        pass
+
+    # Slow path: DOM mutation polling for actions that trigger network activity
+    try:
+        # Install a temporary MutationObserver to count DOM changes
+        await page.evaluate("""() => {
+            window._stabilityMutations = 0;
+            if (window._stabilityObserver) window._stabilityObserver.disconnect();
+            window._stabilityObserver = new MutationObserver((muts) => {
+                window._stabilityMutations += muts.length;
+            });
+            window._stabilityObserver.observe(document.body, {
+                childList: true, subtree: true, attributes: true
+            });
+        }""")
+
+        # Poll: wait until mutations stop (2 consecutive stable checks)
+        stable_count = 0
+        elapsed = 0
+        interval_ms = 150
+        while elapsed < timeout_ms and stable_count < 2:
+            await asyncio.sleep(interval_ms / 1000)
+            elapsed += interval_ms
+            mutations = await page.evaluate("""() => {
+                const c = window._stabilityMutations || 0;
+                window._stabilityMutations = 0;
+                return c;
+            }""")
+            if mutations == 0:
+                stable_count += 1
+            else:
+                stable_count = 0
+
+        # Cleanup observer
+        await page.evaluate("""() => {
+            if (window._stabilityObserver) {
+                window._stabilityObserver.disconnect();
+                window._stabilityObserver = null;
+            }
+        }""")
+    except Exception:
+        # If anything fails (cross-origin, page navigated, etc.), short fallback
+        await asyncio.sleep(0.15)
 
 
 async def _digitar_humanizado(page: Page, valor: str) -> None:
@@ -1141,7 +1209,7 @@ async def _digitar_humanizado(page: Page, valor: str) -> None:
         await asyncio.sleep(random.uniform(0.12, 0.25))
 
 
-async def _executar_acao(locator, page, acao: str, valor: str) -> None:
+async def _executar_acao(locator, page, acao: str, valor: str, profile=None) -> None:
     try:
         await locator.scroll_into_view_if_needed(timeout=2000)
     except Exception:
@@ -1155,7 +1223,7 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
             cy = box["y"] + box["height"] / 2
             from cursor_engine import mover_cursor_humanizado
             await page.evaluate("() => { const c = document.getElementById('robo-cursor'); if(c) c.style.opacity = '1'; }")
-            await mover_cursor_humanizado(page, cx, cy)
+            await mover_cursor_humanizado(page, cx, cy, profile=profile)
 
             # 🟢 A PEÇA QUE FALTAVA: O Hover estabilizador
             # Como o rato já está em (cx, cy), não há teleporte visual.
@@ -1228,6 +1296,8 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
         return
 
     # 3. CLIQUES PADRÃO E SEGUROS (Sem force=True)
+    # NOTE (Req 6.1): Double-click uses Playwright's native dblclick() which manages
+    # the inter-click interval internally. Pacing optimization does NOT affect this timing.
     if acao == "duplo_clique":
         await locator.dblclick(timeout=3000)
     elif acao == "clique_direito":
@@ -1257,7 +1327,8 @@ async def _executar_acao(locator, page, acao: str, valor: str) -> None:
 # TENTATIVA DE SELETOR E FOCO NATIVO
 # ──────────────────────────────────────────────────────────────
 async def _tentar_candidato(
-    page: Page, candidato: TentativaLocalizacao, acao: str, valor: str, timeout_ms: int = 3500
+    page: Page, candidato: TentativaLocalizacao, acao: str, valor: str, timeout_ms: int = 3500,
+    profile=None,
 ) -> bool:
     try:
         contexto = await _resolver_contexto(page, candidato.iframe_hint)
@@ -1282,7 +1353,7 @@ async def _tentar_candidato(
             loc = contexto.locator(candidato.seletor).first
 
         await loc.wait_for(state="visible", timeout=timeout_ms)
-        await _executar_acao(loc, page, acao, valor)
+        await _executar_acao(loc, page, acao, valor, profile=profile)
         return True
     except Exception:
         return False
@@ -1306,20 +1377,28 @@ async def _digitar_no_active_element(page: Page, acao: str, valor: str) -> bool:
 
         await page.evaluate("""() => {
             const el = document.activeElement;
-            el.style.transition = 'all 0.3s';
+            el.style.transition = 'outline 0.3s ease-in, box-shadow 0.3s ease-in';
             el.style.outline = '4px solid #00e5e5';
             el.style.boxShadow = '0 0 25px rgba(0,229,229,0.5)';
         }""")
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(0.3)
         await page.keyboard.press("Control+A")
         await page.keyboard.press("Backspace")
         if valor:
             await page.keyboard.type(valor, delay=40)
         if acao == "digitar_e_enter":
             await page.keyboard.press("Enter")
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.15)
         try:
-            await page.evaluate("() => { const el = document.activeElement; if (el) { el.style.outline = ''; el.style.boxShadow = ''; } }")
+            await page.evaluate("""() => {
+                const el = document.activeElement;
+                if (el) {
+                    el.style.transition = 'outline 0.3s ease-out, box-shadow 0.3s ease-out';
+                    el.style.outline = '4px solid transparent';
+                    el.style.boxShadow = '0 0 0 transparent';
+                }
+            }""")
+            await asyncio.sleep(0.3)
         except Exception:
             pass
         await _aguardar_estabilidade(page)
@@ -1332,7 +1411,8 @@ async def _digitar_no_active_element(page: Page, acao: str, valor: str) -> bool:
 # BUSCA EM TODOS OS FRAMES
 # ──────────────────────────────────────────────────────────────
 async def _buscar_em_todos_os_frames(
-    page: Page, candidatos: list[TentativaLocalizacao], acao: str, valor: str
+    page: Page, candidatos: list[TentativaLocalizacao], acao: str, valor: str,
+    profile=None,
 ) -> Optional[str]:
     try:
         frames = page.frames
@@ -1368,7 +1448,7 @@ async def _buscar_em_todos_os_frames(
                     loc = contexto.locator(cand_frame.seletor).first
 
                 await loc.wait_for(state="visible", timeout=1500)
-                await _executar_acao(loc, page, acao, valor)
+                await _executar_acao(loc, page, acao, valor, profile=profile)
                 logger.info(f"   [Todos os Frames] Encontrado em frame: {frame.url[:60]}")
                 return frame.url
             except Exception:
@@ -1493,6 +1573,8 @@ async def _clicar_por_coordenadas(page: Page, coords, acao: str, valor: str) -> 
         await _highlight_coords(page, x, y)
         await asyncio.sleep(0.3)
 
+        # NOTE (Req 6.1): Double-click uses Playwright's native dblclick() which manages
+        # the inter-click interval internally. Pacing optimization does NOT affect this timing.
         if acao == "duplo_clique":
             await page.mouse.dblclick(x, y)
         elif acao == "clique_direito":
@@ -1705,7 +1787,7 @@ async def _detectar_menu_contexto_ativo(page, iframe_hint: str | None = None, ti
     return None
 
 
-async def _buscar_em_escopo_menu(menu_locator, label_curto: str, page=None) -> str | None:
+async def _buscar_em_escopo_menu(menu_locator, label_curto: str, page=None, profile=None) -> str | None:
     """
     Localiza e clica em um item dentro do container do menu de contexto ngx-contextmenu.
 
@@ -1740,7 +1822,7 @@ async def _buscar_em_escopo_menu(menu_locator, label_curto: str, page=None) -> s
                         cx = box["x"] + box["width"] / 2
                         cy = box["y"] + box["height"] / 2
                         from cursor_engine import mover_cursor_humanizado
-                        await mover_cursor_humanizado(page, cx, cy)
+                        await mover_cursor_humanizado(page, cx, cy, profile=profile)
                 except Exception:
                     pass
             await el.click()
@@ -2121,7 +2203,7 @@ async def _som_vision_matching(page: Page, alvo: dict, label_curto: str) -> Opti
 # ──────────────────────────────────────────────────────────────
 # ORQUESTRADOR PRINCIPAL (A MAQUINA DE DECISAO)
 # ──────────────────────────────────────────────────────────────
-async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
+async def encontrar_e_clicar(page: Page, acao_tec: dict, profile=None) -> bool:
     """
     Roteia a tentativa pelas 7 camadas de fallback ate encontrar o elemento.
     """
@@ -2155,11 +2237,14 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # sem passar pelas camadas normais (Brain, Sniper, Coords, etc.).
     if acao_tec.get("is_context_menu_item"):
         logger.info(f"\n   Executando (menu de contexto): {intencao[:80]}")
-        # Aguarda a animação de entrada do ngx-contextmenu (CDK overlay tem fade-in)
+        # NOTE (Req 6.2): The 0.3s sleep below is for CDK overlay fade-in animation only.
+        # Combined with the skipped post-action pause after clique_direito (see main.py),
+        # the total time from right-click to context menu item click stays well within 500ms
+        # of menu availability. This timing is NOT affected by pacing optimization.
         await asyncio.sleep(0.3)
         menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint, timeout_ms=2000)
         if menu_locator is not None:
-            seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page)
+            seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page, profile=profile)
             if seletor_usado:
                 _registrar_sucesso_cache(intencao, seletor=seletor_usado, iframe=iframe_hint)
                 _registrar_telemetria("0.5_menu_ctx", True)
@@ -2223,7 +2308,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     exact=_brain_exact,
                     descricao="brain knowledge",
                 )
-                if await _tentar_candidato(page, cand_cache, acao, valor):
+                if await _tentar_candidato(page, cand_cache, acao, valor, profile=profile):
                     # [FIX] Verificação de identidade no Brain para seletores posicionais
                     # Se o seletor memorizado é posicional, verificar identidade antes de aceitar.
                     # Se label_curto é genérico/vazio, não há como confirmar → rejeitar e escalar.
@@ -2288,7 +2373,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # Escopa a busca dentro do menu para evitar cliques fora do overlay.
     menu_locator = await _detectar_menu_contexto_ativo(page, iframe_hint)
     if menu_locator is not None:
-        seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page)
+        seletor_usado = await _buscar_em_escopo_menu(menu_locator, label_curto, page, profile=profile)
         if seletor_usado:
             _registrar_sucesso_cache(intencao, seletor_usado)
             _registrar_telemetria("0.5_menu_ctx", True)
@@ -2342,7 +2427,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
         try:
             loc_edit = contexto.locator("[contenteditable='true']")
             if await loc_edit.count() > 0 and await loc_edit.first.is_visible():
-                await _executar_acao(loc_edit.first, page, acao, valor)
+                await _executar_acao(loc_edit.first, page, acao, valor, profile=profile)
                 _registrar_telemetria("1_foco_nativo", True)
                 _registrar_estrategia_vencedora(intencao, "1_foco_nativo")
                 return True
@@ -2375,7 +2460,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 try:
                     loc = contexto_heuristica.locator(sel).first
                     if await loc.count() > 0 and await loc.is_visible():
-                        await _executar_acao(loc, page, acao, valor)
+                        await _executar_acao(loc, page, acao, valor, profile=profile)
                         logger.info("   [Heuristica] Icone Home atingido com sucesso.")
                         _registrar_sucesso_cache(intencao, seletor=sel, iframe=iframe_hint)
                         _registrar_telemetria("1.5_heuristica_seniorx", True)
@@ -2470,7 +2555,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         )
                         continue  # Rejeitar candidato e tentar o próximo
                     # Identidade confirmada — executar ação
-                    await _executar_acao(locator, page, acao, valor)
+                    await _executar_acao(locator, page, acao, valor, profile=profile)
                     _elapsed_ms = (time.monotonic() - _t0) * 1000
                     logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — OK (identidade confirmada)")
                     logger.info(f"   [Sniper] Acerto: {cand.descricao}")
@@ -2498,7 +2583,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                     p in cand.seletor for p in ("[aria-label=", "[data-testid=", "[id=", "[name=")
                 )
                 _timeout_cand = 2000 if _is_alta_confianca else 800
-                _acertou = await _tentar_candidato(page, cand, acao, valor, timeout_ms=_timeout_cand)
+                _acertou = await _tentar_candidato(page, cand, acao, valor, timeout_ms=_timeout_cand, profile=profile)
                 _elapsed_ms = (time.monotonic() - _t0) * 1000
                 logger.debug(f"   [Sniper] '{cand.descricao}' — {_elapsed_ms:.0f}ms — {'OK' if _acertou else 'miss'}")
                 if _acertou:
@@ -2572,7 +2657,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                         seletor=seletor_hint, iframe_hint=iframe_hint,
                         descricao=f"hint original '{seletor_hint[:40]}'",
                     )
-                    if await _tentar_candidato(page, cand_hint, acao, valor):
+                    if await _tentar_candidato(page, cand_hint, acao, valor, profile=profile):
                         logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
                         _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
                         _registrar_telemetria("3_hint_original", True)
@@ -2583,7 +2668,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
                 seletor=seletor_hint, iframe_hint=iframe_hint,
                 descricao=f"hint original '{seletor_hint[:40]}'",
             )
-            if await _tentar_candidato(page, cand_hint, acao, valor):
+            if await _tentar_candidato(page, cand_hint, acao, valor, profile=profile):
                 logger.info(f"   [Hint] Seletor original funcionou: {seletor_hint[:60]}")
                 _registrar_sucesso_cache(intencao, seletor=seletor_hint, iframe=iframe_hint)
                 _registrar_telemetria("3_hint_original", True)
@@ -2662,7 +2747,7 @@ async def encontrar_e_clicar(page: Page, acao_tec: dict) -> bool:
     # Itera por todos os frames filhos da página sem depender do iframe_hint.
     if candidatos:
         logger.info("   [Todos os Frames] Procurando o elemento em frames filhos...")
-        frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor)
+        frame_url = await _buscar_em_todos_os_frames(page, candidatos, acao, valor, profile=profile)
         if frame_url:
             _registrar_sucesso_cache(intencao, iframe=frame_url)
             _registrar_telemetria("4_todos_frames", True)

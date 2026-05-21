@@ -12,6 +12,7 @@ import asyncio
 import logging
 import math
 import random
+from dataclasses import dataclass
 from typing import Optional
 
 # ══════════════════════════════════════════════════════════
@@ -28,6 +29,89 @@ DESVIO_MAX_RATIO = 0.15
 PASSOS_POR_PIXEL = 0.06
 PASSOS_MIN       = 20
 PASSOS_MAX       = 90
+
+
+# ══════════════════════════════════════════════════════════
+# PACING PROFILES
+# ══════════════════════════════════════════════════════════
+@dataclass(frozen=True)
+class PacingProfile:
+    """Immutable pacing constants resolved once per execution run."""
+    name: str
+    cursor_base_ms: int
+    cursor_min_ms: int
+    cursor_max_ms: int
+    safe_pause_min: float
+    safe_pause_max: float
+    steps_per_pixel: float
+    steps_min: int
+    steps_max: int
+
+
+PROFILES: dict[str, PacingProfile] = {
+    "fast": PacingProfile(
+        name="fast",
+        cursor_base_ms=600, cursor_min_ms=300, cursor_max_ms=1400,
+        safe_pause_min=0.1, safe_pause_max=0.3,
+        steps_per_pixel=0.06, steps_min=12, steps_max=50,
+    ),
+    "normal": PacingProfile(
+        name="normal",
+        cursor_base_ms=900, cursor_min_ms=400, cursor_max_ms=1800,
+        safe_pause_min=0.2, safe_pause_max=0.5,
+        steps_per_pixel=0.06, steps_min=12, steps_max=50,
+    ),
+    "conservative": PacingProfile(
+        name="conservative",
+        cursor_base_ms=1200, cursor_min_ms=500, cursor_max_ms=2500,
+        safe_pause_min=0.3, safe_pause_max=0.8,
+        steps_per_pixel=0.06, steps_min=20, steps_max=90,
+    ),
+}
+
+
+# ══════════════════════════════════════════════════════════
+# PACING PROFILE RESOLUTION
+# ══════════════════════════════════════════════════════════
+def resolve_pacing_profile(configuracao_gravacao: dict) -> PacingProfile:
+    """Resolve pacing profile from roteiro config. Defaults to 'fast'.
+
+    When the key is missing, silently defaults to 'fast'.
+    When the value is invalid, logs a warning and falls back to 'fast'.
+    """
+    profile_name = configuracao_gravacao.get("pacing_profile", "fast")
+    if profile_name not in PROFILES:
+        logging.warning(f"Invalid pacing_profile '{profile_name}', falling back to 'fast'")
+        profile_name = "fast"
+    return PROFILES[profile_name]
+
+
+# ══════════════════════════════════════════════════════════
+# DURATION AND STEP CALCULATIONS
+# ══════════════════════════════════════════════════════════
+def calcular_duracao_movimento(distance: float, profile: PacingProfile) -> int:
+    """Calculate cursor movement duration in ms. Pure function, no side effects.
+
+    Returns 0 for distance < 3 (skip signal — no animation needed).
+    Otherwise applies the power-law formula with profile constants,
+    clamps to profile bounds, applies random factor 0.92–1.08, and re-clamps.
+    """
+    if distance < 3:
+        return 0  # skip signal
+    base = profile.cursor_base_ms * (distance / 400) ** 0.55
+    clamped = max(profile.cursor_min_ms, min(profile.cursor_max_ms, base))
+    randomized = clamped * random.uniform(0.92, 1.08)
+    return int(max(profile.cursor_min_ms, min(profile.cursor_max_ms, randomized)))
+
+
+def calcular_passos_movimento(distance: float, profile: PacingProfile) -> int:
+    """Calculate animation step count. Pure function.
+
+    Formula: clamp(distance * profile.steps_per_pixel, profile.steps_min, profile.steps_max)
+    """
+    raw = distance * profile.steps_per_pixel
+    return int(max(profile.steps_min, min(profile.steps_max, raw)))
+
 
 # ══════════════════════════════════════════════════════════
 # CURSOR DOM (NEON FANTASMA)
@@ -198,7 +282,9 @@ def _gerar_pontos_controle(
 
 
 async def mover_cursor_humanizado(
-    page, x_fim: float, y_fim: float, duracao_ms: Optional[int] = None
+    page, x_fim: float, y_fim: float,
+    duracao_ms: Optional[int] = None,
+    profile: Optional[PacingProfile] = None,
 ) -> None:
     try:
         pos = await page.evaluate(
@@ -213,9 +299,14 @@ async def mover_cursor_humanizado(
         return
 
     if duracao_ms is None:
-        base       = DURACAO_BASE_MS * (distancia / 400) ** 0.55
-        duracao_ms = int(max(DURACAO_MIN_MS, min(DURACAO_MAX_MS, base)))
-        duracao_ms = int(duracao_ms * random.uniform(0.92, 1.08))
+        if profile is not None:
+            duracao_ms = calcular_duracao_movimento(distancia, profile)
+            if duracao_ms == 0:
+                return
+        else:
+            base       = DURACAO_BASE_MS * (distancia / 400) ** 0.55
+            duracao_ms = int(max(DURACAO_MIN_MS, min(DURACAO_MAX_MS, base)))
+            duracao_ms = int(duracao_ms * random.uniform(0.92, 1.08))
 
     cp1x, cp1y, cp2x, cp2y = _gerar_pontos_controle(x_ini, y_ini, x_fim, y_fim)
 
@@ -227,7 +318,10 @@ async def mover_cursor_humanizado(
         x_alvo_final = x_fim + (dx / norm) * over
         y_alvo_final = y_fim + (dy / norm) * over
 
-    passos      = int(max(PASSOS_MIN, min(PASSOS_MAX, distancia * PASSOS_POR_PIXEL)))
+    if profile is not None:
+        passos = calcular_passos_movimento(distancia, profile)
+    else:
+        passos = int(max(PASSOS_MIN, min(PASSOS_MAX, distancia * PASSOS_POR_PIXEL)))
     intervalo_s = (duracao_ms / 1000) / passos
 
     for i in range(passos + 1):
@@ -244,8 +338,13 @@ async def mover_cursor_humanizado(
             pass
 
         fator_pausa = 0.6 + 0.8 * abs(math.sin(math.pi * t))
-        await asyncio.sleep(intervalo_s * fator_pausa)
+        delay = intervalo_s * fator_pausa
+        # Enforce minimum 8ms inter-step delay for video capture reliability
+        await asyncio.sleep(max(0.008, delay))
 
+    # NOTE (Req 6.3): Overshoot correction phase uses fixed timing (8 steps × 18ms = 144ms).
+    # This is intentionally NOT affected by PacingProfile — preserving correction fidelity
+    # ensures click accuracy for all actions including double-click and context menu items.
     if (x_alvo_final, y_alvo_final) != (x_fim, y_fim):
         passos_corr, intervalo_corr = 8, 0.018
         ox, oy = x_alvo_final, y_alvo_final

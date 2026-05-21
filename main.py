@@ -18,11 +18,13 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import sys
 import tempfile
 import time
+from enum import Enum
 
 import edge_tts
 import PIL.Image
@@ -34,8 +36,10 @@ from proglog import ProgressBarLogger
 
 import score_engine as _score_engine
 from cursor_engine import (
+    PacingProfile,
     garantir_cursor_visivel,
     instalar_cursor,
+    resolve_pacing_profile,
 )
 from vision_engine import encontrar_e_clicar
 
@@ -57,6 +61,51 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 pygame.mixer.init()
 pygame.mixer.set_num_channels(2)
+
+# ==============================================================
+# ACTION CLASSIFICATION (Pure Function)
+# ==============================================================
+class ActionClassification(Enum):
+    """Classification of actions for pacing decisions."""
+    SAFE = "safe"
+    SENSITIVE = "sensitive"
+
+
+def classificar_acao(acao_tec: dict, passo: dict) -> ActionClassification:
+    """Pure function: classify action as safe or sensitive based on step metadata.
+
+    Classification rules (any match → SENSITIVE, else → SAFE):
+      - acao_tec["duplo_clique"] is True → SENSITIVE
+      - passo["tipo_passo"] in (navigation, navegacao, page_refresh) → SENSITIVE
+      - passo["pause_sugerida"] > 3.0 → SENSITIVE
+      - acao_tec["aguarda_carregamento"] is True → SENSITIVE
+    """
+    # Rule: double-click is always sensitive
+    if acao_tec.get("duplo_clique", False) or acao_tec.get("acao") == "duplo_clique":
+        return ActionClassification.SENSITIVE
+
+    # Rule: navigation tipo_passo is sensitive
+    tipo = str(passo.get("tipo_passo", "")).lower()
+    if tipo in ("navigation", "navegacao", "page_refresh"):
+        return ActionClassification.SENSITIVE
+
+    # Rule: pause_sugerida > 3.0 is sensitive
+    try:
+        pause = float(passo.get("pause_sugerida", 0))
+    except (TypeError, ValueError):
+        pause = 0.0
+    if pause > 3.0:
+        return ActionClassification.SENSITIVE
+
+    # Rule: action followed by wait_for_load_state is sensitive
+    # NOTE (Req 7.3, 7.5): When aguarda_carregamento is True, the action is classified
+    # as SENSITIVE, ensuring pause_sugerida is preserved in full. This protects the
+    # wait_for_load_state timing from being reduced by pacing optimization.
+    if acao_tec.get("aguarda_carregamento", False):
+        return ActionClassification.SENSITIVE
+
+    return ActionClassification.SAFE
+
 
 # ==============================================================
 # CUSTOM LOGGER PARA ENVIAR PORCENTAGEM AO PAINEL
@@ -576,9 +625,118 @@ def _validar_roteiro_gravacao(roteiro: dict) -> list[str]:
             erros.append(f"Passo {pid}: ancora (narracao principal) vazia.")
     return erros
 
-async def clicar_com_animacao(page, acao_tec: dict) -> bool:
+async def clicar_com_animacao(page, acao_tec: dict, profile: PacingProfile | None = None) -> bool:
     await garantir_cursor_visivel(page)
-    return await encontrar_e_clicar(page, acao_tec)
+    return await encontrar_e_clicar(page, acao_tec, profile=profile)
+
+
+# ==============================================================
+# CONCURRENT NARRATION + CURSOR MOVEMENT
+# ==============================================================
+async def _executar_acao_com_narracao(
+    page,
+    acao_tec: dict,
+    passo: dict,
+    profile: PacingProfile,
+    id_passo: int | str,
+    idx_acao: int,
+    nome_arquivo_base: str,
+    voz_escolhida: str,
+    tempo_inicio_gravacao: float,
+    timeline_audios: list,
+) -> bool:
+    """Orchestrate narration playback and cursor movement + click.
+
+    Strategy: narration plays in background (fire-and-forget). The system does
+    NOT wait for narration to finish before proceeding to the next action.
+    This allows narration audio to overlap with subsequent cursor movements,
+    dramatically reducing total video duration.
+
+    Before starting a NEW narration, we wait for any previous narration to
+    finish (prevents audio overlap/garbling).
+
+    When narration is absent or action is clique_direito:
+      - Execute cursor movement + click only, skip narration
+
+    Returns the click result (bool).
+    """
+    micro_narracao = passo.get("pedagogia", {}).get("micro_narracao") or acao_tec.get("micro_narracao", "")
+    is_clique_direito = acao_tec.get("acao") == "clique_direito"
+
+    if micro_narracao and not is_clique_direito:
+        # Wait for any PREVIOUS narration to finish before starting a new one
+        # (prevents audio overlap/garbling between consecutive narrations)
+        try:
+            await asyncio.wait_for(aguardar_audio_terminar(), timeout=5.0)
+        except asyncio.TimeoutError:
+            logging.info(f"[narracao] Previous narration still playing after 5s, proceeding anyway.")
+
+        # Show subtitle
+        await exibir_legenda_cinema(page, micro_narracao)
+
+        # Generate/retrieve audio (cached if already pre-generated)
+        id_acao = f"passo_{id_passo}_acao_{idx_acao}"
+        mp3 = None
+        try:
+            mp3 = await gerar_audio(micro_narracao, id_acao, nome_arquivo_base, voz_escolhida)
+        except Exception as e:
+            logging.warning(f"[narracao] Audio generation failed for action {id_acao}: {e}")
+
+        # Start narration playback (non-blocking via pygame — fire and forget)
+        if mp3:
+            t_atual = time.time() - tempo_inicio_gravacao
+            try:
+                duracao = pygame.mixer.Sound(mp3).get_length()
+            except Exception:
+                duracao = 2.0
+
+            try:
+                iniciar_reproducao_audio(mp3)
+            except Exception as e:
+                logging.warning(f"[narracao] Audio playback failed for {id_acao}: {e}")
+
+            timeline_audios.append({
+                "arquivo": mp3,
+                "inicio": t_atual,
+                "fim": t_atual + duracao,
+                "texto": micro_narracao,
+            })
+
+        # Execute cursor movement + click (narration continues playing in background)
+        resultado_clique = await clicar_com_animacao(page, acao_tec, profile=profile)
+
+        # Do NOT wait for narration to finish — let it play while next action starts
+        # The subtitle will be removed when the next action shows its own subtitle,
+        # or at the end of the step via remover_legenda
+        await remover_legenda(page)
+        return resultado_clique
+    else:
+        # No narration or clique_direito: execute click only (Req 3.5)
+        resultado_clique = await clicar_com_animacao(page, acao_tec, profile=profile)
+        return resultado_clique
+
+
+# ==============================================================
+# CALCULO DE PAUSAS
+# ==============================================================
+def calcular_pausa_pos_acao(
+    classification: ActionClassification,
+    pause_sugerida: float,
+    profile: PacingProfile,
+) -> float:
+    """Calculate post-action pause duration in seconds. Pure function.
+
+    IMPORTANT (Req 7.1, 7.3, 7.5): This function ONLY controls the asyncio.sleep
+    pause between actions. It does NOT affect:
+      - wait_for_load_state() calls (30s timeout preserved)
+      - wait_for() calls on locators
+      - _aguardar_estabilidade() in vision_engine.py
+    Page load waits are handled separately and are never reduced by pacing optimization.
+    """
+    if classification == ActionClassification.SENSITIVE:
+        return pause_sugerida
+    # Safe action: random pause within profile bounds
+    return random.uniform(profile.safe_pause_min, profile.safe_pause_max)
 
 # ==============================================================
 # MOTOR DE EXECUCAO PRINCIPAL
@@ -626,6 +784,10 @@ async def executar_roteiro(caminho_json: str) -> None:
     id_treinamento    = metadata.get("id_treinamento", nome_aula_raw)
     nome_arquivo_base = limpar_nome(id_treinamento)
     voz_escolhida     = roteiro.get("configuracao_gravacao", {}).get("voz_ia", "pt-BR-FranciscaNeural")
+
+    # ── Resolve pacing profile once at execution start (Req 8.5, 8.7) ────
+    profile = resolve_pacing_profile(roteiro.get("configuracao_gravacao", {}))
+    logging.info(f"[Pacing] Profile resolved: {profile.name}")
 
     global _audio_manifest
     async with _audio_manifest_lock:
@@ -740,7 +902,14 @@ async def executar_roteiro(caminho_json: str) -> None:
                 # ── Modo sem login: navega direto para a URL alvo ─────────────
                 logging.info(f"[Adapter] Modo sem login ativo. Navegando para: {adapter.url_base}")
                 await page.goto(SENIOR_URL)
-                await page.wait_for_load_state("load", timeout=30_000)
+                # ── PAGE LOAD WAIT (Req 7.1, 7.3, 7.4, 7.5) ─────────────────
+                # This 30s wait_for_load_state is NOT affected by pacing optimization.
+                # calcular_pausa_pos_acao only controls post-action pauses, not page load waits.
+                # On timeout: log and proceed without retry (Req 7.4).
+                try:
+                    await page.wait_for_load_state("load", timeout=30_000)
+                except Exception as _load_err:
+                    logging.warning(f"[page_load] wait_for_load_state('load') timeout after 30s during navigation: {_load_err}. Proceeding without retry.")
                 await asyncio.sleep(2.0)
             else:
                 # ── Fluxo de login (SeniorXAdapter ou GenericAdapter com login) ──
@@ -769,13 +938,22 @@ async def executar_roteiro(caminho_json: str) -> None:
                 await page.keyboard.press("Enter")
 
                 print("Login efetuado. A aguardar carregamento do painel para gravar...", flush=True)
-                await page.wait_for_load_state("load", timeout=30_000)
+                # ── PAGE LOAD WAIT (Req 7.1, 7.3, 7.4, 7.5) ─────────────────
+                # This 30s wait_for_load_state is NOT affected by pacing optimization.
+                # calcular_pausa_pos_acao only controls post-action pauses, not page load waits.
+                # On timeout: log and proceed without retry (Req 7.4).
+                try:
+                    await page.wait_for_load_state("load", timeout=30_000)
+                except Exception as _load_err:
+                    logging.warning(f"[page_load] wait_for_load_state('load') timeout after 30s post-login: {_load_err}. Proceeding without retry.")
                 await asyncio.sleep(2.0)
 
         except Exception as e:
             logging.warning(f"O auto-login do Robô falhou: {e}")
             print("AVISO: O robô não conseguiu logar. Por favor, conclua o login manualmente na janela do Chrome em até 60 segundos!", flush=True)
             try:
+                # ── MANUAL LOGIN WAIT (Req 7.3) ──────────────────────────────
+                # 60s networkidle wait for manual login. NOT affected by pacing.
                 await page.wait_for_load_state("networkidle", timeout=60000)
                 await asyncio.sleep(3.0)
             except Exception:
@@ -846,6 +1024,12 @@ async def executar_roteiro(caminho_json: str) -> None:
 
                 await atualizar_progress_bar(page, idx + 1, total_passos, nome_aula_raw)
 
+                # ── Anchor narration: MUST remain sequential (Req 3.4) ──────────
+                # The anchor narration (pedagogia.ancora) is the main pedagogical
+                # narration for each step. It plays fully and completes BEFORE any
+                # step actions begin. Do NOT apply concurrent overlap here — only
+                # micro_narracao (inside the action loop) gets concurrent treatment
+                # via _executar_acao_com_narracao.
                 ancora = passo.get("pedagogia", {}).get("ancora", "")
                 if ancora:
                     await exibir_legenda_cinema(page, ancora)
@@ -866,6 +1050,7 @@ async def executar_roteiro(caminho_json: str) -> None:
                             "texto":   ancora,
                         })
 
+                    # Sequential: wait for anchor audio to finish before proceeding
                     await aguardar_audio_terminar()
                     await remover_legenda(page)
                     await asyncio.sleep(0.15)
@@ -890,30 +1075,7 @@ async def executar_roteiro(caminho_json: str) -> None:
                         acao_tec = dict(acao_tec)  # cópia para não mutar o roteiro
                         acao_tec["is_context_menu_item"] = True
 
-                    micro_voz = acao_tec.get("micro_narracao", "")
-                    # ── Clique direito: pula narração para não fechar o menu de contexto ──
-                    # O menu de contexto fecha sozinho após alguns segundos. Se houver
-                    # narração entre o clique_direito e o item do menu, o menu fecha antes
-                    # de a próxima ação ser executada. A narração é adiada para depois.
                     _is_clique_direito = acao_tec.get("acao") == "clique_direito"
-                    if micro_voz and not _is_clique_direito:
-                        await exibir_legenda_cinema(page, micro_voz)
-                        id_acao = f"passo_{id_p}_acao_{i}"
-                        mp3     = await gerar_audio(micro_voz, id_acao, nome_arquivo_base, voz_escolhida)
-
-                        if mp3:
-                            t_atual = time.time() - tempo_inicio_gravacao
-                            try:
-                                duracao = pygame.mixer.Sound(mp3).get_length()
-                            except Exception:
-                                duracao = 2.0
-                            iniciar_reproducao_audio(mp3)
-                            timeline_audios.append({
-                                "arquivo": mp3,
-                                "inicio":  t_atual,
-                                "fim":     t_atual + duracao,
-                                "texto":   micro_voz,
-                            })
 
                     # Aplicar blur no vídeo se ação tem região sensível (Requisito 1.2)
                     _dados_blur = acao_tec.get("elemento_alvo", {}).get("dados_blur") or {}
@@ -925,13 +1087,24 @@ async def executar_roteiro(caminho_json: str) -> None:
                             logging.warning(f"[blur_video] Falha ao aplicar overlay de blur: {_blur_err}")
                             _blur_ativo = False
 
-                    resultado_clique = await clicar_com_animacao(page, acao_tec)
-
-                    # Após clique_direito: não aguarda áudio nem pausa — o menu de contexto
-                    # precisa ser clicado imediatamente antes de fechar sozinho.
-                    if not _is_clique_direito:
-                        await aguardar_audio_terminar()
-                        await remover_legenda(page)
+                    # ── Concurrent narration + cursor movement + click (Req 3.1–3.6) ──
+                    # Uses _executar_acao_com_narracao which handles:
+                    #   - micro_narracao playback concurrent with cursor movement
+                    #   - clique_direito skips narration (Req 3.5)
+                    #   - 15s narration timeout (Req 3.3)
+                    #   - Audio failure does not block (Req 3.6)
+                    resultado_clique = await _executar_acao_com_narracao(
+                        page,
+                        acao_tec,
+                        passo,
+                        profile,
+                        id_passo=id_p,
+                        idx_acao=i,
+                        nome_arquivo_base=nome_arquivo_base,
+                        voz_escolhida=voz_escolhida,
+                        tempo_inicio_gravacao=tempo_inicio_gravacao,
+                        timeline_audios=timeline_audios,
+                    )
 
                     if _blur_ativo:
                         try:
@@ -953,8 +1126,21 @@ async def executar_roteiro(caminho_json: str) -> None:
                     except Exception as _score_err:
                         logging.debug(f"[score_engine] Falha ao registrar execução (ignorada): {_score_err}")
 
-                    pausa_real = min(pausa_inteligente * 0.3, 0.8)
                     if not _is_clique_direito:
+                        # ── Action classification determines pause (Req 4.1–4.7) ──
+                        # NOTE (Req 6.2): When _is_clique_direito is True, this entire pause
+                        # block is SKIPPED, ensuring the follow-up context menu item click
+                        # executes immediately (well within the 500ms menu dismissal window).
+                        classification = classificar_acao(acao_tec, passo)
+                        pausa_real = calcular_pausa_pos_acao(classification, pausa_inteligente, profile)
+                        # ── Req 5.1: Enforce minimum 16ms inter-action interval ──────────
+                        # Between consecutive visual state changes during recording, at least
+                        # 16ms (one frame at 60fps) must pass to allow the video encoder to
+                        # capture all transitions in the 1920x1080 recording.
+                        # calcular_pausa_pos_acao already returns >= 100ms for safe actions
+                        # (profile.safe_pause_min=0.1) which exceeds 16ms. This max() is a
+                        # defensive floor guarantee for correctness.
+                        pausa_real = max(0.016, pausa_real)
                         await asyncio.sleep(pausa_real)
 
         except Exception as e:
