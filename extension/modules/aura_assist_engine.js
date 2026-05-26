@@ -204,40 +204,39 @@
                 console.log('[AuraAssistEngine] Iniciando navegação guiada:', payload.breadcrumb);
                 console.log('[AuraAssistEngine] window.GuidedNavigationController disponível?', typeof window.GuidedNavigationController);
                 
-                // Exibe mensagem do AURA
+                // Monta ações locais para confirmação (NÃO envia nova query ao backend)
+                const navPath = payload.navigation_path;
+                const navBreadcrumb = payload.breadcrumb || '';
+                const opcoesNavegacao = [
+                    {
+                        label: 'Sim, me guie',
+                        action: () => {
+                            if (window.GuidedNavigationController) {
+                                if (!window._auraNavController) {
+                                    window._auraNavController = new window.GuidedNavigationController();
+                                }
+                                window._auraNavController.startNavigation(navPath, navBreadcrumb);
+                                console.log('[AuraAssistEngine] GPS iniciado via confirmação do usuário');
+                            }
+                        }
+                    },
+                    {
+                        label: 'Não, obrigado',
+                        action: () => {
+                            if (global.AuraUI) {
+                                global.AuraUI.exibirBalao('Tudo bem! Se precisar de ajuda, é só perguntar.', [], false);
+                            }
+                        }
+                    }
+                ];
+
+                // Exibe mensagem com botões de confirmação local
                 if (global.AuraUI) {
-                    global.AuraUI.exibirBalao(textoResposta, sugestoes, true);
+                    global.AuraUI.exibirBalao(textoResposta, opcoesNavegacao, true);
                 }
                 
-                // Inicializa o GuidedNavigationController se disponível
-                if (window.GuidedNavigationController) {
-                    console.log('[AuraAssistEngine] GuidedNavigationController encontrado, criando instância...');
-                    
-                    // Cria instância se não existir
-                    if (!window._auraNavController) {
-                        window._auraNavController = new window.GuidedNavigationController();
-                        console.log('[AuraAssistEngine] Nova instância criada');
-                    } else {
-                        console.log('[AuraAssistEngine] Usando instância existente');
-                    }
-                    
-                    // Inicia navegação guiada
-                    window._auraNavController.startNavigation(
-                        payload.navigation_path,
-                        payload.breadcrumb || ''
-                    ).then(function(success) {
-                        if (success) {
-                            console.log('[AuraAssistEngine] Navegação guiada iniciada com sucesso');
-                        } else {
-                            console.warn('[AuraAssistEngine] Falha ao iniciar navegação guiada');
-                        }
-                    }).catch(function(err) {
-                        console.error('[AuraAssistEngine] Erro ao iniciar navegação guiada:', err);
-                    });
-                } else {
-                    console.warn('[AuraAssistEngine] GuidedNavigationController não disponível');
-                    console.warn('[AuraAssistEngine] window object keys:', Object.keys(window).filter(function(k) { return k.includes('Navigation') || k.includes('Guided'); }));
-                }
+                // NÃO inicia automaticamente — espera confirmação do usuário
+                // (respeita requires_confirmation do backend)
                 
             } else if (temGPS) {
                 // ── CTA explícito para GPS — NÃO inicia automaticamente ──────
