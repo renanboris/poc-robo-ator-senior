@@ -389,8 +389,10 @@ def _is_navigation_request(prompt_usuario: str) -> bool:
         "vamos la", "ok", "beleza", "bora", "pode sim", "sim por favor",
         "claro", "com certeza", "quero sim", "quero", "por favor",
         "não, obrigado", "nao obrigado", "não", "nao", "cancelar",
+        "me guie até lá", "me guie ate la", "me guie la",
+        "me leve até lá", "me leve ate la", "me leve lá", "me leve la",
     ]
-    if prompt_lower.rstrip("!.") in confirmation_patterns:
+    if prompt_lower.rstrip("!.?") in confirmation_patterns:
         return False
 
     # Contextual/vague requests that depend on conversation history
@@ -400,6 +402,7 @@ def _is_navigation_request(prompt_usuario: str) -> bool:
         "consegue me ajudar", "pode me ajudar", "me ajuda com isso",
         "como faço isso", "como faz isso", "não entendi", "nao entendi",
         "até lá", "ate la", "para lá", "pra lá", "pra la",
+        "me guie lá", "me guie la", "me leve lá", "me leve la",
     ]
     # If the query is ONLY contextual (no specific module/destination mentioned)
     has_contextual = any(p in prompt_lower for p in contextual_patterns)
