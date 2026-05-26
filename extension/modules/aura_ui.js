@@ -29,6 +29,26 @@
     // ── Helpers de renderização de Message_Bubbles ────────────────────────────
     
     /**
+     * Converte markdown básico para HTML seguro (negrito, itálico, code).
+     * Escapa HTML primeiro para evitar XSS, depois aplica formatação.
+     */
+    function _renderMarkdown(texto) {
+        // 1. Escapa HTML para segurança
+        let safe = texto
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        
+        // 2. Aplica markdown básico
+        safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');  // **negrito**
+        safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');              // *itálico*
+        safe = safe.replace(/`(.+?)`/g, '<code>$1</code>');            // `code`
+        safe = safe.replace(/\n/g, '<br>');                             // quebras de linha
+        
+        return safe;
+    }
+
+    /**
      * Cria e insere uma Message_Bubble na Thread_Area.
      * @param {'aura'|'user'} role
      * @param {string} texto
@@ -40,7 +60,7 @@
         
         const bubble = document.createElement('div');
         bubble.className = `aura-msg-bubble aura-msg-${role}`;
-        bubble.textContent = texto;
+        bubble.innerHTML = _renderMarkdown(texto);
         
         area.appendChild(bubble);
         _scrollThreadToBottom();

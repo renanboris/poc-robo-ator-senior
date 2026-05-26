@@ -379,7 +379,19 @@ def _is_navigation_request(prompt_usuario: str) -> bool:
     Returns:
         bool: True if this is a navigation request, False if it's a conceptual question
     """
-    prompt_lower = prompt_usuario.lower()
+    prompt_lower = prompt_usuario.lower().strip()
+
+    # Confirmation patterns — these are responses to a previous suggestion,
+    # NOT new navigation requests. They should go through the normal pipeline
+    # which has conversational memory to handle context.
+    confirmation_patterns = [
+        "sim, me guie", "sim me guie", "sim", "pode ser", "vamos lá",
+        "vamos la", "ok", "beleza", "bora", "pode sim", "sim por favor",
+        "claro", "com certeza", "quero sim", "quero", "por favor",
+        "não, obrigado", "nao obrigado", "não", "nao", "cancelar",
+    ]
+    if prompt_lower.rstrip("!.") in confirmation_patterns:
+        return False
 
     # Navigation request patterns
     navigation_patterns = [
