@@ -388,6 +388,34 @@
     box-shadow: 0 4px 10px rgba(0, 221, 179, 0.3) !important;
 }
 
+/* ─── 8b. BOTÃO GPS DESTACADO ────────────────────────────────────────────── */
+.aura-btn-gps {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    padding: 8px 18px !important;
+    border-radius: 100px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    font-family: inherit !important;
+    white-space: nowrap !important;
+    transition: all 0.3s ease !important;
+    outline: none !important;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
+    animation: aura-gps-pulse 2s infinite !important;
+}
+
+.aura-btn-gps:hover {
+    transform: translateY(-2px) scale(1.05) !important;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6) !important;
+}
+
+@keyframes aura-gps-pulse {
+    0%, 100% { box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); }
+    50% { box-shadow: 0 4px 25px rgba(102, 126, 234, 0.7); }
+}
+
 /* ─── 9. FEEDBACK ────────────────────────────────────────────────────────── */
 .aura-feedback-bar {
     display: flex !important;

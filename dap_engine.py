@@ -1135,6 +1135,36 @@ INSTRUCOES DE CLIQUE E SUGESTOES (CRITICO):
         if busca_rag and "source_url" in busca_rag:
             resultado_final["source_url"] = busca_rag["source_url"]
 
+        # =========================================================
+        # GPS ENRICHMENT: If this is a navigation query and we have
+        # a matching roteiro, attach GPS steps so the frontend can
+        # offer a "Me guie até lá" button.
+        # =========================================================
+        if _is_navigation_request(prompt_usuario):
+            try:
+                fallback_engine = get_navigation_fallback_engine()
+                if fallback_engine:
+                    gps_results = fallback_engine.indexer.search(prompt_usuario, tenant_id, top_k=1)
+                    if gps_results:
+                        from pathlib import Path as _Path
+                        roteiro_name = gps_results[0]["roteiro_name"]
+                        roteiro_path = _Path("roteiros_salvos") / f"{roteiro_name}.json"
+                        if roteiro_path.exists():
+                            with open(roteiro_path, 'r', encoding='utf-8') as f:
+                                roteiro_data = json.load(f)
+                            nav_path = fallback_engine.path_extractor.extract_navigation_path(
+                                roteiro_data, target_query=prompt_usuario
+                            )
+                            if nav_path and nav_path.get("steps"):
+                                resultado_final["gps_passos"] = nav_path["steps"]
+                                resultado_final["gps_nome_aula"] = roteiro_name
+                                logger.info(
+                                    f"🧭 GPS enrichment: {len(nav_path['steps'])} passos do roteiro "
+                                    f"'{roteiro_name}' anexados à resposta"
+                                )
+            except Exception as e:
+                logger.debug(f"GPS enrichment skipped: {e}")
+
         _cache_set(cache_key, resultado_final)
         return resultado_final
 

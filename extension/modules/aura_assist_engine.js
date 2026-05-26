@@ -209,7 +209,8 @@
                 const navBreadcrumb = payload.breadcrumb || '';
                 const opcoesNavegacao = [
                     {
-                        label: 'Sim, me guie',
+                        label: '🧭 Sim, me guie',
+                        className: 'aura-btn-gps',
                         action: () => {
                             if (window.GuidedNavigationController) {
                                 if (!window._auraNavController) {
@@ -248,7 +249,8 @@
 
                 const opcoes = [
                     {
-                        label: 'Iniciar GPS',
+                        label: '🧭 Me guie até lá',
+                        className: 'aura-btn-gps',
                         action: () => {
                             if (global.AuraSpotlight) global.AuraSpotlight.remover();
                             if (global.AuraState)     global.AuraState.setMode('gps');

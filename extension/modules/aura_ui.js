@@ -302,7 +302,7 @@
 
         opcoes.forEach(opt => {
             const btn = document.createElement('button');
-            btn.className = 'aura-btn';
+            btn.className = opt.className || 'aura-btn';
             btn.innerText = opt.label;
             btn.addEventListener('click', (e) => { e.stopPropagation(); opt.action(); });
             optDiv.appendChild(btn);
