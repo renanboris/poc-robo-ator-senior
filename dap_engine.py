@@ -393,6 +393,32 @@ def _is_navigation_request(prompt_usuario: str) -> bool:
     if prompt_lower.rstrip("!.") in confirmation_patterns:
         return False
 
+    # Contextual/vague requests that depend on conversation history
+    # These should NOT trigger navigation fallback (no useful keywords to search)
+    contextual_patterns = [
+        "não sei acessar", "nao sei acessar", "não sei chegar", "nao sei chegar",
+        "consegue me ajudar", "pode me ajudar", "me ajuda com isso",
+        "como faço isso", "como faz isso", "não entendi", "nao entendi",
+        "até lá", "ate la", "para lá", "pra lá", "pra la",
+    ]
+    # If the query is ONLY contextual (no specific module/destination mentioned)
+    has_contextual = any(p in prompt_lower for p in contextual_patterns)
+    has_specific_target = False
+    # Check if there's a specific destination mentioned
+    specific_targets = [
+        "ged", "bpm", "sign", "senior flow", "folha", "financ", "contab",
+        "patrimôn", "patrimoni", "estoque", "compras", "faturamento",
+        "rh", "ponto", "benefíci", "benefici", "treinamento", "recrutamento",
+        "fiscal", "nfe", "nfse", "edocs", "konviva", "hcm",
+    ]
+    for target in specific_targets:
+        if target in prompt_lower:
+            has_specific_target = True
+            break
+    
+    if has_contextual and not has_specific_target:
+        return False
+
     # Navigation request patterns
     navigation_patterns = [
         "como acessar", "como chegar", "como ir", "onde fica", "onde está", "onde esta",
