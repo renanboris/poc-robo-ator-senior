@@ -248,6 +248,7 @@
     if (!match || !match.elemento) {
       // Fallback: listener no document com delegacao
       function _handler(e) {
+        if (!seletor) return; // seletor vazio não pode ser validado
         var el = e.target;
         while (el) {
           try {
@@ -474,6 +475,25 @@
     }, timeoutMs);
   }
 
+  /**
+   * Retorna true se o passo usa delegação no document:
+   *   - step é falsy
+   *   - step.target_selector está vazio/ausente
+   *   - AuraSpotlight.encontrarElemento não encontra o elemento no DOM
+   *
+   * Função pura de consulta — não modifica nenhum estado.
+   *
+   * @param {object} step — passo normalizado
+   * @returns {boolean}
+   */
+  function _usaDelegacao(step) {
+    if (!step || !step.target_selector) return true;
+    var match = global.AuraSpotlight
+      ? global.AuraSpotlight.encontrarElemento(step.target_selector)
+      : null;
+    return !match || !match.elemento;
+  }
+
   function _avancarPasso() {
     // Limpa timeout
     if (_timeoutHandle !== null) {
@@ -528,6 +548,8 @@
 
     if (proximo >= _passos.length) {
       _concluir();
+    } else if (_usaDelegacao(_passos[proximo])) {
+      setTimeout(function () { _iniciarPasso(proximo); }, 0);
     } else {
       _iniciarPasso(proximo);
     }
@@ -670,8 +692,8 @@
     }
 
     // Inicia passo 0
-    _iniciarPasso(0);
     _isActive = true;
+    _iniciarPasso(0);
   }
 
   /**

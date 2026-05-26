@@ -38,15 +38,9 @@
             'modules/aura_ui.js',
             'modules/aura_dom_mapper.js',
             'modules/aura_spotlight.js',
-            'modules/navigation_highlighter.js',
-            'modules/guided_navigation_controller.js',
             'modules/aura_gps_engine.js',
             'modules/aura_mission_engine.js',
-            'modules/aura_assist_engine.js',
-            'guided_execution.js',
-            'checklist_widget.js',
-            'hesitation_detector.js',
-            'nps_modal.js'
+            'modules/aura_assist_engine.js'
         ];
         console.log('[Aura] Starting to load', modulos.length, 'modules...');
         for (var i = 0; i < modulos.length; i++) {
@@ -116,16 +110,6 @@
         // ── Inicializar módulos ───────────────────────────────────────────────
         window.AuraUI.init();
         window.AuraState.setMode('assist'); // dispara AuraAssistEngine.init() via registry
-
-        // ── Ativar detector de hesitação (Smart Tips) ─────────────────────────
-        if (window.AuraHesitationDetector) {
-            window.AuraHesitationDetector.ativar(window._auraApiBase || 'http://localhost:8000');
-        }
-
-        // ── Inicializar modal de NPS pós-treinamento ──────────────────────────
-        if (window.AuraNpsModal) {
-            window.AuraNpsModal.inicializar(window._auraApiBase || 'http://localhost:8000');
-        }
 
         // ── Handler de clique no player (toggle balão) ────────────────────────
         var player = document.getElementById('aura-lottie-player');

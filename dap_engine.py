@@ -902,6 +902,224 @@ def _severity_rank(severity: str) -> int:
 
 
 # =========================================================
+# GPS ENRICHMENT HELPER
+# =========================================================
+
+def _enriquecer_com_gps(resultado: dict, prompt_usuario: str, tenant_id: str) -> dict:
+    """Busca roteiro GPS relevante e adiciona gps_passos ao resultado.
+
+    Idempotente: retorna ``resultado`` sem modificação se ``"gps_passos"`` já existe.
+    Não propaga exceção: falhas são logadas em DEBUG e ignoradas.
+    Retorna o dict ``resultado`` modificado in-place.
+
+    Usa o RoteiroIndexer (FTS5 em roteiro_name + target_element + breadcrumb)
+    para encontrar o roteiro de navegação correto. O ``navigation_path`` retornado
+    pelo indexer já contém os passos no Step_Model canônico com target_selector
+    resolvido via brain.db — não é necessário re-ler o roteiro JSON.
+    """
+    if "gps_passos" in resultado:
+        return resultado
+    try:
+        fallback_engine = get_navigation_fallback_engine()
+        if not fallback_engine:
+            return resultado
+
+        gps_results = fallback_engine.indexer.search(prompt_usuario, tenant_id, top_k=1)
+        if not gps_results:
+            return resultado
+
+        best = gps_results[0]
+        nav_steps = best.get("navigation_path", [])
+        roteiro_name = best.get("roteiro_name", "")
+
+        if not nav_steps:
+            return resultado
+
+        passos_validos = [p for p in nav_steps if p.get("target_selector")]
+        if len(passos_validos) >= 1:
+            resultado["gps_passos"] = passos_validos
+            resultado["gps_nome_aula"] = roteiro_name
+            logger.info(
+                f"🧭 GPS enrichment: {len(passos_validos)} passos do roteiro "
+                f"'{roteiro_name}' anexados à resposta"
+            )
+    except Exception as e:
+        logger.debug(f"GPS enrichment skipped: {e}")
+    return resultado
+
+
+def _construir_passos_canonicos(roteiro_data: dict, nav_steps: list, tenant_id: str) -> list:
+    """Constrói passos no Step_Model canônico a partir do roteiro JSON.
+
+    Para cada passo do roteiro que corresponde a um step do nav_path,
+    busca o seletor CSS no brain.db via intencao_semantica.
+    Retorna apenas passos com seletor encontrado.
+    """
+    import sqlite3 as _sqlite3
+    import hashlib as _hashlib
+
+    passos_json = roteiro_data.get("passos", [])
+    # Mapeia id_passo → passo para lookup rápido
+    mapa_passos = {str(p.get("id_passo", "")): p for p in passos_json}
+
+    # nav_steps vêm do NavigationPathExtractor — cada step tem "step_id"
+    # que corresponde ao id_passo do roteiro
+    canonicos = []
+    try:
+        conn = _sqlite3.connect("brain.db", timeout=3)
+        for nav_step in nav_steps:
+            step_id = str(nav_step.get("step_id", ""))
+            passo = mapa_passos.get(step_id)
+            if not passo:
+                continue
+
+            acoes = passo.get("acoes_tecnicas", [])
+            if not acoes:
+                continue
+
+            acao = acoes[0]
+            acao_tipo = acao.get("acao", "")
+            if acao_tipo not in ("clique", "hover"):
+                continue
+
+            intencao = acao.get("intencao_semantica", "")
+            el = acao.get("elemento_alvo", {})
+            label = el.get("label_curto", "") or el.get("descricao_visual", "")
+
+            if not label:
+                continue
+
+            # Busca seletor no brain.db por intencao_semantica
+            # Usa o mesmo hash que vision_engine._chave_cache: md5(lower)[:16]
+            seletor = ""
+            if intencao:
+                hash_intencao = _hashlib.md5(intencao.strip().lower().encode()).hexdigest()[:16]
+                row = conn.execute(
+                    "SELECT seletor FROM memoria_semantica WHERE hash_intencao = ? AND seletor IS NOT NULL",
+                    (hash_intencao,)
+                ).fetchone()
+                if row:
+                    seletor = row[0] or ""
+
+            # Fallback: busca por label exato no campo intencao
+            if not seletor and label:
+                row = conn.execute(
+                    "SELECT seletor FROM memoria_semantica WHERE intencao LIKE ? AND seletor IS NOT NULL ORDER BY hits DESC LIMIT 1",
+                    (f"%'{label}'%",)
+                ).fetchone()
+                if row:
+                    seletor = row[0] or ""
+
+            # Fallback 2: busca por label simples
+            if not seletor and label:
+                row = conn.execute(
+                    "SELECT seletor FROM memoria_semantica WHERE seletor LIKE ? AND seletor IS NOT NULL ORDER BY hits DESC LIMIT 1",
+                    (f'%"{label}"%',)
+                ).fetchone()
+                if not row:
+                    row = conn.execute(
+                        "SELECT seletor FROM memoria_semantica WHERE seletor LIKE ? AND seletor IS NOT NULL ORDER BY hits DESC LIMIT 1",
+                        (f"%text=\"{label}\"%",)
+                    ).fetchone()
+                if row:
+                    seletor = row[0] or ""
+
+            if not seletor:
+                logger.debug(f"[GPS] Passo {step_id} ('{label}'): seletor não encontrado no brain.db")
+                continue
+
+            tooltip = passo.get("pedagogia", {}).get("tooltip_dap", "")
+            intent = passo.get("pedagogia", {}).get("objetivo_aprendizagem", "") or intencao or label
+
+            canonicos.append({
+                "id": step_id,
+                "title": label,
+                "intent": intent,
+                "ancora": tooltip or label,
+                "tooltip": tooltip,
+                "acao": acao_tipo,
+                "target_selector": seletor,
+                "label": label,
+                "validation_type": "click",
+                "expected_state": {},
+                "timeout_sec": 30,
+                "hint": "",
+                "difficulty": "medium",
+                "xp_value": 10,
+                "xp_penalty_per_hint": 5,
+            })
+        conn.close()
+    except Exception as e:
+        logger.debug(f"[GPS] Erro ao construir passos canônicos: {e}")
+
+    return canonicos
+
+
+# =========================================================
+# FEEDBACK NEGATIVO — MARCA VETOR E INVALIDA CACHE
+# =========================================================
+
+def processar_feedback_negativo(prompt: str, url: str, ts: int) -> dict:
+    """Marca o vetor Pinecone correspondente ao prompt e invalida o cache SQLite.
+
+    Estratégia: marca com metadata feedback='negative' (não deleta imediatamente,
+    preserva auditoria). O score threshold do RAG pode ser ajustado para ignorar
+    vetores marcados em iteração futura.
+
+    Returns:
+        dict com chave "action":
+          - "skipped"        — engines não disponíveis
+          - "not_found"      — nenhum vetor com score >= SCORE_THRESHOLD
+          - "marked_negative" — vetor marcado com sucesso (inclui "vector_id")
+          - "error"          — exceção capturada (inclui "reason")
+    """
+    if not pinecone_index or not client_openai:
+        return {"action": "skipped", "reason": "engines_unavailable"}
+
+    try:
+        # 1. Gera embedding do prompt para busca
+        embedding = gerar_embedding(prompt)
+
+        # 2. Busca o vetor mais próximo no Pinecone (namespace senior_default)
+        resultados = pinecone_index.query(
+            vector=embedding,
+            top_k=1,
+            namespace="senior_default",
+            include_metadata=True,
+        )
+
+        if not resultados.matches or resultados.matches[0].score < SCORE_THRESHOLD:
+            return {"action": "not_found"}
+
+        melhor = resultados.matches[0]
+
+        # 3. Marca com metadata feedback='negative'
+        pinecone_index.update(
+            id=melhor.id,
+            namespace="senior_default",
+            set_metadata={"feedback": "negative", "feedback_ts": ts},
+        )
+
+        # 4. Invalida entradas no cache SQLite que contenham este prompt
+        with _cache_lock:
+            with sqlite3.connect(_DB_CACHE_FILE) as conn:
+                conn.execute(
+                    "DELETE FROM dap_cache WHERE cache_key LIKE ?",
+                    (f"%{prompt[:50]}%",),
+                )
+                conn.commit()
+
+        logger.info(
+            f"[feedback] Vetor '{melhor.id}' marcado como negative (score={melhor.score:.3f})"
+        )
+        return {"action": "marked_negative", "vector_id": melhor.id}
+
+    except Exception as e:
+        logger.error(f"[feedback] Erro ao processar feedback negativo: {e}")
+        return {"action": "error", "reason": str(e)}
+
+
+# =========================================================
 # CEREBRO DA AURA (VISÃO E MEMÓRIA)
 # =========================================================
 
@@ -1042,6 +1260,7 @@ def _analisar_sync(
         if "source_url" in busca_rag:
             resultado_rapido["source_url"] = busca_rag["source_url"]
 
+        _enriquecer_com_gps(resultado_rapido, prompt_usuario, tenant_id)
         _cache_set(cache_key, resultado_rapido)
         return resultado_rapido
 
@@ -1135,34 +1354,7 @@ INSTRUCOES DE CLIQUE E SUGESTOES (CRITICO):
         if busca_rag and "source_url" in busca_rag:
             resultado_final["source_url"] = busca_rag["source_url"]
 
-        # =========================================================
-        # GPS ENRICHMENT: If we have a matching roteiro for this query,
-        # attach GPS steps so the frontend can offer a "Me guie até lá" button.
-        # Works for navigation AND procedural queries (e.g., "como criar pasta").
-        # =========================================================
-        try:
-            fallback_engine = get_navigation_fallback_engine()
-            if fallback_engine:
-                gps_results = fallback_engine.indexer.search(prompt_usuario, tenant_id, top_k=1)
-                if gps_results:
-                    from pathlib import Path as _Path
-                    roteiro_name = gps_results[0]["roteiro_name"]
-                    roteiro_path = _Path("roteiros_salvos") / f"{roteiro_name}.json"
-                    if roteiro_path.exists():
-                        with open(roteiro_path, 'r', encoding='utf-8') as f:
-                            roteiro_data = json.load(f)
-                        nav_path = fallback_engine.path_extractor.extract_navigation_path(
-                            roteiro_data, target_query=prompt_usuario
-                        )
-                        if nav_path and nav_path.get("steps") and len(nav_path["steps"]) >= 2:
-                            resultado_final["gps_passos"] = nav_path["steps"]
-                            resultado_final["gps_nome_aula"] = roteiro_name
-                            logger.info(
-                                f"🧭 GPS enrichment: {len(nav_path['steps'])} passos do roteiro "
-                                f"'{roteiro_name}' anexados à resposta"
-                            )
-        except Exception as e:
-            logger.debug(f"GPS enrichment skipped: {e}")
+        _enriquecer_com_gps(resultado_final, prompt_usuario, tenant_id)
 
         _cache_set(cache_key, resultado_final)
         return resultado_final

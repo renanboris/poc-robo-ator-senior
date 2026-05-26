@@ -18,7 +18,7 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
   - Tratar exceção em `teardown()` com log e continuação da transição
   - _Requirements: 1.1, 1.5, 1.6_
 
-  - [ ]* 2.2 Escrever property test para exclusividade de modo (Property 1)
+  - [x]* 2.2 Escrever property test para exclusividade de modo (Property 1)
     - **Property 1: Exclusividade de modo**
     - **Validates: Requirements 1.1, 1.5, 1.6**
     - Usar `fc.constantFrom('assist','gps','train','prove')` para sequências de chamadas a `setMode`
@@ -55,7 +55,7 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
     - Consumir Step_Model diretamente sem achatamento
     - _Requirements: 3.2, 3.4, 4.1, 4.2, 4.3, 4.4_
 
-  - [ ]* 5.2 Escrever property test para Step_Model com campos ausentes (Property 3)
+  - [x]* 5.2 Escrever property test para Step_Model com campos ausentes (Property 3)
     - **Property 3: Step_Model com campos ausentes não falha silenciosamente**
     - **Validates: Requirements 3.4**
     - Usar `fc.record({ intent: fc.string() })` como passo mínimo
@@ -69,7 +69,7 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
     - Cada validador bem-sucedido emite `CustomEvent('gps:step_validated')` no `document`
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8_
 
-  - [ ]* 5.4 Escrever property test para validação orientada a tipo (Property 4)
+  - [x]* 5.4 Escrever property test para validação orientada a tipo (Property 4)
     - **Property 4: Validação orientada a tipo — round trip de ação**
     - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7**
     - Para cada `validation_type` suportado, simular a ação correspondente e verificar emissão de `gps:step_validated`
@@ -95,7 +95,7 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
     - Somente após confirmação: chamar `AuraState.setMode('gps')` e `AuraGpsEngine.init(roteiro)`
     - _Requirements: 2.2, 2.4_
 
-  - [ ]* 6.3 Escrever property test para GPS não iniciar automaticamente (Property 2)
+  - [x]* 6.3 Escrever property test para GPS não iniciar automaticamente (Property 2)
     - **Property 2: GPS não inicia automaticamente a partir de resposta IA**
     - **Validates: Requirements 2.2, 2.4**
     - Para qualquer payload com `gps_passos`, verificar que `AuraState.getMode()` permanece `assist` sem ação explícita do usuário
@@ -113,13 +113,13 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
     - Modo `prove`: hints desabilitados ou limitados a 1 por sessão
     - _Requirements: 6.3, 6.4_
 
-  - [ ]* 7.3 Escrever property test para instrumentação GPS sem acoplamento (Property 5)
+  - [x]* 7.3 Escrever property test para instrumentação GPS sem acoplamento (Property 5)
     - **Property 5: Instrumentação GPS pela Mission sem acoplamento**
     - **Validates: Requirements 6.1, 6.2, 4.5**
     - Em modo `train`/`prove`: verificar que eventos GPS são recebidos e XP é atualizado
     - Em modo `gps`: verificar que os mesmos eventos não acionam lógica de XP ou HUD
 
-  - [ ]* 7.4 Escrever property test para hints em modo prove (Property 6)
+  - [x]* 7.4 Escrever property test para hints em modo prove (Property 6)
     - **Property 6: Hints desabilitados ou limitados em modo prove**
     - **Validates: Requirements 6.3, 6.4**
     - Verificar que em modo `prove` o total de hints concedidos é ≤ 1 por sessão
@@ -157,7 +157,7 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
     - Content script envia evento via `postMessage` com `type: "AURA_ANALYTICS_EVENT"`
     - _Requirements: 9.7_
 
-  - [ ]* 9.6 Escrever property test para campos obrigatórios em analytics events (Property 7)
+  - [x]* 9.6 Escrever property test para campos obrigatórios em analytics events (Property 7)
     - **Property 7: Analytics events contêm campos obrigatórios**
     - **Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.5, 9.6**
     - Para cada `event_type`, verificar que o payload contém todos os campos obrigatórios definidos
@@ -178,7 +178,7 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
   - [x] 10.3 Implementar retorno `{ error: "unknown_action" }` para ações não reconhecidas
     - _Requirements: 8.7_
 
-  - [ ]* 10.4 Escrever property test para background com ação desconhecida (Property 9)
+  - [x]* 10.4 Escrever property test para background com ação desconhecida (Property 9)
     - **Property 9: Background retorna erro para ação desconhecida**
     - **Validates: Requirements 8.7**
     - Para qualquer string de ação não reconhecida, verificar que a resposta é `{ error: "unknown_action" }` sem exceção
@@ -189,7 +189,7 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
     - Ignorar silenciosamente mensagens sem campo `type` esperado
     - _Requirements: 10.3, 10.4, 10.5_
 
-  - [ ]* 11.2 Escrever property test para validação de origem de mensagens (Property 8)
+  - [x]* 11.2 Escrever property test para validação de origem de mensagens (Property 8)
     - **Property 8: Validação de origem de mensagens**
     - **Validates: Requirements 10.3, 10.4, 10.5**
     - Para qualquer mensagem com `origin` diferente de `window.location.origin`, verificar que é ignorada
@@ -225,7 +225,7 @@ Reorganização modular do `content.js` monolítico em oito módulos com respons
     - Troca de URL SPA → `AuraAssistEngine.resetarProatividade()` chamado
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
 
-  - [ ]* 15.2 Escrever teste de exemplo para spotlight dentro de iframe
+  - [x]* 15.2 Escrever teste de exemplo para spotlight dentro de iframe
     - Verificar que `AuraSpotlight.encontrarElemento` busca em `document` e em iframes
     - _Requirements: 11.7_
 

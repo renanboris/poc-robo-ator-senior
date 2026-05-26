@@ -670,14 +670,14 @@ class NavigationPathExtractor:
                         parts = tooltip.split(" > ")
                         if parts[-1] not in breadcrumb_parts:
                             breadcrumb_parts.append(parts[-1])
-                    elif step.get("element", {}).get("label"):
-                        label = step["element"]["label"]
+                    elif step.get("label"):
+                        label = step["label"]
                         if label not in breadcrumb_parts:
                             breadcrumb_parts.append(label)
 
                     # Check if this step matches the target query
                     if normalized_target and normalized_target.strip():
-                        step_label = step.get("element", {}).get("label", "")
+                        step_label = step.get("label", "")
                         normalized_label = unidecode(step_label.lower()).strip()
 
                         # Split target into words for flexible matching
@@ -706,7 +706,7 @@ class NavigationPathExtractor:
             breadcrumb = self._build_breadcrumb(steps)
 
             # Target element is the last step's label
-            target_element = steps[-1].get("element", {}).get("label", "")
+            target_element = steps[-1].get("label", "")
 
             return {
                 "breadcrumb": breadcrumb,
@@ -721,25 +721,27 @@ class NavigationPathExtractor:
     def _parse_step(self, passo: Dict) -> Optional[Dict]:
         """
         Parse a single passo to extract navigation information.
-        
-        Returns:
+
+        Returns a Step_Model canônico conforme contracts/step_model.json:
             dict | None: {
-                "step_id": int,
-                "action": str,  # "clique", "hover", etc.
-                "element": {
-                    "label": str,
-                    "selector_hint": str,
-                    "description": str,
-                    "coordinates": dict
-                },
+                "id": str,
+                "title": str,
+                "intent": str,
+                "ancora": str,
                 "tooltip": str,
-                "wait_for_dom": bool,
-                "timeout_ms": int
+                "acao": str,
+                "target_selector": str,
+                "label": str,
+                "validation_type": str,
+                "expected_state": dict,
+                "timeout_sec": int,
+                "hint": str,
+                "difficulty": str,
+                "xp_value": int,
+                "xp_penalty_per_hint": int
             }
         """
         try:
-            # Only extract navigation-relevant steps (tipo_passo == "navigation" or has clique action)
-            tipo_passo = passo.get("tipo_passo", "")
             acoes = passo.get("acoes_tecnicas", [])
 
             if not acoes:
@@ -760,31 +762,48 @@ class NavigationPathExtractor:
             if not label:
                 return None
 
-            # Extract selector hint
-            selector_hint = (
+            # Extract selector — prefer seletor_css, fall back to html_hint
+            target_selector = (
                 acao.get("seletor_css", "") or
                 elemento_alvo.get("seletor_hint", "") or
                 elemento_alvo.get("html_hint", "")
             )
 
-            # Extract coordinates
-            coords = elemento_alvo.get("coordenadas_relativas", {})
+            if not target_selector:
+                # Seletor ausente no roteiro — será buscado no brain.db
+                # pelo _construir_passos_canonicos em dap_engine.py
+                logger.debug(
+                    f"[GPS] Passo {passo.get('id_passo', '?')} ('{label}') sem seletor_css no roteiro"
+                )
 
             # Extract tooltip from pedagogia
             tooltip = passo.get("pedagogia", {}).get("tooltip_dap", "")
 
+            # Map roteiro action type to Step_Model validation_type
+            # "hover" has no direct validation type — treat as click
+            validation_type = "click"
+
+            # Build canonical Step_Model
+            step_id = str(passo.get("id_passo", ""))
+            intent = passo.get("pedagogia", {}).get("objetivo_aprendizagem", "") or label
+            ancora = tooltip or label
+
             return {
-                "step_id": passo.get("id_passo"),
-                "action": acao_tipo,
-                "element": {
-                    "label": label,
-                    "selector_hint": selector_hint,
-                    "description": elemento_alvo.get("contexto_tela", ""),
-                    "coordinates": coords
-                },
+                "id": step_id,
+                "title": label,
+                "intent": intent,
+                "ancora": ancora,
                 "tooltip": tooltip,
-                "wait_for_dom": True,  # Always wait for DOM changes after navigation
-                "timeout_ms": NAVIGATION_STEP_TIMEOUT_MS
+                "acao": acao_tipo,
+                "target_selector": target_selector,
+                "label": label,
+                "validation_type": validation_type,
+                "expected_state": {},
+                "timeout_sec": 30,
+                "hint": "",
+                "difficulty": "medium",
+                "xp_value": 10,
+                "xp_penalty_per_hint": 5,
             }
 
         except Exception as e:
@@ -811,8 +830,8 @@ class NavigationPathExtractor:
                 # Use the full tooltip as it contains the hierarchical path
                 return tooltip
 
-            # Fallback to element label
-            label = step.get("element", {}).get("label", "")
+            # Fallback to label (Step_Model canônico)
+            label = step.get("label", "")
             if label and label not in breadcrumb_parts:
                 breadcrumb_parts.append(label)
 

@@ -40,15 +40,25 @@
         const _registrar = (tipo, btn) => {
             like.disabled = dislike.disabled = true;
             btn.classList.add(tipo === 'like' ? 'voted-yes' : 'voted-no');
+            const payload = {
+                tipo,
+                prompt: (prompt || '').substring(0, 100),
+                url: window.location.href,
+                ts: Date.now()
+            };
             try {
                 const key = `aura_fb_${Date.now()}`;
-                localStorage.setItem(key, JSON.stringify({
-                    tipo,
-                    prompt: (prompt || '').substring(0, 100),
-                    url: window.location.href,
-                    ts: Date.now()
-                }));
+                localStorage.setItem(key, JSON.stringify(payload));
             } catch (e) {}
+            // NOVO: propaga dislike ao backend via bridge
+            if (tipo === 'dislike') {
+                try {
+                    window.postMessage(
+                        { type: 'AURA_FEEDBACK_EVENT', payload },
+                        window.location.origin
+                    );
+                } catch (e) {}
+            }
             setTimeout(() => { bar.style.opacity = '0'; }, 350);
             setTimeout(() => { bar.remove(); }, 850);
         };

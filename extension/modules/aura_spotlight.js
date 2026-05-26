@@ -88,6 +88,10 @@
 
             setTimeout(() => {
                 const rect = el.getBoundingClientRect();
+
+                // Elemento fora da viewport ou sem dimensões — não aplica highlight
+                if (rect.width === 0 && rect.height === 0) return;
+
                 let fTop = 0, fLeft = 0;
                 if (frame) {
                     const fRect = frame.getBoundingClientRect();

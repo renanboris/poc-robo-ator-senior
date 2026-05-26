@@ -632,6 +632,14 @@ class ExtensaoEventoReq(BaseModel):
     payload:    Optional[Dict[str, Any]] = None
 
 
+class FeedbackEventReq(BaseModel):
+    """Schema de eventos de feedback enviados pela extensão Aura (like/dislike)."""
+    tipo:   str   # "like" | "dislike"
+    prompt: str
+    url:    str
+    ts:     int   # timestamp ms
+
+
 # ==============================================================
 # ROTAS DA API
 # ==============================================================
@@ -720,6 +728,32 @@ async def ingerir_evento_extensao(payload: ExtensaoEventoReq, request: Request):
         # Não lança exceção — telemetria não deve quebrar o fluxo do usuário
 
     return {"ok": True}
+
+
+@app.post("/api/feedback")
+async def registrar_feedback(payload: FeedbackEventReq, request: Request):
+    """Recebe feedback de qualidade da extensão Aura.
+
+    Não requer autenticação — dados de uso, não sensíveis (padrão do projeto).
+
+    Para likes: retorna noop imediatamente (sem chamada ao backend).
+    Para dislikes: delega ao dap_engine para marcar/remover o vetor no Pinecone
+    e invalidar o cache SQLite correspondente.
+    """
+    if payload.tipo != "dislike":
+        return {"ok": True, "action": "noop"}
+
+    try:
+        resultado = await asyncio.to_thread(
+            dap_engine.processar_feedback_negativo,
+            payload.prompt,
+            payload.url,
+            payload.ts,
+        )
+        return {"ok": True, "action": resultado.get("action", "unknown")}
+    except Exception as e:
+        logging.error(f"[feedback] Erro ao processar dislike: {e}")
+        return {"ok": False, "reason": str(e)}
 
 
 @app.get("/api/analytics/{roteiro_id}")

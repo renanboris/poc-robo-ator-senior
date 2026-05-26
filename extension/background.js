@@ -20,7 +20,8 @@ const AURA_ENDPOINTS = Object.freeze({
   analyze:   _cfgEndpoints.analyze   || 'http://localhost:8000/analyze',
   missions:  _cfgEndpoints.missions  || 'http://localhost:8000/api/missoes',
   gps:       _cfgEndpoints.gps       || 'http://localhost:8000/api/gps-roteiro',
-  analytics: _cfgEndpoints.analytics || 'http://localhost:8000/api/analytics/extensao'
+  analytics: _cfgEndpoints.analytics || 'http://localhost:8000/api/analytics/extensao',
+  feedback:  _cfgEndpoints.feedback  || 'http://localhost:8000/api/feedback'
 });
 
 // Aviso para endpoints com protocolo não seguro fora de localhost
@@ -119,6 +120,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         _analyticsQueue.push({ payload: request.payload, attempts: 0 });
         _flushAnalyticsQueue();
         sendResponse({ ok: true });
+        return true;
+    }
+
+    if (request.action === 'feedback_event') {
+        fetch(AURA_ENDPOINTS.feedback, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + AURA_AUTH_TOKEN
+            },
+            body: JSON.stringify(request.payload || {})
+        })
+        .then(r => r.json())
+        .then(data => sendResponse({ ok: true, data }))
+        .catch(err => sendResponse({ ok: false, reason: err.message }));
         return true;
     }
 
