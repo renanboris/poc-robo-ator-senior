@@ -16,7 +16,7 @@
         this.clickListener = null;
         
         this.config = {
-            domStabilizationDelay: 1000,
+            domStabilizationDelay: 1500,
             stepTimeout: 5000,
             autoAdvance: true
         };
@@ -61,11 +61,12 @@
         return Promise.resolve(true);
     };
     
-    // Highlight current step
+    // Highlight current step (with retry for SPA navigation)
     window.GuidedNavigationController.prototype.highlightCurrentStep = function() {
         if (!this.navigationPath || this.currentStep >= this.navigationPath.length) {
             console.log('[GuidedNav] Navigation complete');
             this.stopNavigation();
+            this.showCompletionMessage();
             return false;
         }
         
@@ -92,10 +93,54 @@
         var success = highlighter.highlightStep(selector, stepInfo);
         
         if (!success) {
-            console.warn('[GuidedNav] Failed to highlight step ' + (this.currentStep + 1));
+            // Element not found — SPA may still be loading. Start polling.
+            console.log('[GuidedNav] Element not found yet, starting retry polling for:', selector);
+            this._retryHighlight(selector, stepInfo, 0);
         }
         
         return success;
+    };
+    
+    // Retry highlighting with polling (for SPA navigation delays)
+    window.GuidedNavigationController.prototype._retryHighlight = function(selector, stepInfo, attempt) {
+        var self = this;
+        var maxAttempts = 10;
+        var retryInterval = 500; // 500ms between retries (total: 5s max wait)
+        
+        if (!self.isNavigating) {
+            console.log('[GuidedNav] Navigation stopped during retry');
+            return;
+        }
+        
+        if (attempt >= maxAttempts) {
+            console.warn('[GuidedNav] Element not found after ' + maxAttempts + ' retries:', selector);
+            // Show a helpful message instead of silently dying
+            if (window.AuraUI && typeof window.AuraUI.exibirBalao === 'function') {
+                window.AuraUI.exibirBalao(
+                    'Não encontrei o elemento "' + stepInfo.label + '" na tela. A página pode ter mudado. Tente novamente.',
+                    [],
+                    false
+                );
+            }
+            self.stopNavigation();
+            return;
+        }
+        
+        setTimeout(function() {
+            if (!self.isNavigating) return;
+            
+            var highlighter = self._getHighlighter();
+            if (!highlighter) return;
+            
+            var success = highlighter.highlightStep(selector, stepInfo);
+            if (success) {
+                console.log('[GuidedNav] Element found on retry ' + (attempt + 1) + ':', selector);
+                // Re-setup click listener since element changed
+                self.setupClickListener();
+            } else {
+                self._retryHighlight(selector, stepInfo, attempt + 1);
+            }
+        }, retryInterval);
     };
     
     // Setup click listener
