@@ -375,7 +375,10 @@
             prompt:      prompt,
             dom_context: extratoDOM,
             user_name:   nomeReal,
-            tenant_id:   'senior_default'
+            tenant_id:   'senior_default',
+            historico:   (global.AuraUI && typeof global.AuraUI.getHistorico === 'function')
+                ? global.AuraUI.getHistorico()
+                : []
         }, window.location.origin);
     }
 

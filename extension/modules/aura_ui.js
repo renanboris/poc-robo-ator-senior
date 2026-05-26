@@ -472,7 +472,13 @@
         resetDragFlag,
         adicionarMensagemUsuario,
         exibirTypingIndicator,
-        removerTypingIndicator
+        removerTypingIndicator,
+        getHistorico: function() {
+            // Retorna as últimas 5 mensagens para contexto conversacional
+            return _historico.slice(-5).map(function(m) {
+                return { autor: m.role, texto: m.texto };
+            });
+        }
     };
 
     console.log('AuraUI: módulo carregado.');
