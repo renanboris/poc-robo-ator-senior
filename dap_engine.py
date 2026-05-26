@@ -424,10 +424,12 @@ def _is_navigation_request(prompt_usuario: str) -> bool:
 
     # Navigation request patterns
     navigation_patterns = [
-        "como acessar", "como chegar", "como ir", "onde fica", "onde está", "onde esta",
+        "como acessar", "como acesso", "como eu acesso", "como chegar", "como ir",
+        "onde fica", "onde está", "onde esta", "onde acho", "onde encontro",
         "me leve", "me guie", "me mostre", "quero ir", "preciso ir", "ir para",
         "acessar", "navegar", "encontrar", "localizar", "chegar em", "chegar no",
-        "como faço para", "como fazer para", "caminho para"
+        "como faço para", "como fazer para", "caminho para",
+        "como abro", "como eu abro", "como abrir",
     ]
 
     # Conceptual question patterns (should NOT trigger navigation)

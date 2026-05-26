@@ -1090,23 +1090,6 @@ class NavigationFallbackEngine:
             roteiro_name = best_match["roteiro_name"]
             confidence = best_match["confidence_score"]
 
-            # Minimum confidence threshold — reject low-confidence matches
-            # that are likely false positives from vague queries
-            MIN_NAVIGATION_CONFIDENCE = 0.10
-            if confidence < MIN_NAVIGATION_CONFIDENCE:
-                logger.warning(
-                    f"Navigation match rejected: score={confidence:.4f} < threshold={MIN_NAVIGATION_CONFIDENCE} | "
-                    f"roteiro={roteiro_name} | query='{user_query}'"
-                )
-                return {
-                    "mensagem": "Não encontrei um caminho específico para isso nos manuais. Posso tentar ajudar de outra forma?",
-                    "navigation_path": None,
-                    "requires_confirmation": False,
-                    "fallback_type": "general",
-                    "confidence_score": 0.0,
-                    "roteiro_name": None
-                }
-
             # Re-extract navigation path from roteiro with target query to limit steps
             roteiro_path = Path("roteiros_salvos") / f"{roteiro_name}.json"
             if roteiro_path.exists():
