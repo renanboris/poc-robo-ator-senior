@@ -121,10 +121,12 @@ describe('Aura DAP Restructure — Regressão', () => {
     // ── Teste 2: Resposta com seletor_css → spotlight aplicado ───────────────
     // Validates: Requirement 11.3
 
-    test('AURA_RESPONSE com seletor_css aplica spotlight no elemento', () => {
+    test('AURA_RESPONSE com seletor_css aplica spotlight no elemento', async () => {
         // Arrange: registra o handler de mensagem (replica _handleMessage do assist engine)
+        // Nota: no JSDOM, event.origin de postMessage é sempre "" — aceitar ambos
         function handleMessage(event) {
-            if (event.origin !== window.location.origin) return;
+            const expectedOrigin = window.location.origin;
+            if (event.origin !== expectedOrigin && event.origin !== '') return;
             if (!event.data || !event.data.type) return;
 
             if (event.data.type === 'AURA_RESPONSE') {
@@ -148,6 +150,7 @@ describe('Aura DAP Restructure — Regressão', () => {
         window.addEventListener('message', handleMessage);
 
         // Act: simula postMessage com seletor_css
+        jest.useRealTimers();
         window.postMessage(
             {
                 type: 'AURA_RESPONSE',
@@ -156,14 +159,14 @@ describe('Aura DAP Restructure — Regressão', () => {
             window.location.origin
         );
 
-        // Processa eventos pendentes
-        return new Promise(resolve => setTimeout(resolve, 0)).then(() => {
-            // Assert
-            expect(global.AuraSpotlight.aplicar).toHaveBeenCalledTimes(1);
-            expect(global.AuraSpotlight.aplicar).toHaveBeenCalledWith('.btn-salvar', true);
+        // Aguarda o event loop processar o postMessage
+        await new Promise(resolve => setTimeout(resolve, 0));
 
-            window.removeEventListener('message', handleMessage);
-        });
+        // Assert
+        expect(global.AuraSpotlight.aplicar).toHaveBeenCalledTimes(1);
+        expect(global.AuraSpotlight.aplicar).toHaveBeenCalledWith('.btn-salvar', true);
+
+        window.removeEventListener('message', handleMessage);
     });
 
     // ── Teste 3: URL com aura_mission → missão carregada ─────────────────────
@@ -315,10 +318,12 @@ describe('Aura DAP Restructure — Regressão', () => {
     // ── Teste 6: GPS não inicia automaticamente ao receber gps_passos ─────────
     // Validates: Requirement 11.2 / Requirement 2.2
 
-    test('AURA_RESPONSE com gps_passos NÃO muda aura_mode e exibe botão "Iniciar GPS"', () => {
+    test('AURA_RESPONSE com gps_passos NÃO muda aura_mode e exibe botão "Iniciar GPS"', async () => {
         // Arrange: registra handler que replica o comportamento do assist engine
+        // Nota: no JSDOM, event.origin de postMessage é sempre "" — aceitar ambos
         function handleMessage(event) {
-            if (event.origin !== window.location.origin) return;
+            const expectedOrigin = window.location.origin;
+            if (event.origin !== expectedOrigin && event.origin !== '') return;
             if (!event.data || !event.data.type) return;
 
             if (event.data.type === 'AURA_RESPONSE') {
@@ -351,6 +356,7 @@ describe('Aura DAP Restructure — Regressão', () => {
         window.addEventListener('message', handleMessage);
 
         // Act: simula resposta com gps_passos
+        jest.useRealTimers();
         window.postMessage(
             {
                 type: 'AURA_RESPONSE',
@@ -362,21 +368,22 @@ describe('Aura DAP Restructure — Regressão', () => {
             window.location.origin
         );
 
-        return new Promise(resolve => setTimeout(resolve, 0)).then(() => {
-            // Assert: setMode NÃO foi chamado com 'gps' automaticamente
-            expect(global.AuraState.setMode).not.toHaveBeenCalledWith('gps');
+        // Aguarda o event loop processar o postMessage
+        await new Promise(resolve => setTimeout(resolve, 0));
 
-            // Assert: exibirBalao foi chamado com botão "Iniciar GPS"
-            expect(global.AuraUI.exibirBalao).toHaveBeenCalledTimes(1);
-            const [, opcoes] = global.AuraUI.exibirBalao.mock.calls[0];
-            expect(opcoes).toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({ label: 'Iniciar GPS' })
-                ])
-            );
+        // Assert: setMode NÃO foi chamado com 'gps' automaticamente
+        expect(global.AuraState.setMode).not.toHaveBeenCalledWith('gps');
 
-            window.removeEventListener('message', handleMessage);
-        });
+        // Assert: exibirBalao foi chamado com botão "Iniciar GPS"
+        expect(global.AuraUI.exibirBalao).toHaveBeenCalledTimes(1);
+        const [, opcoes] = global.AuraUI.exibirBalao.mock.calls[0];
+        expect(opcoes).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ label: 'Iniciar GPS' })
+            ])
+        );
+
+        window.removeEventListener('message', handleMessage);
     });
 
 });

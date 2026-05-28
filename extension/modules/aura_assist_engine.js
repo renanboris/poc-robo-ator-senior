@@ -7,6 +7,7 @@
  *  - Disparo de análise IA (postMessage AURA_CAPTURE)
  *  - Handler de AURA_RESPONSE com CTA explícito para GPS quando gps_passos presente
  *  - Reativação de inputs após resposta
+ *  - Detecção de hesitação em campos de input e exibição de dica contextual (Req. 11.8, 12.4, 13.3)
  *
  * Dependências (carregadas antes via <script> sequencial):
  *  - window.AuraUI       — exibirBalao, exibirBaloesSequenciais, ativarBadge, setLastPrompt
@@ -28,6 +29,17 @@
     let _throttleTimer = null;
     let _idleInterval = null;
     let _messageListener = null;
+
+    // ── Estado privado — Detecção de Hesitação ────────────────────────────────
+    const HESITATION_THRESHOLD_MS = 5000;
+    const CAMPOS_MONITORADOS = ['INPUT', 'TEXTAREA', 'SELECT'];
+    const _HESITATION_TOOLTIP_ID = 'aura-hint-tooltip';
+    let _hesitationTimer = null;
+    let _campoHesitacao = null;
+    let _hesitationFocusinHandler = null;
+    let _hesitationFocusoutHandler = null;
+    let _hesitationAtivo = false;
+    let _hesitationApiBase = 'http://localhost:8000';
 
     // ── Funções privadas ──────────────────────────────────────────────────────
 
@@ -138,6 +150,321 @@
         }
     }
 
+    // ── Funções privadas — Detecção de Hesitação ─────────────────────────────
+
+    /**
+     * Retorna o threshold de hesitação em ms.
+     * Usa window.AURA_HESITATION_MS se definido e positivo, senão HESITATION_THRESHOLD_MS.
+     */
+    function _getHesitationThreshold() {
+        const custom = global.AURA_HESITATION_MS;
+        if (typeof custom === 'number' && custom > 0) return custom;
+        return HESITATION_THRESHOLD_MS;
+    }
+
+    /**
+     * Obtém o seletor CSS do campo para uso na consulta de hint.
+     * Prioridade: #id > [name="..."] > tagName
+     *
+     * @param {Element} campo
+     * @returns {string}
+     */
+    function _obterSeletorCampo(campo) {
+        if (campo.id) return '#' + campo.id;
+        if (campo.name) return '[name="' + campo.name + '"]';
+        return campo.tagName.toLowerCase();
+    }
+
+    /**
+     * Verifica se o campo é do tipo password.
+     * Campos de senha nunca recebem hint (Req. 11.8).
+     *
+     * @param {Element} campo
+     * @returns {boolean}
+     */
+    function _isCampoSenha(campo) {
+        return !!(campo.type && campo.type.toLowerCase() === 'password');
+    }
+
+    /**
+     * Remove o tooltip de hint do DOM, se existir.
+     */
+    function _removerTooltipHesitacao() {
+        const existente = document.getElementById(_HESITATION_TOOLTIP_ID);
+        if (existente && existente.parentNode) {
+            existente.parentNode.removeChild(existente);
+        }
+    }
+
+    /**
+     * Posiciona o tooltip próximo ao campo de input.
+     * Prefere abaixo; se não couber, posiciona acima.
+     *
+     * @param {HTMLElement} tooltip
+     * @param {Element}     campo
+     */
+    function _posicionarTooltipHesitacao(tooltip, campo) {
+        if (!campo) {
+            tooltip.style.bottom = '24px';
+            tooltip.style.right  = '24px';
+            return;
+        }
+
+        const rect = campo.getBoundingClientRect();
+        const tw   = tooltip.offsetWidth  || 260;
+        const th   = tooltip.offsetHeight || 110;
+        const vw   = global.innerWidth;
+        const vh   = global.innerHeight;
+        const GAP  = 8;
+
+        let top  = rect.bottom + GAP;
+        let left = rect.left;
+
+        // Não sair pela direita
+        if (left + tw > vw - GAP) left = vw - tw - GAP;
+        if (left < GAP) left = GAP;
+
+        // Se não couber abaixo, posicionar acima
+        if (top + th > vh - GAP) top = rect.top - th - GAP;
+        if (top < GAP) top = GAP;
+
+        tooltip.style.top  = top  + 'px';
+        tooltip.style.left = left + 'px';
+    }
+
+    /**
+     * Cria e exibe o tooltip de hint próximo ao campo.
+     * Usa textContent para todos os textos (sem innerHTML com dados da API).
+     *
+     * @param {Element} campo — campo de input que gerou a hesitação
+     * @param {Object}  hint  — objeto retornado pela API { micro_narracao, roteiro_id, passo_id }
+     */
+    function _exibirTooltipHesitacao(campo, hint) {
+        _removerTooltipHesitacao();
+
+        const tooltip = document.createElement('div');
+        tooltip.id = _HESITATION_TOOLTIP_ID;
+
+        tooltip.style.cssText = [
+            'position: fixed',
+            'background: #1e293b',
+            'color: #ffffff',
+            'border-radius: 10px',
+            'padding: 14px 16px',
+            'max-width: 300px',
+            'min-width: 200px',
+            'z-index: 2147483644',
+            'box-shadow: 0 8px 32px rgba(0,0,0,0.45)',
+            'font-family: system-ui, -apple-system, sans-serif',
+            'font-size: 13px',
+            'line-height: 1.5',
+            'pointer-events: auto',
+            'user-select: none'
+        ].join(';');
+
+        // Cabeçalho com label e botão fechar
+        const cabecalho = document.createElement('div');
+        cabecalho.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px';
+
+        const label = document.createElement('span');
+        label.style.cssText = 'font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.05em;text-transform:uppercase';
+        label.textContent = 'Dica Aura';
+        cabecalho.appendChild(label);
+
+        const btnFechar = document.createElement('button');
+        btnFechar.style.cssText = [
+            'background: transparent',
+            'border: none',
+            'color: #94a3b8',
+            'cursor: pointer',
+            'font-size: 14px',
+            'line-height: 1',
+            'padding: 0 0 0 8px'
+        ].join(';');
+        btnFechar.textContent = '✕';
+        btnFechar.setAttribute('aria-label', 'Fechar dica');
+        btnFechar.addEventListener('click', function (e) {
+            e.stopPropagation();
+            _removerTooltipHesitacao();
+        });
+        cabecalho.appendChild(btnFechar);
+        tooltip.appendChild(cabecalho);
+
+        // Texto da micro_narracao
+        const texto = document.createElement('div');
+        texto.style.cssText = 'margin-bottom:12px;color:#e2e8f0';
+        texto.textContent = hint.micro_narracao || '';
+        tooltip.appendChild(texto);
+
+        // Botão "Ver passo completo"
+        const btnVerPasso = document.createElement('button');
+        btnVerPasso.style.cssText = [
+            'background: #3b82f6',
+            'border: none',
+            'color: #ffffff',
+            'border-radius: 6px',
+            'padding: 6px 12px',
+            'cursor: pointer',
+            'font-size: 12px',
+            'font-weight: 600',
+            'width: 100%'
+        ].join(';');
+        btnVerPasso.textContent = 'Ver passo completo';
+        btnVerPasso.addEventListener('click', function (e) {
+            e.stopPropagation();
+            _removerTooltipHesitacao();
+            // Usa AuraGpsEngine se disponível; caso contrário apenas fecha o tooltip
+            if (global.AuraGpsEngine && typeof global.AuraGpsEngine.init === 'function' && hint.roteiro_id) {
+                global.AuraGpsEngine.init({ id: hint.roteiro_id });
+            }
+        });
+        tooltip.appendChild(btnVerPasso);
+
+        document.documentElement.appendChild(tooltip);
+        _posicionarTooltipHesitacao(tooltip, campo);
+    }
+
+    /**
+     * Consulta a API de hint para o campo atual.
+     * Silencioso em caso de erro (fetch não quebra a extensão).
+     *
+     * @param {Element} campo
+     */
+    function _consultarHintHesitacao(campo) {
+        const seletor = _obterSeletorCampo(campo);
+        const apiBase = global.AURA_CONFIG && global.AURA_CONFIG.apiBase
+            ? global.AURA_CONFIG.apiBase
+            : _hesitationApiBase;
+        const url = apiBase + '/api/dap/hint' +
+                    '?url='     + encodeURIComponent(global.location.href) +
+                    '&seletor=' + encodeURIComponent(seletor);
+
+        fetch(url)
+            .then(function (res) {
+                if (!res.ok) return null;
+                return res.json();
+            })
+            .then(function (hint) {
+                if (!hint) return;
+                if (_campoHesitacao !== campo) return; // usuário já mudou de campo
+                _exibirTooltipHesitacao(campo, hint);
+            })
+            .catch(function () {
+                // Silencioso — não quebrar a extensão
+            });
+    }
+
+    /**
+     * Cancela o timer de hesitação em andamento.
+     */
+    function _cancelarTimerHesitacao() {
+        if (_hesitationTimer !== null) {
+            clearTimeout(_hesitationTimer);
+            _hesitationTimer = null;
+        }
+    }
+
+    /**
+     * Inicia o monitoramento de hesitação para o campo recém-focado.
+     *
+     * @param {Element} campo
+     */
+    function _iniciarMonitoramentoHesitacao(campo) {
+        _cancelarTimerHesitacao();
+        _removerTooltipHesitacao();
+        _campoHesitacao = campo;
+
+        // Listener de keydown com { once: true } — cancela timer ao digitar
+        campo.addEventListener('keydown', function _onKeydown() {
+            _cancelarTimerHesitacao();
+            _removerTooltipHesitacao();
+        }, { once: true });
+
+        _hesitationTimer = setTimeout(function () {
+            _hesitationTimer = null;
+            if (_campoHesitacao !== campo) return;
+            if (_isCampoSenha(campo)) return; // nunca exibir hint em campos de senha
+            _consultarHintHesitacao(campo);
+        }, _getHesitationThreshold());
+    }
+
+    /**
+     * Handler de focusin: detecta foco em campos monitorados.
+     *
+     * @param {FocusEvent} event
+     */
+    function _handleHesitationFocusin(event) {
+        const alvo = event.target;
+        if (!alvo || CAMPOS_MONITORADOS.indexOf(alvo.tagName) === -1) return;
+        _iniciarMonitoramentoHesitacao(alvo);
+    }
+
+    /**
+     * Handler de focusout: cancela timer e remove tooltip ao sair do campo.
+     *
+     * @param {FocusEvent} event
+     */
+    function _handleHesitationFocusout(event) {
+        const alvo = event.target;
+        if (!alvo || CAMPOS_MONITORADOS.indexOf(alvo.tagName) === -1) return;
+        if (_campoHesitacao === alvo) {
+            _cancelarTimerHesitacao();
+            _removerTooltipHesitacao();
+            _campoHesitacao = null;
+        }
+    }
+
+    // ── Funções públicas — Detecção de Hesitação ──────────────────────────────
+
+    /**
+     * Ativa o detector de hesitação em campos de input.
+     * Idempotente: chamar duas vezes não duplica listeners.
+     *
+     * @param {string} [apiBase] — base URL da API; usa window.AURA_CONFIG.apiBase ou fallback
+     */
+    function ativarDetectorHesitacao(apiBase) {
+        if (_hesitationAtivo) return; // idempotência
+
+        _hesitationApiBase = apiBase
+            || (global.AURA_CONFIG && global.AURA_CONFIG.apiBase)
+            || 'http://localhost:8000';
+        _hesitationAtivo = true;
+
+        _hesitationFocusinHandler  = _handleHesitationFocusin;
+        _hesitationFocusoutHandler = _handleHesitationFocusout;
+
+        document.addEventListener('focusin',  _hesitationFocusinHandler,  true);
+        document.addEventListener('focusout', _hesitationFocusoutHandler, true);
+
+        console.log('[AuraAssistEngine] Detector de hesitação ativado. Threshold:', _getHesitationThreshold(), 'ms');
+    }
+
+    /**
+     * Desativa o detector de hesitação: remove listeners, cancela timer e remove tooltip.
+     */
+    function desativarDetectorHesitacao() {
+        if (!_hesitationAtivo) return;
+
+        _cancelarTimerHesitacao();
+        _removerTooltipHesitacao();
+
+        if (_hesitationFocusinHandler) {
+            document.removeEventListener('focusin',  _hesitationFocusinHandler,  true);
+            _hesitationFocusinHandler = null;
+        }
+        if (_hesitationFocusoutHandler) {
+            document.removeEventListener('focusout', _hesitationFocusoutHandler, true);
+            _hesitationFocusoutHandler = null;
+        }
+
+        _hesitationAtivo   = false;
+        _campoHesitacao    = null;
+
+        console.log('[AuraAssistEngine] Detector de hesitação desativado.');
+    }
+
+    // ── Handler de mensagens ──────────────────────────────────────────────────
+
     /**
      * Handler de mensagens window para AURA_RESPONSE.
      * Implementa CTA explícito para GPS quando gps_passos está presente —
@@ -175,10 +502,6 @@
 
             const temGPS = payload.gps_passos && Array.isArray(payload.gps_passos) && payload.gps_passos.length > 0;
             const temSpotlight = !!(payload.seletor_css || payload.elemento_id);
-            const temNavigationGuided = payload.navigation_mode === 'guided' && 
-                                       payload.navigation_path && 
-                                       Array.isArray(payload.navigation_path) && 
-                                       payload.navigation_path.length > 0;
             const tenantIdResp = (global.AuraState && global.AuraState.session && global.AuraState.session.tenant_id)
                 ? global.AuraState.session.tenant_id
                 : 'senior_default';
@@ -192,54 +515,13 @@
                     payload: {
                         has_gps:      temGPS,
                         has_spotlight: temSpotlight,
-                        has_navigation: temNavigationGuided,
                         tenant_id:    tenantIdResp,
                         timestamp:    new Date().toISOString()
                     }
                 }
             }, window.location.origin);
 
-            if (temNavigationGuided) {
-                // ── Navegação guiada passo-a-passo ────────────────────────────
-                console.log('[AuraAssistEngine] Iniciando navegação guiada:', payload.breadcrumb);
-                console.log('[AuraAssistEngine] window.GuidedNavigationController disponível?', typeof window.GuidedNavigationController);
-                
-                // Monta ações locais para confirmação (NÃO envia nova query ao backend)
-                const navPath = payload.navigation_path;
-                const navBreadcrumb = payload.breadcrumb || '';
-                const opcoesNavegacao = [
-                    {
-                        label: '🧭 Sim, me guie',
-                        className: 'aura-btn-gps',
-                        action: () => {
-                            if (window.GuidedNavigationController) {
-                                if (!window._auraNavController) {
-                                    window._auraNavController = new window.GuidedNavigationController();
-                                }
-                                window._auraNavController.startNavigation(navPath, navBreadcrumb);
-                                console.log('[AuraAssistEngine] GPS iniciado via confirmação do usuário');
-                            }
-                        }
-                    },
-                    {
-                        label: 'Não, obrigado',
-                        action: () => {
-                            if (global.AuraUI) {
-                                global.AuraUI.exibirBalao('Tudo bem! Se precisar de ajuda, é só perguntar.', [], false);
-                            }
-                        }
-                    }
-                ];
-
-                // Exibe mensagem com botões de confirmação local
-                if (global.AuraUI) {
-                    global.AuraUI.exibirBalao(textoResposta, opcoesNavegacao, true);
-                }
-                
-                // NÃO inicia automaticamente — espera confirmação do usuário
-                // (respeita requires_confirmation do backend)
-                
-            } else if (temGPS) {
+            if (temGPS) {
                 // ── CTA explícito para GPS — NÃO inicia automaticamente ──────
                 // Preserva o Step_Model canônico sem achatamento (sem missionDataAdapter)
                 const roteiro = {
@@ -295,7 +577,8 @@
     // ── Interface pública ─────────────────────────────────────────────────────
 
     /**
-     * Inicializa o módulo: registra listener de mensagens e inicia idle timer.
+     * Inicializa o módulo: registra listener de mensagens, inicia idle timer
+     * e ativa o detector de hesitação em campos de input.
      * Chamado por AuraState.setMode('assist') ou diretamente pelo orquestrador.
      */
     function init() {
@@ -305,11 +588,13 @@
         _messageListener = _handleMessage;
         window.addEventListener('message', _messageListener);
         _iniciarIdleTimer();
+        ativarDetectorHesitacao();
         console.log('[AuraAssistEngine] init()');
     }
 
     /**
-     * Encerra o módulo: remove listener de mensagens e para idle timer.
+     * Encerra o módulo: remove listener de mensagens, para idle timer
+     * e desativa o detector de hesitação.
      * Chamado por AuraState.setMode() ao sair do modo assist.
      */
     function teardown() {
@@ -318,6 +603,7 @@
             _messageListener = null;
         }
         _pararIdleTimer();
+        desativarDetectorHesitacao();
         console.log('[AuraAssistEngine] teardown()');
     }
 
@@ -402,7 +688,9 @@
         init,
         teardown,
         dispararAnalise,
-        resetarProatividade
+        resetarProatividade,
+        ativarDetectorHesitacao,
+        desativarDetectorHesitacao
     };
 
     console.log('[AuraAssistEngine] módulo carregado.');

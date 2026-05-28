@@ -161,7 +161,6 @@ describe('Bug Condition — _injectScript deve funcionar no mundo MAIN (sem chro
         'guided_execution.js',
         'checklist_widget.js',
         'hesitation_detector.js',
-        'nps_modal.js',
     ];
 
     modulos.forEach(function (modulo) {

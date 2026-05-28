@@ -302,28 +302,51 @@ describe('Bug Condition — Ícones SVG com conflito fill/stroke renderizam inco
         );
     });
 
-    // ── Teste de Expected Behavior (DEVE FALHAR no código não corrigido) ─────
-    // Validates: Requirements 2.1, 2.2 (from bugfix.md)
-    //
-    // Este teste codifica o COMPORTAMENTO ESPERADO após o fix:
-    // - SVG elements NÃO devem ter atributo fill
-    // - Computed style deve mostrar fill: none e stroke: currentColor
-    // - Ícones devem usar apenas stroke para renderização
-    //
-    // **EXPECTED OUTCOME**: Este teste FALHA no código não corrigido
-    // (confirma que o comportamento esperado NÃO está presente)
-    //
-    // Após o fix (Task 3), este mesmo teste PASSARÁ
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grupo: Expected Behavior — Ícones SVG devem usar apenas stroke sem atributo fill
+//
+// **Property 2: Expected Behavior** - Ícones corrigidos usam apenas stroke
+//
+// Estes testes verificam o COMPORTAMENTO ESPERADO no código corrigido:
+// - SVG elements NÃO devem ter atributo fill
+// - Computed style deve mostrar fill: none e stroke: currentColor
+// - Ícones devem usar apenas stroke para renderização
+//
+// Usa o código atual do módulo aura_feedback.js (window.AuraFeedback.criar)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Expected Behavior — Ícones SVG devem usar apenas stroke sem atributo fill', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const auraFeedbackCode = fs.readFileSync(
+        path.join(__dirname, '../modules/aura_feedback.js'),
+        'utf-8'
+    );
+
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        injectFeedbackCSS();
+        eval(auraFeedbackCode);
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
+        document.head.innerHTML = '';
+    });
+
+    // ── Teste determinístico: Like icon não deve ter atributo fill ────────────
+    // Validates: Requirements 2.1, 2.2
 
     test('EXPECTED BEHAVIOR: Like icon deve usar apenas stroke sem atributo fill (DEVE FALHAR agora)', () => {
-        const bar = criar_unfixed('test prompt', 'test response');
+        const bar = window.AuraFeedback.criar('test prompt', 'test response');
         document.body.appendChild(bar);
 
         const likeBtn = bar.querySelector('.aura-fb-like');
         const svg = likeBtn.querySelector('svg');
 
         // Expected behavior: NÃO deve ter atributo fill
-        // No código não corrigido, este teste FALHA
         expect(svg.hasAttribute('fill')).toBe(false);
 
         // Expected behavior: computed style deve ser fill: none, stroke: currentColor
@@ -332,15 +355,17 @@ describe('Bug Condition — Ícones SVG com conflito fill/stroke renderizam inco
         expect(computedStyle.stroke).toBe('currentColor');
     });
 
+    // ── Teste determinístico: Dislike icon não deve ter atributo fill ─────────
+    // Validates: Requirements 2.1, 2.2
+
     test('EXPECTED BEHAVIOR: Dislike icon deve usar apenas stroke sem atributo fill (DEVE FALHAR agora)', () => {
-        const bar = criar_unfixed('test prompt', 'test response');
+        const bar = window.AuraFeedback.criar('test prompt', 'test response');
         document.body.appendChild(bar);
 
         const dislikeBtn = bar.querySelector('.aura-fb-dislike');
         const svg = dislikeBtn.querySelector('svg');
 
         // Expected behavior: NÃO deve ter atributo fill
-        // No código não corrigido, este teste FALHA
         expect(svg.hasAttribute('fill')).toBe(false);
 
         // Expected behavior: computed style deve ser fill: none, stroke: currentColor
@@ -349,14 +374,11 @@ describe('Bug Condition — Ícones SVG com conflito fill/stroke renderizam inco
         expect(computedStyle.stroke).toBe('currentColor');
     });
 
-    // ── Property-based test: Expected Behavior (DEVE FALHAR no código não corrigido) ──
+    // ── Property-based test: Expected Behavior para qualquer prompt/resposta ──
     // Validates: Requirements 2.1, 2.2
     //
     // Para qualquer prompt e resposta, os ícones devem usar apenas stroke
     // sem atributo fill.
-    //
-    // **EXPECTED OUTCOME**: Este teste FALHA no código não corrigido
-    // Após o fix, este teste PASSARÁ
 
     test('fc.property: EXPECTED BEHAVIOR - Ícones devem usar apenas stroke para qualquer (prompt, resposta) (DEVE FALHAR agora)', async () => {
         await fc.assert(
@@ -365,7 +387,7 @@ describe('Bug Condition — Ícones SVG com conflito fill/stroke renderizam inco
                 fc.string(),
                 async function (prompt, resposta) {
                     document.body.innerHTML = '';
-                    const bar = criar_unfixed(prompt, resposta);
+                    const bar = window.AuraFeedback.criar(prompt, resposta);
                     document.body.appendChild(bar);
 
                     const likeBtn = bar.querySelector('.aura-fb-like');

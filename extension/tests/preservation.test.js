@@ -99,8 +99,8 @@ async function _inicializarAura(extensionId) {
         window.AuraHesitationDetector.ativar(window._auraApiBase || 'http://localhost:8000');
     }
 
-    if (window.AuraNpsModal) {
-        window.AuraNpsModal.inicializar(window._auraApiBase || 'http://localhost:8000');
+    if (window.AuraFeedback && window.AuraFeedback.inicializarNps) {
+        window.AuraFeedback.inicializarNps(window._auraApiBase || 'http://localhost:8000');
     }
 
     var player = document.getElementById('aura-lottie-player');
@@ -259,8 +259,10 @@ describe('Observação 2 — _inicializarAura: URL do dotlottie-player é chrome
         global.window.AuraHesitationDetector = {
             ativar: jest.fn(),
         };
-        global.window.AuraNpsModal = {
-            inicializar: jest.fn(),
+        global.window.AuraFeedback = {
+            criar: jest.fn(),
+            inicializarNps: jest.fn(),
+            mostrarNps: jest.fn(),
         };
         // Não mockar customElements — deixar o guard `if (window.customElements)` em
         // _inicializarAura pular o await whenDefined, evitando dependência de timers.
@@ -276,7 +278,7 @@ describe('Observação 2 — _inicializarAura: URL do dotlottie-player é chrome
         delete global.window.AuraUI;
         delete global.window.AuraState;
         delete global.window.AuraHesitationDetector;
-        delete global.window.AuraNpsModal;
+        delete global.window.AuraFeedback;
 
         jest.clearAllMocks();
     });

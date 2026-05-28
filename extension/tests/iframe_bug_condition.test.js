@@ -11,6 +11,12 @@
 // Validates: Requirements 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4
 
 const fc = require('fast-check');
+const fs = require('fs');
+const path = require('path');
+const auraDomMapperCode = fs.readFileSync(
+    path.join(__dirname, '../modules/aura_dom_mapper.js'),
+    'utf-8'
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Extração da função AuraDomMapper.capturar() ORIGINAL (não corrigida)
@@ -130,11 +136,13 @@ describe('Bug Condition — Iframe Elements Not Captured (DEVE FALHAR no código
             configurable: true,
             value: 768
         });
+        eval(auraDomMapperCode);
     });
 
     afterEach(() => {
         document.body.innerHTML = '';
         document.head.innerHTML = '';
+        delete window.AuraDomMapper;
     });
 
     // ── Teste 1: Single Iframe com botão ──────────────────────────────────────
@@ -157,7 +165,7 @@ describe('Bug Condition — Iframe Elements Not Captured (DEVE FALHAR no código
         expect(isBugCondition()).toBe(true);
 
         // Act: Executa captura no código não corrigido
-        const resultado = capturar_original();
+        const resultado = window.AuraDomMapper.capturar();
 
         // Assert: NO CÓDIGO NÃO CORRIGIDO, este teste FALHA
         // porque o botão do iframe NÃO está presente na saída
@@ -186,7 +194,7 @@ describe('Bug Condition — Iframe Elements Not Captured (DEVE FALHAR no código
         expect(isBugCondition()).toBe(true);
 
         // Act
-        const resultado = capturar_original();
+        const resultado = window.AuraDomMapper.capturar();
 
         // Assert: NO CÓDIGO NÃO CORRIGIDO, estes testes FALHAM
         expect(resultado).toContain('Novo Documento');
@@ -213,7 +221,7 @@ describe('Bug Condition — Iframe Elements Not Captured (DEVE FALHAR no código
         expect(isBugCondition()).toBe(true);
 
         // Act
-        const resultado = capturar_original();
+        const resultado = window.AuraDomMapper.capturar();
 
         // Assert: NO CÓDIGO NÃO CORRIGIDO, este teste FALHA
         // "Botão Principal" está presente, mas "Botão Iframe" NÃO está
@@ -241,7 +249,7 @@ describe('Bug Condition — Iframe Elements Not Captured (DEVE FALHAR no código
         expect(isBugCondition()).toBe(true);
 
         // Act
-        capturar_original();
+        window.AuraDomMapper.capturar();
 
         // Assert: NO CÓDIGO NÃO CORRIGIDO, este teste FALHA
         // O botão do iframe NÃO tem data-aura-map
@@ -262,7 +270,10 @@ describe('Bug Condition — Iframe Elements Not Captured (DEVE FALHAR no código
         fc.assert(
             fc.property(
                 fc.integer({ min: 1, max: 5 }), // Número de botões no iframe
-                fc.array(fc.string({ minLength: 3, maxLength: 20 }), { minLength: 1, maxLength: 5 }), // Textos dos botões
+                fc.array(
+                    fc.string({ minLength: 3, maxLength: 20 }).filter(s => s.trim().length > 1),
+                    { minLength: 1, maxLength: 5 }
+                ), // Textos dos botões com conteúdo visível
                 (numButtons, buttonTexts) => {
                     // Arrange: Cria iframe com N botões
                     const buttons = buttonTexts.slice(0, numButtons).map(text => 
@@ -273,12 +284,12 @@ describe('Bug Condition — Iframe Elements Not Captured (DEVE FALHAR no código
                     expect(isBugCondition()).toBe(true);
 
                     // Act
-                    const resultado = capturar_original();
+                    const resultado = window.AuraDomMapper.capturar();
 
                     // Assert: NO CÓDIGO NÃO CORRIGIDO, este teste FALHA
                     // Pelo menos um dos textos dos botões deve aparecer na saída
                     const algumTextoEncontrado = buttonTexts.slice(0, numButtons).some(text => 
-                        resultado.includes(text)
+                        resultado.includes(text.trim().substring(0, 40))
                     );
                     expect(algumTextoEncontrado).toBe(true);
                 }
@@ -321,7 +332,7 @@ describe('Bug Condition — Iframe Elements Not Captured (DEVE FALHAR no código
         expect(isBugCondition()).toBe(true);
 
         // Act
-        const resultado = capturar_original();
+        const resultado = window.AuraDomMapper.capturar();
 
         // Assert: NO CÓDIGO NÃO CORRIGIDO, estes testes FALHAM
         // Elementos do header/sidebar aparecem, mas elementos do GED NÃO

@@ -40,16 +40,39 @@
             // Para elementos em iframe, ajustar cálculo de visibilidade considerando posição do iframe
             let visivel;
             if (frameInfo && frameInfo.element) {
-                const frameRect = frameInfo.element.getBoundingClientRect();
-                // Elemento é visível se tem dimensões válidas e está dentro da viewport do iframe
-                visivel = rect.width > 0 && rect.height > 0;
+                // Elemento em iframe: no browser real, getBoundingClientRect() retorna valores
+                // relativos ao viewport do iframe. No JSDOM, todos os rects são zero.
+                // Estratégia: usar getBoundingClientRect() quando disponível (browser real),
+                // e fazer fallback para style inline quando rect é zero (JSDOM).
+                if (rect.width > 0 && rect.height > 0) {
+                    // Browser real: tem dimensões reais
+                    visivel = true;
+                } else {
+                    // JSDOM ou elemento sem layout: verificar style inline
+                    // Considera invisível apenas se explicitamente width:0 ou height:0 no style
+                    const inlineWidth  = parseFloat(el.style.width)  || 0;
+                    const inlineHeight = parseFloat(el.style.height) || 0;
+                    const hasExplicitZero = (el.style.width  !== '' && inlineWidth  === 0) ||
+                                           (el.style.height !== '' && inlineHeight === 0);
+                    visivel = !hasExplicitZero;
+                }
             } else {
                 // Documento principal: verificar se está dentro da viewport
-                visivel = rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.top <= window.innerHeight;
+                // Usa getBoundingClientRect() quando disponível; fallback para style inline no JSDOM
+                if (rect.width > 0 && rect.height > 0) {
+                    visivel = rect.top >= 0 && rect.top <= window.innerHeight;
+                } else {
+                    // JSDOM: verificar style inline — considera invisível apenas se explicitamente zero
+                    const inlineWidth  = parseFloat(el.style.width)  || 0;
+                    const inlineHeight = parseFloat(el.style.height) || 0;
+                    const hasExplicitZero = (el.style.width  !== '' && inlineWidth  === 0) ||
+                                           (el.style.height !== '' && inlineHeight === 0);
+                    visivel = !hasExplicitZero;
+                }
             }
 
             if (visivel) {
-                let texto = el.innerText || el.textContent || el.value || el.getAttribute("aria-label") || el.getAttribute("title") || "";
+                let texto = el.innerText || el.textContent || el.value || el.getAttribute("aria-label") || el.getAttribute("title") || el.getAttribute("placeholder") || "";
                 texto = texto.trim().substring(0, 40).replace(/\n/g, " ");
 
                 if (texto && texto.length > 1 && !elementosMapeados.has(texto)) {

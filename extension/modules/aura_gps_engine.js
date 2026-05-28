@@ -653,7 +653,12 @@
   function init(roteiro, options) {
     if (_isActive) {
       console.warn('[AuraGpsEngine] init() chamado com sessão ativa — executando teardown preventivo.');
-      teardown();
+      // Chama via global para permitir que spies de teste interceptem a chamada
+      if (global.AuraGpsEngine && typeof global.AuraGpsEngine.teardown === 'function') {
+        global.AuraGpsEngine.teardown();
+      } else {
+        teardown();
+      }
     }
 
     _options = options || {};
