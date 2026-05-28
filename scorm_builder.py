@@ -8,6 +8,98 @@ from pathlib import Path
 from utils import limpar_nome
 
 
+def _selecionar_imagem_ancora(passos: list, idx: int) -> str | None:
+    """
+    Retorna a imagem de âncora para o passo de índice `idx`.
+
+    Prioridade:
+      1. screenshot_depois da última ação do passo anterior com valor não-vazio
+      2. screenshot_referencia da última ação do passo anterior com valor não-vazio
+      3. None (sem exceção)
+
+    Para idx == 0, retorna None diretamente.
+    """
+    if idx == 0:
+        return None
+    acoes = passos[idx - 1].get("acoes_tecnicas", [])
+    for acao in reversed(acoes):
+        val = acao.get("elemento_alvo", {}).get("screenshot_depois")
+        if val and isinstance(val, str):
+            return val
+    for acao in reversed(acoes):
+        val = acao.get("elemento_alvo", {}).get("screenshot_referencia")
+        if val and isinstance(val, str):
+            return val
+    return None
+
+
+def _ler_viewport(acao: dict) -> tuple[int, int]:
+    """
+    Lê _vp_w/_vp_h com fallback em dois níveis:
+      1. Nível da ação técnica (irmão de elemento_alvo) — fonte primária
+      2. Dentro de elemento_alvo — fallback para roteiros legados
+      3. 1920 × 1080 — padrão final
+    """
+    vp_w = acao.get("_vp_w") or 0
+    vp_h = acao.get("_vp_h") or 0
+    if not (vp_w > 0 and vp_h > 0):
+        alvo = acao.get("elemento_alvo", {}) or {}
+        vp_w = alvo.get("_vp_w") or 0
+        vp_h = alvo.get("_vp_h") or 0
+    if not (vp_w > 0 and vp_h > 0):
+        vp_w, vp_h = 1920, 1080
+    return int(vp_w), int(vp_h)
+
+
+def _som_box_valido(som_box) -> bool:
+    if not isinstance(som_box, dict):
+        return False
+    try:
+        return (
+            float(som_box["x"]) >= 0
+            and float(som_box["y"]) >= 0
+            and float(som_box["w"]) > 0
+            and float(som_box["h"]) > 0
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _calcular_coords_som(
+    som_box: dict, vp_w: int, vp_h: int
+) -> tuple[float, float, float, float]:
+    """
+    Converte som_box_clicada (coordenadas absolutas) em percentuais [0.0, 1.0].
+    Aplica clamping se os valores excederem os limites do viewport.
+    """
+    x_pct = min(max((som_box["x"] + som_box["w"] / 2) / vp_w, 0.0), 1.0)
+    y_pct = min(max((som_box["y"] + som_box["h"] / 2) / vp_h, 0.0), 1.0)
+    w_pct = min(max(som_box["w"] / vp_w, 0.0), 1.0)
+    h_pct = min(max(som_box["h"] / vp_h, 0.0), 1.0)
+    return x_pct, y_pct, w_pct, h_pct
+
+
+def _resolver_coords(acao: dict) -> tuple[float, float, float, float]:
+    """
+    Resolve x_pct, y_pct, w_pct, h_pct para uma ação técnica.
+    Prioridade: SoM → coordenadas_relativas → padrão 0.5/0.05
+    """
+    alvo = acao.get("elemento_alvo", {}) or {}
+    som_box = alvo.get("som_box_clicada")
+    vp_w, vp_h = _ler_viewport(acao)
+
+    if _som_box_valido(som_box) and vp_w > 0 and vp_h > 0:
+        return _calcular_coords_som(som_box, vp_w, vp_h)
+
+    coords = alvo.get("coordenadas_relativas") or {}
+    return (
+        coords.get("x_pct", 0.5),
+        coords.get("y_pct", 0.5),
+        coords.get("w_pct", 0.05),
+        coords.get("h_pct", 0.05),
+    )
+
+
 def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
     """
     Lê o JSON do treinamento e empacota um arquivo .zip SCORM 1.2
@@ -78,16 +170,7 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
             peso = passo.get("peso_narrativo", 2)
             tipo_passo = passo.get("tipo_passo", "navigation")
 
-            # Âncora usa screenshot do passo ANTERIOR (estado da tela antes de começar)
-            # para não adiantar visualmente o que o usuário ainda vai fazer.
-            img_ancora = None
-            if idx > 0:
-                passo_anterior = passos[idx - 1]
-                for acao in passo_anterior.get("acoes_tecnicas", []):
-                    ref = acao.get("elemento_alvo", {}).get("screenshot_referencia")
-                    if ref:
-                        img_ancora = ref
-                        break
+            img_ancora = _selecionar_imagem_ancora(passos, idx)
 
             if ancora:
                 slides.append({
@@ -108,24 +191,7 @@ def criar_pacote_scorm(caminho_json, pasta_destino="scorm_exports"):
                     continue
 
                 alvo = acao.get("elemento_alvo", {}) or {}
-                coords = alvo.get("coordenadas_relativas", {}) or {}
-
-                # Nova precisão geométrica com SoM
-                som_box = alvo.get("som_box_clicada")
-                vp_w = alvo.get("_vp_w", 1920)
-                vp_h = alvo.get("_vp_h", 1080)
-                
-                if som_box and vp_w > 0 and vp_h > 0:
-                    # SoM guarda coordenadas absolutas, convertemos para percentuais exatos
-                    x_pct = (som_box["x"] + som_box["w"] / 2) / vp_w
-                    y_pct = (som_box["y"] + som_box["h"] / 2) / vp_h
-                    w_pct = som_box["w"] / vp_w
-                    h_pct = som_box["h"] / vp_h
-                else:
-                    x_pct = coords.get("x_pct", 0.5)
-                    y_pct = coords.get("y_pct", 0.5)
-                    w_pct = coords.get("w_pct", 0.05)
-                    h_pct = coords.get("h_pct", 0.05)
+                x_pct, y_pct, w_pct, h_pct = _resolver_coords(acao)
 
                 slides.append({
                     "tipo": "interacao",

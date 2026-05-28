@@ -424,3 +424,61 @@ class TestPropriedades:
             with zipfile.ZipFile(zip_path) as zf:
                 manifest = zf.read("imsmanifest.xml").decode("utf-8")
             assert nome_aula in manifest
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TESTES DE PROPRIEDADE — scorm-simlink-refinement
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Estratégias auxiliares para scorm-simlink-refinement
+@st.composite
+def st_acao_com_viewport_apenas_no_nivel_acao(draw):
+    """Ação técnica com _vp_w/_vp_h apenas no nível da ação (não dentro de elemento_alvo)."""
+    vp_w = draw(st.integers(min_value=1, max_value=2560))
+    vp_h = draw(st.integers(min_value=1, max_value=1440))
+    return {
+        "_vp_w": vp_w,
+        "_vp_h": vp_h,
+        "acao": "clique",
+        "elemento_alvo": {
+            # _vp_w/_vp_h ausentes dentro de elemento_alvo
+            "coordenadas_relativas": {"x_pct": 0.5, "y_pct": 0.5, "w_pct": 0.05, "h_pct": 0.05},
+        },
+    }
+
+
+class TestScormSimlinkRefinement:
+
+    # Feature: scorm-simlink-refinement, Property 2: viewport reading at action level
+    @given(acao=st_acao_com_viewport_apenas_no_nivel_acao())
+    @settings(max_examples=20)
+    def test_property_p2_viewport_lido_do_nivel_correto(self, acao):
+        """_ler_viewport deve retornar os valores do nível da ação, não 1920×1080.
+
+        **Validates: Requirements 2.1, 2.2**
+        """
+        from scorm_builder import _ler_viewport
+        vp_w, vp_h = _ler_viewport(acao)
+        assert vp_w == acao["_vp_w"]
+        assert vp_h == acao["_vp_h"]
+
+    # Feature: scorm-simlink-refinement, Property 3: coordinate clamping invariant
+    @given(
+        som_box=st.fixed_dictionaries({
+            "x": st.floats(min_value=-100, max_value=3000, allow_nan=False, allow_infinity=False),
+            "y": st.floats(min_value=-100, max_value=2000, allow_nan=False, allow_infinity=False),
+            "w": st.floats(min_value=0.1, max_value=2000, allow_nan=False, allow_infinity=False),
+            "h": st.floats(min_value=0.1, max_value=2000, allow_nan=False, allow_infinity=False),
+        }),
+        vp_w=st.integers(min_value=1, max_value=3840),
+        vp_h=st.integers(min_value=1, max_value=2160),
+    )
+    @settings(max_examples=20)
+    def test_property_p3_coords_sempre_em_range(self, som_box, vp_w, vp_h):
+        """_calcular_coords_som deve sempre retornar valores em [0.0, 1.0]."""
+        from scorm_builder import _calcular_coords_som
+        x, y, w, h = _calcular_coords_som(som_box, vp_w, vp_h)
+        assert 0.0 <= x <= 1.0, f"x_pct={x} fora do intervalo"
+        assert 0.0 <= y <= 1.0, f"y_pct={y} fora do intervalo"
+        assert 0.0 <= w <= 1.0, f"w_pct={w} fora do intervalo"
+        assert 0.0 <= h <= 1.0, f"h_pct={h} fora do intervalo"

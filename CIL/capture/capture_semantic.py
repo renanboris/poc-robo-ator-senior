@@ -740,12 +740,15 @@ async def processar_click_semantico(item: dict):
     descricao_depois = {}
     if page:
         try:
-            await asyncio.sleep(1.2)  # aguarda animação/navegação
+            await page.wait_for_load_state("networkidle", timeout=3000)
+        except Exception:
+            pass  # timeout ou página inacessível — captura no estado atual
+        try:
             screenshot_depois = await page.screenshot(type="jpeg", quality=60, full_page=False)
             b64_img_depois = base64.b64encode(screenshot_depois).decode("utf-8")
             descricao_depois = await _descrever_tela(b64_img_depois, "após o clique")
         except Exception:
-            pass
+            b64_img_depois = ""
 
     pattern      = normalizar_pattern(analise.get("pattern_detectado"))
     acao_raw     = payload.get("acao", "clique")

@@ -23,6 +23,100 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from utils import limpar_nome
 
 
+# ── Funções auxiliares (código idêntico ao scorm_builder.py) ─────────────────
+
+def _selecionar_imagem_ancora(passos: list, idx: int) -> str | None:
+    """
+    Retorna a imagem de âncora para o passo de índice `idx`.
+
+    Prioridade:
+      1. screenshot_depois da última ação do passo anterior com valor não-vazio
+      2. screenshot_referencia da última ação do passo anterior com valor não-vazio
+      3. None (sem exceção)
+
+    Para idx == 0, retorna None diretamente.
+    """
+    if idx == 0:
+        return None
+    acoes = passos[idx - 1].get("acoes_tecnicas", [])
+    for acao in reversed(acoes):
+        val = acao.get("elemento_alvo", {}).get("screenshot_depois")
+        if val and isinstance(val, str):
+            return val
+    for acao in reversed(acoes):
+        val = acao.get("elemento_alvo", {}).get("screenshot_referencia")
+        if val and isinstance(val, str):
+            return val
+    return None
+
+
+def _ler_viewport(acao: dict) -> tuple[int, int]:
+    """
+    Lê _vp_w/_vp_h com fallback em dois níveis:
+      1. Nível da ação técnica (irmão de elemento_alvo) — fonte primária
+      2. Dentro de elemento_alvo — fallback para roteiros legados
+      3. 1920 × 1080 — padrão final
+    """
+    vp_w = acao.get("_vp_w") or 0
+    vp_h = acao.get("_vp_h") or 0
+    if not (vp_w > 0 and vp_h > 0):
+        alvo = acao.get("elemento_alvo", {}) or {}
+        vp_w = alvo.get("_vp_w") or 0
+        vp_h = alvo.get("_vp_h") or 0
+    if not (vp_w > 0 and vp_h > 0):
+        vp_w, vp_h = 1920, 1080
+    return int(vp_w), int(vp_h)
+
+
+def _som_box_valido(som_box) -> bool:
+    if not isinstance(som_box, dict):
+        return False
+    try:
+        return (
+            float(som_box["x"]) >= 0
+            and float(som_box["y"]) >= 0
+            and float(som_box["w"]) > 0
+            and float(som_box["h"]) > 0
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _calcular_coords_som(
+    som_box: dict, vp_w: int, vp_h: int
+) -> tuple[float, float, float, float]:
+    """
+    Converte som_box_clicada (coordenadas absolutas) em percentuais [0.0, 1.0].
+    Aplica clamping se os valores excederem os limites do viewport.
+    """
+    x_pct = min(max((som_box["x"] + som_box["w"] / 2) / vp_w, 0.0), 1.0)
+    y_pct = min(max((som_box["y"] + som_box["h"] / 2) / vp_h, 0.0), 1.0)
+    w_pct = min(max(som_box["w"] / vp_w, 0.0), 1.0)
+    h_pct = min(max(som_box["h"] / vp_h, 0.0), 1.0)
+    return x_pct, y_pct, w_pct, h_pct
+
+
+def _resolver_coords(acao: dict) -> tuple[float, float, float, float]:
+    """
+    Resolve x_pct, y_pct, w_pct, h_pct para uma ação técnica.
+    Prioridade: SoM → coordenadas_relativas → padrão 0.5/0.05
+    """
+    alvo = acao.get("elemento_alvo", {}) or {}
+    som_box = alvo.get("som_box_clicada")
+    vp_w, vp_h = _ler_viewport(acao)
+
+    if _som_box_valido(som_box) and vp_w > 0 and vp_h > 0:
+        return _calcular_coords_som(som_box, vp_w, vp_h)
+
+    coords = alvo.get("coordenadas_relativas") or {}
+    return (
+        coords.get("x_pct", 0.5),
+        coords.get("y_pct", 0.5),
+        coords.get("w_pct", 0.05),
+        coords.get("h_pct", 0.05),
+    )
+
+
 def criar_sim_link(caminho_json: str, pasta_destino: str = "sim_links") -> str:
     """
     Lê o roteiro JSON e gera um arquivo HTML standalone (SimLink).
@@ -41,18 +135,13 @@ def criar_sim_link(caminho_json: str, pasta_destino: str = "sim_links") -> str:
     # ── Monta os slides (mesma lógica do scorm_builder) ──────────────────────
     slides = []
     pasta_audio = Path("audios_gerados") / nome_base
+    passos = roteiro.get("passos", [])
 
-    for idx, passo in enumerate(roteiro.get("passos", [])):
+    for idx, passo in enumerate(passos):
         id_p = passo.get("id_passo", idx + 1)
         ancora = passo.get("pedagogia", {}).get("ancora", "")
 
-        # Primeira imagem disponível no passo (evita tela preta na âncora)
-        img_ancora = None
-        for acao in passo.get("acoes_tecnicas", []):
-            ref = acao.get("elemento_alvo", {}).get("screenshot_referencia")
-            if ref:
-                img_ancora = ref
-                break
+        img_ancora = _selecionar_imagem_ancora(passos, idx)
 
         if ancora:
             audio_ancora = _audio_b64(pasta_audio, id_p, "ancora")
@@ -67,8 +156,8 @@ def criar_sim_link(caminho_json: str, pasta_destino: str = "sim_links") -> str:
             if acao.get("acao") == "concluir_video":
                 continue
 
-            alvo = acao.get("elemento_alvo", {})
-            coords = alvo.get("coordenadas_relativas", {})
+            alvo = acao.get("elemento_alvo", {}) or {}
+            x_pct, y_pct, w_pct, h_pct = _resolver_coords(acao)
             audio_micro = _audio_b64(pasta_audio, id_p, f"micro_{i}")
 
             slides.append({
@@ -77,11 +166,11 @@ def criar_sim_link(caminho_json: str, pasta_destino: str = "sim_links") -> str:
                 "valor_input": acao.get("valor_input", ""),
                 "texto": acao.get("micro_narracao", f"Interaja com {alvo.get('label_curto', 'o elemento')}"),
                 "audio_b64": audio_micro,
-                "imagem_b64": alvo.get("screenshot_referencia", ""),
-                "x_pct": coords.get("x_pct", 0.5),
-                "y_pct": coords.get("y_pct", 0.5),
-                "w_pct": coords.get("w_pct", 0.05),
-                "h_pct": coords.get("h_pct", 0.05),
+                "imagem_b64": alvo.get("screenshot_referencia", "") or "",
+                "x_pct": x_pct,
+                "y_pct": y_pct,
+                "w_pct": w_pct,
+                "h_pct": h_pct,
             })
 
     slides_json = json.dumps(slides, ensure_ascii=False)
